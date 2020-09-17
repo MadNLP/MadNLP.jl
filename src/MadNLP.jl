@@ -8,7 +8,11 @@ using LinearAlgebra, SparseArrays, Libdl, Printf,
 
 import Base: string, show, print, size, getindex
 
-export NonlinearProgram,InteriorPointSolver,plasmonlp
+export NonlinearProgram,InteriorPointSolver,madnlp
+
+# Version info
+version() = v"0.1.0"
+introduce() = "MadNLP version $(version())"
 
 # Linear solver dependencies
 include("../deps/deps.jl")

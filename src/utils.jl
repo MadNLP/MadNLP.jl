@@ -1,10 +1,6 @@
 # MadNLP.jl.
 # Created by Sungho Shin (sungho.shin@wisc.edu)
 
-# Version info
-version() = v"0.0.1"
-introduce() = "MadNLP version $(version())"
-
 # Build info
 function available_linear_solvers()
     solvers = ["umfpack"]
