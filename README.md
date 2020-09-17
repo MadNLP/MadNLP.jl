@@ -10,7 +10,7 @@ pkg> add git@github.com:sshin23/MadNLP.git
 ## Build
 **Automatic build is currently only supported for Linux and MacOS.** 
 
-MadNLP is interfaced with non-julia sparse/dense linear solvers:
+MadNLP is interfaced with non-Julia sparse/dense linear solvers:
 - [Umfpack](https://people.engr.tamu.edu/davis/suitesparse.html)
 - [Mumps](http://mumps.enseeiht.fr/) 
 - [MKL-Pardiso](https://software.intel.com/content/www/us/en/develop/documentation/mkl-developer-reference-fortran/top/sparse-solver-routines/intel-mkl-pardiso-parallel-direct-sparse-solver-interface.html) 
@@ -19,7 +19,7 @@ MadNLP is interfaced with non-julia sparse/dense linear solvers:
 - [MKL-Lapack](https://software.intel.com/content/www/us/en/develop/documentation/mkl-developer-reference-fortran/top/lapack-routines.html)
 - [cuSOLVER](https://docs.nvidia.com/cuda/cusolver/index.html) (optional)
 
-All the dependencies except for HSL solvers and Pardiso are automatically obtained. To build MadNLP with HSL linear solvers (Ma27, Ma57, Ma77, Ma86, Ma97), the source codes need to be obtained by the user from <http://www.hsl.rl.ac.uk/ipopt/> under Coin-HSL Full (Stable). Then, the tarball `coinhsl-2015.06.23.tar.gz` should be placed at `deps/download`. To use Pardiso, the user needs to obtain the Paridso shared libraries from <https://www.pardiso-project.org/>, place the shared library file (e.g., `libpardiso600-GNU720-X86-64.so`) at `deps/download`, and place the license file in the home directory. To use cuSOLVER,  After obtaining the files, run
+All the dependencies except for HSL solvers and Pardiso are automatically installed. To build MadNLP with HSL linear solvers (Ma27, Ma57, Ma77, Ma86, Ma97), the source codes need to be obtained by the user from <http://www.hsl.rl.ac.uk/ipopt/> under Coin-HSL Full (Stable). Then, the tarball `coinhsl-2015.06.23.tar.gz` should be placed at `deps/download`. To use Pardiso, the user needs to obtain the Paridso shared libraries from <https://www.pardiso-project.org/>, place the shared library file (e.g., `libpardiso600-GNU720-X86-64.so`) at `deps/download`, and place the license file in the home directory. To use cuSOLVER, functional NVIDIA driver and corresponding CUDA toolkit need to be installed by the user. After obtaining the files, run
 ```julia
 pkg> build MadNLP
 ```
@@ -77,9 +77,8 @@ model = CUTEstModel("PRIMALC1")
 plamonlp(model,linear_solver="pardisomkl",log_level="warn",max_wall_time=3600)
 ```
 
-## MadNLP Options
-To see the list of MadNLP options, check the [Options.md](https://github.com/sshin23/MadNLP/blob/master/OPTIONS.md) file.
+## Solver options
+To see the list of MadNLP solver options, check the [Options.md](https://github.com/sshin23/MadNLP/blob/master/OPTIONS.md) file.
 
 ## Bug reports and support
 Please report issues and feature requests via the [Github issue tracker](https://github.com/sshin23/MadNLP/issues).
-
