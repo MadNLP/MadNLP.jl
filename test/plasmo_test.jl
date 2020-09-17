@@ -2,7 +2,7 @@ using Plasmo
 
 atol = rtol = 1e-8
 n_nodes=2
-M = 10
+M = 100
 d = sin.((0:M*n_nodes).*pi/100)
 sol = [0.0,0.012006369082345895,0.03601910729568777,0.06464019379378924,0.09511095463076837,
        0.12658435685718497,0.15930888245402086,0.19490782553916158,0.23803327964088575,0.30104877201645763,
@@ -22,18 +22,15 @@ nodecnt = 1
 for (i,node) in enumerate(nodes)
     local x
     global nodecnt
-    @variable(node, x[1:M+1])
+    @variable(node, x[1:M])
     @variable(node, -1<=u[1:M]<=1)
-    @constraint(node, dynamics[i in 1:M], x[i+1] == x[i] + u[i] + d[i])
-    @objective(node, Min, sum(x[i]^2 - 2*x[i]*d[i+(nodecnt-1)*M] for i in 1:M) + sum(u[i]^2 for i in 1:M))
+    @constraint(node, dynamics[i in 1:M-1], x[i+1] == x[i] + u[i])
+    @objective(node, Min, sum(x[i]^2 - 2*x[i]*d[i+(nodecnt-1)*M] for i in 1:M) +
+               sum(u[i]^2 for i in 1:M))
     nodecnt += 1
 end
-
-#Link constraints
-for i = 1:n_nodes - 1
-    ni = getnode(graph,i)
-    nj = getnode(graph,i+1)
-    @linkconstraint(graph, ni[:x][end] == nj[:x][1])  #last state in partition i is first state in partition j
+for i=1:n_nodes-1
+    @linkconstraint(graph, nodes[i+1][:x][1] == nodes[i][:x][M] + nodes[i][:u][M],attach=nodes[i+1])
 end
 
 #First node gets initial condition

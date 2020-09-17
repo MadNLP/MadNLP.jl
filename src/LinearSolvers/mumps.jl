@@ -121,6 +121,7 @@ mutable struct Solver <: AbstractLinearSolver
     sym_perm::Vector{Int32}
     pivnul_list::Vector{Int32}
     mumps_struc::Struc
+    is_singular::Bool
     opt::Options
 end
 dmumps_c(mumps_struc::Struc)=ccall(
@@ -174,22 +175,41 @@ function Solver(csc::SparseMatrixCSC{Float64,Int32};
     
     mumps_struc.cntl = setindex(mumps_struc.cntl,opt.mumps_pivtol,1)
 
-    csc.nzval.+=1; # mumps ignores structural zero
+    a = copy(csc.nzval) # would there be a better way?
+    csc.nzval.=1
+    
     dmumps_c(mumps_struc);    
     mumps_struc.info[1] < 0 && throw(SymbolicException())
-    csc.nzval.-=1; # set it back
+
+    csc.nzval.=a
     
-    return Solver(csc,I,J,sym_perm,pivnul_list,mumps_struc,opt)
+    return Solver(csc,I,J,sym_perm,pivnul_list,mumps_struc,false,opt)
 end
 
 function factorize!(M::Solver)
+    M.is_singular = false
     M.mumps_struc.job = 2;
-    dmumps_c(M.mumps_struc)
-    M.mumps_struc.info[1] < 0 && throw(FactorizationException())
+    cnt = 0
+    while true
+        dmumps_c(M.mumps_struc)
+        if M.mumps_struc.info[1] in [-8,-9]
+            cnt >= 10 && throw(FactorizationException())
+            M.mumps_struc.icntl = setindex(M.mumps_struc.icntl,M.mumps_struc.icntl[14]*2.,14)
+            cnt += 1
+        elseif M.mumps_struc.info[1] == -10
+            M.is_singular = true
+            break
+        elseif M.mumps_struc.info[1] < 0
+            throw(FactorizationException())
+        else
+            break
+        end
+    end
     return M
 end
 
 function solve!(M::Solver,rhs::StrideOneVector{Float64})
+    M.is_singular && return rhs
     M.mumps_struc.rhs = pointer(rhs)
     M.mumps_struc.job = 3
     dmumps_c(M.mumps_struc)
@@ -199,8 +219,8 @@ end
 
 is_inertia(::Solver) = true
 function inertia(M::Solver)
-    return (M.csc.n-(M.mumps_struc.info[1]==-6)-M.mumps_struc.infog[12],
-            M.mumps_struc.info[1]==-6,
+    return (M.csc.n-M.is_singular-M.mumps_struc.infog[12],
+            M.is_singular,
             M.mumps_struc.infog[12])
 end
 
@@ -210,7 +230,7 @@ function improve!(M::Solver)
         debug(LOGGER,"improve quality failed.")
         return false
     end
-    M.mumps_struc.cntl = setindex(M.mumps_struc.cntl,min(M.opt.mumps_pivtolmax,M.mumps_struc.cntl[1]^.75),1)
+    M.mumps_struc.cntl = setindex(M.mumps_struc.cntl,min(M.opt.mumps_pivtolmax,M.mumps_struc.cntl[1]^.5),1)
     debug(LOGGER,"improved quality: pivtol = $(M.mumps_struc.cntl[1])")
     return true
 end
