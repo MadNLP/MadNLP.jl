@@ -250,6 +250,9 @@ Linear solver options are specific to the linear solver chosen at `linear_solver
 
 ### Reference
 [Bunch, 1977]: J R Bunch and L Kaufman, Some stable methods for calculating inertia and solving symmetric linear systems, Mathematics of Computation 31:137 (1977), 163-179.
+
 [Greif, 2014]: Greif, Chen, Erin Moulding, and Dominique Orban. "Bounds on eigenvalues of matrices arising from interior-point methods." SIAM Journal on Optimization 24.1 (2014): 49-83.
+
 [Wächter, 2006]: Wächter, Andreas, and Lorenz T. Biegler. "On the implementation of an interior-point filter line-search algorithm for large-scale nonlinear programming." Mathematical programming 106.1 (2006): 25-57.
+
 [Chiang, 2016]: Chiang, Nai-Yuan, and Victor M. Zavala. "An inertia-free filter line-search algorithm for large-scale nonlinear programming." Computational Optimization and Applications 64.2 (2016): 327-354.
