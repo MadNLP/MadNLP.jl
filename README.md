@@ -1,6 +1,6 @@
 MadNLP
 ========
-MadNLP is a [noninear programming](https://en.wikipedia.org/wiki/Nonlinear_programming) (NLP) solver, purely implemented in [Julia](https://julialang.org/).
+MadNLP is a [nonlinear programming](https://en.wikipedia.org/wiki/Nonlinear_programming) (NLP) solver, purely implemented in [Julia](https://julialang.org/). The solver implements a filter line-search algorithm, as that used in [Ipopt](https://github.com/coin-or/Ipopt). MadNLP seeks to streamline the development of modeling and algorithmic paradigms in order to exploit structures and to make efficient use of high-performance computers. 
 
 ## Installation
 ```julia
