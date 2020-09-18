@@ -9,14 +9,14 @@ codecov: true
 sudo: required
 before_install:
   - sudo apt-get install gfortran
-#jobs:
-  #allow_failures:
-  #  - julia: nightly
-  # include:
-  #   - stage: "MINLPTests"
-  #     julia: 1.0
-  #     os: linux
-  #     script:
-  #       - julia --project=test/MINLPTests -e 'using Pkg; Pkg.instantiate(); Pkg.add(PackageSpec(path=pwd()))'
-  #       - julia --project=test/MINLPTests --color=yes test/MINLPTests/run_minlptests.jl
+jobs:
+  allow_failures:
+   - julia: nightly
+  include:
+    - stage: "MINLPTests"
+      julia: 1.0
+      os: linux
+      script:
+        - julia --project=test/MINLPTests -e 'using Pkg; Pkg.instantiate(); Pkg.add(PackageSpec(path=pwd()))'
+        - julia --project=test/MINLPTests --color=yes test/MINLPTests/run_minlptests.jl
 
