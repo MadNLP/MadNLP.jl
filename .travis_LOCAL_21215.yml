@@ -19,4 +19,3 @@ before_install:
   #     script:
   #       - julia --project=test/MINLPTests -e 'using Pkg; Pkg.instantiate(); Pkg.add(PackageSpec(path=pwd()))'
   #       - julia --project=test/MINLPTests --color=yes test/MINLPTests/run_minlptests.jl
-
