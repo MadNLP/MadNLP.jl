@@ -7,8 +7,9 @@ julia:
   #- nightly
 codecov: true
 sudo: required
-before_install:
-  - sudo apt-get install gfortran
+addons:
+  apt_packages:
+    - gfortran
 jobs:
   allow_failures:
    - julia: nightly
