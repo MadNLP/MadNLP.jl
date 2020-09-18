@@ -26,8 +26,14 @@ SolverTools = "b5612192-2639-5dc1-abfe-fbedd65fab29"
 SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 SuiteSparse = "4607b0f0-06f3-5cda-b6b1-a6196a1729e9"
-Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [compat]
 METIS_jll = "4.0.3"
 MUMPS_seq_jll = "4.10.0"
+
+[extras]
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+CUTEst = "1b53aba6-35b6-5f92-a507-53c67d53f819"
+
+[targets]
+test = ["Test", "CUTEst"]
