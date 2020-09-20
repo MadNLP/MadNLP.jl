@@ -40,7 +40,7 @@ get_full_size(mlp::MonolevelPartition) = nv(mlp.g)
 
 function MonolevelPartition(csc::SparseMatrixCSC,part,nparts;max_size=0.)
     g   = Graph(csc)
-    isempty(part) && (part=Metis.partition(g,nparts,alg=:KWAY))
+    isempty(part) && (part=partition(g,nparts,alg=:KWAY))
     return MonolevelPartition(g,nparts,part)
 end
 
@@ -61,7 +61,7 @@ get_full_size(blp::BilevelPartition) = blp.nparts_lower
 
 function BilevelPartition(csc,part_lower,nparts_lower,part_upper,nparts_upper;max_size=0.)
     g_lower   = Graph(csc)
-    isempty(part_lower) && (part_lower= Metis.partition(g_lower,nparts_lower,alg=:KWAY))
+    isempty(part_lower) && (part_lower= partition(g_lower,nparts_lower,alg=:KWAY))
     V_lower = Vector{Vector{Int}}(undef,nparts_lower)
     @blas_safe_threads for k=1:nparts_lower
         V_lower[k] = findall(part_lower.==k)
@@ -71,7 +71,7 @@ function BilevelPartition(csc,part_lower,nparts_lower,part_upper,nparts_upper;ma
     for e in edges(g_lower)
         add_edge!(g_upper,part_lower[src(e)],part_lower[dst(e)])
     end
-    isempty(part_upper) && (part_upper = Metis.partition(g_upper,nparts_upper,alg=:KWAY))
+    isempty(part_upper) && (part_upper = partition(g_upper,nparts_upper,alg=:KWAY))
     
     return BilevelPartition(g_lower,nparts_lower,part_lower,V_lower,g_upper,nparts_upper,part_upper)
 end
@@ -87,7 +87,7 @@ end
 function TwoStagePartition(csc::SparseMatrixCSC,part,nparts)
     if isempty(part) || findfirst(x->x==0.,part) == nothing
         g = Graph(csc)
-        isempty(part) && (part = Metis.partition(g,nparts,alg=:KWAY))
+        isempty(part) && (part = partition(g,nparts,alg=:KWAY))
         mark_boundary!(g,part)
     end
     return TwoStagePartition(nparts,part)

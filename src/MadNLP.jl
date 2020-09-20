@@ -5,6 +5,7 @@ module MadNLP
 
 import IterativeSolvers, MathOptInterface, MPI, MKL_jll, OpenBLAS32_jll
 import Libdl: dlopen, dlext, RTLD_DEEPBIND, RTLD_GLOBAL
+import Metis: partition
 import Parameters: @with_kw
 import Printf: @sprintf
 import LinearAlgebra: BLAS, Adjoint, Symmetric, mul!, ldiv!, norm, dot
