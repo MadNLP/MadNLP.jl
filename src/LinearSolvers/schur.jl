@@ -7,7 +7,7 @@ import ..MadNLP:
     @with_kw, getlogger, register, setlevel!, debug, warn, error,
     AbstractOptions, AbstractLinearSolver, set_options!, SparseMatrixCSC, SubVector, StrideOneVector, 
     SymbolicException,FactorizationException,SolveException,InertiaException,
-    introduce, factorize!, solve!, improve!, inertia,
+    introduce, factorize!, solve!, improve!, is_inertia, inertia,
     default_subproblem_solver, default_dense_solver, get_csc_view, get_cscsy_view, mv!, nnz,
     TwoStagePartition, set_blas_num_threads, blas_num_threads, @blas_safe_threads
 
@@ -167,6 +167,7 @@ function solve!(M::Solver,x::AbstractVector{Float64})
     return x
 end
 
+is_inertia(M::Solver) = is_inertia(M.fact) && is_inertia(M.sws[1].M)
 function inertia(M::Solver)
     numpos,numzero,numneg = inertia(M.fact)
     for k=1:M.opt.schur_num_parts

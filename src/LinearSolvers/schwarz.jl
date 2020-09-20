@@ -10,7 +10,7 @@ import ..MadNLP:
     AbstractOptions, AbstractLinearSolver, set_options!,
     MonolevelPartition, MonolevelStruc, BilevelPartition, BilevelStruc,
     expand!, get_current_V, get_current_size, get_full_size,
-    EmptyLinearSolver, introduce, factorize!, solve!, improve!, inertia,
+    EmptyLinearSolver, introduce, factorize!, solve!, improve!, is_inertia, inertia,
     set_blas_num_threads, blas_num_threads, @blas_safe_threads, @sprintf
 
 const INPUT_MATRIX_TYPE = :csc
@@ -163,7 +163,7 @@ function improve!(M::Solver)
     return true
 end
 
-isinertia(::Solver)=false
+is_inertia(::Solver)=false
 function inertia(M::Solver)
     throw(InertiaException)
 end
