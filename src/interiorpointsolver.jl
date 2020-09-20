@@ -55,7 +55,7 @@ end
     reduced_system::Bool = true
 
     # initialization options
-    inertia_correction_method::String = "inertia_free" 
+    inertia_correction_method::String = "auto" 
     constr_mult_init_max::Float64 = 1e3
     bound_push::Float64 = 1e-2 
     bound_fac::Float64 = 1e-2 
@@ -524,8 +524,11 @@ function Solver(nlp::NonlinearProgram;
         opt.linear_system_scaler.Scaler(aug_com)
 
     trace(LOGGER,"Initializing fixed variable treatment scheme.")
-
     fixed_variable_treatment_aug = get_fixed_variable_treatment_aug(aug_com,ind_fixed)
+    
+    if opt.inertia_correction_method == "auto"
+        opt.inertia_correction_method = is_inertia(linear_solver) ? "inertia_based" : "inertia_free"
+    end
 
     function factorize_wrapper!()
         trace(LOGGER,"Factorization started.")

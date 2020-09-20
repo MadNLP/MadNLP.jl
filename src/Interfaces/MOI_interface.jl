@@ -856,13 +856,15 @@ function MOI.get(model::Optimizer, ::MOI.TerminationStatus)
     if status == :Solve_Succeeded || status == :Feasible_Point_Found
         return MOI.LOCALLY_SOLVED
     elseif status == :Solved_To_Acceptable_Level
-        return MOI.NEARLY_FEASIBLE_POINT
+        return MOI.ALMOST_LOCALLY_SOLVED
     elseif status == :Maximum_Iterations_Exceeded
         return MOI.ITERATION_LIMIT
     elseif status == :Maximum_WallTime_Exceeded
         return MOI.TIME_LIMIT
     elseif status == :Restoration_Failed
         return MOI.NUMERICAL_ERROR
+    elseif status == :Infeasible_Problem_Detected
+        return MOI.LOCALLY_INFEASIBLE
     elseif status == :Error_In_Step_Computation
         return MOI.NUMERICAL_ERROR
     elseif status == :Invalid_Option
@@ -1149,6 +1151,7 @@ function get_obj_scale(sense)
 end
 
 function NonlinearProgram(model::Optimizer)
+    :Hess in MOI.features_available(model.nlp_data.evaluator) || error("Hessian information is needed.")
     MOI.initialize(model.nlp_data.evaluator, [:Grad,:Hess,:Jac])
 
     n = num_variables(model)
@@ -1182,7 +1185,7 @@ function NonlinearProgram(model::Optimizer)
     hess_sparsity!(I,J)= hessian_lagrangian_structure(model,I,J)
     jac_sparsity!(I,J) = jacobian_structure(model,I,J)
     
-    model.option_dict[:hessian_constant],model.option_dict[:jacobian_constant] = is_jac_hess_constant(model)
+    model.option_dict[:jacobian_constant], model.option_dict[:hessian_constant] = is_jac_hess_constant(model)
 
     return NonlinearProgram(n,m,nnz_hess,nnz_jac,0.,x,g,l,zl,zu,xl,xu,gl,gu,obj,obj_grad!,con!,con_jac!,
                             lag_hess!,hess_sparsity!,jac_sparsity!,:Initial,Dict{Symbol,Any}())
