@@ -2,12 +2,13 @@ module LapackMKL
 
 using Memento, Parameters, LightGraphs, LinearAlgebra
 import ..MadNLP:
+    @with_kw, getlogger, register, setlevel!, debug, warn, error,
     AbstractOptions, AbstractLinearSolver, set_options!, tril_to_full!,
     SymbolicException,FactorizationException,SolveException,InertiaException,
     introduce, factorize!, solve!, improve!, is_inertia, inertia, libmkl32
 
 const LOGGER=getlogger(@__MODULE__)
-__init__() = Memento.register(LOGGER)
+__init__() = register(LOGGER)
 const INPUT_MATRIX_TYPE = :dense
     
 @with_kw mutable struct Options <: AbstractOptions

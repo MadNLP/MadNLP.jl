@@ -3,20 +3,15 @@
 
 module Krylov
 
-using Memento,IterativeSolvers
-
-const LOGGER=getlogger(@__MODULE__)
-__init__() = Memento.register(LOGGER)
-
-using LinearAlgebra, Parameters
 import ..MadNLP:
-    AbstractOptions, AbstractIterator, set_options!, @sprintf, @printf,
-    solve_refine!
+    @with_kw, getlogger, register, setlevel!, debug, warn, error,
+    AbstractOptions, AbstractIterator, set_options!, @sprintf, 
+    solve_refine!, mul!, ldiv!, size, IterativeSolvers
 import IterativeSolvers:
-    FastHessenberg, ArnoldiDecomp, Residual, init!, init_residual!, expand!,
+    FastHessenberg, ArnoldiDecomp, Residual, init!, init_residual!, expand!, Identity,
     orthogonalize_and_normalize!, update_residual!, gmres_iterable!, GMRESIterable, converged
-import LinearAlgebra: mul!, ldiv!
-import Base: size
+const LOGGER=getlogger(@__MODULE__)
+__init__() = register(LOGGER)
 
 @with_kw mutable struct Options <: AbstractOptions
     krylov_restart::Int = 5

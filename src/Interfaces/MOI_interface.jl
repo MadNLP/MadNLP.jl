@@ -1,10 +1,6 @@
 # MadNLP.jl
 # Modified from Ipopt.jl (https://github.com/jump-dev/Ipopt.jl)
 
-import MathOptInterface
-const MOI = MathOptInterface
-const MOIU = MathOptInterface.Utilities
-
 @with_kw mutable struct VariableInfo
     lower_bound::Float64 = -Inf
     has_lower_bound::Bool = false

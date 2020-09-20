@@ -3,12 +3,30 @@
 
 module MadNLP
 
-using LinearAlgebra, SparseArrays, Libdl, Printf,
-    Metis, LightGraphs,Memento, Parameters, MKL_jll, OpenBLAS32_jll
+import IterativeSolvers, MathOptInterface, MPI, MKL_jll, OpenBLAS32_jll
+import Libdl: dlopen, dlext, RTLD_DEEPBIND, RTLD_GLOBAL
+import Parameters: @with_kw
+import Printf: @sprintf
+import LinearAlgebra: BLAS, Adjoint, Symmetric, mul!, ldiv!, norm, dot
+import SparseArrays: AbstractSparseMatrix, SparseMatrixCSC, sparse, getcolptr, rowvals, nnz
+import Memento: Attribute, AttributeRecord, Formatter, Handler, Record, DefaultFormatter, register, getlogger, emit, 
+    setlevel!, setrecord!, format, setpropagating!, trace, debug, info, notice, warn, error
+import Base: string, show, print, size, getindex, copyto!
+import StaticArrays: SVector, setindex
+import SuiteSparse: UMFPACK
+import CUDA: CUBLAS, CUSOLVER, CuVector, CuMatrix
+import LightGraphs: Graph, Edge, add_edge!, edges, src, dst, neighbors, nv
+import Plasmo: OptiGraph, OptiNode, OptiEdge, all_nodes, all_edges, all_variables, num_all_nodes, num_variables,
+    getlinkconstraints
+import JuMP: _create_nlp_block_data, set_optimizer, GenericAffExpr, backend
+import NLPModels: finalize, AbstractNLPModel,
+    obj, grad!, cons!, jac_coord!, hess_coord!, hess_structure!, jac_structure!
+import SolverTools: GenericExecutionStats
 
-import Base: string, show, print, size, getindex
+const MOI = MathOptInterface
+const MOIU = MathOptInterface.Utilities
 
-export NonlinearProgram,InteriorPointSolver,madnlp
+export madnlp
 
 # Version info
 version() = v"0.1.0"
@@ -35,7 +53,7 @@ function __init__()
         "lib/libmkl_sequential.$(dlext)",
         "lib/libmkl_intel_lp64.$(dlext)"]),RTLD_GLOBAL)
     @isdefined(libopenblas32) && dlopen(libopenblas32,RTLD_GLOBAL)
-    Memento.register(LOGGER)
+    register(LOGGER)
 
     set_blas_num_threads(haskey(ENV,"JULIA_NUM_THREADS") ? parse(Int,ENV["JULIA_NUM_THREADS"]) : 1 ;permanent=true)
 end

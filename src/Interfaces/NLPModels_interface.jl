@@ -1,8 +1,6 @@
 # MadNLP.jl
 # Created by Sungho Shin (sungho.shin@wisc.edu)
 
-using NLPModels, SolverTools
-
 NonlinearProgram(model::AbstractNLPModel) = NonlinearProgram(
     model.meta.nvar,model.meta.ncon,model.meta.nnzh,model.meta.nnzj,
     0.,model.meta.x0,zeros(model.meta.ncon),model.meta.y0,
@@ -37,7 +35,7 @@ function madnlp(model::AbstractNLPModel;kwargs...)
     ips.zu.=0
     # ------------------------------------------
     optimize!(ips)
-    NLPModels.finalize(model)
+    finalize(model)
 
     return GenericExecutionStats(
         haskey(status_translator,nlp.status) ? status_translator[nlp.status] : :unknown,

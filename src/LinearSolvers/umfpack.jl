@@ -3,20 +3,19 @@
 
 module Umfpack
 
-using Memento,Parameters
-const LOGGER=getlogger(@__MODULE__)
-__init__() = Memento.register(LOGGER)
-const INPUT_MATRIX_TYPE = :csc
-
 import ..MadNLP:
+    @with_kw, getlogger, register, setlevel!, debug, warn, error,
     SubVector, StrideOneVector, SparseMatrixCSC, get_tril_to_full,
     SymbolicException,FactorizationException,SolveException,InertiaException,
-    AbstractOptions, AbstractLinearSolver, set_options!,
+    AbstractOptions, AbstractLinearSolver, set_options!, UMFPACK,
     introduce, factorize!, solve!, mul!, improve!, is_inertia, inertia
 
-using SuiteSparse
-const umfpack_default_ctrl = copy(SuiteSparse.UMFPACK.umf_ctrl)
-const umfpack_default_info = copy(SuiteSparse.UMFPACK.umf_info)
+const LOGGER=getlogger(@__MODULE__)
+__init__() = register(LOGGER)
+const INPUT_MATRIX_TYPE = :csc
+
+const umfpack_default_ctrl = copy(UMFPACK.umf_ctrl)
+const umfpack_default_info = copy(UMFPACK.umf_info)
 
 @with_kw mutable struct Options <: AbstractOptions
     umfpack_pivtol::Float64 = 1e-4
@@ -29,7 +28,7 @@ const umfpack_default_info = copy(SuiteSparse.UMFPACK.umf_info)
 end
 
 mutable struct Solver <: AbstractLinearSolver
-    inner::SuiteSparse.UMFPACK.UmfpackLU
+    inner::UMFPACK.UmfpackLU
     tril::SparseMatrixCSC{Float64}
     full::SparseMatrixCSC{Float64}
     tril_to_full_view::SubVector{Float64}
@@ -65,9 +64,9 @@ function Solver(csc::SparseMatrixCSC;
     
     full.colptr.-=1; full.rowval.-=1
     
-    inner = SuiteSparse.UMFPACK.UmfpackLU(C_NULL,C_NULL,full.n,full.n,full.colptr,full.rowval,full.nzval,0)
-    SuiteSparse.UMFPACK.finalizer(SuiteSparse.UMFPACK.umfpack_free_symbolic,inner)
-    SuiteSparse.UMFPACK.umfpack_symbolic!(inner)
+    inner = UMFPACK.UmfpackLU(C_NULL,C_NULL,full.n,full.n,full.colptr,full.rowval,full.nzval,0)
+    UMFPACK.finalizer(UMFPACK.umfpack_free_symbolic,inner)
+    UMFPACK.umfpack_symbolic!(inner)
     ctrl = copy(umfpack_default_ctrl)
     info = copy(umfpack_default_info)
     ctrl[4]=opt.umfpack_pivtol
@@ -77,7 +76,7 @@ function Solver(csc::SparseMatrixCSC;
     return Solver(inner,csc,full,tril_to_full_view,p,ctrl,info,opt)
 end
 function factorize!(M::Solver)
-    SuiteSparse.UMFPACK.umfpack_free_numeric(M.inner)
+    UMFPACK.umfpack_free_numeric(M.inner)
     M.full.nzval.=M.tril_to_full_view
     tmp = Vector{Ptr{Cvoid}}(undef, 1)
     status=umfpack_di_numeric(M.inner.colptr,M.inner.rowval,M.inner.nzval,
@@ -87,7 +86,7 @@ function factorize!(M::Solver)
     return M
 end
 function solve!(M::Solver,rhs::StrideOneVector{Float64})
-    rhs.=SuiteSparse.UMFPACK.solve!(M.p,M.inner,rhs,1)
+    rhs.=UMFPACK.solve!(M.p,M.inner,rhs,1)
     return rhs
 end
 is_inertia(::Solver) = false
@@ -112,4 +111,3 @@ end # module
     
 # forgiving names
 const umfpack=Umfpack;
-const UMFPACK=Umfpack;

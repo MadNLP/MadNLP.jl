@@ -1,9 +1,6 @@
 # MadNLP.jl
 # Created by Sungho Shin (sungho.shin@wisc.edu)
 
-using Plasmo
-using JuMP: _create_nlp_block_data, set_optimizer
-
 const dummy_function = ()->nothing
 
 num_linkconstraints(modeledge::OptiEdge) = length(modeledge.linkconstraints)
@@ -166,14 +163,14 @@ function NonlinearProgram(graph::OptiGraph)
     linkedges = all_edges(graph)
 
     for modelnode in modelnodes
-        Plasmo.num_variables(modelnode) == 0 && error("Empty node exist! Delete the empty nodes.")
+        num_variables(modelnode) == 0 && error("Empty node exist! Delete the empty nodes.")
     end
     
     @blas_safe_threads for k=1:length(modelnodes)
-        JuMP.set_optimizer(modelnodes[k].model,Optimizer)
+        set_optimizer(modelnodes[k].model,Optimizer)
         if modelnodes[k].model.nlp_data !== nothing
             MOI.set(modelnodes[k].model, MOI.NLPBlock(),
-                    JuMP._create_nlp_block_data(modelnodes[k].model))
+                    _create_nlp_block_data(modelnodes[k].model))
             empty!(modelnodes[k].model.nlp_data.nlconstr_duals)
         end
         MOIU.attach_optimizer(modelnodes[k].model)
@@ -326,13 +323,13 @@ function optimize!(graph::OptiGraph; option_dict = Dict{Symbol,Any}(), kwargs...
         
         part= get_part(graph,nlp)
         option_dict[:schwarz_part] = part
-        option_dict[:schwarz_num_parts] = Plasmo.num_all_nodes(graph)
+        option_dict[:schwarz_num_parts] = num_all_nodes(graph)
         
     elseif (haskey(kwargs,:schur_custom_partition) && kwargs[:schur_custom_partition]) ||
         (haskey(option_dict,:schur_custom_partition) && option_dict[:schur_custom_partition])
 
         part= get_part(graph,nlp)
-        K = Plasmo.num_all_nodes(graph) 
+        K = num_all_nodes(graph) 
         part[part.>K].=0
         option_dict[:schur_part] = part
         option_dict[:schur_num_parts] = K

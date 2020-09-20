@@ -1,13 +1,14 @@
 module LapackCUDA
 
-using Memento, Parameters, LightGraphs, LinearAlgebra, CUDA
 import ..MadNLP:
+    @with_kw, getlogger, register, setlevel!, debug, warn, error,
+    CUBLAS, CUSOLVER, CuVector, CuMatrix,
     AbstractOptions, AbstractLinearSolver, set_options!, 
     SymbolicException,FactorizationException,SolveException,InertiaException,
     introduce, factorize!, solve!, improve!, is_inertia, inertia, libmkl32, LapackMKL, tril_to_full!
 
 const LOGGER=getlogger(@__MODULE__)
-__init__() = Memento.register(LOGGER)
+__init__() = register(LOGGER)
 const INPUT_MATRIX_TYPE = :dense
     
 @with_kw mutable struct Options <: AbstractOptions
@@ -75,11 +76,11 @@ function factorize_bunchkaufman!(M::Solver)
     haskey(M.etc,:ipiv) || (M.etc[:ipiv] = CuVector{Int32}(undef,size(M.dense,1)))
     
     copyto!(M.fact,M.dense)
-    CUDA.CUSOLVER.cusolverDnDsytrf_bufferSize(
-        CUDA.CUSOLVER.dense_handle(),Int32(size(M.fact,1)),M.fact,Int32(size(M.fact,2)),M.lwork)
+    CUSOLVER.cusolverDnDsytrf_bufferSize(
+        CUSOLVER.dense_handle(),Int32(size(M.fact,1)),M.fact,Int32(size(M.fact,2)),M.lwork)
     length(M.work) < M.lwork[] && resize!(M.work,Int(M.lwork[]))
-    CUDA.CUSOLVER.cusolverDnDsytrf(
-        CUDA.CUSOLVER.dense_handle(),CUDA.CUBLAS.CUBLAS_FILL_MODE_LOWER,
+    CUSOLVER.cusolverDnDsytrf(
+        CUSOLVER.dense_handle(),CUBLAS.CUBLAS_FILL_MODE_LOWER,
         Int32(size(M.fact,1)),M.fact,Int32(size(M.fact,2)),
         M.etc[:ipiv],M.work,M.lwork[],M.info)
 
@@ -95,13 +96,13 @@ end
 function solve_bunchkaufman!(M::Solver,x)
     # It seems that Nvidia haven't implement sytrs yet -------------------
     # copyto!(M.rhs,x)
-    # CUDA.CUSOLVER.cusolverDnDsytrs_bufferSize(
-    #     CUDA.CUSOLVER.dense_handle(),CUDA.CUBLAS.CUBLAS_FILL_MODE_LOWER,
+    # CUSOLVER.cusolverDnDsytrs_bufferSize(
+    #     CUSOLVER.dense_handle(),CUBLAS.CUBLAS_FILL_MODE_LOWER,
     #     Int32(size(M.fact,1)),Int32(1),M.fact,Int32(size(M.fact,2)),
     #     M.etc[:ipiv],M.rhs,Int32(length(M.rhs)),M.lwork)
     # length(M.work) < M.lwork[] && resize!(M.work,Int(M.lwork[]))
-    # CUDA.CUSOLVER.cusolverDnDsytrs(
-    #     CUDA.CUSOLVER.dense_handle(),CUDA.CUBLAS.CUBLAS_FILL_MODE_LOWER,
+    # CUSOLVER.cusolverDnDsytrs(
+    #     CUSOLVER.dense_handle(),CUBLAS.CUBLAS_FILL_MODE_LOWER,
     #     Int32(size(M.fact,1)),Int32(1),M.fact,Int32(size(M.fact,2)),
     #     M.etc[:ipiv],M.rhs,Int32(length(M.rhs)),M.work,M.lwork[],M.info)
     # copyto!(x,M.rhs)
@@ -119,20 +120,20 @@ function factorize_lu!(M::Solver)
     
     tril_to_full!(M.dense)
     copyto!(M.fact,M.dense)
-    CUDA.CUSOLVER.cusolverDnDgetrf_bufferSize(
-        CUDA.CUSOLVER.dense_handle(),Int32(size(M.fact,1)),Int32(size(M.fact,2)),
+    CUSOLVER.cusolverDnDgetrf_bufferSize(
+        CUSOLVER.dense_handle(),Int32(size(M.fact,1)),Int32(size(M.fact,2)),
         M.fact,Int32(size(M.fact,2)),M.lwork)
     length(M.work) < M.lwork[] && resize!(M.work,Int(M.lwork[]))
-    CUDA.CUSOLVER.cusolverDnDgetrf(
-        CUDA.CUSOLVER.dense_handle(),Int32(size(M.fact,1)),Int32(size(M.fact,2)),
+    CUSOLVER.cusolverDnDgetrf(
+        CUSOLVER.dense_handle(),Int32(size(M.fact,1)),Int32(size(M.fact,2)),
         M.fact,Int32(size(M.fact,2)),M.work,M.etc[:ipiv],M.info)
     return M
 end
 
 function solve_lu!(M::Solver,x)
     copyto!(M.rhs,x)
-    CUDA.CUSOLVER.cusolverDnDgetrs(
-        CUDA.CUSOLVER.dense_handle(),CUDA.CUBLAS.CUBLAS_OP_N,
+    CUSOLVER.cusolverDnDgetrs(
+        CUSOLVER.dense_handle(),CUBLAS.CUBLAS_OP_N,
         Int32(size(M.fact,1)),Int32(1),M.fact,Int32(size(M.fact,2)),
         M.etc[:ipiv],M.rhs,Int32(length(M.rhs)),M.info)
     copyto!(x,M.rhs)
@@ -143,27 +144,27 @@ function factorize_qr!(M::Solver)
     tril_to_full!(M.dense)
     copyto!(M.fact,M.dense)
     haskey(M.etc,:tau) || (M.etc[:tau] = CuVector{Float64}(undef,size(M.dense,1)))
-    CUDA.CUSOLVER.cusolverDnDgeqrf_bufferSize(
-        CUDA.CUSOLVER.dense_handle(),Int32(size(M.fact,1)),Int32(size(M.fact,2)),
+    CUSOLVER.cusolverDnDgeqrf_bufferSize(
+        CUSOLVER.dense_handle(),Int32(size(M.fact,1)),Int32(size(M.fact,2)),
         M.fact,Int32(size(M.fact,2)),M.lwork)
     length(M.work) < M.lwork[] && resize!(M.work,Int(M.lwork[]))
-    CUDA.CUSOLVER.cusolverDnDgeqrf(
-        CUDA.CUSOLVER.dense_handle(),Int32(size(M.fact,1)),Int32(size(M.fact,2)),
+    CUSOLVER.cusolverDnDgeqrf(
+        CUSOLVER.dense_handle(),Int32(size(M.fact,1)),Int32(size(M.fact,2)),
         M.fact,Int32(size(M.fact,2)),M.etc[:tau],M.work,M.lwork[],M.info)
     return M
 end
 
 function solve_qr!(M::Solver,x)
     copyto!(M.rhs,x)
-    CUDA.CUSOLVER.cusolverDnDormqr(
-        CUDA.CUSOLVER.dense_handle(),
-        CUDA.CUBLAS.CUBLAS_SIDE_LEFT,CUDA.CUBLAS.CUBLAS_OP_N,
+    CUSOLVER.cusolverDnDormqr(
+        CUSOLVER.dense_handle(),
+        CUBLAS.CUBLAS_SIDE_LEFT,CUBLAS.CUBLAS_OP_N,
         Int32(size(M.fact,1)),Int32(1),Int32(size(M.fact,2)),M.fact,Int32(size(M.fact,2)),
         M.etc[:tau],M.rhs,Int32(length(M.rhs)),M.work,M.lwork[],M.info)
-    CUDA.CUBLAS.cublasDtrsm_v2(
-        CUDA.CUBLAS.handle(),
-        CUDA.CUBLAS.CUBLAS_SIDE_LEFT,CUDA.CUBLAS.CUBLAS_FILL_MODE_UPPER,
-        CUDA.CUBLAS.CUBLAS_OP_N,CUDA.CUBLAS.CUBLAS_DIAG_NON_UNIT,Int32(size(M.fact,1)),Int32(1),[1.],
+    CUBLAS.cublasDtrsm_v2(
+        CUBLAS.handle(),
+        CUBLAS.CUBLAS_SIDE_LEFT,CUBLAS.CUBLAS_FILL_MODE_UPPER,
+        CUBLAS.CUBLAS_OP_N,CUBLAS.CUBLAS_DIAG_NON_UNIT,Int32(size(M.fact,1)),Int32(1),[1.],
         M.fact,Int32(size(M.fact,2)),M.rhs,Int32(length(M.rhs)))
     copyto!(x,M.rhs)
     return x

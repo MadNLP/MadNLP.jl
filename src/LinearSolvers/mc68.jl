@@ -3,8 +3,7 @@
 
 module Mc68
 
-using Parameters
-import ..MadNLP: libhsl
+import ..MadNLP: @with_kw, libhsl
 
 @with_kw mutable struct Control
     f_array_in::Cint = 0

@@ -3,18 +3,17 @@
 
 module Mumps
 
-using Memento,Parameters
-const LOGGER=getlogger(@__MODULE__)
-__init__() = Memento.register(LOGGER)
-const INPUT_MATRIX_TYPE = :csc
-
 import ..MadNLP:
+    SVector, setindex, MPI,
+    @with_kw, getlogger, register, setlevel!, debug, warn, error,
     SparseMatrixCSC, SubVector, StrideOneVector, libmumps, 
     SymbolicException,FactorizationException,SolveException,InertiaException,
     AbstractOptions, AbstractLinearSolver, set_options!,
     introduce, factorize!, solve!, improve!, is_inertia, inertia, findIJ, nnz
 
-using StaticArrays, MPI
+const LOGGER=getlogger(@__MODULE__)
+__init__() = register(LOGGER)
+const INPUT_MATRIX_TYPE = :csc
 
 @with_kw mutable struct Options <: AbstractOptions
     mumps_dep_tol::Float64 = 0.

@@ -36,7 +36,6 @@ end
 module DummyModule end
 
 # Logger
-import Memento: Attribute, emit
 mutable struct MadNLPRecord <: AttributeRecord
     level::Attribute
     levelnum::Attribute
@@ -57,14 +56,14 @@ const mono_color_dict = Dict{String,Symbol}(
     "trace" => :normal,"debug" => :normal,"info" => :normal,"notice" => :normal,"warn" => :normal,"error" => :normal)
 function emit(handler::MadNLPHandler{F, O}, rec::Record) where {F<:Formatter, O<:IO}
     rec.levelnum < handler.levelnum && return
-    str = Memento.format(handler.fmt, rec)
+    str = format(handler.fmt, rec)
     clr = handler.color_dict[rec.level]
     clr==:normal ? println(handler.io, str) : printstyled(handler.io, str, "\n", color=clr)
     flush(handler.io)
 end
 const LOGGER = getlogger(@__MODULE__)
-Memento.setpropagating!(LOGGER,false)
-Memento.setrecord!(LOGGER,MadNLPRecord)
+setpropagating!(LOGGER,false)
+setrecord!(LOGGER,MadNLPRecord)
 
 # BLAS
 const blas_num_threads = Ref{Int}()

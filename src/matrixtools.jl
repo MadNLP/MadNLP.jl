@@ -1,6 +1,5 @@
 # MadNLP.jl
 # Created by Sungho Shin (sungho.shin@wisc.edu)
-import SparseArrays: nnz
 
 abstract type AbstractSparseMatrixCOO{Tv,Ti<:Integer} <: AbstractSparseMatrix{Tv,Ti} end
 mutable struct SparseMatrixCOO{Tv,Ti<:Integer} <: AbstractSparseMatrixCOO{Tv,Ti}
@@ -48,11 +47,11 @@ mv!(y::StrideOneVector{Float64},A::Adjoint{Float64,SparseMatrixCSC{Float64,Int32
               't',Int32(A.parent.m),Int32(A.parent.n),alpha,"G00000",A.parent.nzval,A.parent.rowval,
               pointer(A.parent.colptr),pointer(A.parent.colptr)+4,x,beta,y)
 symv!(y::StrideOneVector{Float64},A::Matrix{Float64},x::StrideOneVector{Float64}) =
-    (length(y) > 0 && length(x) >0) && LinearAlgebra.BLAS.symv!('l', 1., A, x, 0., y)
+    (length(y) > 0 && length(x) >0) && BLAS.symv!('l', 1., A, x, 0., y)
 mv!(y::StrideOneVector{Float64},A::Matrix{Float64},x::StrideOneVector{Float64};
-    alpha::Float64=1.,beta::Float64=0.) = (length(y) > 0) && LinearAlgebra.BLAS.gemv!('n',alpha,A,x,beta,y)
+    alpha::Float64=1.,beta::Float64=0.) = (length(y) > 0) && BLAS.gemv!('n',alpha,A,x,beta,y)
 mv!(y::StrideOneVector{Float64},A::Adjoint{Float64,Matrix{Float64}},x::StrideOneVector{Float64};
-    alpha::Float64=1.,beta::Float64=0.) = (length(y) > 0) && LinearAlgebra.BLAS.gemv!('t',alpha,A.parent,x,beta,y)
+    alpha::Float64=1.,beta::Float64=0.) = (length(y) > 0) && BLAS.gemv!('t',alpha,A.parent,x,beta,y)
 
 
 function findIJ(S::SparseMatrixCSC{Tv,Ti}) where {Tv,Ti}
@@ -61,7 +60,7 @@ function findIJ(S::SparseMatrixCSC{Tv,Ti}) where {Tv,Ti}
     J = Vector{Ti}(undef,numnz)
 
     cnt = 1
-    @inbounds for col = 1 : size(S, 2), k = SparseArrays.getcolptr(S)[col] : (SparseArrays.getcolptr(S)[col+1]-1)
+    @inbounds for col = 1 : size(S, 2), k = getcolptr(S)[col] : (getcolptr(S)[col+1]-1)
         I[cnt] = rowvals(S)[k]
         J[cnt] = col
         cnt += 1
@@ -123,7 +122,7 @@ function get_coo_to_dense(coo::SparseMatrixCOO{Tv,Ti}) where {Tv,Ti<:Integer}
     dense = Matrix{Float64}(undef,coo.m,coo.n)
     return dense, ()->copyto!(dense,coo)
 end
-import Base.copyto!
+
 copyto!(dense::Matrix{Tv},coo::SparseMatrixCOO{Tv,Ti}) where {Tv,Ti<:Integer} = copyto!(dense,coo.I,coo.J,coo.V)
 function copyto!(dense::Matrix{Tv},I,J,V) where Tv
     dense.=0
@@ -143,7 +142,7 @@ function get_cscsy_view(csc::SparseMatrixCSC{Tv,Ti},Ix;inds=collect(1:nnz(csc)))
                                   
 end
 function get_csc_view(csc::SparseMatrixCSC{Tv,Ti},Ix,Jx;inds=collect(1:nnz(csc))) where {Tv,Ti<:Integer}
-    cscind = LinearAlgebra.Symmetric(SparseMatrixCSC{Int,Ti}(csc.m,csc.n,csc.colptr,csc.rowval,inds),:L)
+    cscind = Symmetric(SparseMatrixCSC{Int,Ti}(csc.m,csc.n,csc.colptr,csc.rowval,inds),:L)
     cscindsub = cscind[Ix,Jx]
     resize!(cscindsub.rowval,cscindsub.colptr[end]-1)
     resize!(cscindsub.nzval,cscindsub.colptr[end]-1)

@@ -3,22 +3,19 @@
 
 module Schwarz
 
-using Memento,Parameters,Printf
-using LightGraphs,Metis
-import LightGraphs.Graph
-const INPUT_MATRIX_TYPE = :csc
-
-const LOGGER=getlogger(@__MODULE__)
-__init__() = Memento.register(LOGGER)
-
 import ..MadNLP:
+    @with_kw, getlogger, register, setlevel!, debug, warn, error,
     default_subproblem_solver,SparseMatrixCSC, SubVector, StrideOneVector, get_cscsy_view, nnz,
     SymbolicException,FactorizationException,SolveException,InertiaException,
     AbstractOptions, AbstractLinearSolver, set_options!,
     MonolevelPartition, MonolevelStruc, BilevelPartition, BilevelStruc,
     expand!, get_current_V, get_current_size, get_full_size,
     EmptyLinearSolver, introduce, factorize!, solve!, improve!, inertia,
-    set_blas_num_threads, blas_num_threads, @blas_safe_threads
+    set_blas_num_threads, blas_num_threads, @blas_safe_threads, @sprintf
+
+const INPUT_MATRIX_TYPE = :csc
+const LOGGER=getlogger(@__MODULE__)
+__init__() = register(LOGGER)
 
 @with_kw mutable struct Options <: AbstractOptions
     schwarz_num_parts_upper::Int = 0

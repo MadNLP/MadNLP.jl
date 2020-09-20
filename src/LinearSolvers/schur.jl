@@ -3,19 +3,18 @@
 
 module Schur
 
-using Memento, Parameters, LightGraphs, LinearAlgebra
-const LOGGER=getlogger(@__MODULE__)
-__init__() = Memento.register(LOGGER)
-const INPUT_MATRIX_TYPE = :csc
-
-using Metis
 import ..MadNLP:
+    @with_kw, getlogger, register, setlevel!, debug, warn, error,
     AbstractOptions, AbstractLinearSolver, set_options!, SparseMatrixCSC, SubVector, StrideOneVector, 
     SymbolicException,FactorizationException,SolveException,InertiaException,
     introduce, factorize!, solve!, improve!, inertia,
     default_subproblem_solver, default_dense_solver, get_csc_view, get_cscsy_view, mv!, nnz,
     TwoStagePartition, set_blas_num_threads, blas_num_threads, @blas_safe_threads
-import LightGraphs.Graph
+
+const LOGGER=getlogger(@__MODULE__)
+__init__() = register(LOGGER)
+const INPUT_MATRIX_TYPE = :csc
+
 
 @with_kw mutable struct Options <: AbstractOptions
     schur_custom_partition::Bool = false

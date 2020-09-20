@@ -3,16 +3,16 @@
 
 module PardisoMKL
 
-using Memento, Parameters
-const LOGGER=getlogger(@__MODULE__)
-__init__() = Memento.register(LOGGER)
-const INPUT_MATRIX_TYPE = :csc
-
 import ..MadNLP:
+    @with_kw, getlogger, register, setlevel!, debug, warn, error,
     SubVector, StrideOneVector, SparseMatrixCSC, libmkl32,
     SymbolicException,FactorizationException,SolveException,InertiaException,
     AbstractOptions, AbstractLinearSolver, set_options!,
     introduce, factorize!, solve!, improve!, is_inertia, inertia, blas_num_threads
+
+const LOGGER=getlogger(@__MODULE__)
+__init__() = register(LOGGER)
+const INPUT_MATRIX_TYPE = :csc
 
 @with_kw mutable struct Options <: AbstractOptions
     pardisomkl_num_threads::Int = 1
@@ -47,13 +47,13 @@ pardisomkl_pardisoinit(pt,mtype::Ref{Cint},iparm::Vector{Cint}) =
 pardisomkl_pardiso(pt,maxfct::Ref{Cint},mnum::Ref{Cint},mtype::Ref{Cint},
                    phase::Ref{Cint},n::Ref{Cint},a::Vector{Cdouble},ia::Vector{Cint},ja::Vector{Cint},
                    perm::Vector{Cint},nrhs::Ref{Cint},iparm::Vector{Cint},msglvl::Ref{Cint},
-                   b::Vector{Cdouble},x::Vector{Cdouble},err::Ref{Cint}) =
+                   b::StrideOneVector{Cdouble},x::StrideOneVector{Cdouble},err::Ref{Cint}) =
                        ccall(
-                       (:pardiso,libmkl32),
-                       Cvoid,
-                       (Ptr{Cvoid}, Ptr{Cint}, Ptr{Cint}, Ptr{Cint}, Ptr{Cint},
-                        Ptr{Cint}, Ptr{Cdouble}, Ptr{Cint}, Ptr{Cint}, Ptr{Cint},
-                        Ptr{Cint}, Ptr{Cint}, Ptr{Cint}, Ptr{Cdouble}, Ptr{Cdouble},Ptr{Cint}),
+                           (:pardiso,libmkl32),
+                           Cvoid,
+                           (Ptr{Cvoid}, Ptr{Cint}, Ptr{Cint}, Ptr{Cint}, Ptr{Cint},
+                            Ptr{Cint}, Ptr{Cdouble}, Ptr{Cint}, Ptr{Cint}, Ptr{Cint},
+                            Ptr{Cint}, Ptr{Cint}, Ptr{Cint}, Ptr{Cdouble}, Ptr{Cdouble},Ptr{Cint}),
                            pt,maxfct,mnum,mtype,phase,n,a,ia,ja,perm,nrhs,iparm,msglvl,b,x,err)
 
 function pardisomkl_set_num_threads!(n)

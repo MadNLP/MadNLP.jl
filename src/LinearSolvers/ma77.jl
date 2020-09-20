@@ -3,17 +3,17 @@
 
 module Ma77
 
-using Memento, Parameters
-const LOGGER=getlogger(@__MODULE__)
-__init__() = Memento.register(LOGGER)
-const INPUT_MATRIX_TYPE = :csc
-
 import ..MadNLP:
+    @with_kw, getlogger, register, setlevel!, debug, warn, error,
     SparseMatrixCSC, SparseMatrixCSC, SubVector, StrideOneVector,
     libhsl, Mc68, get_tril_to_full, transform!,
     AbstractOptions, AbstractLinearSolver, set_options!, 
     SymbolicException,FactorizationException,SolveException,InertiaException,
     introduce, factorize!, solve!, improve!, is_inertia, inertia
+
+const LOGGER=getlogger(@__MODULE__)
+__init__() = register(LOGGER)
+const INPUT_MATRIX_TYPE = :csc
 
 @with_kw mutable struct Options <: AbstractOptions
     ma77_buffer_lpage::Int = 4096

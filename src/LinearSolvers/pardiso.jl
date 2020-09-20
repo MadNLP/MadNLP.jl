@@ -3,12 +3,12 @@
 
 module Pardiso
 
-using Memento, Parameters
 const LOGGER=getlogger(@__MODULE__)
-__init__() = Memento.register(LOGGER)
+__init__() = register(LOGGER)
 const INPUT_MATRIX_TYPE = :csc
 
 import ..MadNLP:
+    @with_kw, getlogger, register, setlevel!, debug, warn, error,
     SubVector, StrideOneVector, SparseMatrixCSC, libpardiso,
     SymbolicException,FactorizationException,SolveException,InertiaException,
     AbstractOptions, AbstractLinearSolver, set_options!,
@@ -50,7 +50,7 @@ _pardiso(
     pt::Vector{Int},maxfct::Ref{Cint},mnum::Ref{Cint},mtype::Ref{Cint},
     phase::Ref{Cint},n::Ref{Cint},a::Vector{Cdouble},ia::Vector{Cint},ja::Vector{Cint},
     perm::Vector{Cint},nrhs::Ref{Cint},iparm::Vector{Cint},msglvl::Ref{Cint},
-    b::Vector{Cdouble},x::Vector{Cdouble},err::Ref{Cint},dparm::Vector{Cdouble}) =
+    b::StrideOneVector{Cdouble},x::StrideOneVector{Cdouble},err::Ref{Cint},dparm::Vector{Cdouble}) =
         ccall(
             (:pardiso,libpardiso),
             Cvoid,

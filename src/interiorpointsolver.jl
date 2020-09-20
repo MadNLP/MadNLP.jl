@@ -1890,7 +1890,7 @@ function set_logger!(log_level,print_level,output_file,file_print_level)
         push!(LOGGER,MadNLPHandler(DefaultFormatter(),io,file_print_levelnum,mono_color_dict))
         finalizer(close,io)
     end
-    Memento.setlevel!(LOGGER,log_level;recursive=true)
+    setlevel!(LOGGER,log_level;recursive=true)
 end
 
 function string(ips::Solver)

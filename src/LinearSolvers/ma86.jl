@@ -3,17 +3,16 @@
 
 module Ma86
 
-using Memento,Parameters
-const LOGGER=getlogger(@__MODULE__)
-__init__() = Memento.register(LOGGER)
-const INPUT_MATRIX_TYPE = :csc
-
 import ..MadNLP:
+    @with_kw, getlogger, register, setlevel!, debug, warn, error,
     SparseMatrixCSC, SubVector, StrideOneVector, libhsl, Mc68, 
     SymbolicException,FactorizationException,SolveException,InertiaException,
     AbstractOptions, AbstractLinearSolver, set_options!,
     introduce, factorize!, solve!, improve!, is_inertia, inertia
 
+const LOGGER=getlogger(@__MODULE__)
+__init__() = register(LOGGER)
+const INPUT_MATRIX_TYPE = :csc
 const ma86_scaling_dict = Dict("none"=>0,
                                "mc64"=>1,
                                "mc77"=>2)

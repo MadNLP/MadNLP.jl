@@ -3,15 +3,14 @@
 
 module Ma27
 
-using Memento, Parameters
-const LOGGER=getlogger(@__MODULE__)
-__init__() = Memento.register(LOGGER)
-
 import ..MadNLP:
+    @with_kw, getlogger, register, setlevel!, debug, warn, error,
     AbstractOptions, AbstractLinearSolver, set_options!, SparseMatrixCSC, SubVector, StrideOneVector, 
     SymbolicException,FactorizationException,SolveException,InertiaException,
     libhsl, introduce, factorize!, solve!, improve!, is_inertia, inertia, findIJ, nnz
 
+const LOGGER=getlogger(@__MODULE__)
+__init__() = register(LOGGER)
 const ma27_default_icntl = Int32[
     6,6,0,2139062143,1,32639,32639,32639,32639,14,9,8,8,9,10,32639,32639,32639,32689,24,11,9,8,9,10,0,0,0,0,0]
 const ma27_default_cntl  = [.1,1.0,0.,0.,0.]

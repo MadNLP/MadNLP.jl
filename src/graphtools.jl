@@ -2,7 +2,7 @@
 # Created by Sungho Shin (sungho.shin@wisc.edu)
 
 mutable struct MonolevelPartition
-    g::LightGraphs.Graph
+    g::Graph
     nparts::Int
     part::Vector{Int}
 end
@@ -13,12 +13,12 @@ mutable struct MonolevelStruc
 end
 
 mutable struct BilevelPartition
-    g_lower::LightGraphs.Graph
+    g_lower::Graph
     nparts_lower::Int
     part_lower::Vector{Int}
     V_lower::Vector{Vector{Int}}
     
-    g_upper::LightGraphs.Graph
+    g_upper::Graph
     nparts_upper::Int
     part_upper::Vector{Int}
 end
@@ -39,7 +39,7 @@ get_current_size(mls::MonolevelStruc) = length(mls.V)
 get_full_size(mlp::MonolevelPartition) = nv(mlp.g)
 
 function MonolevelPartition(csc::SparseMatrixCSC,part,nparts;max_size=0.)
-    g   = LightGraphs.Graph(csc)
+    g   = Graph(csc)
     isempty(part) && (part=Metis.partition(g,nparts,alg=:KWAY))
     return MonolevelPartition(g,nparts,part)
 end
@@ -60,16 +60,16 @@ get_current_size(bls::BilevelStruc) = length(bls.V_upper)
 get_full_size(blp::BilevelPartition) = blp.nparts_lower
 
 function BilevelPartition(csc,part_lower,nparts_lower,part_upper,nparts_upper;max_size=0.)
-    g_lower   = LightGraphs.Graph(csc)
+    g_lower   = Graph(csc)
     isempty(part_lower) && (part_lower= Metis.partition(g_lower,nparts_lower,alg=:KWAY))
     V_lower = Vector{Vector{Int}}(undef,nparts_lower)
     @blas_safe_threads for k=1:nparts_lower
         V_lower[k] = findall(part_lower.==k)
     end
 
-    g_upper = LightGraphs.Graph(nparts_lower)
+    g_upper = Graph(nparts_lower)
     for e in edges(g_lower)
-        LightGraphs.add_edge!(g_upper,part_lower[src(e)],part_lower[dst(e)])
+        add_edge!(g_upper,part_lower[src(e)],part_lower[dst(e)])
     end
     isempty(part_upper) && (part_upper = Metis.partition(g_upper,nparts_upper,alg=:KWAY))
     
@@ -86,14 +86,14 @@ end
 
 function TwoStagePartition(csc::SparseMatrixCSC,part,nparts)
     if isempty(part) || findfirst(x->x==0.,part) == nothing
-        g = LightGraphs.Graph(csc)
+        g = Graph(csc)
         isempty(part) && (part = Metis.partition(g,nparts,alg=:KWAY))
         mark_boundary!(g,part)
     end
     return TwoStagePartition(nparts,part)
 end
 
-LightGraphs.Graph(csc::SparseMatrixCSC) = SimpleGraph(getelistcsc(csc.colptr,csc.rowval))
+Graph(csc::SparseMatrixCSC) = Graph(getelistcsc(csc.colptr,csc.rowval))
 getelistcsc(colptr,rowval) = [Edge(i,Int(j)) for i=1:length(colptr)-1 for j in @view rowval[colptr[i]:colptr[i+1]-1]]
 
 function expand!(bls::BilevelStruc,blp::BilevelPartition,max_size)
@@ -103,7 +103,7 @@ function expand!(bls::BilevelStruc,blp::BilevelPartition,max_size)
     return 
 end
 
-function expand!(V_om,g::LightGraphs.Graph,max_size;
+function expand!(V_om,g::Graph,max_size;
                  new_nbr=[])
     if isempty(new_nbr)
         new_nbr = Int[]
