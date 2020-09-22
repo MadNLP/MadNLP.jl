@@ -345,3 +345,5 @@ function optimize!(graph::OptiGraph; option_dict = Dict{Symbol,Any}(), kwargs...
         moi_optimizer(modelnode).nlp.obj_val= graph.optimizer.obj_val
     end
 end
+
+termination_status(ips::Solver) = termination_status(ips.nlp.status)

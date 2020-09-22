@@ -1,15 +1,12 @@
-using MathOptInterface
 const MOI = MathOptInterface
 const MOIT = MOI.Test
 const MOIU = MOI.Utilities
 const MOIB = MOI.Bridges
 
-const config = MOIT.TestConfig(atol=1e-4, rtol=1e-4,
-                               optimal_status=MOI.LOCALLY_SOLVED)
-const config_no_duals = MOIT.TestConfig(atol=1e-4, rtol=1e-4, duals=false,
-                                        optimal_status=MOI.LOCALLY_SOLVED)
-const optimizer = MadNLP.Optimizer()
+const config = MOIT.TestConfig(atol=1e-4, rtol=1e-4,optimal_status=MOI.LOCALLY_SOLVED)
+const config_no_duals = MOIT.TestConfig(atol=1e-4, rtol=1e-4, duals=false,optimal_status=MOI.LOCALLY_SOLVED)
 
+optimizer = MadNLP.Optimizer()
 @testset "MOI utils" begin
     @testset "SolverName" begin
         @test MOI.get(optimizer, MOI.SolverName()) == "MadNLP"
@@ -31,21 +28,18 @@ const optimizer = MadNLP.Optimizer()
         @test MOI.get(optimizer, MOI.TimeLimitSec()) == my_time_limit
     end
 end
-MOI.empty!(optimizer)
 
 @testset "Testing getters" begin
-    MOIT.copytest(MOI.instantiate(MadNLP.Optimizer, with_bridge_type=Float64), MOIU.Model{Float64}())
+    MOIT.copytest(MOI.instantiate(
+        ()->optimizer, with_bridge_type=Float64), MOIU.Model{Float64}())
 end
-MOI.empty!(optimizer)
 
 @testset "Bounds set twice" begin
     MOIT.set_lower_bound_twice(optimizer, Float64)
     MOIT.set_upper_bound_twice(optimizer, Float64)
 end
-MOI.empty!(optimizer)
 
 @testset "MOI Linear tests" begin
-    optimizer = MadNLP.Optimizer(log_level="error")
     exclude = ["linear1", # modify constraints not allowed
                "linear5", # modify constraints not allowed
                "linear6", # constraint set for l/q not allowed
@@ -62,11 +56,8 @@ MOI.empty!(optimizer)
                ]
     MOIT.contlineartest(optimizer, config_no_duals,exclude)
 end
-MOI.empty!(optimizer)
 
-optimizer = MadNLP.Optimizer()
 @testset "MOI NLP tests" begin
-    optimizer = MadNLP.Optimizer(log_level="error")
     exclude = [
         "feasibility_sense_with_objective_and_no_hessian", # we need Hessians
         "feasibility_sense_with_no_objective_and_no_hessian", # we need Hessians
@@ -74,10 +65,9 @@ optimizer = MadNLP.Optimizer()
     ] 
     MOIT.nlptest(optimizer,config,exclude)
 end
-MOI.empty!(optimizer)
 
 @testset "Unit" begin
-    bridged = MOIB.full_bridge_optimizer(MadNLP.Optimizer(),Float64)
+    bridged = MOIB.full_bridge_optimizer(optimizer,Float64)
     exclude = ["delete_variable", # Deleting not supported.
                "delete_variables", # Deleting not supported.
                "getvariable", # Variable names not supported.
@@ -109,13 +99,11 @@ MOI.empty!(optimizer)
                ]
     MOIT.unittest(bridged, config, exclude)
 end
-MOI.empty!(optimizer)
 
 @testset "MOI QP/QCQP tests" begin
-    qp_optimizer = MOIU.CachingOptimizer(MOIU.Model{Float64}(), optimizer)
+    qp_optimizer = MOIU.CachingOptimizer(MOIU.Model{Float64}(), MadNLP.Optimizer(log_level="error"))
     MOIT.qptest(qp_optimizer, config)
     exclude = ["qcp1", # VectorAffineFunction not supported.
               ]
     MOIT.qcptest(qp_optimizer, config_no_duals, exclude)
 end
-MOI.empty!(optimizer)

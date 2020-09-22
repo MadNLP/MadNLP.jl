@@ -19,7 +19,7 @@ import CUDA: CUBLAS, CUSOLVER, CuVector, CuMatrix
 import LightGraphs: Graph, Edge, add_edge!, edges, src, dst, neighbors, nv
 import Plasmo: OptiGraph, OptiNode, OptiEdge, all_nodes, all_edges, all_variables, num_all_nodes, num_variables,
     getlinkconstraints
-import JuMP: _create_nlp_block_data, set_optimizer, GenericAffExpr, backend
+import JuMP: _create_nlp_block_data, set_optimizer, GenericAffExpr, backend, termination_status
 import NLPModels: finalize, AbstractNLPModel,
     obj, grad!, cons!, jac_coord!, hess_coord!, hess_structure!, jac_structure!
 import SolverTools: GenericExecutionStats

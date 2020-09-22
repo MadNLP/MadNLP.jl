@@ -1,5 +1,3 @@
-using SparseArrays, LinearAlgebra
-
 atol = rtol = 1e-8
 
 m = 2

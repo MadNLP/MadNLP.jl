@@ -1,5 +1,5 @@
-using MadNLP
-using Test
+using Test, MadNLP
+using MathOptInterface, SparseArrays, LinearAlgebra, Plasmo, JuMP 
 
 function solcmp(x,sol,atol,rtol)
     aerr = norm(x-sol,Inf)
@@ -18,10 +18,6 @@ end
 
     @testset "MOI interface" begin
         include("MOI_interface_test.jl")
-    end
-
-    @testset "CUTEst/NLPModels interfcae" begin # this also serves as interior point algorithm test
-        include("CUTEst_test.jl")
     end
 
     @testset "Plasmo interface" begin # this also serves as decomposition solver test

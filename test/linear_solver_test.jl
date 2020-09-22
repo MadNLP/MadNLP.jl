@@ -1,5 +1,3 @@
-using SparseArrays, LinearAlgebra
-
 A  = sparse(Int32[1,2,2],Int32[1,1,2],Float64[1.,.1,2.],2,2)
 b  = [1.0,3.0]
 sol= [0.8542713567839195, 1.4572864321608041]
