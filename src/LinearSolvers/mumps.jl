@@ -123,8 +123,9 @@ mutable struct Solver <: AbstractLinearSolver
     is_singular::Bool
     opt::Options
 end
+
 dmumps_c(mumps_struc::Struc)=ccall(
-    (:dmumps_c,libmumps),
+    (:dmumps_c, libmumps),
     Cvoid,
     (Ref{Struc},),
     mumps_struc)

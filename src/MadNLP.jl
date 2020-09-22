@@ -35,6 +35,7 @@ introduce() = "MadNLP version $(version())"
 
 # Linear solver dependencies
 include("../deps/deps.jl")
+
 include("utils.jl")
 include("nonlinearprogram.jl")
 include("matrixtools.jl")
