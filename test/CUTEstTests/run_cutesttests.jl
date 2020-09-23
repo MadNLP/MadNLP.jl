@@ -12,7 +12,6 @@ kwargs_collection = [
     Dict(:inertia_correction_method=>"inertia_free",:log_level=>"error"),
     Dict(:inertia_correction_method=>"inertia_based",:log_level=>"error")]
 
-GC.gc()
 @testset "CUTEst" begin
     for str in selected_case
         for kwargs in kwargs_collection
