@@ -1,7 +1,7 @@
 # MadNLP.jl
 # Created by Sungho Shin (sungho.shin@wisc.edu)
 
-@with_kw mutable struct InteriorPointCounters
+@with_kw mutable struct Counters
     k::Int = 0 # total iteration counter
     l::Int = 0 # backtracking line search counter
     t::Int = 0 # restoration phase counter
@@ -22,7 +22,7 @@
     acceptable_cnt::Int = 0
 end
 
-@with_kw mutable struct InteriorPointOptions <: AbstractOptions
+@with_kw mutable struct Options <: AbstractOptions
     # General options
     rethrow_error::Bool = true
     disable_garbage_collector::Bool = false
@@ -32,10 +32,10 @@ end
     linear_system_scaler::Module = DummyModule
     
     # Output options
-    log_level::String = "info"
+    log_level::LogLevels = INFO
     output_file::String = ""   
-    print_level::String = "trace" 
-    file_print_level::String = "trace"
+    print_level::LogLevels = TRACE
+    file_print_level::LogLevels = TRACE
 
     # Termination options
     tol::Float64 = 1e-8
@@ -48,13 +48,13 @@ end
 
     # NLP options
     kappa_d::Float64 = 1e-5
-    fixed_variable_treatment::String = "make_parameter"
+    fixed_variable_treatment::FixedVariableTreatment = MAKE_PARAMETER
     jacobian_constant::Bool = false
     hessian_constant::Bool = false
     reduced_system::Bool = true
 
     # initialization options
-    inertia_correction_method::String = "auto" 
+    inertia_correction_method::InertiaCorrectionMethod = INERTIA_AUTO
     constr_mult_init_max::Float64 = 1e3
     bound_push::Float64 = 1e-2 
     bound_fac::Float64 = 1e-2 
@@ -135,8 +135,9 @@ end
 mutable struct Solver
     nlp::NonlinearProgram
 
-    opt::InteriorPointOptions
-    cnt::InteriorPointCounters
+    opt::Options
+    cnt::Counters
+    logger::Logger
     
     n::Int # number of variables (after reformulation)
     m::Int # number of cons
@@ -267,29 +268,9 @@ mutable struct Solver
     filter::Vector{Tuple{Float64,Float64}}
 
     RR::Union{Nothing,RobustRestorer}
-    status::Symbol
+    status::Status
     output::Dict
 end
-
-const status_dict = Dict(
-    :Solve_Succeeded=>"Optimal Solution Found.",
-    :Solved_To_Acceptable_Level=>"Solved To Acceptable Level.",
-    :Search_Direction_Becomes_Too_Small=>"Search Direction is becoming Too Small.",
-    :Diverging_Iterates=>"Iterates divering; problem might be unbounded.",
-    :Maximum_Iterations_Exceeded=>"Maximum Number of Iterations Exceeded.",
-    :Maximum_WallTime_Exceeded=>"Maximum wall-clock Time Exceeded.",
-    :Restoration_Failed=>"Restoration Failed",
-    :Infeasible_Problem_Detected=>"Converged to a point of local infeasibility. Problem may be infeasible.",
-    :Invalid_Number_Detected=>"Invalid number in NLP function or derivative detected.",
-    :Error_In_Step_Computation=>"Error in step computation.",
-    :Not_Enough_Degrees_Of_Freedom=>"Problem has too few degrees of freedom.",
-    :User_Requested_Stop=>"Stopping optimization at current point as requested by user.",
-    :Internal_Error=>"Internal Error.")
-
-const error_status = [
-    :Error_In_Step_Computation,
-    :Not_Enough_Degrees_Of_Freedom,
-    :Invalid_Number_Detected]
 
 struct InvalidNumberException <: Exception end
 struct NotEnoughDegreesOfFreedomException <: Exception end
@@ -313,7 +294,7 @@ end
 
 
 function initialize_robust_restorer!(ips::Solver)
-    trace(LOGGER,"Initializing restoration phase variables.")
+    @trace(ips.logger,"Initializing restoration phase variables.")
     ips.RR == nothing && (ips.RR = RobustRestorer(ips))
     RR = ips.RR
     
@@ -350,18 +331,19 @@ function Solver(nlp::NonlinearProgram;
                              option_dict::Dict{Symbol,Any}=Dict{Symbol,Any}(),
                              kwargs...)    
     
-    cnt = InteriorPointCounters(start_time=time())
-    opt = InteriorPointOptions(linear_solver=default_linear_solver())
+    cnt = Counters(start_time=time())
+    opt = Options(linear_solver=default_linear_solver())
     set_options!(opt,option_dict,kwargs)
-    set_logger!(opt.log_level,opt.print_level,opt.output_file,opt.file_print_level)
-    trace(LOGGER,"Logger is initialized.")
+    logger = Logger(print_level=opt.print_level,file_print_level=opt.file_print_level,
+                    file = opt.output_file == "" ? nothing : open(opt.output_file,"w+"))
+    @trace(logger,"Logger is initialized.")
     
     # generic options
     opt.disable_garbage_collector &&
-        (GC.enable(false); warn(LOGGER,"Julia garbage collector is temporarily disabled"))
+        (GC.enable(false); @warn(logger,"Julia garbage collector is temporarily disabled"))
     opt.blas_num_threads == -1 || set_blas_num_threads(opt.blas_num_threads; permanent=true)
 
-    trace(LOGGER,"Initializing variables.")
+    @trace(logger,"Initializing variables.")
     ind_ineq = findall(nlp.gl.!=nlp.gu)
     ns = length(ind_ineq)
     n = nlp.n+ns
@@ -392,7 +374,7 @@ function Solver(nlp::NonlinearProgram;
     n_jac = length(jac_sparsity_I)
     n_hess= length(hess_sparsity_I)
 
-    if opt.fixed_variable_treatment == "make_parameter"
+    if opt.fixed_variable_treatment == MAKE_PARAMETER
         ind_fixed = findall(xl.==xu)  
         ind_lb = findall((xl.!=-Inf) .* (xl.!=xu))
         ind_ub = findall((xu.!= Inf) .* (xl.!=xu))
@@ -445,6 +427,8 @@ function Solver(nlp::NonlinearProgram;
     _w4x= view(_w4,1:n)
     _w4l= view(_w4,n+1:n+m)
 
+    jacl = zeros(n) # spblas may throw an error if not initialized to zero
+    
     d = Vector{Float64}(undef,aug_vec_length)
     dx= view(d,1:n) 
     dl= view(d,n+1:n+m)
@@ -510,27 +494,28 @@ function Solver(nlp::NonlinearProgram;
     aug_com,aug_compress = get_coo_to_com(aug_raw)
     jac_com,jac_compress = get_coo_to_com(jac_raw)
 
-    trace(LOGGER,"Initializing linear solver.")
-    cnt.linear_solver_time = @elapsed linear_solver = opt.linear_solver.Solver(aug_com;option_dict=option_dict)
+    @trace(logger,"Initializing linear solver.")
+    cnt.linear_solver_time =
+        @elapsed linear_solver = opt.linear_solver.Solver(aug_com;option_dict=option_dict,logger=logger)
     
-    trace(LOGGER,"Initializing iterative solver.")
+    @trace(logger,"Initializing iterative solver.")
     iterator = opt.iterator.Solver(
         Vector{Float64}(undef,m+n), 
         (b,x)->symv!(b,aug_com,x),(x)->solve!(linear_solver,x);option_dict=option_dict)
 
-    trace(LOGGER,"Initializing linear system scaler.")
+    @trace(logger,"Initializing linear system scaler.")
     linear_system_scaler = opt.linear_system_scaler == DummyModule ? nothing :
         opt.linear_system_scaler.Scaler(aug_com)
 
-    trace(LOGGER,"Initializing fixed variable treatment scheme.")
+    @trace(logger,"Initializing fixed variable treatment scheme.")
     fixed_variable_treatment_aug = get_fixed_variable_treatment_aug(aug_com,ind_fixed)
     
-    if opt.inertia_correction_method == "auto"
-        opt.inertia_correction_method = is_inertia(linear_solver) ? "inertia_based" : "inertia_free"
+    if opt.inertia_correction_method == INERTIA_AUTO
+        opt.inertia_correction_method = is_inertia(linear_solver) ? INERTIA_BASED : INERTIA_FREE
     end
 
     function factorize_wrapper!()
-        trace(LOGGER,"Factorization started.")
+        @trace(logger,"Factorization started.")
         aug_compress()
         fixed_variable_treatment_aug()
         linear_system_scaler == nothing ||
@@ -539,36 +524,36 @@ function Solver(nlp::NonlinearProgram;
     end
     
     function solve_refine_wrapper!(x,b)
-        trace(LOGGER,"Iterative solution started.")
+        @trace(logger,"Iterative solution started.")
         fixed_variable_treatment_vec!(b,ind_fixed)
         linear_system_scaler == nothing || scale!(b,linear_system_scaler)
         
         cnt.linear_solver_time += @elapsed (result = solve_refine!(x,iterator,b))
         if result == :Solved
-            status =  true
+            solve_status =  true
         else
             if improve!(linear_solver)
                 cnt.linear_solver_time += @elapsed begin
                     factorize!(linear_solver)
-                    status = (solve_refine!(x,iterator,b) == :Solved ? true : false)
+                    solve_status = (solve_refine!(x,iterator,b) == :Solved ? true : false)
                 end
             else
-                status = false
+                solve_status = false
             end
         end
         linear_system_scaler == nothing || scale!(x,linear_system_scaler)
         fixed_variable_treatment_vec!(x,ind_fixed)
-        return status
+        return solve_status
     end    
     function obj(x::Vector{Float64})
-        trace(LOGGER,"Evaluating objective.")
+        @trace(logger,"Evaluating objective.")
         cnt.eval_function_time += @elapsed obj_val = nlp.obj(view(x,1:nlp.n))
         cnt.obj_cnt+=1
         cnt.obj_cnt==1 && (is_valid(obj_val) || throw(InvalidNumberException()))
         return obj_val*obj_scale[]
     end
     function obj_grad!(f::Vector{Float64},x::Vector{Float64})
-        trace(LOGGER,"Evaluating objective gradient.")
+        @trace(logger,"Evaluating objective gradient.")
         cnt.eval_function_time += @elapsed nlp.obj_grad!(f,view(x,1:nlp.n))
         f.*=obj_scale[]
         cnt.obj_grad_cnt+=1
@@ -576,7 +561,7 @@ function Solver(nlp::NonlinearProgram;
         return f
     end
     function con!(c::Vector{Float64},x::Vector{Float64})
-        trace(LOGGER,"Evaluating constraints.")
+        @trace(logger,"Evaluating constraints.")
         cnt.eval_function_time += @elapsed nlp.con!(c,view(x,1:nlp.n))
         view(c,ind_ineq).-=view(x,nlp.n+1:n)
         c.-=rhs
@@ -586,19 +571,18 @@ function Solver(nlp::NonlinearProgram;
         return c
     end
     function con_jac!(x::Vector{Float64})
-        trace(LOGGER,"Evaluating constraint Jacobian.")
+        @trace(logger,"Evaluating constraint Jacobian.")
         cnt.eval_function_time += @elapsed nlp.con_jac!(jac,view(x,1:nlp.n))
         jac[n_jac-ns+1:n_jac].=-1.
         jac.*=con_jac_scale
         cnt.con_jac_cnt+=1
         cnt.con_jac_cnt==1 && (is_valid(jac) || throw(InvalidNumberException()))
         jac_compress()
-        trace(LOGGER,"Constraint jacobian evaluation started.")
+        @trace(logger,"Constraint jacobian evaluation started.")
         return jac
     end
-    function lag_hess!(x::Vector{Float64},l::Vector{Float64};
-                       is_resto=false)
-        trace(LOGGER,"Evaluating Lagrangian Hessian.")
+    function lag_hess!(x::Vector{Float64},l::Vector{Float64};is_resto=false)
+        @trace(logger,"Evaluating Lagrangian Hessian.")
         _w1l .= l.*con_scale
         cnt.eval_function_time += @elapsed  nlp.lag_hess!(
             hess,view(x,1:nlp.n),_w1l,is_resto ? 0. : obj_scale[])
@@ -607,13 +591,12 @@ function Solver(nlp::NonlinearProgram;
         return hess
     end
 
-    !isempty(option_dict) && print_ignored_options(option_dict)
+    !isempty(option_dict) && print_ignored_options(logger,option_dict)
 
-    return Solver(nlp,opt,cnt,n,m,nlb,nub,
-                  x,l,zl,zu,xl,xu,0.,f,c,
+    return Solver(nlp,opt,cnt,logger,
+                  n,m,nlb,nub,x,l,zl,zu,xl,xu,0.,f,c,
                   hess,jac,pr_diag,du_diag,l_diag,u_diag,l_lower,u_lower,
-                  aug_raw,aug_com,aug_compress,jac_raw,jac_com,jac_compress,
-                  zeros(n), # spblas may throw an error if not initialized to zero
+                  aug_raw,aug_com,aug_compress,jac_raw,jac_com,jac_compress,jacl,
                   d,dx,dl,dzl,dzu,p,px,pl,pzl,pzu,
                   _w1,_w1x,_w1l,_w1zl,_w1zu,_w2,_w2x,_w2l,_w2zl,_w2zu,_w3,_w3x,_w3l,_w4,_w4x,_w4l,
                   x_trial,c_trial,0.,x_slk,c_slk,rhs,ind_fixed,ind_llb,ind_uub,
@@ -623,18 +606,18 @@ function Solver(nlp::NonlinearProgram;
                   obj_scale,con_scale,con_jac_scale,
                   obj,obj_grad!,con!,con_jac!,lag_hess!,
                   0.,0.,0.,0.,0.,0.,0.,0.,0.," ",0.,0.,0.,
-                  Vector{Float64}[],nothing,:Initial,Dict())
+                  Vector{Float64}[],nothing,INITIAL,Dict())
 end
 
 function initialize!(ips::Solver)
     # initializing slack variables
-    trace(LOGGER,"Initializing slack variables.")
+    @trace(ips.logger,"Initializing slack variables.")
     ips.nlp.con!(ips.c,ips.nlp.x)
     ips.cnt.con_cnt += 1
     ips.x_slk.=ips.c_slk
 
     # Initialization
-    trace(LOGGER,"Initializing primal and bound duals.")
+    @trace(ips.logger,"Initializing primal and bound duals.")
     ips.zl_r.=1.0
     ips.zu_r.=1.0
     ips.xl_r.-= max.(1,abs.(ips.xl_r)).*ips.opt.tol 
@@ -642,7 +625,7 @@ function initialize!(ips::Solver)
     initialize_variables!(ips.x,ips.xl,ips.xu,ips.opt.bound_push,ips.opt.bound_fac)
 
     # Automatic scaling (constraints)
-    trace(LOGGER,"Computing constraint scaling.")
+    @trace(ips.logger,"Computing constraint scaling.")
     ips.con_jac!(ips.x)
     set_con_scale!(ips.con_scale,ips.con_jac_scale,ips.jac,ips.jac_raw.I,ips.opt.nlp_scaling_max_gradient)
     ips.l./=ips.con_scale
@@ -651,12 +634,12 @@ function initialize!(ips::Solver)
     
     # Automatic scaling (objective)
     ips.obj_grad!(ips.f,ips.x)
-    trace(LOGGER,"Computing objective scaling.")
+    @trace(ips.logger,"Computing objective scaling.")
     ips.obj_scale[] = min(1,ips.opt.nlp_scaling_max_gradient/norm(ips.f,Inf))
     ips.f.*=ips.obj_scale[]
     
     # Initialize dual variables
-    trace(LOGGER,"Initializing constraint duals.")
+    @trace(ips.logger,"Initializing constraint duals.")
     if ips.opt.reduced_system 
         set_initial_aug_reduced!(ips.pr_diag,ips.du_diag,ips.hess)
         set_initial_rhs_reduced!(ips.px,ips.pl,ips.f,ips.zl,ips.zu)
@@ -680,49 +663,49 @@ function initialize!(ips::Solver)
     ips.tau=max(ips.opt.tau_min,1-ips.opt.mu_init)
     ips.filter = [(ips.theta_max,-Inf)]
     
-    return :Regular
+    return REGULAR
 end
 
 # major loops ---------------------------------------------------------
 function optimize!(ips::Solver)
     try
-        notice(LOGGER,"This is $(introduce()), running with $(introduce(ips.linear_solver))\n")
+        @notice(ips.logger,"This is $(introduce()), running with $(introduce(ips.linear_solver))\n")
         print_init(ips)
-        ips.status == :Initial && (ips.status = initialize!(ips))
+        ips.status == INITIAL && (ips.status = initialize!(ips))
 
-        while ips.status in [:Regular,:Restore,:Robust]
-            ips.status == :Regular && (ips.status = regular!(ips))
-            ips.status == :Restore && (ips.status = robust!(ips))
-            ips.status == :Robust && (ips.status = robust!(ips))
+        while ips.status >= REGULAR
+            ips.status == REGULAR && (ips.status = regular!(ips))
+            ips.status == RESTORE && (ips.status = robust!(ips))
+            ips.status == ROBUST && (ips.status = robust!(ips))
         end
     catch e
         if e isa InvalidNumberException
-            ips.status=:Invalid_Number_Detected
+            ips.status=INVALID_NUMBER_DETECTED
         elseif e isa NotEnoughDegreesOfFreedomException
-            ips.status=:Not_Enough_Degrees_Of_Freedom
+            ips.status=NOT_ENOUGH_DEGREES_OF_FREEDOM
         elseif e isa LinearSolverException
-            ips.status=:Error_In_Step_Computation;
+            ips.status=ERROR_IN_STEP_COMPUTATION;
             ips.opt.rethrow_error && rethrow(e)
         elseif e isa InterruptException
-            ips.status=:User_Requested_Stop
+            ips.status=USER_REQUESTED_STOP
             ips.opt.rethrow_error && rethrow(e)
         else
-            ips.status=:Internal_Error
+            ips.status=INTERNAL_ERROR
             ips.opt.rethrow_error && rethrow(e)
         end
     finally
         ips.cnt.total_time = time() - ips.cnt.start_time
-        !(ips.status in error_status) && (print_summary_1(ips);print_summary_2(ips))
-        notice(LOGGER,"EXIT: $(status_dict[ips.status])")
+        !(ips.status < SOLVE_SUCCEEDED) && (print_summary_1(ips);print_summary_2(ips))
+        @notice(ips.logger,"EXIT: $(status_output_dict[ips.status])")
         terminate!(ips)
         ips.opt.disable_garbage_collector &&
-            (GC.enable(true); warn(LOGGER,"Julia garbage collector is turned back on"))
-        empty!(LOGGER.handlers) # logger dies
+            (GC.enable(true); @warn(ips.logger,"Julia garbage collector is turned back on"))
+        finalize(ips.logger) 
     end
 end
 
 function terminate!(ips::Solver)
-    trace(LOGGER,"Writing the result to NonlinearProgram.")
+    @trace(ips.logger,"Writing the result to NonlinearProgram.")
     ips.nlp.obj_val = ips.obj_val/ips.obj_scale[]
     ips.nlp.x .=  view(ips.x,1:ips.nlp.n)
     ips.c ./= ips.con_scale
@@ -751,17 +734,17 @@ function regular!(ips::Solver)
         print_iter(ips)
 
         # evaluate termination criteria        
-        trace(LOGGER,"Evaluating termination criteria.")
-        max(ips.inf_pr,ips.inf_du,ips.inf_compl) <= ips.opt.tol && return :Solve_Succeeded
+        @trace(ips.logger,"Evaluating termination criteria.")
+        max(ips.inf_pr,ips.inf_du,ips.inf_compl) <= ips.opt.tol && return SOLVE_SUCCEEDED
         max(ips.inf_pr,ips.inf_du,ips.inf_compl) <= ips.opt.acceptable_tol ?
             (ips.cnt.acceptable_cnt < ips.opt.acceptable_iter ?
-             ips.cnt.acceptable_cnt+=1 : return :Solved_To_Acceptable_Level) : (ips.cnt.acceptable_cnt = 0)
-        max(ips.inf_pr,ips.inf_du,ips.inf_compl) >= ips.opt.diverging_iterates_tol && return :Diverging_Iterates
-        ips.cnt.k>=ips.opt.max_iter && return :Maximum_Iterations_Exceeded
-        time()-ips.cnt.start_time>=ips.opt.max_wall_time && return :Maximum_WallTime_Exceeded
+             ips.cnt.acceptable_cnt+=1 : return SOLVED_TO_ACCEPTABLE_LEVEL) : (ips.cnt.acceptable_cnt = 0)
+        max(ips.inf_pr,ips.inf_du,ips.inf_compl) >= ips.opt.diverging_iterates_tol && return DIVERGING_ITERATES
+        ips.cnt.k>=ips.opt.max_iter && return MAXIMUM_ITERATIONS_EXCEEDED
+        time()-ips.cnt.start_time>=ips.opt.max_wall_time && return MAXIMUM_WALLTIME_EXCEEDED
 
         # update the barrier parameter
-        trace(LOGGER,"Updating the barrier parameter.")
+        @trace(ips.logger,"Updating the barrier parameter.")
         while ips.mu != ips.opt.mu_min &&
             max(ips.inf_pr,ips.inf_du,inf_compl_mu) <= ips.opt.barrier_tol_factor*ips.mu
             mu_new = get_mu(ips.mu,ips.opt.mu_min,
@@ -776,32 +759,29 @@ function regular!(ips::Solver)
         end
 
         # compute the newton step
-        trace(LOGGER,"Computing the newton step.")
+        @trace(ips.logger,"Computing the newton step.")
         (ips.cnt.k!=0 && !ips.opt.hessian_constant) && ips.lag_hess!(ips.x,ips.l)
 
         if ips.opt.reduced_system
             set_aug_reduced!(ips.pr_diag,ips.du_diag,ips.x,ips.xl,ips.xu,ips.zl,ips.zu)
             set_aug_rhs_reduced!(ips.x,ips.xl,ips.xu,ips.f,ips.c,ips.jacl,ips.px,ips.pl,ips.mu)
-            ips.opt.inertia_correction_method == "inertia_free" &&
-                set_aug_rhs_ifr_reduced!(ips.c,ips._w1x,ips._w1l)
+            ips.opt.inertia_correction_method == INERTIA_FREE && set_aug_rhs_ifr_reduced!(ips.c,ips._w1x,ips._w1l)
         else
             set_aug_unreduced!(ips.pr_diag,ips.du_diag,ips.l_lower,ips.u_lower,ips.l_diag,ips.u_diag,
                                ips.zl_r,ips.zu_r,ips.x_lr,ips.xl_r,ips.xu_r,ips.x_ur)
             set_aug_rhs_unreduced!(ips.px,ips.pl,ips.pzl,ips.pzu,ips.f,ips.c,ips.jacl,ips.l_lower,ips.u_lower,
                                    ips.x_lr,ips.xl_r,ips.xu_r,ips.x_ur,ips.zl,ips.zu,ips.mu)
-            ips.opt.inertia_correction_method == "inertia_free" &&
+            ips.opt.inertia_correction_method == INERTIA_FREE &&
                 set_aug_rhs_ifr_unreduced!(ips.c,ips._w1x,ips._w1l,ips._w1zl,ips._w1zu)
         end
         dual_inf_perturbation!(ips.px,ips.ind_llb,ips.ind_uub,ips.mu,ips.opt.kappa_d)
 
         # start inertia conrrection
-        trace(LOGGER,"Solving primal-dual system.")
-        if ips.opt.inertia_correction_method == "inertia_free"
-            inertia_free_reg(ips) || return :Restore
-        elseif ips.opt.inertia_correction_method == "inertia_based"
-            inertia_based_reg(ips) || return :Restore
-        elseif ips.opt.inertia_correction_method == "inertia_ignored"
-            inertia_ignored_reg(ips) || return :Restore
+        @trace(ips.logger,"Solving primal-dual system.")
+        if ips.opt.inertia_correction_method == INERTIA_FREE
+            inertia_free_reg(ips) || return RESTORE
+        elseif ips.opt.inertia_correction_method == INERTIA_BASED
+            inertia_based_reg(ips) || return RESTORE
         end
 
         if ips.opt.reduced_system
@@ -813,7 +793,7 @@ function regular!(ips::Solver)
 
         
         # filter start
-        trace(LOGGER,"Backtracking line search initiated.")
+        @trace(ips.logger,"Backtracking line search initiated.")
         theta = get_theta(ips.c)
         varphi= get_varphi(ips.obj_val,ips.x_lr,ips.xl_r,ips.xu_r,ips.x_ur,ips.mu)
         varphi_d = get_varphi_d(ips.f,ips.x,ips.xl,ips.xu,ips.dx,ips.mu)
@@ -844,7 +824,7 @@ function regular!(ips::Solver)
             ips.ftype = get_ftype(
                 ips.filter,theta,theta_trial,varphi,varphi_trial,switching_condition,armijo_condition,
                 ips.theta_min,ips.opt.obj_max_inc,ips.opt.gamma_theta,ips.opt.gamma_phi)
-            ips.ftype in ["f","h"] && (trace(LOGGER,"Step accepted with type $(ips.ftype)"); break)
+            ips.ftype in ["f","h"] && (@trace(ips.logger,"Step accepted with type $(ips.ftype)"); break)
             
             ips.cnt.l==1 && theta_trial>=theta && second_order_correction(
                 ips,alpha_max,theta,varphi,theta_trial,varphi_d,switching_condition) && break
@@ -852,24 +832,25 @@ function regular!(ips::Solver)
             ips.alpha /= 2
             ips.cnt.l += 1
             if ips.alpha < alpha_min
-                debug(LOGGER,
+                @debug(ips.logger,
                       "Cannot find an acceptable step at iteration $(ips.cnt.k). Switching to restoration phase.")
                 ips.cnt.k+=1
-                return :Restore
+                return RESTORE
             else
-                trace(LOGGER,"Step rejected; proceed with the next trial step.")
+                @trace(ips.logger,"Step rejected; proceed with the next trial step.")
                 ips.alpha < eps(Float64)*10 && return ips.cnt.acceptable_cnt >0 ?
-                    :Solved_To_Acceptable_Level : :Search_Direction_Becomes_Too_Small
+                    SOLVED_TO_ACCEPTABLE_LEVEL : SEARCH_DIRECTION_BECOMES_TOO_SMALL
             end
         end
         
-        trace(LOGGER,"Updating primal-dual variables.")
+        @trace(ips.logger,"Updating primal-dual variables.")
         ips.x.=ips.x_trial
         ips.c.=ips.c_trial
         ips.obj_val=ips.obj_val_trial
         
         adjusted = adjust_boundary!(ips.x_lr,ips.xl_r,ips.x_ur,ips.xu_r,ips.mu)
-        adjusted > 0 && warn(LOGGER,"In iteration $(ips.cnt.k), $adjusted Slack too small, adjusting variable bound")
+        adjusted > 0 &&
+            @warn(ips.logger,"In iteration $(ips.cnt.k), $adjusted Slack too small, adjusting variable bound")
         
         ips.l.+=ips.alpha.*ips.dl
         ips.zl_r.+=ips.alpha_z.*ips.dzl
@@ -879,12 +860,12 @@ function regular!(ips::Solver)
         ips.obj_grad!(ips.f,ips.x)
         
         if !switching_condition || !armijo_condition
-            trace(LOGGER,"Augmenting filter.")
+            @trace(ips.logger,"Augmenting filter.")
             augment_filter!(ips.filter,theta_trial,varphi_trial,ips.opt.gamma_theta)
         end
         
         ips.cnt.k+=1
-        trace(LOGGER,"Proceeding to the next interior point iteration.")
+        @trace(ips.logger,"Proceeding to the next interior point iteration.")
     end
 end
 
@@ -914,7 +895,7 @@ function restore!(ips::Solver)
 
         F_trial = get_F(
             ips.c,ips.f,ips.zl,ips.zu,ips.jacl,ips.x_lr,ips.xl_r,ips.zl_r,ips.xu_r,ips.x_ur,ips.zu_r,ips.mu)  
-        F_trial > ips.opt.soft_resto_pderror_reduction_factor*F && (ips.x.=ips._w1x; return :Robust)
+        F_trial > ips.opt.soft_resto_pderror_reduction_factor*F && (ips.x.=ips._w1x; return ROBUST)
         F = F_trial
         
         theta = get_theta(ips.c)
@@ -922,9 +903,9 @@ function restore!(ips::Solver)
         
         ips.cnt.k+=1
         
-        is_filter_acceptable(ips.filter,theta,varphi) ? (ips.cnt.t+=1) : return :Regular
-        ips.cnt.k>=ips.opt.max_iter && return :Maximum_Iterations_Exceeded
-        time()-ips.cnt.start_time>=ips.opt.max_wall_time && return :Maximum_WallTime_Exceeded
+        is_filter_acceptable(ips.filter,theta,varphi) ? (ips.cnt.t+=1) : return REGULAR
+        ips.cnt.k>=ips.opt.max_iter && return MAXIMUM_ITERATIONS_XCEEDED
+        time()-ips.cnt.start_time>=ip.opt.max_wall_time && return MAXIMUM_WALLTIME_EXCEEDED
 
 
         sd = get_sd(ips.l,ips.zl_r,ips.zu_r,ips.opt.s_max)
@@ -970,7 +951,7 @@ function robust!(ips::Solver)
         # end
         
         # evaluate termination criteria
-        trace(LOGGER,"Evaluating restoration phase termination criteria.")
+        @trace(ips.logger,"Evaluating restoration phase termination criteria.")
         sd = get_sd(ips.l,ips.zl_r,ips.zu_r,ips.opt.s_max)
         sc = get_sc(ips.zl_r,ips.zu_r,ips.opt.s_max)
         ips.inf_pr = get_inf_pr(ips.c)
@@ -987,14 +968,13 @@ function robust!(ips::Solver)
         
         print_iter(ips;is_resto=true)
         
-        max(RR.inf_pr_R,RR.inf_du_R,RR.inf_compl_R) <= ips.opt.tol &&
-            return :Infeasible_Problem_Detected
-        ips.cnt.k>=ips.opt.max_iter && return :Maximum_Iterations_Exceeded
-        time()-ips.cnt.start_time>=ips.opt.max_wall_time && return :Maximum_WallTime_Exceeded
+        max(RR.inf_pr_R,RR.inf_du_R,RR.inf_compl_R) <= ips.opt.tol && return INFEASIBLE_PROBLEM_DETECTED
+        ips.cnt.k>=ips.opt.max_iter && return MAXIMUM_ITERATIONS_EXCEEDED
+        time()-ips.cnt.start_time>=ips.opt.max_wall_time && return MAXIMUM_WALLTIME_EXCEEDED
 
 
         # update the barrier parameter
-        trace(LOGGER,"Updating restoration phase barrier parameter.")
+        @trace(ips.logger,"Updating restoration phase barrier parameter.")
         while RR.mu_R != ips.opt.mu_min*100 &&
             max(RR.inf_pr_R,RR.inf_du_R,inf_compl_mu_R) <= ips.opt.barrier_tol_factor*RR.mu_R
             mu_new = get_mu(RR.mu_R,ips.opt.mu_min,
@@ -1031,7 +1011,7 @@ function robust!(ips::Solver)
         end
         
         # without inertia correction,
-        trace(LOGGER,"Solving restoration phase primal-dual system.")
+        @trace(ips.logger,"Solving restoration phase primal-dual system.")
         ips.factorize!()
         ips.solve_refine!(ips.d,ips.p)
 
@@ -1056,7 +1036,7 @@ function robust!(ips::Solver)
                                   ips.opt.alpha_min_frac,ips.opt.delta,ips.opt.s_theta,ips.opt.s_phi)
 
         # filter start
-        trace(LOGGER,"Backtracking line search initiated.")
+        @trace(ips.logger,"Backtracking line search initiated.")
         ips.alpha = alpha_max
         ips.cnt.l = 1
         theta_R_trial = 0.
@@ -1081,22 +1061,21 @@ function robust!(ips::Solver)
             ips.ftype = get_ftype(
                 RR.filter,theta_R,theta_R_trial,varphi_R,varphi_R_trial,switching_condition,armijo_condition,
                 ips.theta_min,ips.opt.obj_max_inc,ips.opt.gamma_theta,ips.opt.gamma_phi)
-            ips.ftype in ["f","h"] && (trace(LOGGER,"Step accepted with type $(ips.ftype)"); break)
+            ips.ftype in ["f","h"] && (@trace(ips.logger,"Step accepted with type $(ips.ftype)"); break)
             
             ips.alpha /= 2
             ips.cnt.l += 1
             if ips.alpha < alpha_min
-                debug(LOGGER,
-                      "Restoration phase cannot find an acceptable step at iteration $(ips.cnt.k).")
-                return :Restoration_Failed
+                @debug(ips.logger,"Restoration phase cannot find an acceptable step at iteration $(ips.cnt.k).")
+                return RESTORATION_FAILED
             else
-                trace(LOGGER,"Step rejected; proceed with the next trial step.")
+                @trace(ips.logger,"Step rejected; proceed with the next trial step.")
                 ips.alpha < eps(Float64)*10 && return ips.cnt.acceptable_cnt >0 ?
-                    :Solved_To_Acceptable_Level : :Search_Direction_Becomes_Too_Small
+                    SOLVED_TO_ACCEPTABLE_LEVEL : SEARCH_DIRECTION_BECOMES_TOO_SMALL
             end
         end
 
-        trace(LOGGER,"Updating primal-dual variables.")
+        @trace(ips.logger,"Updating primal-dual variables.")
         ips.x.=ips.x_trial
         ips.c.=ips.c_trial
         RR.pp.=RR.pp_trial
@@ -1117,12 +1096,12 @@ function robust!(ips::Solver)
         reset_bound_dual!(RR.zn,RR.nn,RR.mu_R,ips.opt.kappa_sigma)
 
         if !switching_condition || !armijo_condition
-            trace(LOGGER,"Augmenting restoration phase filter.")
+            @trace(ips.logger,"Augmenting restoration phase filter.")
             augment_filter!(RR.filter,theta_R_trial,varphi_R_trial,ips.opt.gamma_theta)
         end
         
         # check if going back to regular phase
-        trace(LOGGER,"Checking if going back to regular phase.")
+        @trace(ips.logger,"Checking if going back to regular phase.")
         ips.obj_val = ips.obj(ips.x)
         ips.obj_grad!(ips.f,ips.x)
         theta = get_theta(ips.c)
@@ -1132,7 +1111,7 @@ function robust!(ips::Solver)
         if !is_filter_acceptable(ips.RR.filter,theta,varphi) &&
             theta <= ips.opt.required_infeasibility_reduction * RR.theta_ref
             
-            trace(LOGGER,"Going back to the regular pahse.")
+            @trace(ips.logger,"Going back to the regular pahse.")
             ips.zl_r.=1
             ips.zu_r.=1
 
@@ -1150,55 +1129,20 @@ function robust!(ips::Solver)
             norm(ips.dl,Inf)>ips.opt.constr_mult_init_max ? (ips.l.= 0) : (ips.l.= ips.dl)
             ips.cnt.k+=1
             
-            return :Regular
+            return REGULAR
         end
 
-        ips.cnt.k>=ips.opt.max_iter && return :Maximum_Iterations_Exceeded
-        time()-ips.cnt.start_time>=ips.opt.max_wall_time && return :Maximum_WallTime_Exceeded
+        ips.cnt.k>=ips.opt.max_iter && return MAXIMUM_ITERATIONS_EXCEEDED
+        time()-ips.cnt.start_time>=ips.opt.max_wall_time && return MAXIMUM_WALLTIME_EXCEEDED
 
-        trace(LOGGER,"Proceeding to the next restoration phase iteration.")
+        @trace(ips.logger,"Proceeding to the next restoration phase iteration.")
         ips.cnt.k+=1
         ips.cnt.t+=1
     end
 end
 
-function inertia_ignored_reg(ips::Solver)
-    trace(LOGGER,"Inertia-ignored regularization started.")
-    
-    ips.factorize!()
-    solve_status = ips.solve_refine!(ips.d,ips.p)
-    n_trial = 0
-    ips.del_w = del_w_prev = 0.
-    
-    while !solve_status
-        debug(LOGGER,"Primal-dual perturbed.")
-        if n_trial == 0 
-            ips.del_w = ips.del_w_last==.0 ? ips.opt.first_hessian_perturbation :
-                max(ips.opt.min_hessian_perturbation,ips.opt.perturb_dec_fact*ips.del_w_last)
-        else
-            ips.del_w*= ips.del_w_last==.0 ? ips.opt.perturb_inc_fact_first : ips.opt.perturb_inc_fact
-            if ips.del_w>ips.opt.max_hessian_perturbation ips.cnt.k+=1
-                debug(LOGGER,"Primal regularization is too big. Switching to restoration phase.")
-                return false
-            end
-        end
-        ips.del_c =  !solve_status ?
-            ips.opt.jacobian_regularization_value * ips.mu^(ips.opt.jacobian_regularization_exponent) : 0.
-        ips.pr_diag.+=ips.del_w-del_w_prev
-        ips.du_diag.=-ips.del_c
-        del_w_prev = ips.del_w
-
-        ips.factorize!()
-        solve_status = ips.solve_refine!(ips.d,ips.p)
-        n_trial += 1
-    end
-    ips.del_w != 0 && (ips.del_w_last = ips.del_w)
-    
-    return true
-end
-
 function inertia_based_reg(ips::Solver)
-    trace(LOGGER,"Inertia-based regularization started.")
+    @trace(ips.logger,"Inertia-based regularization started.")
     
     ips.factorize!()
     num_pos,num_zero,num_neg = inertia(ips.linear_solver)
@@ -1207,7 +1151,7 @@ function inertia_based_reg(ips::Solver)
     n_trial = 0
     ips.del_w = del_w_prev = 0.
     while num_zero!= 0 || num_pos != ips.n || !solve_status
-        debug(LOGGER,"Primal-dual perturbed.")
+        @debug(ips.logger,"Primal-dual perturbed.")
         if n_trial > 0 
             if ips.del_w == 0.
                 ips.del_w = ips.del_w_last==0. ? ips.opt.first_hessian_perturbation :
@@ -1215,7 +1159,7 @@ function inertia_based_reg(ips::Solver)
             else
                 ips.del_w*= ips.del_w_last==0. ? ips.opt.perturb_inc_fact_first : ips.opt.perturb_inc_fact
                 if ips.del_w>ips.opt.max_hessian_perturbation ips.cnt.k+=1
-                    debug(LOGGER,"Primal regularization is too big. Switching to restoration phase.")
+                    @debug(ips.logger,"Primal regularization is too big. Switching to restoration phase.")
                     return false
                 end
             end
@@ -1239,7 +1183,7 @@ end
 
 function inertia_free_reg(ips::Solver)
     
-    trace(LOGGER,"Inertia-free regularization started.")
+    @trace(ips.logger,"Inertia-free regularization started.")
     p0 = ips._w1 
     d0= ips._w2
     t = ips._w3x
@@ -1263,14 +1207,14 @@ function inertia_free_reg(ips::Solver)
     ips.del_w = del_w_prev = 0.
 
     while !curv_test(t,n,g,wx,ips.opt.inertia_free_tol)  || !solve_status
-        debug(LOGGER,"Primal-dual perturbed.")
+        @debug(ips.logger,"Primal-dual perturbed.")
         if n_trial == 0 
             ips.del_w = ips.del_w_last==.0 ? ips.opt.first_hessian_perturbation :
                 max(ips.opt.min_hessian_perturbation,ips.opt.perturb_dec_fact*ips.del_w_last)
         else
             ips.del_w*= ips.del_w_last==.0 ? ips.opt.perturb_inc_fact_first : ips.opt.perturb_inc_fact
             if ips.del_w>ips.opt.max_hessian_perturbation ips.cnt.k+=1
-                debug(LOGGER,"Primal regularization is too big. Switching to restoration phase.")
+                @debug(ips.logger,"Primal regularization is too big. Switching to restoration phase.")
                 return false
             end
         end
@@ -1295,7 +1239,7 @@ curv_test(t,n,g,wx,inertia_free_tol) = dot(wx,t) + max(dot(wx,n)-dot(g,n),0) - i
                                     
 function second_order_correction(ips::Solver,alpha_max::Float64,theta::Float64,varphi::Float64,
                                  theta_trial::Float64,varphi_d::Float64,switching_condition::Bool)
-    trace(LOGGER,"Second-order correction started.")
+    @trace(ips.logger,"Second-order correction started.")
     
     ips._w1l .= alpha_max .* ips.c .+ ips.c_trial
     theta_soc_old = theta_trial
@@ -1325,7 +1269,7 @@ function second_order_correction(ips::Solver,alpha_max::Float64,theta::Float64,v
         if theta <=ips.theta_min && switching_condition
             # Case I
             if is_armijo(varphi_soc,varphi,ips.opt.eta_phi,ips.alpha,varphi_d)
-                trace(LOGGER,"Step in second order correction accepted by armijo condition.")
+                @trace(ips.logger,"Step in second order correction accepted by armijo condition.")
                 ips.ftype = "F"
                 ips.alpha=alpha_soc
                 return true
@@ -1333,7 +1277,7 @@ function second_order_correction(ips::Solver,alpha_max::Float64,theta::Float64,v
         else
             # Case II
             if is_sufficient_progress(theta_soc,theta,ips.opt.gamma_theta,varphi_soc,varphi,ips.opt.gamma_phi)
-                trace(LOGGER,"Step in second order correction accepted by sufficient progress.")
+                @trace(ips.logger,"Step in second order correction accepted by sufficient progress.")
                 ips.ftype = "H"
                 ips.alpha=alpha_soc
                 return true
@@ -1343,7 +1287,7 @@ function second_order_correction(ips::Solver,alpha_max::Float64,theta::Float64,v
         theta_soc>ips.opt.kappa_soc*theta_soc_old && break
         theta_soc_old = theta_soc
     end
-    trace(LOGGER,"Second-order correction terminated.")
+    @trace(ips.logger,"Second-order correction terminated.")
     
     return false
 end
@@ -1799,8 +1743,8 @@ end
 
 # Print functions -----------------------------------------------------------
 function print_init(ips::Solver)
-    notice(LOGGER,@sprintf("Number of nonzeros in constraint Jacobian............: %8i",ips.nlp.nnz_jac))
-    notice(LOGGER,@sprintf("Number of nonzeros in Lagrangian Hessian.............: %8i\n",ips.nlp.nnz_hess))
+    @notice(ips.logger,@sprintf("Number of nonzeros in constraint Jacobian............: %8i",ips.nlp.nnz_jac))
+    @notice(ips.logger,@sprintf("Number of nonzeros in Lagrangian Hessian.............: %8i\n",ips.nlp.nnz_hess))
 
     num_fixed = length(ips.ind_fixed)
     num_var = ips.nlp.n - num_fixed
@@ -1814,22 +1758,22 @@ function print_init(ips::Solver)
     num_lu_cons = sum((ips.nlp.gl.!=ips.nlp.gu).*(ips.nlp.gl.!=-Inf).*(ips.nlp.gu.!=Inf))
     ips.nlp.n < num_eq_cons && throw(NotEnoughDegreesOfFreedomException())
     
-    notice(LOGGER,@sprintf("Total number of variables............................: %8i",num_var))
-    notice(LOGGER,@sprintf("                     variables with only lower bounds: %8i",num_llb_vars))
-    notice(LOGGER,@sprintf("                variables with lower and upper bounds: %8i",num_lu_vars))
-    notice(LOGGER,@sprintf("                     variables with only upper bounds: %8i",num_uub_vars))
-    notice(LOGGER,@sprintf("Total number of equality constraints.................: %8i",num_eq_cons))
-    notice(LOGGER,@sprintf("Total number of inequality constraints...............: %8i",num_ineq_cons))
-    notice(LOGGER,@sprintf("        inequality constraints with only lower bounds: %8i",num_le_cons))
-    notice(LOGGER,@sprintf("   inequality constraints with lower and upper bounds: %8i",num_lu_cons))
-    notice(LOGGER,@sprintf("        inequality constraints with only upper bounds: %8i\n",num_ue_cons))
+    @notice(ips.logger,@sprintf("Total number of variables............................: %8i",num_var))
+    @notice(ips.logger,@sprintf("                     variables with only lower bounds: %8i",num_llb_vars))
+    @notice(ips.logger,@sprintf("                variables with lower and upper bounds: %8i",num_lu_vars))
+    @notice(ips.logger,@sprintf("                     variables with only upper bounds: %8i",num_uub_vars))
+    @notice(ips.logger,@sprintf("Total number of equality constraints.................: %8i",num_eq_cons))
+    @notice(ips.logger,@sprintf("Total number of inequality constraints...............: %8i",num_ineq_cons))
+    @notice(ips.logger,@sprintf("        inequality constraints with only lower bounds: %8i",num_le_cons))
+    @notice(ips.logger,@sprintf("   inequality constraints with lower and upper bounds: %8i",num_lu_cons))
+    @notice(ips.logger,@sprintf("        inequality constraints with only upper bounds: %8i\n",num_ue_cons))
     return
 end
 
 function print_iter(ips::Solver;is_resto=false)
-    mod(ips.cnt.k,10)==0&& info(LOGGER,@sprintf(
+    mod(ips.cnt.k,10)==0&& @info(ips.logger,@sprintf(
         "iter    objective    inf_pr   inf_du lg(mu)  ||d||  lg(rg) alpha_du alpha_pr  ls"))
-    info(LOGGER,@sprintf(
+    @info(ips.logger,@sprintf(
         "%4i%s% 10.7e %6.2e %6.2e %5.1f %6.2e %s %6.2e %6.2e%s  %i",
         ips.cnt.k,is_resto ? "r" : " ",ips.obj_val/ips.obj_scale[],
         is_resto ? ips.RR.inf_pr_R : ips.inf_pr,
@@ -1842,15 +1786,15 @@ function print_iter(ips::Solver;is_resto=false)
 end
 
 function print_summary_1(ips::Solver)
-    notice(LOGGER,"")
-    notice(LOGGER,"Number of Iterations....: $(ips.cnt.k)\n")
-    notice(LOGGER,"                                   (scaled)                 (unscaled)")
-    notice(LOGGER,@sprintf("Objective...............:  % 1.16e   % 1.16e",ips.obj_val,ips.obj_val/ips.obj_scale[]))
-    notice(LOGGER,@sprintf("Dual infeasibility......:   %1.16e    %1.16e",ips.inf_du,ips.inf_du/ips.obj_scale[]))
-    notice(LOGGER,@sprintf("Constraint violation....:   %1.16e    %1.16e",norm(ips.c,Inf),ips.inf_pr))
-    notice(LOGGER,@sprintf("Complementarity.........:   %1.16e    %1.16e",
+    @notice(ips.logger,"")
+    @notice(ips.logger,"Number of Iterations....: $(ips.cnt.k)\n")
+    @notice(ips.logger,"                                   (scaled)                 (unscaled)")
+    @notice(ips.logger,@sprintf("Objective...............:  % 1.16e   % 1.16e",ips.obj_val,ips.obj_val/ips.obj_scale[]))
+    @notice(ips.logger,@sprintf("Dual infeasibility......:   %1.16e    %1.16e",ips.inf_du,ips.inf_du/ips.obj_scale[]))
+    @notice(ips.logger,@sprintf("Constraint violation....:   %1.16e    %1.16e",norm(ips.c,Inf),ips.inf_pr))
+    @notice(ips.logger,@sprintf("Complementarity.........:   %1.16e    %1.16e",
                            ips.inf_compl*ips.obj_scale[],ips.inf_compl))
-    notice(LOGGER,@sprintf("Overall NLP error.......:   %1.16e    %1.16e\n",
+    @notice(ips.logger,@sprintf("Overall NLP error.......:   %1.16e    %1.16e\n",
                            max(ips.inf_du*ips.obj_scale[],norm(ips.c,Inf),ips.inf_compl),
                            max(ips.inf_du,ips.inf_pr,ips.inf_compl)))
     return
@@ -1858,43 +1802,27 @@ end
 
 function print_summary_2(ips::Solver)
     ips.cnt.solver_time = ips.cnt.total_time-ips.cnt.linear_solver_time-ips.cnt.eval_function_time
-    notice(LOGGER,"Number of objective function evaluations             = $(ips.cnt.obj_cnt)")
-    notice(LOGGER,"Number of objective gradient evaluations             = $(ips.cnt.obj_grad_cnt)")
-    notice(LOGGER,"Number of constraint evaluations                     = $(ips.cnt.con_cnt)")
-    notice(LOGGER,"Number of constraint Jacobian evaluations            = $(ips.cnt.con_jac_cnt)")
-    notice(LOGGER,"Number of Lagrangian Hessessian evaluations          = $(ips.cnt.lag_hess_cnt)")
-    notice(LOGGER,@sprintf("Total wall-clock secs in solver (w/o fun. eval./lin. alg.)  = %6.3f",
+    @notice(ips.logger,"Number of objective function evaluations             = $(ips.cnt.obj_cnt)")
+    @notice(ips.logger,"Number of objective gradient evaluations             = $(ips.cnt.obj_grad_cnt)")
+    @notice(ips.logger,"Number of constraint evaluations                     = $(ips.cnt.con_cnt)")
+    @notice(ips.logger,"Number of constraint Jacobian evaluations            = $(ips.cnt.con_jac_cnt)")
+    @notice(ips.logger,"Number of Lagrangian Hessessian evaluations          = $(ips.cnt.lag_hess_cnt)")
+    @notice(ips.logger,@sprintf("Total wall-clock secs in solver (w/o fun. eval./lin. alg.)  = %6.3f",
                            ips.cnt.solver_time))
-    notice(LOGGER,@sprintf("Total wall-clock secs in linear solver                      = %6.3f",
+    @notice(ips.logger,@sprintf("Total wall-clock secs in linear solver                      = %6.3f",
                            ips.cnt.linear_solver_time))
-    notice(LOGGER,@sprintf("Total wall-clock secs in NLP function evaluations           = %6.3f",
+    @notice(ips.logger,@sprintf("Total wall-clock secs in NLP function evaluations           = %6.3f",
                            ips.cnt.eval_function_time))
-    notice(LOGGER,@sprintf("Total wall-clock secs                                       = %6.3f\n",
+    @notice(ips.logger,@sprintf("Total wall-clock secs                                       = %6.3f\n",
                            ips.cnt.total_time))
 end
 
-function print_ignored_options(option_dict)
-    warn(LOGGER,"The following options are ignored: ")
+function print_ignored_options(logger,option_dict)
+    @warn(logger,"The following options are ignored: ")
     for (key,val) in option_dict
-        warn(LOGGER," - "*string(key))
+        @warn(logger," - "*string(key))
     end
 end
-
-function set_logger!(log_level,print_level,output_file,file_print_level)
-    empty!(LOGGER.handlers)
-    print_levelnum = LOGGER.levels[print_level]
-    push!(LOGGER,MadNLPHandler(DefaultFormatter(
-        LOGGER.levels[log_level] <= 10 ? "[{level} | {name}]: {msg}" : "{msg}"),stdout,print_levelnum,
-                                 default_color_dict))
-    if output_file != ""
-        file_print_levelnum = LOGGER.levels[file_print_level]
-        io = open(output_file,"w+")
-        push!(LOGGER,MadNLPHandler(DefaultFormatter(),io,file_print_levelnum,mono_color_dict))
-        finalizer(close,io)
-    end
-    setlevel!(LOGGER,log_level;recursive=true)
-end
-
 function string(ips::Solver)
     """
     Interior point solver

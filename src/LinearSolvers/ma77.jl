@@ -4,16 +4,16 @@
 module Ma77
 
 import ..MadNLP:
-    @with_kw, getlogger, register, setlevel!, debug, warn, error,
+    @with_kw, Logger, @debug, @warn, @error,
     SparseMatrixCSC, SparseMatrixCSC, SubVector, StrideOneVector,
     libhsl, Mc68, get_tril_to_full, transform!,
     AbstractOptions, AbstractLinearSolver, set_options!, 
     SymbolicException,FactorizationException,SolveException,InertiaException,
     introduce, factorize!, solve!, improve!, is_inertia, inertia
 
-const LOGGER=getlogger(@__MODULE__)
-__init__() = register(LOGGER)
 const INPUT_MATRIX_TYPE = :csc
+
+@enum(Ordering::Int,AMD = 1, METIS = 3)
 
 @with_kw mutable struct Options <: AbstractOptions
     ma77_buffer_lpage::Int = 4096
@@ -21,13 +21,12 @@ const INPUT_MATRIX_TYPE = :csc
     ma77_file_size::Int = 2097152
     ma77_maxstore::Int = 0
     ma77_nemin::Int = 8
-    ma77_order::String = "metis"
+    ma77_order::Ordering = METIS
     ma77_print_level::Int = -1
     ma77_small::Float64 = 1e-20
     ma77_static::Float64 = 0.
     ma77_u::Float64 = 1e-8
     ma77_umax::Float64 = 1e-4
-    ma77_log_level::String = ""
 end
 
 @with_kw mutable struct Control
@@ -173,11 +172,8 @@ mutable struct Solver <: AbstractLinearSolver
     keep::Vector{Ptr{Nothing}}
 
     opt::Options
+    logger::Logger
 end
-
-ma77_scaling = Dict("none"=>0,
-                    "mc64"=>1,
-                    "mc77"=>2)
 
 ma77_default_control_d(control::Control) = ccall(
     (:ma77_default_control_d,libhsl),
@@ -240,12 +236,10 @@ ma77_finalize_d(keep::Vector{Ptr{Cvoid}},control::Control,info::Info) = ccall(
 
 function Solver(csc::SparseMatrixCSC{Float64,Int32};
                 option_dict::Dict{Symbol,Any}=Dict{Symbol,Any}(),
-                opt=Options(),
+                opt=Options(),logger=Logger(),
                 kwargs...)
     
-
     set_options!(opt,option_dict,kwargs)
-    opt.ma77_log_level=="" || setlevel!(LOGGER,opt.ma77_log_level)
     
     full,tril_to_full_view = get_tril_to_full(csc)
     order = Vector{Int32}(undef,csc.n)
@@ -257,7 +251,7 @@ function Solver(csc::SparseMatrixCSC{Float64,Int32};
 
     mc68_control.f_array_in=1
     mc68_control.f_array_out=1
-    Mc68.mc68_order_i(Int32(1),Int32(csc.n),csc.colptr,csc.rowval,order,mc68_control,mc68_info)
+    Mc68.mc68_order_i(Int32(opt.ma77_order),Int32(csc.n),csc.colptr,csc.rowval,order,mc68_control,mc68_info)
     
     info=Info()
     control=Control()
@@ -299,7 +293,7 @@ function Solver(csc::SparseMatrixCSC{Float64,Int32};
     info.flag<0 && throw(SymbolicException())
     
     M = Solver(csc,full,tril_to_full_view,
-               control,info,mc68_control,mc68_info,order,keep,opt)
+               control,info,mc68_control,mc68_info,order,keep,opt,logger)
     finalizer(finalize,M)
     return M
 end
@@ -331,11 +325,11 @@ finalize(M::Solver) = ma77_finalize_d(M.keep,M.control,M.info)
 
 function improve!(M::Solver)
     if M.control.u == M.opt.ma77_umax
-        debug(LOGGER,"improve quality failed.")
+        @debug(M.logger,"improve quality failed.")
         return false
     end
     M.control.u = min(M.opt.ma77_umax,M.control.u^.75)
-    debug(LOGGER,"improved quality: pivtol = $(M.control.u)")
+    @debug(M.logger,"improved quality: pivtol = $(M.control.u)")
     return true
 end
 

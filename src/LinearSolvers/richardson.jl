@@ -3,12 +3,9 @@
 
 module Richardson
 
-using Memento
-const LOGGER=getlogger(@__MODULE__)
-__init__() = Memento.register(LOGGER)
-
-using LinearAlgebra, Parameters
 import ..MadNLP:
+    @with_kw, Logger, @debug, @warn, @error,
+    norm,
     AbstractOptions, AbstractIterator, set_options!, @sprintf, StrideOneVector,
     solve_refine!
 
@@ -16,7 +13,6 @@ import ..MadNLP:
     richardson_max_iter::Int = 10
     richardson_tol::Float64 = 1e-10
     richardson_acceptable_tol::Float64 = 1e-5
-    richardson_log_level::String=""
 end
 
 mutable struct Solver <: AbstractIterator
@@ -24,21 +20,20 @@ mutable struct Solver <: AbstractIterator
     mul!::Function
     div!::Function
     opt::Options
+    logger::Logger
 end
 function Solver(res::Vector{Float64},mul!,div!;
+                opt=Options(),logger=Logger(),
                 option_dict::Dict{Symbol,Any}=Dict{Symbol,Any}(),kwargs...)
-
-    opt=Options()
     !isempty(kwargs) && (for (key,val) in kwargs; option_dict[key]=val; end)
     set_options!(opt,option_dict)
-    opt.richardson_log_level=="" || setlevel!(LOGGER,opt.richardson_log_level)
-    return Solver(res,mul!,div!,opt)
+    return Solver(res,mul!,div!,opt,logger)
 end
 
 function solve_refine!(x::StrideOneVector{Float64},
                        IS::Solver,
                        b::AbstractVector{Float64})
-    debug(LOGGER,"Iterative solver initiated")
+    @debug(IS.logger,"Iterative solver initiated")
     norm_b = norm(b,Inf)
     # x.=b
     # IS.div!(x)
@@ -54,14 +49,14 @@ function solve_refine!(x::StrideOneVector{Float64},
     
     while true
         mod(iter,10)==0 &&
-            debug(LOGGER,"iter ||res||")
-        debug(LOGGER,@sprintf("%4i %6.2e",iter,residual_ratio))
+            @debug(IS.logger,"iter ||res||")
+        @debug(IS.logger,@sprintf("%4i %6.2e",iter,residual_ratio))
         iter += 1
         iter > IS.opt.richardson_max_iter && break
         residual_ratio < IS.opt.richardson_tol && break
         # residual_ratio>=residual_ratio_old && residual_ratio>IS.opt.richardson_acceptable_tol && (noprogress+=1)
         # if noprogress >= 3
-        #     debug(LOGGER,@sprintf(
+        #     @debug(logger,@sprintf(
         #         "Iterative solver terminated with %4i refinement steps and residual = %6.2e",
         #         iter,residual_ratio))
         #     return :Singular
@@ -77,7 +72,7 @@ function solve_refine!(x::StrideOneVector{Float64},
         residual_ratio = norm_res/(1+norm_b)
     end
     
-    debug(LOGGER,@sprintf(
+    @debug(IS.logger,@sprintf(
         "Iterative solver terminated with %4i refinement steps and residual = %6.2e",
         iter,residual_ratio))
     

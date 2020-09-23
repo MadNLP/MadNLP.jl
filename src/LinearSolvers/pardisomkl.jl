@@ -4,23 +4,22 @@
 module PardisoMKL
 
 import ..MadNLP:
-    @with_kw, getlogger, register, setlevel!, debug, warn, error,
+    @with_kw, Logger, @debug, @warn, @error,
     SubVector, StrideOneVector, SparseMatrixCSC, libmkl32,
     SymbolicException,FactorizationException,SolveException,InertiaException,
     AbstractOptions, AbstractLinearSolver, set_options!,
     introduce, factorize!, solve!, improve!, is_inertia, inertia, blas_num_threads
 
-const LOGGER=getlogger(@__MODULE__)
-__init__() = register(LOGGER)
 const INPUT_MATRIX_TYPE = :csc
+
+@enum(MatchingStrategy::Int,COMPLETE=1,COMPLETE2x2=2,CONSTRAINTS=3)
 
 @with_kw mutable struct Options <: AbstractOptions
     pardisomkl_num_threads::Int = 1
-    pardisomkl_matching_strategy::String = "complete+2x2"
+    pardiso_matching_strategy::MatchingStrategy = COMPLETE2x2
     pardisomkl_max_iterative_refinement_steps::Int = 1
     pardisomkl_msglvl::Int = 0 
     pardisomkl_order::Int = 2
-    pardisomkl_log_level::String = ""
 end
 
 mutable struct Solver <: AbstractLinearSolver
@@ -32,11 +31,8 @@ mutable struct Solver <: AbstractLinearSolver
     csc::SparseMatrixCSC{Float64,Int32}
     w::Vector{Float64}
     opt::Options
+    logger::Logger
 end
-
-const matching_strategy_dict = Dict("complete"=>1,
-                                    "complete+2x2"=>2,
-                                    "constraints"=>3)
 
 pardisomkl_pardisoinit(pt,mtype::Ref{Cint},iparm::Vector{Cint}) =
     ccall(
@@ -69,12 +65,11 @@ end
 
 
 function Solver(csc::SparseMatrixCSC;
+                opt=Options(),logger=Logger(),
                 option_dict::Dict{Symbol,Any}=Dict{Symbol,Any}(),
                 kwargs...)
-    opt=Options()
     !isempty(kwargs) && (for (key,val) in kwargs; option_dict[key]=val; end)
     set_options!(opt,option_dict)
-    opt.pardisomkl_log_level=="" || setlevel!(LOGGER,opt.pardisomkl_log_level)
     
     w   = Vector{Float64}(undef,csc.n)    
     
@@ -110,7 +105,7 @@ function Solver(csc::SparseMatrixCSC;
     
     err.x < 0  && throw(SymbolicException())
     
-    M = Solver(pt,iparm,perm,msglvl,err,csc,w,opt)
+    M = Solver(pt,iparm,perm,msglvl,err,csc,w,opt,logger)
     
     finalizer(finalize,M)
     
@@ -156,7 +151,7 @@ function inertia(M::Solver)
 end
 
 function improve!(M::Solver)
-    debug(LOGGER,"improve quality failed.")
+    @debug(M.logger,"improve quality failed.")
     return false
 end
 introduce(::Solver)="pardiso-mkl"

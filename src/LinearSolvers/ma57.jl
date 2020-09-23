@@ -4,13 +4,11 @@
 module Ma57
 
 import ..MadNLP:
-    @with_kw, getlogger, register, setlevel!, debug, warn, error, 
+    @with_kw, Logger, @debug, @warn, @error,
     AbstractOptions, set_options!, AbstractLinearSolver, StrideOneVector, 
     SymbolicException,FactorizationException,SolveException,InertiaException,
     SparseMatrixCSC, libhsl, introduce, factorize!, solve!, improve!, is_inertia, inertia, findIJ, nnz
 
-const LOGGER=getlogger(@__MODULE__)
-__init__() = register(LOGGER)
 const ma57_default_icntl = Int32[0,0,6,1,0,5,1,0,10,0,16,16,10,100,0,0,0,0,0,0]
 const ma57_default_cntl  = Float64[1e-8,1.0e-20,0.5,0.0,0.0]
 const INPUT_MATRIX_TYPE = :csc
@@ -25,7 +23,6 @@ const INPUT_MATRIX_TYPE = :csc
     ma57_block_size::Int = 16
     ma57_node_amalgamation::Int = 16
     ma57_small_pivot_flag::Int = 0
-    ma57_log_level::String = ""
 end
 
 mutable struct Solver <: AbstractLinearSolver
@@ -53,6 +50,7 @@ mutable struct Solver <: AbstractLinearSolver
     work::Vector{Float64}
 
     opt::Options
+    logger::Logger
 end
 
 
@@ -92,11 +90,9 @@ ma57cd!(job::Cint,n::Cint,fact::Vector{Cdouble},lfact::Cint,
 
 function Solver(csc::SparseMatrixCSC;
                 option_dict::Dict{Symbol,Any}=Dict{Symbol,Any}(),
-                opt=Options(),
-                kwargs...)
+                opt=Options(),logger=Logger(),kwargs...)
     
     set_options!(opt,option_dict,kwargs)
-    opt.ma57_log_level=="" || setlevel!(LOGGER,opt.ma57_log_level)
     
     I,J=findIJ(csc)
 
@@ -133,7 +129,7 @@ function Solver(csc::SparseMatrixCSC;
     lwork= csc.n
     work = Vector{Float64}(undef,lwork)
     
-    return Solver(csc,I,J,icntl,cntl,info,rinfo,lkeep,keep,lfact,fact,lifact,ifact,iwork,lwork,work,opt)
+    return Solver(csc,I,J,icntl,cntl,info,rinfo,lkeep,keep,lfact,fact,lifact,ifact,iwork,lwork,work,opt,logger)
 end
 
 function factorize!(M::Solver)
@@ -145,11 +141,11 @@ function factorize!(M::Solver)
         if M.info[1] == -3 || M.info[1] == 10
             M.lfact = ceil(Int32,M.opt.ma57_pre_alloc*M.info[17])
             resize!(M.fact, M.lfact)
-            debug(LOGGER,"Reallocating memory: lfact ($(M.lfact))")
+            @debug(M.logger,"Reallocating memory: lfact ($(M.lfact))")
         elseif M.info[1] == -4 || M.info[1] == 11
             M.lifact = ceil(Int32,M.opt.ma57_pre_alloc*M.info[18])
             resize!(M.ifact,M.lifact)
-            debug(LOGGER,"Reallocating memory: lifact ($(M.lifact))")
+            @debug(M.logger,"Reallocating memory: lifact ($(M.lifact))")
         elseif M.info[1] < 0
             throw(FactorizationException())
         else
@@ -172,11 +168,11 @@ function inertia(M::Solver)
 end
 function improve!(M::Solver)
     if M.cntl[1] == M.opt.ma57_pivtolmax
-        debug(LOGGER,"improve quality failed.")
+        @debug(M.logger,"improve quality failed.")
         return false
     end
     M.cntl[1] = min(M.opt.ma57_pivtolmax,M.cntl[1]^.75)
-    debug(LOGGER,"improved quality: pivtol = $(M.cntl[1])")
+    @debug(M.logger,"improved quality: pivtol = $(M.cntl[1])")
     return true
 end
 

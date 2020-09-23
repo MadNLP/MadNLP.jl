@@ -1,19 +1,15 @@
 module LapackMKL
 
-using Memento, Parameters, LightGraphs, LinearAlgebra
 import ..MadNLP:
-    @with_kw, getlogger, register, setlevel!, debug, warn, error,
+    @with_kw, Logger, @debug, @warn, @error,
     AbstractOptions, AbstractLinearSolver, set_options!, tril_to_full!,
     SymbolicException,FactorizationException,SolveException,InertiaException,
     introduce, factorize!, solve!, improve!, is_inertia, inertia, libmkl32
 
-const LOGGER=getlogger(@__MODULE__)
-__init__() = register(LOGGER)
 const INPUT_MATRIX_TYPE = :dense
     
 @with_kw mutable struct Options <: AbstractOptions
     lapackmkl_algorithm::String = "bunchkaufman"
-    lapackmkl_log_level::String = ""
 end
 
 mutable struct Solver <: AbstractLinearSolver
@@ -24,6 +20,7 @@ mutable struct Solver <: AbstractLinearSolver
     info::Ref{Int32}
     etc::Dict{Symbol,Any}
     opt::Options
+    logger::Logger
 end
 
 sytrf(uplo,n,a,lda,ipiv,work,lwork,info)=ccall(
@@ -68,11 +65,10 @@ trsm(side,uplo,trans,diag,m,n,alpha,a,lda,b,ldb) = ccall(
 
 function Solver(dense::Matrix{Float64};
                 option_dict::Dict{Symbol,Any}=Dict{Symbol,Any}(),
-                opt=Options(),
+                opt=Options(),logger=Logger(),
                 kwargs...)
     
     set_options!(opt,option_dict,kwargs...)
-    opt.lapackmkl_log_level=="" || setlevel!(LOGGER,opt.lapackmkl_log_level)
     # fact = rewrite_factorization ? dense : copy(dense)
     fact = copy(dense)
     
@@ -80,7 +76,7 @@ function Solver(dense::Matrix{Float64};
     work = Vector{Float64}(undef, 1)
     info=Int32(0)
     
-    return Solver(dense,fact,work,-1,info,etc,opt)
+    return Solver(dense,fact,work,-1,info,etc,opt,logger)
 end
 
 function factorize!(M::Solver)

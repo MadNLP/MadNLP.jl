@@ -4,13 +4,11 @@
 module Ma27
 
 import ..MadNLP:
-    @with_kw, getlogger, register, setlevel!, debug, warn, error,
+    @with_kw, Logger, @debug, @warn, @error,
     AbstractOptions, AbstractLinearSolver, set_options!, SparseMatrixCSC, SubVector, StrideOneVector, 
     SymbolicException,FactorizationException,SolveException,InertiaException,
     libhsl, introduce, factorize!, solve!, improve!, is_inertia, inertia, findIJ, nnz
 
-const LOGGER=getlogger(@__MODULE__)
-__init__() = register(LOGGER)
 const ma27_default_icntl = Int32[
     6,6,0,2139062143,1,32639,32639,32639,32639,14,9,8,8,9,10,32639,32639,32639,32689,24,11,9,8,9,10,0,0,0,0,0]
 const ma27_default_cntl  = [.1,1.0,0.,0.,0.]
@@ -22,7 +20,6 @@ const INPUT_MATRIX_TYPE = :csc
     ma27_liw_init_factor::Float64 = 5.
     ma27_la_init_factor::Float64 =5.
     ma27_meminc_factor::Float64 =2.
-    ma27_log_level::String = ""
 end
 
 mutable struct Solver <: AbstractLinearSolver
@@ -48,6 +45,7 @@ mutable struct Solver <: AbstractLinearSolver
     maxfrt::Vector{Int32}
 
     opt::Options
+    logger::Logger
 end
 
 ma27ad!(n::Cint,nz::Cint,I::StrideOneVector{Cint},J::StrideOneVector{Cint},
@@ -87,11 +85,9 @@ ma27cd!(n::Cint,a::Vector{Cdouble},la::Cint,iw::Vector{Cint},
 
 function Solver(csc::SparseMatrixCSC;
                 option_dict::Dict{Symbol,Any}=Dict{Symbol,Any}(),
-                opt=Options(),
-                kwargs...)
+                opt=Options(),logger=Logger(),kwargs...)
     
     set_options!(opt,option_dict,kwargs)
-    opt.ma27_log_level=="" || setlevel!(LOGGER,opt.ma27_log_level)
     
     I,J = findIJ(csc)
     nz=Int32(nnz(csc))
@@ -120,7 +116,7 @@ function Solver(csc::SparseMatrixCSC;
     maxfrt=Int32[1]
 
     return Solver(csc,I,J,icntl,cntl,info,a,a_view,la,ikeep,iw,liw,
-                  iw1,nsteps,Vector{Float64}(),maxfrt,opt)
+                  iw1,nsteps,Vector{Float64}(),maxfrt,opt,logger)
 end
 
 
@@ -133,11 +129,11 @@ function factorize!(M::Solver)
         if M.info[1] == -3 
             M.liw = ceil(Int32,M.opt.ma27_meminc_factor*M.liw)
             resize!(M.iw, M.liw)
-            debug(LOGGER,"Reallocating memory: liw ($(M.liw))")
+            @debug(M.logger,"Reallocating memory: liw ($(M.liw))")
         elseif M.info[1] == -4
             M.la = ceil(Int32,M.opt.ma27_meminc_factor*M.la)
             resize!(M.a,M.la)
-            debug(LOGGER,"Reallocating memory: la ($(M.la))")
+            @debug(M.logger,"Reallocating memory: la ($(M.la))")
         elseif M.info[1] < 0
             throw(FactorizationException())
         else
@@ -164,11 +160,11 @@ end
 
 function improve!(M::Solver)
     if M.cntl[1] == M.opt.ma27_pivtolmax
-        debug(LOGGER,"improve quality failed.")
+        @debug(M.logger,"improve quality failed.")
         return false
     end
     M.cntl[1] = min(M.opt.ma27_pivtolmax,M.cntl[1]^.75)
-    debug(LOGGER,"improved quality: pivtol = $(M.cntl[1])")
+    @debug(M.logger,"improved quality: pivtol = $(M.cntl[1])")
     return true
 end
 

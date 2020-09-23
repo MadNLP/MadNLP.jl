@@ -24,9 +24,9 @@ end
 
 #First node gets initial condition
 kwargs_collection = [
-    Dict(:log_level=>"error"),
-    Dict(:linear_solver=>"schur",  :schur_custom_partition=>true,:log_level=>"error"),
-    Dict(:linear_solver=>"schwarz",:schwarz_custom_partition=>true,:log_level=>"error")
+    Dict(:print_level=>MadNLP.ERROR),
+    Dict(:linear_solver=>"schur",  :schur_custom_partition=>true,:print_level=>MadNLP.ERROR),
+    Dict(:linear_solver=>"schwarz",:schwarz_custom_partition=>true,:print_level=>MadNLP.ERROR)
 ]
 
 n1 = getnode(graph,1)

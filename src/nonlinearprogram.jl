@@ -28,7 +28,7 @@ mutable struct NonlinearProgram
     hess_sparsity!::Function
     jac_sparsity!::Function
 
-    status::Symbol
+    status::Status
     ext::Dict{Symbol,Any}
 end
 

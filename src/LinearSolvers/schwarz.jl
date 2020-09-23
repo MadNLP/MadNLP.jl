@@ -4,7 +4,7 @@
 module Schwarz
 
 import ..MadNLP:
-    @with_kw, getlogger, register, setlevel!, debug, warn, error,
+    @with_kw, Logger, @debug, @warn, @error,
     default_subproblem_solver,SparseMatrixCSC, SubVector, StrideOneVector, get_cscsy_view, nnz,
     SymbolicException,FactorizationException,SolveException,InertiaException,
     AbstractOptions, AbstractLinearSolver, set_options!,
@@ -14,8 +14,6 @@ import ..MadNLP:
     set_blas_num_threads, blas_num_threads, @blas_safe_threads, @sprintf
 
 const INPUT_MATRIX_TYPE = :csc
-const LOGGER=getlogger(@__MODULE__)
-__init__() = register(LOGGER)
 
 @with_kw mutable struct Options <: AbstractOptions
     schwarz_num_parts_upper::Int = 0
@@ -23,7 +21,6 @@ __init__() = register(LOGGER)
     schwarz_subproblem_solver::Module
     schwarz_fully_improve_subproblem_solver::Bool=true
     schwarz_max_expand_factor::Int = 4
-    schwarz_log_level::String = ""
     schwarz_custom_partition::Bool = false
     schwarz_part_upper::Vector{Int} = Int[]
     schwarz_part::Vector{Int} = Int[]
@@ -59,16 +56,16 @@ mutable struct Solver <: AbstractLinearSolver
     w::Vector{Float64}
     sws::Vector{SolverWorker}
     opt::Options
+    logger::Logger
 end
 
 
 function Solver(csc::SparseMatrixCSC{Float64};
                 option_dict::Dict{Symbol,Any}=Dict(),
-                opt=Options(schwarz_subproblem_solver=default_subproblem_solver()),
+                opt=Options(schwarz_subproblem_solver=default_subproblem_solver()),logger=Logger(),
                 kwargs...)
     
     set_options!(opt,option_dict,kwargs...)
-    opt.schwarz_log_level=="" || setlevel!(LOGGER,opt.schwarz_log_level)
 
     inds = collect(1:nnz(csc))
     
@@ -92,19 +89,19 @@ function Solver(csc::SparseMatrixCSC{Float64};
         sws[k] = SolverWorker(
             partition,csc,inds,p,k,opt.schwarz_max_expand_factor,
             opt.schwarz_subproblem_solver,opt.schwarz_fully_improve_subproblem_solver,
-            k==1 ? option_dict : copy(copied_option_dict))
+            logger,k==1 ? option_dict : copy(copied_option_dict))
     end
 
     saturation = maximum(sws[k].csc.n/csc.n*100 for k=1:length(sws))
-    debug(LOGGER,@sprintf("overlap size initialized with %3d%% saturation.\n",saturation))
+    @debug(logger,@sprintf("overlap size initialized with %3d%% saturation.\n",saturation))
     
-    return Solver(partition,csc,inds,p,w,sws,opt)
+    return Solver(partition,csc,inds,p,w,sws,opt,logger)
 end
 
 function SolverWorker(
     partition,csc::SparseMatrixCSC{Float64},inds::Vector{Int},p::Vector{Float64},
     k::Int,max_expand_factor::Int,SubproblemSolverModule::Module,fully_improve_subproblem_solver::Bool,
-    option_dict::Dict{Symbol,Any})
+    logger::Logger,option_dict::Dict{Symbol,Any})
     struc= partition isa MonolevelPartition ?
         MonolevelStruc(partition,k) : BilevelStruc(partition,k)
     overlap_increase_factor =
@@ -116,9 +113,9 @@ function SolverWorker(
     csc,csc_view = get_cscsy_view(csc,get_current_V(struc),inds=inds)
     if csc.n == 0
         M = EmptyLinearSolver()
-        warn(LOGGER,"empty subproblem at partition $k")
+        @warn(logger,"empty subproblem at partition $k")
     else
-        M = SubproblemSolverModule.Solver(csc;option_dict = option_dict)
+        M = SubproblemSolverModule.Solver(csc;option_dict = option_dict,logger=logger)
     end
     fully_improve_subproblem_solver && while improve!(M) end # starts with fully improved    
     q = Vector{Float64}(undef,length(get_current_V(struc)))
@@ -139,7 +136,7 @@ is_maximal_overlap(M::Solver) = all(sw.max_size>=M.csc.n for sw in M.sws)
 
 
 function improve!(M::Solver)
-    is_maximal_overlap(M) && (debug(LOGGER,"improve quality failed.\n");return false)
+    is_maximal_overlap(M) && (@debug(M.logger,"improve quality failed.\n");return false)
     
     @blas_safe_threads for k=1:length(M.sws)
         M.sws[k].max_size *= M.sws[k].overlap_increase_factor
@@ -156,8 +153,8 @@ function improve!(M::Solver)
     
     saturation = maximum(M.sws[k].csc.n/M.csc.n*100 for k=1:length(M.sws));
     saturation == 100. ?
-        warn(LOGGER,@sprintf("overlap is maximally saturated")) :
-        debug(LOGGER,@sprintf("overlap size increased to %3d%% saturation.\n",saturation)) 
+        @warn(M.logger,@sprintf("overlap is maximally saturated")) :
+        @debug(M.logger,@sprintf("overlap size increased to %3d%% saturation.\n",saturation)) 
         
     
     return true

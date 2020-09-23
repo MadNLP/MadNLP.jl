@@ -5,14 +5,12 @@ module Mumps
 
 import ..MadNLP:
     SVector, setindex, MPI,
-    @with_kw, getlogger, register, setlevel!, debug, warn, error,
+    @with_kw, Logger, @debug, @warn, @error,
     SparseMatrixCSC, SubVector, StrideOneVector, libmumps, 
     SymbolicException,FactorizationException,SolveException,InertiaException,
     AbstractOptions, AbstractLinearSolver, set_options!,
     introduce, factorize!, solve!, improve!, is_inertia, inertia, findIJ, nnz
 
-const LOGGER=getlogger(@__MODULE__)
-__init__() = register(LOGGER)
 const INPUT_MATRIX_TYPE = :csc
 
 @with_kw mutable struct Options <: AbstractOptions
@@ -23,7 +21,6 @@ const INPUT_MATRIX_TYPE = :csc
     mumps_pivtol::Float64 = 1e-6
     mumps_pivtolmax::Float64 = .1
     mumps_scaling::Int = 77
-    mumps_log_level::String = ""
 end
 
 mutable struct Struc
@@ -122,6 +119,7 @@ mutable struct Solver <: AbstractLinearSolver
     mumps_struc::Struc
     is_singular::Bool
     opt::Options
+    logger::Logger
 end
 
 dmumps_c(mumps_struc::Struc)=ccall(
@@ -132,11 +130,10 @@ dmumps_c(mumps_struc::Struc)=ccall(
 
 function Solver(csc::SparseMatrixCSC{Float64,Int32};
                 option_dict::Dict{Symbol,Any}=Dict{Symbol,Any}(),
-                opt=Options(),
+                opt=Options(),logger=Logger(),
                 kwargs...)
     
     set_options!(opt,option_dict,kwargs)
-    opt.mumps_log_level=="" || setlevel!(LOGGER,opt.mumps_log_level)
         
     I,J = findIJ(csc)
     sym_perm = zeros(Int32,csc.n)
@@ -183,7 +180,7 @@ function Solver(csc::SparseMatrixCSC{Float64,Int32};
 
     csc.nzval.=a
     
-    return Solver(csc,I,J,sym_perm,pivnul_list,mumps_struc,false,opt)
+    return Solver(csc,I,J,sym_perm,pivnul_list,mumps_struc,false,opt,logger)
 end
 
 function factorize!(M::Solver)
@@ -227,11 +224,11 @@ end
 
 function improve!(M::Solver)
     if M.mumps_struc.cntl[1] == M.opt.mumps_pivtolmax
-        debug(LOGGER,"improve quality failed.")
+        @debug(M.logger,"improve quality failed.")
         return false
     end
     M.mumps_struc.cntl = setindex(M.mumps_struc.cntl,min(M.opt.mumps_pivtolmax,M.mumps_struc.cntl[1]^.5),1)
-    debug(LOGGER,"improved quality: pivtol = $(M.mumps_struc.cntl[1])")
+    @debug(M.logger,"improved quality: pivtol = $(M.mumps_struc.cntl[1])")
     return true
 end
 

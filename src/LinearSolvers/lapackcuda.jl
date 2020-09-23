@@ -1,19 +1,16 @@
 module LapackCUDA
 
 import ..MadNLP:
-    @with_kw, getlogger, register, setlevel!, debug, warn, error,
+    @with_kw, Logger, @debug, @warn, @error,
     CUBLAS, CUSOLVER, CuVector, CuMatrix,
     AbstractOptions, AbstractLinearSolver, set_options!, 
     SymbolicException,FactorizationException,SolveException,InertiaException,
     introduce, factorize!, solve!, improve!, is_inertia, inertia, libmkl32, LapackMKL, tril_to_full!
 
-const LOGGER=getlogger(@__MODULE__)
-__init__() = register(LOGGER)
 const INPUT_MATRIX_TYPE = :dense
     
 @with_kw mutable struct Options <: AbstractOptions
     lapackcuda_algorithm::String = "bunchkaufman"
-    lapackcuda_log_level::String = ""
 end
 
 mutable struct Solver <: AbstractLinearSolver
@@ -29,7 +26,7 @@ end
 
 function Solver(dense::Matrix{Float64};
                 option_dict::Dict{Symbol,Any}=Dict{Symbol,Any}(),
-                opt=Options(),
+                opt=Options(),logger=Logger(),
                 kwargs...)
     
     set_options!(opt,option_dict,kwargs...)
@@ -41,7 +38,7 @@ function Solver(dense::Matrix{Float64};
     info = CuVector{Int32}(undef,1)
     etc = Dict{Symbol,Any}()
     
-    return Solver(dense,fact,rhs,work,lwork,info,etc,opt)
+    return Solver(dense,fact,rhs,work,lwork,info,etc,opt,logger)
 end
 
 function factorize!(M::Solver)

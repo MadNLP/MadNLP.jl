@@ -12,15 +12,15 @@ NonlinearProgram(model::AbstractNLPModel) = NonlinearProgram(
     (jac,x)->jac_coord!(model,x,jac),
     model.meta.minimize ? (hess,x,l,sig)->hess_coord!(model,x,l,hess;obj_weight= sig) :
     (hess,x,l,sig)->hess_coord!(model,x,l,hess;obj_weight= -sig),
-    (I,J)->hess_structure!(model,I,J),(I,J)->jac_structure!(model,I,J),:Initial,Dict{Symbol,Any}())
+    (I,J)->hess_structure!(model,I,J),(I,J)->jac_structure!(model,I,J),INITIAL,Dict{Symbol,Any}())
 
 status_translator = Dict(
-    :Solve_Succeeded=>:first_order,
-    :Solved_To_Acceptable_Level=>:acceptable,
-    :Infeasible_Problem_Detected=>:infeasible,
-    :User_Requested_Stop=>:user,
-    :Maximum_Iterations_Exceeded=>:max_iter,
-    :Maximum_CpuTime_Exceeded=>:max_time)
+    SOLVE_SUCCEEDED=>:first_order,
+    SOLVED_TO_ACCEPTABLE_LEVEL=>:acceptable,
+    INFEASIBLE_PROBLEM_DETECTED=>:infeasible,
+    USER_REQUESTED_STOP=>:user,
+    MAXIMUM_ITERATIONS_EXCEEDED=>:max_iter,
+    MAXIMUM_WALLTIME_EXCEEDED=>:max_time)
 
 function madnlp(model::AbstractNLPModel;kwargs...)
     

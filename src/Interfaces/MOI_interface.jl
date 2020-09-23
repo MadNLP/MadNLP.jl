@@ -263,7 +263,7 @@ MOI.get(model::Optimizer, ::MOI.ObjectiveSense) = model.sense
 
 # silence
 const SILENT_KEY = :log_level
-const SILENT_VAL = "error"
+const SILENT_VAL = ERROR
 MOI.supports(::Optimizer,::MOI.Silent) = true
 MOI.set(model::Optimizer, ::MOI.Silent, value::Bool)= value ?
     MOI.set(model,MOI.RawParameter(SILENT_KEY),SILENT_VAL) : delete!(model.option_dict,SILENT_KEY)
@@ -854,40 +854,8 @@ function MOI.get(model::Optimizer, ::MOI.TerminationStatus)
     end
     return termination_status(model.ips)
 end
-termination_status(ips::Solver) = termination_status(ips.nlp.status)
-function termination_status(status)
-    if status == :Solve_Succeeded || status == :Feasible_Point_Found
-        return MOI.LOCALLY_SOLVED
-    elseif status == :Solved_To_Acceptable_Level
-        return MOI.ALMOST_LOCALLY_SOLVED
-    elseif status == :Maximum_Iterations_Exceeded
-        return MOI.ITERATION_LIMIT
-    elseif status == :Maximum_WallTime_Exceeded
-        return MOI.TIME_LIMIT
-    elseif status == :Restoration_Failed
-        return MOI.NUMERICAL_ERROR
-    elseif status == :Infeasible_Problem_Detected
-        return MOI.LOCALLY_INFEASIBLE
-    elseif status == :Error_In_Step_Computation
-        return MOI.NUMERICAL_ERROR
-    elseif status == :Invalid_Option
-        return MOI.INVALID_OPTION
-    elseif status == :Not_Enough_Degrees_Of_Freedom
-        return MOI.INVALID_MODEL
-    elseif status == :Invalid_Problem_Definition
-        return MOI.INVALID_MODEL
-    elseif status == :Invalid_Number_Detected
-        return MOI.INVALID_MODEL
-    elseif status == :Unrecoverable_Exception
-        return MOI.OTHER_ERROR
-    elseif status == :NonMadNLP_Exception_Thrown
-        return MOI.OTHER_ERROR
-    elseif status == :Insufficient_Memory
-        return MOI.MEMORY_LIMIT
-    else
-        error("Unrecognized MadNLP status $status")
-    end
-end
+termination_status(ips::Solver) = status_moi_dict[ips.nlp.status]
+
 
 function MOI.get(model::Optimizer, ::MOI.RawStatusString)
     return string(model.nlp.status)
@@ -902,13 +870,13 @@ function MOI.get(model::Optimizer, attr::MOI.PrimalStatus)
         return MOI.NO_SOLUTION
     end
     status = model.nlp.status
-    if status == :Solve_Succeeded
+    if status == SOLVE_SUCCEEDED
         return MOI.FEASIBLE_POINT
-    elseif status == :Feasible_Point_Found
+    elseif status == FEASIBLE_POINT_FOUND
         return MOI.FEASIBLE_POINT
-    elseif status == :Solved_To_Acceptable_Level
+    elseif status == SOLVED_TO_ACCEPTABLE_LEVEL
         return MOI.NEARLY_FEASIBLE_POINT
-    elseif status == :Infeasible_Problem_Detected
+    elseif status == INFEASIBLE_PROBLEM_DETECTED
         return MOI.INFEASIBLE_POINT
     else
         return MOI.UNKNOWN_RESULT_STATUS
@@ -920,13 +888,13 @@ function MOI.get(model::Optimizer, attr::MOI.DualStatus)
         return MOI.NO_SOLUTION
     end
     status = model.nlp.status
-    if status == :Solve_Succeeded
+    if status == SOLVE_SUCCEEDED
         return MOI.FEASIBLE_POINT
-    elseif status == :Feasible_Point_Found
+    elseif status == FEASIBLE_POINT_FOUND
         return MOI.FEASIBLE_POINT
-    elseif status == :Solved_To_Acceptable_Level
+    elseif status == SOLVED_TO_ACCEPTABLE_LEVEL
         return MOI.NEARLY_FEASIBLE_POINT
-    elseif status == :Infeasible_Problem_Detected
+    elseif status == INFEASIBLE_PROBLEM_DETECTED
         return MOI.UNKNOWN_RESULT_STATUS
     else
         return MOI.UNKNOWN_RESULT_STATUS
@@ -1191,7 +1159,7 @@ function NonlinearProgram(model::Optimizer)
     model.option_dict[:jacobian_constant], model.option_dict[:hessian_constant] = is_jac_hess_constant(model)
 
     return NonlinearProgram(n,m,nnz_hess,nnz_jac,0.,x,g,l,zl,zu,xl,xu,gl,gu,obj,obj_grad!,con!,con_jac!,
-                            lag_hess!,hess_sparsity!,jac_sparsity!,:Initial,Dict{Symbol,Any}())
+                            lag_hess!,hess_sparsity!,jac_sparsity!,INITIAL,Dict{Symbol,Any}())
 end
 
 function MOI.optimize!(model::Optimizer)

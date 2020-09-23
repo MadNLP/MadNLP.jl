@@ -4,15 +4,13 @@
 module Schur
 
 import ..MadNLP:
-    @with_kw, getlogger, register, setlevel!, debug, warn, error,
+    @with_kw, Logger, @debug, @warn, @error,
     AbstractOptions, AbstractLinearSolver, set_options!, SparseMatrixCSC, SubVector, StrideOneVector, 
     SymbolicException,FactorizationException,SolveException,InertiaException,
     introduce, factorize!, solve!, improve!, is_inertia, inertia,
     default_subproblem_solver, default_dense_solver, get_csc_view, get_cscsy_view, mv!, nnz,
     TwoStagePartition, set_blas_num_threads, blas_num_threads, @blas_safe_threads
 
-const LOGGER=getlogger(@__MODULE__)
-__init__() = register(LOGGER)
 const INPUT_MATRIX_TYPE = :csc
 
 
@@ -22,7 +20,6 @@ const INPUT_MATRIX_TYPE = :csc
     schur_part::Vector{Int} = Int[]
     schur_subproblem_solver::Module
     schur_dense_solver::Module 
-    schur_log_level::String = ""
 end
 
 mutable struct SolverWorker
@@ -53,6 +50,7 @@ mutable struct Solver <: AbstractLinearSolver
     sws::Vector{SolverWorker}
     
     opt::Options
+    logger::Logger
 end
 
 
@@ -60,10 +58,10 @@ function Solver(csc::SparseMatrixCSC{Float64};
                 option_dict::Dict{Symbol,Any}=Dict{Symbol,Any}(),
                 opt=Options(schur_subproblem_solver=default_subproblem_solver(),
                             schur_dense_solver=default_dense_solver()),
+                logger=Logger(),
                 kwargs...)
     
     set_options!(opt,option_dict,kwargs...)
-    opt.schur_log_level=="" || setlevel!(LOGGER,opt.schur_log_level)
     inds = collect(1:nnz(csc))
     
     tsp = TwoStagePartition(csc,opt.schur_part,opt.schur_num_parts)
@@ -81,17 +79,16 @@ function Solver(csc::SparseMatrixCSC{Float64};
     copied_option_dict = copy(option_dict)
     @blas_safe_threads for k=1:opt.schur_num_parts
         sws[k] = SolverWorker(
-            tsp,V_0,csc,inds,k,
-            opt.schur_subproblem_solver,k==1 ? option_dict : copy(copied_option_dict))
+            tsp,V_0,csc,inds,k,opt.schur_subproblem_solver,logger,k==1 ? option_dict : copy(copied_option_dict))
     end
     fact = opt.schur_dense_solver.Solver(schur)
-    return Solver(csc,inds,tsp,schur,colors,fact,V_0,csc_0,csc_0_view,w_0,sws,opt)
+    return Solver(csc,inds,tsp,schur,colors,fact,V_0,csc_0,csc_0_view,w_0,sws,opt,logger)
 end
 
 get_colors(n0,K) = [findall((x)->mod(x-1,K)+1==k,1:n0) for k=1:K]
 
 function SolverWorker(tsp,V_0,csc::SparseMatrixCSC{Float64},inds::Vector{Int},k,
-                      SubproblemSolverModule::Module,option_dict::Dict{Symbol,Any})
+                      SubproblemSolverModule::Module,logger::Logger,option_dict::Dict{Symbol,Any})
     
     V    = findall(tsp.part.==k)
     length(V) == 0 && throw(SymbolicException())
@@ -99,7 +96,7 @@ function SolverWorker(tsp,V_0,csc::SparseMatrixCSC{Float64},inds::Vector{Int},k,
     compl,compl_view = get_csc_view(csc,V,V_0,inds=inds)
     V_0_nz = findnz(compl.colptr)
 
-    M    = SubproblemSolverModule.Solver(csc_k;option_dict=option_dict)
+    M    = SubproblemSolverModule.Solver(csc_k;option_dict=option_dict,logger=logger)
     w    = Vector{Float64}(undef,csc_k.n)
 
     return SolverWorker(V,V_0_nz,csc_k,csc_k_view,compl,compl_view,M,w)

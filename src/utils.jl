@@ -36,34 +36,42 @@ end
 module DummyModule end
 
 # Logger
-mutable struct MadNLPRecord <: AttributeRecord
-    level::Attribute
-    levelnum::Attribute
-    msg::Attribute
-    name::Attribute
+@with_kw mutable struct Logger
+    print_level::LogLevels = INFO
+    file_print_level::LogLevels = INFO
+    file::Union{IOStream,Nothing} = nothing
 end
-MadNLPRecord(name::AbstractString, level::AbstractString, levelnum::Int, msg) = MadNLPRecord(
-    Attribute(level),Attribute(levelnum),Attribute{AbstractString}(msg),Attribute(name))
-mutable struct MadNLPHandler{F<:Formatter, O <: IO}  <: Handler{F}
-    fmt::F
-    io::O
-    levelnum::Int
-    color_dict::Dict{String,Symbol}
+
+get_parent(logger::Logger) = logger.parent
+get_level(logger::Logger) = logger.print_level
+get_file_level(logger::Logger) = logger.file_print_level
+get_file(logger::Logger) = logger.file
+finalize(logger::Logger) = logger.file != nothing && close(f)
+
+for (name,level,color) in [(:trace,TRACE,7),(:debug,DEBUG,6),(:info,INFO,256),(:notice,NOTICE,256),(:warn,WARN,5),(:error,ERROR,9)]
+    @eval begin
+        macro $name(logger,str)
+            gl = $get_level
+            gfl= $get_file_level
+            gf = $get_file
+            l = $level
+            c = $color
+            code = quote
+                if $gl($logger) <= $l
+                    if $c == 256
+                        println($str)
+                    else
+                        printstyled($str,"\n",color=$c)
+                    end
+                end
+                if $gf($logger) != nothing && $gfl($logger) <= $l
+                    println($gf(logger),$str)
+                end
+            end
+            esc(code)
+        end
+    end
 end
-const default_color_dict = Dict{String,Symbol}(
-    "trace" => :cyan,"debug" => :green,"info" => :normal,"notice" => :normal,"warn" => :magenta,"error" => :red)
-const mono_color_dict = Dict{String,Symbol}(
-    "trace" => :normal,"debug" => :normal,"info" => :normal,"notice" => :normal,"warn" => :normal,"error" => :normal)
-function emit(handler::MadNLPHandler{F, O}, rec::Record) where {F<:Formatter, O<:IO}
-    rec.levelnum < handler.levelnum && return
-    str = format(handler.fmt, rec)
-    clr = handler.color_dict[rec.level]
-    clr==:normal ? println(handler.io, str) : printstyled(handler.io, str, "\n", color=clr)
-    flush(handler.io)
-end
-const LOGGER = getlogger(@__MODULE__)
-setpropagating!(LOGGER,false)
-setrecord!(LOGGER,MadNLPRecord)
 
 # BLAS
 const blas_num_threads = Ref{Int}()

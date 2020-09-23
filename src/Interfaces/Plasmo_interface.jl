@@ -256,7 +256,7 @@ function NonlinearProgram(graph::OptiGraph)
             0,0,0,0,0.,view(x,ninds[k]),Float64[],view(l,minds[k]),view(zl,ninds[k]),view(zu,ninds[k]),
             Float64[],Float64[],Float64[],Float64[],
             dummy_function,dummy_function,dummy_function,dummy_function,dummy_function,
-            dummy_function,dummy_function,:Initial, Dict{Symbol,Any}())
+            dummy_function,dummy_function,INITIAL, Dict{Symbol,Any}())
     end
 
     jac_constant = true
@@ -271,7 +271,7 @@ function NonlinearProgram(graph::OptiGraph)
                            :linkedges=>linkedges,:jac_constant=>jac_constant,:hess_constant=>hess_constant)
     
     return NonlinearProgram(n,m+p,nnz_hess,nnz_jac+nnz_link_jac,0.,x,g,l,zl,zu,xl,xu,gl,gu,obj,obj_grad!,
-                            con!,con_jac!,lag_hess!,hess_sparsity!,jac_sparsity!, :Initial , ext)
+                            con!,con_jac!,lag_hess!,hess_sparsity!,jac_sparsity!, INITIAL , ext)
 end
 
 function get_part(graph,nlp::NonlinearProgram)

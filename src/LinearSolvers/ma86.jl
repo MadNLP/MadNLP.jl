@@ -4,29 +4,26 @@
 module Ma86
 
 import ..MadNLP:
-    @with_kw, getlogger, register, setlevel!, debug, warn, error,
+    @with_kw, Logger, @debug, @warn, @error,
     SparseMatrixCSC, SubVector, StrideOneVector, libhsl, Mc68, 
     SymbolicException,FactorizationException,SolveException,InertiaException,
     AbstractOptions, AbstractLinearSolver, set_options!,
     introduce, factorize!, solve!, improve!, is_inertia, inertia
 
-const LOGGER=getlogger(@__MODULE__)
-__init__() = register(LOGGER)
 const INPUT_MATRIX_TYPE = :csc
-const ma86_scaling_dict = Dict("none"=>0,
-                               "mc64"=>1,
-                               "mc77"=>2)
+@enum(Ordering::Int,AMD = 1, METIS = 3)
+@enum(Scaling::Int,SCALING_NONE = 0, MC64 = 1, MC77 = 2)
 
 @with_kw mutable struct Options <: AbstractOptions
     ma86_num_threads::Int = 1
     ma86_print_level::Float64 = -1
     ma86_nemin::Int = 32
-    ma86_scaling::String = "none"
+    ma86_order::Ordering = METIS
+    ma86_scaling::Scaling = SCALING_NONE
     ma86_small::Float64 = 1e-20
     ma86_static::Float64 = 0.
     ma86_u::Float64 = 1e-8
     ma86_umax::Float64 = 1e-4
-    ma86_log_level::String = ""
 end
 
 @with_kw mutable struct Control
@@ -79,6 +76,7 @@ mutable struct Solver<:AbstractLinearSolver
     keep::Vector{Ptr{Nothing}}
 
     opt::Options
+    logger::Logger
 end
 
 
@@ -125,11 +123,10 @@ ma86_set_num_threads(n) = ccall((:omp_set_num_threads_,libhsl),
 
 function Solver(csc::SparseMatrixCSC{Float64,Int32};
                 option_dict::Dict{Symbol,Any}=Dict{Symbol,Any}(),
-                opt=Options(),
+                opt=Options(),logger=Logger(),
                 kwargs...)
     
     set_options!(opt,option_dict,kwargs)
-    opt.ma86_log_level=="" || setlevel!(LOGGER,opt.ma86_log_level)
 
     ma86_set_num_threads(opt.ma86_num_threads)
     
@@ -144,20 +141,20 @@ function Solver(csc::SparseMatrixCSC{Float64,Int32};
 
     mc68_control.f_array_in=1
     mc68_control.f_array_out=1
-    Mc68.mc68_order_i(Int32(1),Int32(csc.n),csc.colptr,csc.rowval,order,mc68_control,mc68_info)
+    Mc68.mc68_order_i(Int32(opt.ma86_order),Int32(csc.n),csc.colptr,csc.rowval,order,mc68_control,mc68_info)
     
     ma86_default_control_d(control)
-    control.diagnostics_level = opt.ma86_print_level
+    control.diagnostics_level = Int32(opt.ma86_print_level)
     control.f_arrays = 1
     control.nemin = opt.ma86_nemin
     control.small = opt.ma86_small
     control.u = opt.ma86_u
-    control.scaling = ma86_scaling_dict[opt.ma86_scaling]
+    control.scaling = Int32(opt.ma86_scaling)
 
     ma86_analyse_d(Int32(csc.n),csc.colptr,csc.rowval,order,keep,control,info)
     info.flag<0 && throw(SymbolicException())
 
-    M = Solver(csc,control,info,mc68_control,mc68_info,order,keep,opt)
+    M = Solver(csc,control,info,mc68_control,mc68_info,order,keep,opt,logger)
     finalizer(finalize,M)
     
     return M
@@ -181,12 +178,12 @@ end
 finalize(M::Solver) = ma86_finalize_d(M.keep,M.control)
 function improve!(M::Solver)
     if M.control.u == M.opt.ma86_umax
-        debug(LOGGER,"improve quality failed.",
+        @debug(M.logger,"improve quality failed.",
                                             color=:red)
         return false
     end
     M.control.u = min(M.opt.ma86_umax,M.control.u^.75)
-    debug(LOGGER,"improved quality: pivtol = $(M.control.u)")
+    @debug(M.logger,"improved quality: pivtol = $(M.control.u)")
     return true
 end
 introduce(::Solver)="ma86"

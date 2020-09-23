@@ -10,8 +10,7 @@ import Parameters: @with_kw
 import Printf: @sprintf
 import LinearAlgebra: BLAS, Adjoint, Symmetric, mul!, ldiv!, norm, dot
 import SparseArrays: AbstractSparseMatrix, SparseMatrixCSC, sparse, getcolptr, rowvals, nnz
-import Memento: Attribute, AttributeRecord, Formatter, Handler, Record, DefaultFormatter, register, getlogger, emit, 
-    setlevel!, setrecord!, format, setpropagating!, trace, debug, info, notice, warn, error
+import Logging: @debug, @info,  @warn, @error
 import Base: string, show, print, size, getindex, copyto!
 import StaticArrays: SVector, setindex
 import SuiteSparse: UMFPACK
@@ -35,7 +34,7 @@ introduce() = "MadNLP version $(version())"
 
 # Linear solver dependencies
 include("../deps/deps.jl")
-
+include("enums.jl")
 include("utils.jl")
 include("nonlinearprogram.jl")
 include("matrixtools.jl")
@@ -55,8 +54,6 @@ function __init__()
         "lib/libmkl_sequential.$(dlext)",
         "lib/libmkl_intel_lp64.$(dlext)"]),RTLD_GLOBAL)
     @isdefined(libopenblas32) && dlopen(libopenblas32,RTLD_GLOBAL)
-    register(LOGGER)
-
     set_blas_num_threads(haskey(ENV,"JULIA_NUM_THREADS") ? parse(Int,ENV["JULIA_NUM_THREADS"]) : 1 ;permanent=true)
 end
 

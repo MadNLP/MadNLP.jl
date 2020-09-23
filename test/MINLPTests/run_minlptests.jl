@@ -3,7 +3,7 @@ import MINLPTests
 
 using Test
 
-const OPTIMIZER = ()->MadNLP.Optimizer(log_level="error")
+const OPTIMIZER = ()->MadNLP.Optimizer(print_level=MadNLP.ERROR)
 
 @testset "MINLPTests" begin
     ###

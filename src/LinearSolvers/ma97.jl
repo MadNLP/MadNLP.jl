@@ -4,25 +4,25 @@
 module Ma97
 
 import ..MadNLP:
-    @with_kw, getlogger, register, setlevel!, debug, warn, error,
+    @with_kw, Logger, @debug, @warn, @error,
     AbstractOptions, AbstractLinearSolver, set_options!, SparseMatrixCSC, SubVector, StrideOneVector,
     libhsl, SymbolicException,FactorizationException,SolveException,InertiaException,
     introduce, factorize!, solve!, improve!, is_inertia, inertia
 
-const LOGGER=getlogger(@__MODULE__)
-__init__() = register(LOGGER)
 const INPUT_MATRIX_TYPE = :csc
+
+@enum(Ordering::Int32,AMD = 1, METIS = 3)
+@enum(Scaling::Int32,SCALING_NONE = 0, MC64 = 1, MC77 = 2, MC30 = 4)
 
 @with_kw mutable struct Options <: AbstractOptions
     ma97_num_threads::Int = 1
     ma97_print_level::Int = -1
     ma97_nemin::Int = 8
-    ma97_order::String = "metis"
-    ma97_scaling::String = "none"
     ma97_small::Float64 = 1e-20
+    ma97_order::Ordering = METIS
+    ma97_scaling::Scaling = SCALING_NONE
     ma97_u::Float64 = 1e-8
     ma97_umax::Float64 = 1e-4
-    ma97_log_level::String = ""
 end
 
 @with_kw mutable struct Control
@@ -81,20 +81,8 @@ mutable struct Solver <:AbstractLinearSolver
     fkeep::Vector{Ptr{Nothing}}
 
     opt::Options
+    logger::Logger
 end
-
-
-const ma97_ordering_dict = Dict("amd"=>1,
-                                "auto"=>5,
-                                "metis"=>3,
-                                "matched-auto"=>5,
-                                "matched-metis"=>8,
-                                "matched-amd"=>7)
-
-const ma97_scaling_dict = Dict("none"=>0,
-                               "mc64"=>1,
-                               "mc77"=>2,
-                               "mc30"=>4)
 
 ma97_default_control_d(control::Control) = ccall(
     (:ma97_default_control_d,libhsl),
@@ -140,11 +128,10 @@ ma97_set_num_threads(n) = ccall((:omp_set_num_threads_,libhsl),
 
 function Solver(csc::SparseMatrixCSC{Float64,Int32};
                 option_dict::Dict{Symbol,Any}=Dict{Symbol,Any}(),
-                opt=Options(),
+                opt=Options(),logger=Logger(),
                 kwargs...)
     
     set_options!(opt,option_dict,kwargs)
-    opt.ma97_log_level=="" || setlevel!(LOGGER,opt.ma97_log_level)
     
     ma97_set_num_threads(opt.ma97_num_threads)
     
@@ -157,17 +144,17 @@ function Solver(csc::SparseMatrixCSC{Float64,Int32};
     control.print_level = opt.ma97_print_level
     control.f_arrays = 1
     control.nemin = opt.ma97_nemin
-    control.ordering = ma97_ordering_dict[opt.ma97_order]
+    control.ordering = Int32(opt.ma97_order)
     control.small = opt.ma97_small
     control.u = opt.ma97_u
-    control.scaling = ma97_scaling_dict[opt.ma97_scaling]
+    control.scaling = Int32(opt.ma97_scaling)
 
     akeep = [C_NULL]
     fkeep = [C_NULL]
     
     ma97_analyse_d(Int32(1),n,csc.colptr,csc.rowval,C_NULL,akeep,control,info,C_NULL)
     info.flag<0 && throw(SymbolicException())
-    M = Solver(n,csc,control,info,akeep,fkeep,opt)
+    M = Solver(n,csc,control,info,akeep,fkeep,opt,logger)
     finalizer(finalize,M)
     return M
 end
@@ -189,11 +176,11 @@ finalize(M::Solver) = ma97_finalize_d(M.akeep,M.fkeep)
 
 function improve!(M::Solver)
     if M.control.u == M.opt.ma97_umax
-        debug(LOGGER,"improve quality failed.")
+        @debug(M.logger,"improve quality failed.")
         return false
     end
     M.control.u = min(M.opt.ma97_umax,M.control.u^.75)
-    debug(LOGGER,"improved quality: pivtol = $(M.control.u)")
+    @debug(M.logger,"improved quality: pivtol = $(M.control.u)")
     return true
 end
 introduce(::Solver)="ma97"

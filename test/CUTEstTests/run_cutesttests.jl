@@ -7,10 +7,11 @@ selected_case = ["DIXMAANI","LIARWHD","SCHMVETT","POLAK4","DUAL2","MPC2","HS35",
                  "READING6","HS7","SPIN2LS","SBRYBND","ARGLINC","TOINTGOR","S268","DIXMAANC",
                  "TABLE8","BROWNDEN","HILBERTA","STEENBRA","BQPGAUSS","DUALC5"]
 kwargs_collection = [
-    Dict(:reduced_system=>false,:log_level=>"error"),
-    Dict(:fixed_variable_treatment=>"relax_bounds",:log_level=>"error"),
-    Dict(:inertia_correction_method=>"inertia_free",:log_level=>"error"),
-    Dict(:inertia_correction_method=>"inertia_based",:log_level=>"error")]
+    Dict(:iterator=>MadNLP.Krylov,:print_level=>MadNLP.ERROR),
+    Dict(:reduced_system=>false,:print_level=>MadNLP.ERROR),
+    Dict(:fixed_variable_treatment=>MadNLP.RELAX_BOUND,:print_level=>MadNLP.ERROR),
+    Dict(:inertia_correction_method=>MadNLP.INERTIA_FREE,:print_level=>MadNLP.ERROR),
+    Dict(:inertia_correction_method=>MadNLP.INERTIA_BASED,:print_level=>MadNLP.ERROR)]
 
 @testset "CUTEst" begin
     for str in selected_case

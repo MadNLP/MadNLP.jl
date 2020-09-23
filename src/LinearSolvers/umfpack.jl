@@ -4,14 +4,12 @@
 module Umfpack
 
 import ..MadNLP:
-    @with_kw, getlogger, register, setlevel!, debug, warn, error,
+    @with_kw, Logger, @debug, @warn, @error,
     SubVector, StrideOneVector, SparseMatrixCSC, get_tril_to_full,
     SymbolicException,FactorizationException,SolveException,InertiaException,
     AbstractOptions, AbstractLinearSolver, set_options!, UMFPACK,
     introduce, factorize!, solve!, mul!, improve!, is_inertia, inertia
 
-const LOGGER=getlogger(@__MODULE__)
-__init__() = register(LOGGER)
 const INPUT_MATRIX_TYPE = :csc
 
 const umfpack_default_ctrl = copy(UMFPACK.umf_ctrl)
@@ -23,8 +21,6 @@ const umfpack_default_info = copy(UMFPACK.umf_info)
     umfpack_sym_pivtol::Float64 = 1e-3
     umfpack_block_size::Float64 = 16
     umfpack_strategy::Float64 = 2.
-
-    umfpack_log_level::String = ""
 end
 
 mutable struct Solver <: AbstractLinearSolver
@@ -39,6 +35,7 @@ mutable struct Solver <: AbstractLinearSolver
     info::Vector{Float64}
 
     opt::Options
+    logger::Logger
 end
 
 umfpack_di_numeric(colptr::StrideOneVector{Int32},rowval::StrideOneVector{Int32},
@@ -53,11 +50,10 @@ umfpack_di_numeric(colptr::StrideOneVector{Int32},rowval::StrideOneVector{Int32}
 
 function Solver(csc::SparseMatrixCSC;
                 option_dict::Dict{Symbol,Any}=Dict{Symbol,Any}(),
-                opt=Options(),
+                opt=Options(),logger=Logger(),
                 kwargs...)
     
     set_options!(opt,option_dict,kwargs)
-    opt.umfpack_log_level=="" || setlevel!(LOGGER,opt.umfpack_log_level)
     
     p = Vector{Float64}(undef,csc.n)
     full,tril_to_full_view = get_tril_to_full(csc)
@@ -73,7 +69,7 @@ function Solver(csc::SparseMatrixCSC;
     ctrl[12]=opt.umfpack_sym_pivtol
     ctrl[5]=opt.umfpack_block_size
     ctrl[6]=opt.umfpack_strategy
-    return Solver(inner,csc,full,tril_to_full_view,p,ctrl,info,opt)
+    return Solver(inner,csc,full,tril_to_full_view,p,ctrl,info,opt,logger)
 end
 function factorize!(M::Solver)
     UMFPACK.umfpack_free_numeric(M.inner)
@@ -90,17 +86,15 @@ function solve!(M::Solver,rhs::StrideOneVector{Float64})
     return rhs
 end
 is_inertia(::Solver) = false
-function inertia(M::Solver)
-    throw(InertiaException())
-end
+inertia(M::Solver) = throw(InertiaException())
 
 function improve!(M::Solver)
     if M.ctrl[4] == M.opt.umfpack_pivtolmax
-        debug(LOGGER,"improve quality failed.")
+        @debug(M.logger,"improve quality failed.")
         return false
     end
     M.ctrl[4] = min(M.opt.umfpack_pivtolmax,M.ctrl[4]^.75)
-    debug(LOGGER,"improved quality: pivtol = $(M.ctrl[4])")
+    @debug(M.logger,"improved quality: pivtol = $(M.ctrl[4])")
     return true
 
     return false

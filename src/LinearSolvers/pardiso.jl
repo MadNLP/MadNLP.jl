@@ -3,19 +3,19 @@
 
 module Pardiso
 
-const LOGGER=getlogger(@__MODULE__)
-__init__() = register(LOGGER)
 const INPUT_MATRIX_TYPE = :csc
 
 import ..MadNLP:
-    @with_kw, getlogger, register, setlevel!, debug, warn, error,
+    @with_kw, Logger, @debug, @warn, @error,
     SubVector, StrideOneVector, SparseMatrixCSC, libpardiso,
     SymbolicException,FactorizationException,SolveException,InertiaException,
     AbstractOptions, AbstractLinearSolver, set_options!,
     introduce, factorize!, solve!, improve!, is_inertia, inertia
 
+@enum(MatchingStrategy::Int,COMPLETE=1,COMPLETE2x2=2,CONSTRAINTS=3)
+
 @with_kw mutable struct Options <: AbstractOptions
-    pardiso_matching_strategy::String = "complete+2x2"
+    pardiso_matching_strategy::MatchingStrategy = COMPLETE2x2
     pardiso_max_inner_refinement_steps::Int = 1
     pardiso_msglvl::Int = 0
     pardiso_order::Int = 2
@@ -32,11 +32,8 @@ mutable struct Solver <: AbstractLinearSolver
     csc::SparseMatrixCSC{Float64,Int32}
     w::Vector{Float64}
     opt::Options
+    logger::Logger
 end
-
-const pardiso_matching_strategy_dict = Dict{String,Int32}("complete"=>1,
-                                                          "complete+2x2"=>2,
-                                                          "constraints"=>3)
 
 _pardisoinit(
     pt::Vector{Int},mtype::Ref{Cint},solver::Ref{Cint},iparm::Vector{Cint},
@@ -59,12 +56,11 @@ _pardiso(
             pt,maxfct,mnum,mtype,phase,n,a,ia,ja,perm,nrhs,iparm,msglvl,b,x,err,dparm)
 
 function Solver(csc::SparseMatrixCSC{Float64,Int32};
+                opt=Options(),logger=Logger(),
                 option_dict::Dict{Symbol,Any}=Dict{Symbol,Any}(),
                 kwargs...)
-    opt=Options()
     !isempty(kwargs) && (for (key,val) in kwargs; option_dict[key]=val; end)
     set_options!(opt,option_dict)
-    opt.pardiso_log_level=="" || setlevel!(LOGGER,opt.pardiso_log_level)
     
     w   = Vector{Float64}(undef,csc.n)    
     
@@ -98,7 +94,7 @@ function Solver(csc::SparseMatrixCSC{Float64,Int32};
              Ref{Int32}(1),iparm,msglvl,Float64[],Float64[],err,dparm)
     err.x < 0  && throw(SymbolicException())
     
-    M = Solver(pt,iparm,dparm,perm,msglvl,err,csc,w,opt)
+    M = Solver(pt,iparm,dparm,perm,msglvl,err,csc,w,opt,logger)
 
     finalizer(finalize,M)
     
@@ -135,7 +131,7 @@ function inertia(M::Solver)
     return (pos,M.csc.n-pos-neg,neg)
 end
 function improve!(M::Solver)
-    debug(LOGGER,"improve quality failed.")
+    @debug(M.logger,"improve quality failed.")
     return false
 end
 
