@@ -1,17 +1,13 @@
 # MadNLP.jl
 # Created by Sungho Shin (sungho.shin@wisc.edu)
 
-using BinaryProvider, METIS_jll, MKL_jll, OpenBLAS32_jll, MUMPS_seq_jll
+using BinaryProvider, METIS_jll, MUMPS_seq_jll, MKL_jll, OpenBLAS32_jll
 
 # Parse some basic command-line arguments
 const verbose = "--verbose" in ARGS
-const blasvendor=(haskey(ENV,"PLASMONLP_BLAS") && ENV["PLASMONLP_BLAS"]=="openblas") ? :openblas : :mkl
+const blasvendor=(haskey(ENV,"PLASMONLP_BLAS") && ENV["PLASMONLP_BLAS"]=="openblas") ?
+    :openblas : :mkl
 @info "Building HSL and Mumps with $(blasvendor == :mkl ? "MKL" : "OpenBLAS")"
-
-const libmetis_dir = joinpath(METIS_jll.artifact_dir, "lib")
-const libmumps_dir = joinpath(MUMPS_seq_jll.artifact_dir,"lib")
-const libmkl_dir = joinpath(MKL_jll.artifact_dir,"lib")
-const libopenblas_dir = joinpath(OpenBLAS32_jll.artifact_dir,"lib")
 
 const prefix = Prefix(@__DIR__)
 const so = BinaryProvider.platform_dlext()
@@ -21,7 +17,10 @@ const no_whole_archive = Sys.isapple() ? `-Wl,-noall_load` : `-Wl,--no-whole-arc
 const libdir     = mkpath(joinpath(@__DIR__, "lib"))
 const CC = haskey(ENV,"PLASMONLP_CC") ? ENV["PLASMONLP_CC"] : `gcc`
 const FC = haskey(ENV,"PLASMONLP_FC") ? ENV["PLASMONLP_FC"] : `gfortran`
+const libmetis_dir = joinpath(METIS_jll.artifact_dir, "lib")
 const with_metis = `-L$libmetis_dir $rpath$libmetis_dir -lmetis`
+const libmkl_dir = joinpath(MKL_jll.artifact_dir,"lib")
+const libopenblas_dir = joinpath(OpenBLAS32_jll.artifact_dir,"lib")
 const with_mkl = `-L$libmkl_dir $rpath$libmkl_dir -lmkl_intel_lp64 -lmkl_sequential -lmkl_core`
 const with_openblas = `-L$libopenblas_dir $rpath$libopenblas_dir -lopenblas`
 const openmp_flag = haskey(ENV,"PLASMONLP_ENABLE_OPENMP") ? ENV["PLASMONLP_ENABLE_OPENMP"] : `-fopenmp`
@@ -60,7 +59,9 @@ end
 @info "Building HSL (Ma27, Ma57, Ma77, Ma86, Ma97) $(build_succeded(products[end]))."
 
 # MUMPS_seq
-push!(products,FileProduct(prefix,joinpath(libmumps_dir,"libdmumps.$so"),:libmumps))
+const libmumps_dir = joinpath(MUMPS_seq_jll.artifact_dir,"lib")
+push!(products,FileProduct(prefix,joinpath(libdir,"libmumps.$so"),:libmumps))
+wait(OutputCollector(`$FC -o$(libdir)/libmumps.$so -shared $whole_archive -L$libmumps_dir $rpath$libmumps_dir -ldmumps $no_whole_archive -lmumps_common -lmpiseq -lpord $with_metis $(blasvendor == :mkl ? with_mkl : with_openblas)`,verbose=verbose))
 @info "Building Mumps (sequential) $(build_succeded(products[end]))."
 
 # Pardiso
