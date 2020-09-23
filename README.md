@@ -1,7 +1,5 @@
 MadNLP
 ========
-
-Dev:
 [![Build Status](https://travis-ci.org/sshin23/MadNLP.jl.svg?branch=master)](https://travis-ci.org/sshin23/MadNLP.jl) [![codecov](https://codecov.io/gh/sshin23/MadNLP.jl/branch/master/graph/badge.svg)](https://codecov.io/gh/sshin23/MadNLP.jl)
 
 
