@@ -287,6 +287,7 @@ MOI.get(model::Optimizer, p::MOI.RawParameter) = haskey(model.option_dict, p.nam
 MOI.get(model::Optimizer, ::MOI.SolveTime) = model.ips.cnt.total_time
 
 function MOI.empty!(model::Optimizer)
+    # empty!(model.option_dict)
     empty!(model.variable_info)
     model.nlp_data = empty_nlp_data()
     model.sense = MOI.FEASIBILITY_SENSE
@@ -847,13 +848,13 @@ end
 
 
 
-function MOI.get(model::Optimizer, ::MOI.TerminationStatus) 
+function MOI.get(model::Optimizer, ::MOI.TerminationStatus)
     if model.nlp === nothing
         return MOI.OPTIMIZE_NOT_CALLED
     end
-    return termination_status(model.nlp.status)
+    return termination_status(model.ips)
 end
-
+termination_status(ips::Solver) = termination_status(ips.nlp.status)
 function termination_status(status)
     if status == :Solve_Succeeded || status == :Feasible_Point_Found
         return MOI.LOCALLY_SOLVED

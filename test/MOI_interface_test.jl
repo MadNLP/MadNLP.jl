@@ -1,13 +1,16 @@
+using MathOptInterface
 const MOI = MathOptInterface
 const MOIT = MOI.Test
 const MOIU = MOI.Utilities
 const MOIB = MOI.Bridges
 
-const config = MOIT.TestConfig(atol=1e-4, rtol=1e-4,optimal_status=MOI.LOCALLY_SOLVED)
-const config_no_duals = MOIT.TestConfig(atol=1e-4, rtol=1e-4, duals=false,optimal_status=MOI.LOCALLY_SOLVED)
+const config = MOIT.TestConfig(atol=1e-4, rtol=1e-4,
+                               optimal_status=MOI.LOCALLY_SOLVED)
+const config_no_duals = MOIT.TestConfig(atol=1e-4, rtol=1e-4, duals=false,
+                                        optimal_status=MOI.LOCALLY_SOLVED)
 
-optimizer = MadNLP.Optimizer()
 @testset "MOI utils" begin
+    optimizer = MadNLP.Optimizer()
     @testset "SolverName" begin
         @test MOI.get(optimizer, MOI.SolverName()) == "MadNLP"
     end
@@ -30,16 +33,17 @@ optimizer = MadNLP.Optimizer()
 end
 
 @testset "Testing getters" begin
-    MOIT.copytest(MOI.instantiate(
-        ()->optimizer, with_bridge_type=Float64), MOIU.Model{Float64}())
+    MOIT.copytest(MOI.instantiate(MadNLP.Optimizer, with_bridge_type=Float64), MOIU.Model{Float64}())
 end
 
 @testset "Bounds set twice" begin
+    optimizer = MadNLP.Optimizer(log_level="error")
     MOIT.set_lower_bound_twice(optimizer, Float64)
     MOIT.set_upper_bound_twice(optimizer, Float64)
 end
 
 @testset "MOI Linear tests" begin
+    optimizer = MadNLP.Optimizer(log_level="error")
     exclude = ["linear1", # modify constraints not allowed
                "linear5", # modify constraints not allowed
                "linear6", # constraint set for l/q not allowed
@@ -57,7 +61,9 @@ end
     MOIT.contlineartest(optimizer, config_no_duals,exclude)
 end
 
+optimizer = MadNLP.Optimizer()
 @testset "MOI NLP tests" begin
+    optimizer = MadNLP.Optimizer(log_level="error")
     exclude = [
         "feasibility_sense_with_objective_and_no_hessian", # we need Hessians
         "feasibility_sense_with_no_objective_and_no_hessian", # we need Hessians
@@ -67,7 +73,7 @@ end
 end
 
 @testset "Unit" begin
-    bridged = MOIB.full_bridge_optimizer(optimizer,Float64)
+    bridged = MOIB.full_bridge_optimizer(MadNLP.Optimizer(log_level="error"),Float64)
     exclude = ["delete_variable", # Deleting not supported.
                "delete_variables", # Deleting not supported.
                "getvariable", # Variable names not supported.
@@ -101,7 +107,8 @@ end
 end
 
 @testset "MOI QP/QCQP tests" begin
-    qp_optimizer = MOIU.CachingOptimizer(MOIU.Model{Float64}(), MadNLP.Optimizer(log_level="error"))
+    optimizer = MadNLP.Optimizer(log_level="error")
+    qp_optimizer = MOIU.CachingOptimizer(MOIU.Model{Float64}(), optimizer)
     MOIT.qptest(qp_optimizer, config)
     exclude = ["qcp1", # VectorAffineFunction not supported.
               ]
