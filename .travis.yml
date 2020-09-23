@@ -4,7 +4,7 @@ os:
   - osx
 julia:
   - 1
-  #- nightly
+  - nightly
 codecov: true
 sudo: required
 addons:
@@ -14,11 +14,12 @@ jobs:
   allow_failures:
    - julia: nightly
   include:
-    - stage: "MINLPTests"
+    - stage: "MINLPTests and CUTEstTests"
       julia: 1
       os: linux
       script:
         - julia --project=test/MINLPTests -e 'using Pkg; Pkg.instantiate(); Pkg.add(PackageSpec(path=pwd()))'
         - julia --project=test/MINLPTests --color=yes test/MINLPTests/run_minlptests.jl
+        - julia --project=test/CUTEstTests -e 'using Pkg; Pkg.instantiate(); Pkg.add(PackageSpec(path=pwd()))'
+        - julia --project=test/CUTEstTests --color=yes test/CUTEstTests/run_cutesttests.jl
       after_success: skip
-
