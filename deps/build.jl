@@ -58,7 +58,8 @@ end
 
 # MUMPS_seq
 if is_FC
-    push!(products,FileProduct(prefix,joinpath(libmumps_dir,"libdmumps.$so"),:libmumps))
+    push!(products,FileProduct(prefix,joinpath(libdir,"libmumps.$so"),:libmumps))
+    wait(OutputCollector(`$FC -o$(libdir)/libmumps.$so -shared $whole_archive -L$libmumps_dir $rpath$libmumps_dir -ldmumps $no_whole_archive -lmumps_common -lmpiseq -lpord $with_metis $(blasvendor == :mkl ? with_mkl : with_openblas)`,verbose=verbose))
     @info "Building Mumps (sequential) $(build_succeded(products[end]))."
 end
 
