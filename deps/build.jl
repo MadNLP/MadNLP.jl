@@ -1,19 +1,17 @@
 # MadNLP.jl
 # Created by Sungho Shin (sungho.shin@wisc.edu)
 
+
 Sys.iswindows() && error("Windows is currently not supported.")
 
-using BinaryProvider, METIS_jll, MKL_jll, OpenBLAS32_jll, MUMPS_seq_jll
+using BinaryProvider, METIS_jll, MUMPS_seq_jll, MKL_jll, OpenBLAS32_jll
 
 # Parse some basic command-line arguments
 const verbose = "--verbose" in ARGS
-const blasvendor=(haskey(ENV,"MADNLP_BLAS") && ENV["MADNLP_BLAS"]=="openblas") ? :openblas : :mkl
-@info "Building HSL and Mumps with $(blasvendor == :mkl ? "MKL" : "OpenBLAS")"
+const blasvendor=(haskey(ENV,"MADNLP_BLAS") && ENV["MADNLP_BLAS"]=="openblas") ?
+    :openblas : :mkl
 
-const libmetis_dir = joinpath(METIS_jll.artifact_dir, "lib")
-const libmumps_dir = joinpath(MUMPS_seq_jll.artifact_dir,"lib")
-const libmkl_dir = joinpath(MKL_jll.artifact_dir,"lib")
-const libopenblas_dir = joinpath(OpenBLAS32_jll.artifact_dir,"lib")
+@info "Building HSL and Mumps with $(blasvendor == :mkl ? "MKL" : "OpenBLAS")"
 
 const prefix = Prefix(@__DIR__)
 const so = BinaryProvider.platform_dlext()
@@ -23,7 +21,10 @@ const no_whole_archive = Sys.isapple() ? `-Wl,-noall_load` : `-Wl,--no-whole-arc
 const libdir     = mkpath(joinpath(@__DIR__, "lib"))
 const CC = haskey(ENV,"MADNLP_CC") ? ENV["MADNLP_CC"] : `gcc`
 const FC = haskey(ENV,"MADNLP_FC") ? ENV["MADNLP_FC"] : `gfortran`
+const libmetis_dir = joinpath(METIS_jll.artifact_dir, "lib")
 const with_metis = `-L$libmetis_dir $rpath$libmetis_dir -lmetis`
+const libmkl_dir = joinpath(MKL_jll.artifact_dir,"lib")
+const libopenblas_dir = joinpath(OpenBLAS32_jll.artifact_dir,"lib")
 const with_mkl = `-L$libmkl_dir $rpath$libmkl_dir -lmkl_intel_lp64 -lmkl_sequential -lmkl_core`
 const with_openblas = `-L$libopenblas_dir $rpath$libopenblas_dir -lopenblas`
 const openmp_flag = haskey(ENV,"MADNLP_ENABLE_OPENMP") ? ENV["MADNLP_ENABLE_OPENMP"] : `-fopenmp`
