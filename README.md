@@ -1,8 +1,7 @@
 MadNLP
 ========
+[![Build Status](https://travis-ci.org/sshin23/MadNLP.jl.svg?branch=master)](https://travis-ci.org/sshin23/MadNLP.jl) [![codecov](https://codecov.io/gh/sshin23/MadNLP.jl/branch/master/graph/badge.svg)](https://codecov.io/gh/sshin23/MadNLP.jl)
 
-Dev:
-[![Build Status](https://travis-ci.org/sshin23/MadNLP.jl.svg?branch=master)](https://travis-ci.org/sshin23/MadNLP.jl)
 
 MadNLP is a [nonlinear programming](https://en.wikipedia.org/wiki/Nonlinear_programming) (NLP) solver, purely implemented in [Julia](https://julialang.org/). MadNLP implements a filter line-search algorithm, as that used in [Ipopt](https://github.com/coin-or/Ipopt). MadNLP seeks to streamline the development of modeling and algorithmic paradigms in order to exploit structures and to make efficient use of high-performance computers. 
 
