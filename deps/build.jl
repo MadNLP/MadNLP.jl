@@ -1,7 +1,11 @@
 # MadNLP.jl
 # Created by Sungho Shin (sungho.shin@wisc.edu)
 
+<<<<<<< HEAD
 using BinaryProvider, METIS_jll, MUMPS_seq_jll, MKL_jll, OpenBLAS32_jll
+=======
+using BinaryProvider, METIS_jll, MKL_jll, OpenBLAS32_jll
+>>>>>>> 61f9dbf83ae6488b6064d3c967c399429f0ecdd8
 
 # Parse some basic command-line arguments
 const verbose = "--verbose" in ARGS
@@ -59,9 +63,16 @@ end
 @info "Building HSL (Ma27, Ma57, Ma77, Ma86, Ma97) $(build_succeded(products[end]))."
 
 # MUMPS_seq
+<<<<<<< HEAD
 const libmumps_dir = joinpath(MUMPS_seq_jll.artifact_dir,"lib")
 push!(products,FileProduct(prefix,joinpath(libdir,"libmumps.$so"),:libmumps))
 wait(OutputCollector(`$FC -o$(libdir)/libmumps.$so -shared $whole_archive -L$libmumps_dir $rpath$libmumps_dir -ldmumps $no_whole_archive -lmumps_common -lmpiseq -lpord $with_metis $(blasvendor == :mkl ? with_mkl : with_openblas)`,verbose=verbose))
+=======
+using MUMPS_seq_jll
+const libmumps_dir = joinpath(MUMPS_seq_jll.artifact_dir,"lib")
+push!(products,FileProduct(prefix,joinpath(libdir,"libmumps.$so"),:libmumps))
+wait(OutputCollector(`$FC -o$(libdir)/libmumps.$so -shared $whole_archive -L$libmumps_dir -ldmumps $no_whole_archive -lmumps_common -lmpiseq -lpord $with_metis $(blasvendor == :mkl ? with_mkl : with_openblas)`,verbose=verbose))
+>>>>>>> 61f9dbf83ae6488b6064d3c967c399429f0ecdd8
 @info "Building Mumps (sequential) $(build_succeded(products[end]))."
 
 # Pardiso
