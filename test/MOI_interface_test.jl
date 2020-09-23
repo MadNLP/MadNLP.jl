@@ -61,6 +61,7 @@ end
     MOIT.contlineartest(optimizer, config_no_duals,exclude)
 end
 
+optimizer = MadNLP.Optimizer()
 @testset "MOI NLP tests" begin
     optimizer = MadNLP.Optimizer(log_level="error")
     exclude = [
@@ -102,4 +103,14 @@ end
                "solve_result_index", # DualObjectiveValue not supported
                "time_limit_sec", #time limit given as Flaot64?
                ]
-    MOIT.un
+    MOIT.unittest(bridged, config, exclude)
+end
+
+@testset "MOI QP/QCQP tests" begin
+    optimizer = MadNLP.Optimizer(log_level="error")
+    qp_optimizer = MOIU.CachingOptimizer(MOIU.Model{Float64}(), optimizer)
+    MOIT.qptest(qp_optimizer, config)
+    exclude = ["qcp1", # VectorAffineFunction not supported.
+              ]
+    MOIT.qcptest(qp_optimizer, config_no_duals, exclude)
+end
