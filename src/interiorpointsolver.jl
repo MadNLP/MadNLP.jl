@@ -22,7 +22,6 @@
     acceptable_cnt::Int = 0
 end
 
-
 @with_kw mutable struct InteriorPointOptions <: AbstractOptions
     # General options
     rethrow_error::Bool = true
@@ -33,7 +32,7 @@ end
     linear_system_scaler::Module = DummyModule
     
     # Output options
-    log_level::String = "info" 
+    log_level::String = "info"
     output_file::String = ""   
     print_level::String = "trace" 
     file_print_level::String = "trace"
