@@ -32,10 +32,9 @@ end
     linear_system_scaler::Module = DummyModule
     
     # Output options
-    log_level::LogLevels = INFO
     output_file::String = ""   
-    print_level::LogLevels = TRACE
-    file_print_level::LogLevels = TRACE
+    print_level::LogLevels = INFO
+    file_print_level::LogLevels = INFO
 
     # Termination options
     tol::Float64 = 1e-8

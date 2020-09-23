@@ -848,58 +848,46 @@ end
 
 
 
-function MOI.get(model::Optimizer, ::MOI.TerminationStatus)
-    if model.nlp === nothing
-        return MOI.OPTIMIZE_NOT_CALLED
-    end
-    return termination_status(model.ips)
-end
-termination_status(ips::Solver) = status_moi_dict[ips.nlp.status]
+MOI.get(model::Optimizer, ::MOI.TerminationStatus) = model.nlp === nothing ?
+    MOI.OPTIMIZE_NOT_CALLED : termination_status(model.ips)
+MOI.get(model::Optimizer, ::MOI.RawStatusString) = string(model.nlp.status)
+MOI.get(model::Optimizer, ::MOI.ResultCount) = (model.nlp !== nothing) ? 1 : 0
+MOI.get(model::Optimizer, attr::MOI.PrimalStatus) = !(1 <= attr.N <= MOI.get(model, MOI.ResultCount())) ?
+    MOI.NO_SOLUTION : primal_status(model.ips)
+MOI.get(model::Optimizer, attr::MOI.DualStatus) = !(1 <= attr.N <= MOI.get(model, MOI.ResultCount())) ?
+    MOI.NO_SOLUTION : dual_status(model.ips)
 
+const status_moi_dict = Dict(
+    SOLVE_SUCCEEDED => MOI.LOCALLY_SOLVED,
+    SOLVED_TO_ACCEPTABLE_LEVEL => MOI.ALMOST_LOCALLY_SOLVED,
+    SEARCH_DIRECTION_BECOMES_TOO_SMALL => MOI.SLOW_PROGRESS,
+    DIVERGING_ITERATES => MOI.INFEASIBLE_OR_UNBOUNDED,
+    INFEASIBLE_PROBLEM_DETECTED => MOI.LOCALLY_INFEASIBLE,
+    MAXIMUM_ITERATIONS_EXCEEDED => MOI.ITERATION_LIMIT,
+    MAXIMUM_WALLTIME_EXCEEDED => MOI.TIME_LIMIT,
+    INITIAL => MOI.OPTIMIZE_NOT_CALLED,
+    RESTORATION_FAILED => MOI.NUMERICAL_ERROR,
+    INVALID_NUMBER_DETECTED => MOI.INVALID_MODEL,
+    ERROR_IN_STEP_COMPUTATION => MOI.NUMERICAL_ERROR,
+    NOT_ENOUGH_DEGREES_OF_FREEDOM => MOI.INVALID_MODEL,
+    USER_REQUESTED_STOP => MOI.INTERRUPTED,
+    INTERNAL_ERROR => MOI.OTHER_ERROR)
+const status_primal_dict = Dict(
+    SOLVE_SUCCEEDED => MOI.FEASIBLE_POINT,
+    SOLVED_TO_ACCEPTABLE_LEVEL => MOI.NEARLY_FEASIBLE_POINT,
+    INFEASIBLE_PROBLEM_DETECTED => MOI.INFEASIBLE_POINT)
+const status_dual_dict = Dict(
+    SOLVE_SUCCEEDED => MOI.FEASIBLE_POINT,
+    SOLVED_TO_ACCEPTABLE_LEVEL => MOI.NEARLY_FEASIBLE_POINT,
+    INFEASIBLE_PROBLEM_DETECTED => MOI.INFEASIBLE_POINT)
 
-function MOI.get(model::Optimizer, ::MOI.RawStatusString)
-    return string(model.nlp.status)
-end
+termination_status(ips::Solver) = haskey(status_moi_dict,ips.nlp.status) ?
+    status_moi_dict[ips.nlp.status] : MOI.UNKNOWN_RESULT_STATUS
+primal_status(ips::Solver) = haskey(status_moi_dict,ips.nlp.status) ?
+    status_primal_dict[ips.nlp.status] : MOI.UNKNOWN_RESULT_STATUS
+dual_status(ips::Solver) = haskey(status_moi_dict,ips.nlp.status) ?
+    status_dual_dict[ips.nlp.status] : MOI.UNKNOWN_RESULT_STATUS
 
-function MOI.get(model::Optimizer, ::MOI.ResultCount)
-    return (model.nlp !== nothing) ? 1 : 0
-end
-
-function MOI.get(model::Optimizer, attr::MOI.PrimalStatus)
-    if !(1 <= attr.N <= MOI.get(model, MOI.ResultCount()))
-        return MOI.NO_SOLUTION
-    end
-    status = model.nlp.status
-    if status == SOLVE_SUCCEEDED
-        return MOI.FEASIBLE_POINT
-    elseif status == FEASIBLE_POINT_FOUND
-        return MOI.FEASIBLE_POINT
-    elseif status == SOLVED_TO_ACCEPTABLE_LEVEL
-        return MOI.NEARLY_FEASIBLE_POINT
-    elseif status == INFEASIBLE_PROBLEM_DETECTED
-        return MOI.INFEASIBLE_POINT
-    else
-        return MOI.UNKNOWN_RESULT_STATUS
-    end
-end
-
-function MOI.get(model::Optimizer, attr::MOI.DualStatus)
-    if !(1 <= attr.N <= MOI.get(model, MOI.ResultCount()))
-        return MOI.NO_SOLUTION
-    end
-    status = model.nlp.status
-    if status == SOLVE_SUCCEEDED
-        return MOI.FEASIBLE_POINT
-    elseif status == FEASIBLE_POINT_FOUND
-        return MOI.FEASIBLE_POINT
-    elseif status == SOLVED_TO_ACCEPTABLE_LEVEL
-        return MOI.NEARLY_FEASIBLE_POINT
-    elseif status == INFEASIBLE_PROBLEM_DETECTED
-        return MOI.UNKNOWN_RESULT_STATUS
-    else
-        return MOI.UNKNOWN_RESULT_STATUS
-    end
-end
 
 function MOI.get(model::Optimizer, attr::MOI.ObjectiveValue)
     MOI.check_result_index_bounds(model, attr)
