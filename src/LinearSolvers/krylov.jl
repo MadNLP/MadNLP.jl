@@ -6,7 +6,7 @@ module Krylov
 import ..MadNLP:
     @with_kw, Logger, @debug, @warn, @error,
     AbstractOptions, AbstractIterator, set_options!, @sprintf, 
-    solve_refine!, mul!, ldiv!, size, IterativeSolvers
+    solve_refine!, mul!, ldiv!, size, IterativeSolvers, StrideOneVector
 import IterativeSolvers:
     FastHessenberg, ArnoldiDecomp, Residual, init!, init_residual!, expand!, Identity,
     orthogonalize_and_normalize!, update_residual!, gmres_iterable!, GMRESIterable, converged
@@ -29,7 +29,7 @@ size(A::VirtualMatrix,i) = (A.m,A.n)[i]
 struct VirtualPreconditioner
     ldiv!::Function
 end
-ldiv!(Pl::VirtualPreconditioner,x) = Pl.ldiv!(x)
+ldiv!(Pl::VirtualPreconditioner,x::StrideOneVector{Float64}) = Pl.ldiv!(x)
 
 mutable struct Solver <: AbstractIterator
     g::Union{Nothing,GMRESIterable}

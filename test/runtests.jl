@@ -23,4 +23,8 @@ end
     @testset "Plasmo interface" begin # this also serves as decomposition solver test
         include("plasmo_test.jl")
     end
+
+    @testset "NLP Algorithm" begin # this also serves as decomposition solver test
+        include("nlp_test.jl")
+    end
 end # @testset

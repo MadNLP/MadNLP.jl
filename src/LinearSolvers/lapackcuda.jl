@@ -8,9 +8,10 @@ import ..MadNLP:
     introduce, factorize!, solve!, improve!, is_inertia, inertia, libmkl32, LapackMKL, tril_to_full!
 
 const INPUT_MATRIX_TYPE = :dense
-    
+
+@enum(Algorithms::Int, BUNCHKAUFMAN = 1, LU = 2, QR = 3)
 @with_kw mutable struct Options <: AbstractOptions
-    lapackcuda_algorithm::String = "bunchkaufman"
+    lapackcuda_algorithm::Algorithms = BUNCHKAUFMAN
 end
 
 mutable struct Solver <: AbstractLinearSolver
@@ -22,6 +23,7 @@ mutable struct Solver <: AbstractLinearSolver
     info
     etc::Dict{Symbol,Any} # throw some algorithm-specific things here
     opt::Options
+    logger::Logger
 end
 
 function Solver(dense::Matrix{Float64};
@@ -30,7 +32,6 @@ function Solver(dense::Matrix{Float64};
                 kwargs...)
     
     set_options!(opt,option_dict,kwargs...)
-    opt.lapackcuda_log_level=="" || setlevel!(LOGGER,opt.lapackcuda_log_level)
     fact = CuMatrix{Float64}(undef,size(dense))
     rhs = CuVector{Float64}(undef,size(dense,1))
     work  = CuVector{Float64}(undef, 1)
@@ -42,29 +43,29 @@ function Solver(dense::Matrix{Float64};
 end
 
 function factorize!(M::Solver)
-    if M.opt.lapackcuda_algorithm == "bunchkaufman"
+    if M.opt.lapackcuda_algorithm == BUNCHKAUFMAN
         factorize_bunchkaufman!(M)
-    elseif M.opt.lapackcuda_algorithm == "lu"
+    elseif M.opt.lapackcuda_algorithm == LU
         factorize_lu!(M)
-    elseif M.opt.lapackcuda_algorithm == "qr"
+    elseif M.opt.lapackcuda_algorithm == QR
         factorize_qr!(M)
     else
         error(LOGGER,"Invalid lapackcuda_algorithm")
     end
 end
 function solve!(M::Solver,x)
-    if M.opt.lapackcuda_algorithm == "bunchkaufman"
+    if M.opt.lapackcuda_algorithm == BUNCHKAUFMAN
         solve_bunchkaufman!(M,x)
-    elseif M.opt.lapackcuda_algorithm == "lu"
+    elseif M.opt.lapackcuda_algorithm == LU
         solve_lu!(M,x)
-    elseif M.opt.lapackcuda_algorithm == "qr"
+    elseif M.opt.lapackcuda_algorithm == QR
         solve_qr!(M,x)
     else
         error(LOGGER,"Invalid lapackcuda_algorithm")
     end
 end
 
-is_inertia(M::Solver) = M.opt.lapackcuda_algorithm == "bunchkaufman"
+is_inertia(M::Solver) = M.opt.lapackcuda_algorithm == BUNCHKAUFMAN
 inertia(M::Solver) = LapackMKL.inertia(M.etc[:fact_cpu],M.etc[:ipiv_cpu],M.info[])
 improve!(M::Solver) = false
 introduce(M::Solver) = "Lapack-CUDA ($(M.opt.lapackcuda_algorithm))"

@@ -7,9 +7,10 @@ import ..MadNLP:
     introduce, factorize!, solve!, improve!, is_inertia, inertia, libmkl32
 
 const INPUT_MATRIX_TYPE = :dense
-    
+
+@enum(Algorithms::Int, BUNCHKAUFMAN = 1, LU = 2, QR = 3)
 @with_kw mutable struct Options <: AbstractOptions
-    lapackmkl_algorithm::String = "bunchkaufman"
+    lapackmkl_algorithm::Algorithms = BUNCHKAUFMAN
 end
 
 mutable struct Solver <: AbstractLinearSolver
@@ -69,7 +70,6 @@ function Solver(dense::Matrix{Float64};
                 kwargs...)
     
     set_options!(opt,option_dict,kwargs...)
-    # fact = rewrite_factorization ? dense : copy(dense)
     fact = copy(dense)
     
     etc = Dict{Symbol,Any}()
@@ -80,22 +80,22 @@ function Solver(dense::Matrix{Float64};
 end
 
 function factorize!(M::Solver)
-    if M.opt.lapackmkl_algorithm == "bunchkaufman"
+    if M.opt.lapackmkl_algorithm == BUNCHKAUFMAN
         factorize_bunchkaufman!(M)
-    elseif M.opt.lapackmkl_algorithm == "lu"
+    elseif M.opt.lapackmkl_algorithm == LU
         factorize_lu!(M)
-    elseif M.opt.lapackmkl_algorithm == "qr"
+    elseif M.opt.lapackmkl_algorithm == QR
         factorize_qr!(M)
     else
         error(LOGGER,"Invalid lapackmkl_algorithm")
     end
 end
 function solve!(M::Solver,x)
-    if M.opt.lapackmkl_algorithm == "bunchkaufman"
+    if M.opt.lapackmkl_algorithm == BUNCHKAUFMAN
         solve_bunchkaufman!(M,x)
-    elseif M.opt.lapackmkl_algorithm == "lu"
+    elseif M.opt.lapackmkl_algorithm == LU
         solve_lu!(M,x)
-    elseif M.opt.lapackmkl_algorithm == "qr"
+    elseif M.opt.lapackmkl_algorithm == QR
         solve_qr!(M,x)
     else
         error(LOGGER,"Invalid lapackmkl_algorithm")
@@ -151,7 +151,7 @@ function solve_qr!(M::Solver,x)
     return x
 end
 
-is_inertia(M::Solver) = M.opt.lapackmkl_algorithm == "bunchkaufman"
+is_inertia(M::Solver) = M.opt.lapackmkl_algorithm == BUNCHKAUFMAN
 inertia(M::Solver) = inertia(M.fact,M.etc[:ipiv],M.info[])
 function inertia(fact,ipiv,info)
     numneg = num_neg_ev(size(fact,1),fact,ipiv)
