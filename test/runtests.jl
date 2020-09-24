@@ -27,8 +27,4 @@ end
     @testset "NLP Algorithm" begin # this also serves as decomposition solver test
         include("nlp_test.jl")
     end
-
-    @testset "Misc" begin
-        include("misc_test.jl")
-    end
 end # @testset
