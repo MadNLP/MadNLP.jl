@@ -38,8 +38,9 @@ end
 optimizer_constructors = [
     ()->MadNLP.Optimizer(print_level=MadNLP.ERROR),
     ()->MadNLP.Optimizer(linear_solver="schur",schur_num_parts=2,print_level=MadNLP.ERROR),
-    ()->MadNLP.Optimizer(linear_solver="schwarz",schwarz_num_parts=2),
-    ()->MadNLP.Optimizer(linear_solver="schwarz",schwarz_num_parts_upper=2,schwarz_num_parts=10)
+    ()->MadNLP.Optimizer(linear_solver="schwarz",schwarz_num_parts=2,print_level=MadNLP.ERROR),
+    ()->MadNLP.Optimizer(linear_solver="schwarz",schwarz_num_parts_upper=2,schwarz_num_parts=10,
+                         print_level=MadNLP.ERROR)
 ]
 
 @testset "Plasmo test" for optimizer_constructor in optimizer_constructors

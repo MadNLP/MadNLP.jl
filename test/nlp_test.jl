@@ -105,6 +105,14 @@ sets = [
     ],
     [
         ()->MadNLP.Optimizer(
+            linear_solver="LapackMKL",
+            fixed_variable_treatment=MadNLP.RELAX_BOUND,
+            print_level=MadNLP.ERROR),
+        [],
+        true
+    ],
+    [
+        ()->MadNLP.Optimizer(
             tol=1e-8,
             reduced_system=false,
             print_level=MadNLP.ERROR),

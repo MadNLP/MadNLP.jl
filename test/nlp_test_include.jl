@@ -24,10 +24,19 @@ end
 function lootsma(optimizer_constructor::Function)
     m=Model(optimizer_constructor)
     @variable(m,0 <= x[i=1:3] <= 5, start = 0.)
-    @NLconstraint(m,-sqrt(x[1]) - sqrt(x[2]) + sqrt(x[3]) >= 0.)
-    @NLconstraint(m,sqrt(x[1]) + sqrt(x[2]) + sqrt(x[3]) >= 4.)
+    l=[
+        @NLconstraint(m,-sqrt(x[1]) - sqrt(x[2]) + sqrt(x[3]) >= 0.)
+        @NLconstraint(m,sqrt(x[1]) + sqrt(x[2]) + sqrt(x[3]) >= 4.)
+    ]
     @NLobjective(m,Min,x[1]^3 + 11. *x[1] - 6. *sqrt(x[1])  +x[3] )
+
     optimize!(m)
+
+    solcmp(value.(x),[0.07415998565403112,2.9848713863700236,4.0000304145340415],1e-4,1e-4)
+    solcmp(dual.(l),[2.000024518601535,2.0000305441119535],1e-4,1e-4)
+    solcmp(dual.(LowerBoundRef.(x)),[0.000186628762032665,4.202611521176758e-6,3.285036300951934e-6],1e-4,1e-4)
+    solcmp(dual.(UpperBoundRef.(x)),[-2.5466950450392374e-6,-6.034205830350869e-6,-1.2544280272965098e-5],1e-4,1e-4)
+    
     @test termination_status(m) == MOI.LOCALLY_SOLVED
 end
 

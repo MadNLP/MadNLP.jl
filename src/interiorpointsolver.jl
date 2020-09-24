@@ -53,6 +53,7 @@ end
     reduced_system::Bool = true
 
     # initialization options
+    dual_initialized::Bool = false
     inertia_correction_method::InertiaCorrectionMethod = INERTIA_AUTO
     constr_mult_init_max::Float64 = 1e3
     bound_push::Float64 = 1e-2 
@@ -639,16 +640,19 @@ function initialize!(ips::Solver)
     
     # Initialize dual variables
     @trace(ips.logger,"Initializing constraint duals.")
-    if ips.opt.reduced_system 
-        set_initial_aug_reduced!(ips.pr_diag,ips.du_diag,ips.hess)
-        set_initial_rhs_reduced!(ips.px,ips.pl,ips.f,ips.zl,ips.zu)
-    else
-        set_initial_aug_unreduced!(ips.pr_diag,ips.du_diag,ips.hess,ips.l_lower,ips.u_lower,ips.l_diag,ips.u_diag)
-        set_initial_rhs_unreduced!(ips.px,ips.pl,ips.pzl,ips.pzu,ips.f,ips.zl,ips.zu)
+    if !ips.opt.dual_initialized
+        if ips.opt.reduced_system 
+            set_initial_aug_reduced!(ips.pr_diag,ips.du_diag,ips.hess)
+            set_initial_rhs_reduced!(ips.px,ips.pl,ips.f,ips.zl,ips.zu)
+        else
+            set_initial_aug_unreduced!(
+                ips.pr_diag,ips.du_diag,ips.hess,ips.l_lower,ips.u_lower,ips.l_diag,ips.u_diag)
+            set_initial_rhs_unreduced!(ips.px,ips.pl,ips.pzl,ips.pzu,ips.f,ips.zl,ips.zu)
+        end
+        ips.factorize!()
+        ips.solve_refine!(ips.d,ips.p)
+        norm(ips.dl,Inf)>ips.opt.constr_mult_init_max ? (ips.l.= 0.) : (ips.l.= ips.dl)
     end
-    ips.factorize!()
-    ips.solve_refine!(ips.d,ips.p)
-    norm(ips.dl,Inf)>ips.opt.constr_mult_init_max ? (ips.l.= 0.) : (ips.l.= ips.dl)
 
     # Initializing 
     ips.obj_val = ips.obj(ips.x)
@@ -674,7 +678,6 @@ function optimize!(ips::Solver)
 
         while ips.status >= REGULAR
             ips.status == REGULAR && (ips.status = regular!(ips))
-            ips.status == RESTORE && (ips.status = robust!(ips))
             ips.status == ROBUST && (ips.status = robust!(ips))
         end
     catch e
@@ -778,9 +781,9 @@ function regular!(ips::Solver)
         # start inertia conrrection
         @trace(ips.logger,"Solving primal-dual system.")
         if ips.opt.inertia_correction_method == INERTIA_FREE
-            inertia_free_reg(ips) || return RESTORE
+            inertia_free_reg(ips) || return ROBUST
         elseif ips.opt.inertia_correction_method == INERTIA_BASED
-            inertia_based_reg(ips) || return RESTORE
+            inertia_based_reg(ips) || return ROBUST
         end
 
         if ips.opt.reduced_system
@@ -834,7 +837,7 @@ function regular!(ips::Solver)
                 @debug(ips.logger,
                       "Cannot find an acceptable step at iteration $(ips.cnt.k). Switching to restoration phase.")
                 ips.cnt.k+=1
-                return RESTORE
+                return ROBUST
             else
                 @trace(ips.logger,"Step rejected; proceed with the next trial step.")
                 ips.alpha < eps(Float64)*10 && return ips.cnt.acceptable_cnt >0 ?
@@ -865,77 +868,6 @@ function regular!(ips::Solver)
         
         ips.cnt.k+=1
         @trace(ips.logger,"Proceeding to the next interior point iteration.")
-    end
-end
-
-function restore!(ips::Solver)
-    ips.del_w=0
-    ips._w1x = ips.x # backup the previous primal iterate
-    F = get_F(ips.c,ips.f,ips.zl,ips.zu,ips.jacl,ips.x_lr,ips.xl_r,ips.zl_r,ips.xu_r,ips.x_ur,ips.zu_r,ips.mu)
-    ips.cnt.t = 0
-    ips.alpha_z = 0.
-    ips.ftype = "R"
-    
-    while true
-        ips.alpha = min(get_alpha_max(ips.x,ips.xl,ips.xu,ips.dx,ips.tau),
-                        get_alpha_z(ips.zl_r,ips.zu_r,ips.dzl,ips.dzu,ips.tau))       
-        
-        ips.x .+= ips.alpha.*ips.dx
-        ips.l .+= ips.alpha.*ips.dl
-        ips.zl_r.+=ips.alpha.*ips.dzl
-        ips.zu_r.+=ips.alpha.*ips.dzu
-        
-        ips.con!(ips.c,ips.x)
-        ips.obj_grad!(ips.f,ips.x)
-        ips.obj_val = ips.obj(ips.x)
-
-        !ips.opt.jacobian_constant && ips.con_jac!(ips.x)
-        mv!(ips.jacl,ips.jac_com',ips.l)
-
-        F_trial = get_F(
-            ips.c,ips.f,ips.zl,ips.zu,ips.jacl,ips.x_lr,ips.xl_r,ips.zl_r,ips.xu_r,ips.x_ur,ips.zu_r,ips.mu)  
-        F_trial > ips.opt.soft_resto_pderror_reduction_factor*F && (ips.x.=ips._w1x; return ROBUST)
-        F = F_trial
-        
-        theta = get_theta(ips.c)
-        varphi= get_varphi(ips.obj_val,ips.x_lr,ips.xl_r,ips.xu_r,ips.x_ur,ips.mu)
-        
-        ips.cnt.k+=1
-        
-        is_filter_acceptable(ips.filter,theta,varphi) ? (ips.cnt.t+=1) : return REGULAR
-        ips.cnt.k>=ips.opt.max_iter && return MAXIMUM_ITERATIONS_XCEEDED
-        time()-ips.cnt.start_time>=ip.opt.max_wall_time && return MAXIMUM_WALLTIME_EXCEEDED
-
-
-        sd = get_sd(ips.l,ips.zl_r,ips.zu_r,ips.opt.s_max)
-        sc = get_sc(ips.zl_r,ips.zu_r,ips.opt.s_max)
-        ips.inf_pr = get_inf_pr(ips.c)
-        ips.inf_du = get_inf_du(ips.f,ips.zl,ips.zu,ips.jacl,sd)
-        ips.inf_compl = get_inf_compl(ips.x_lr,ips.xl_r,ips.zl_r,ips.xu_r,ips.x_ur,ips.zu_r,0.,sc)
-        inf_compl_mu = get_inf_compl(ips.x_lr,ips.xl_r,ips.zl_r,ips.xu_r,ips.x_ur,ips.zu_r,ips.mu,sc)
-        print_iter(ips)
-        
-        !ips.opt.hessian_constant && ips.lag_hess!(ips.x,ips.l)
-        if ips.opt.reduced_system
-            set_aug_reduced!(ips.pr_diag,ips.du_diag,ips.x,ips.xl,ips.xu,ips.zl,ips.zu)
-            set_aug_rhs_reduced!(ips.x,ips.xl,ips.xu,ips.f,ips.c,ips.jacl,ips.px,ips.pl,ips.mu)
-        else
-            set_aug_unreduced!(ips.pr_diag,ips.du_diag,ips.l_lower,ips.u_lower,ips.l_diag,ips.u_diag,
-                               ips.zl_r,ips.zu_r,ips.x_lr,ips.xl_r,ips.xu_r,ips.x_ur)
-            set_aug_rhs_unreduced!(ips.px,ips.pl,ips.pzl,ips.pzu,ips.f,ips.c,ips.jacl,ips.l_lower,ips.u_lower,
-                                   ips.x_lr,ips.xl_r,ips.xu_r,ips.x_ur,ips.zl,ips.zu,ips.mu)
-        end
-        dual_inf_perturbation!(ips.px,ips.ind_llb,ips.ind_uub,ips.mu,ips.opt.kappa_d)
-        ips.factorize!()
-        ips.solve_refine!(ips.d,ips.p)
-        
-        if ips.opt.reduced_system
-            finish_aug_solve_reduced!(
-                ips.x_lr,ips.xl_r,ips.zl_r,ips.dx_lr,ips.dzl,ips.x_ur,ips.xu_r,ips.zu_r,ips.dx_ur,ips.dzu,ips.mu)
-        else
-            finish_aug_solve_unreduced!(ips.dzl,ips.dzu,ips.l_lower,ips.u_lower)
-        end
-        ips.ftype = "f"
     end
 end
 
@@ -1362,13 +1294,6 @@ function get_obj_val_R(p,n,D_R,x,x_ref,rho,zeta)
     obj_val_R = 0.
     for i=1:length(p)
         @inbounds obj_val_R += rho*(p[i]+n[i]) .+ zeta/2*D_R[i]^2*(x[i]-x_ref[i])^2
-    end
-    return obj_val_R
-end
-function get_obj_val_R(p,n,rho)
-    obj_val_R = 0.
-    for i=1:length(p)
-        @inbounds obj_val_R += rho*(p[i]+n[i]) 
     end
     return obj_val_R
 end

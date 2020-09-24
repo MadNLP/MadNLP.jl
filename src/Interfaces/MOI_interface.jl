@@ -103,7 +103,6 @@ MOI.supports_constraint(::Optimizer,::Type{MOI.ScalarQuadraticFunction{Float64}}
 MOI.supports_constraint(::Optimizer,::Type{MOI.ScalarAffineFunction{Float64}},::Type{MOI.Interval{Float64}})=false
 MOI.supports_constraint(::Optimizer,::Type{MOI.ScalarQuadraticFunction{Float64}},::Type{MOI.Interval{Float64}})=false
 
-
 MOI.get(::Optimizer, ::MOI.SolverName) = "MadNLP"
 MOI.get(model::Optimizer,::MOI.ObjectiveFunctionType)=typeof(model.objective)
 MOI.get(model::Optimizer,::MOI.NumberOfVariables)=length(model.variable_info)
@@ -319,9 +318,7 @@ function MOI.add_variable(model::Optimizer)
     push!(model.variable_info, VariableInfo())
     return MOI.VariableIndex(length(model.variable_info))
 end
-function MOI.add_variables(model::Optimizer, n::Int)
-    return [MOI.add_variable(model) for i in 1:n]
-end
+MOI.add_variables(model::Optimizer, n::Int) = [MOI.add_variable(model) for i in 1:n]
 
 # checking inbounds
 function check_inbounds(model::Optimizer, vi::MOI.VariableIndex)
@@ -923,17 +920,17 @@ end
 @define_constraint_primal(MOI.ScalarQuadraticFunction{Float64},MOI.GreaterThan{Float64}, quadratic_ge)
 @define_constraint_primal(MOI.ScalarQuadraticFunction{Float64},MOI.EqualTo{Float64}, quadratic_eq)
 
-function MOI.get(model::Optimizer, attr::MOI.ConstraintPrimal,
-                 ci::MOI.ConstraintIndex{MOI.SingleVariable,
-                                         MOI.LessThan{Float64}})
-    MOI.check_result_index_bounds(model, attr)
-    vi = MOI.VariableIndex(ci.value)
-    check_inbounds(model, vi)
-    if !has_upper_bound(model, vi)
-        error("Variable $vi has no upper bound -- ConstraintPrimal not defined.")
-    end
-    return model.nlp.x[vi.value]
-end
+# function MOI.get(model::Optimizer, attr::MOI.ConstraintPrimal,
+#                  ci::MOI.ConstraintIndex{MOI.SingleVariable,
+#                                          MOI.LessThan{Float64}})
+#     MOI.check_result_index_bounds(model, attr)
+#     vi = MOI.VariableIndex(ci.value)
+#     check_inbounds(model, vi)
+#     if !has_upper_bound(model, vi)
+#         error("Variable $vi has no upper bound -- ConstraintPrimal not defined.")
+#     end
+#     return model.nlp.x[vi.value]
+# end
 
 function MOI.get(model::Optimizer, attr::MOI.ConstraintPrimal,
                  ci::MOI.ConstraintIndex{MOI.SingleVariable,
@@ -1095,9 +1092,13 @@ function set_g!(model::Optimizer,l,gl,gu)
         j+=1
     end
     k=0
-    model.nlp_dual_start == nothing || for v in model.nlp_dual_start
-        l[i+k] = v
-        k+=1
+    if model.nlp_dual_start != nothing
+        for v in model.nlp_dual_start
+            l[i+k] = v
+            k+=1
+        end
+    else
+        l[i:end] .= 0.
     end
 end
 
@@ -1145,6 +1146,7 @@ function NonlinearProgram(model::Optimizer)
     jac_sparsity!(I,J) = jacobian_structure(model,I,J)
     
     model.option_dict[:jacobian_constant], model.option_dict[:hessian_constant] = is_jac_hess_constant(model)
+    model.option_dict[:dual_initialized] = !iszero(l)
 
     return NonlinearProgram(n,m,nnz_hess,nnz_jac,0.,x,g,l,zl,zu,xl,xu,gl,gu,obj,obj_grad!,con!,con_jac!,
                             lag_hess!,hess_sparsity!,jac_sparsity!,INITIAL,Dict{Symbol,Any}())
