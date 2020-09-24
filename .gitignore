@@ -1,6 +1,7 @@
 Manifest.toml
 test/MINLPTests/Manifest.toml
 test/CUTEstTests/Manifest.toml
+test/.test.out
 
 deps/deps.jl
 deps/lib/*

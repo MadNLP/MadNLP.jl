@@ -18,6 +18,8 @@ for (i,node) in enumerate(nodes)
                sum(u[i]^2 for i in 1:M))
     nodecnt += 1
 end
+n1 = getnode(graph,1)
+@constraint(n1,n1[:x][1] == 0)
 for i=1:n_nodes-1
     @linkconstraint(graph, nodes[i+1][:x][1] == nodes[i][:x][M] + nodes[i][:u][M],attach=nodes[i+1])
 end
@@ -28,13 +30,20 @@ kwargs_collection = [
     Dict(:linear_solver=>"schur",  :schur_custom_partition=>true,:print_level=>MadNLP.ERROR),
     Dict(:linear_solver=>"schwarz",:schwarz_custom_partition=>true,:print_level=>MadNLP.ERROR)
 ]
-
-n1 = getnode(graph,1)
-@constraint(n1,n1[:x][1] == 0)
-
 @testset "Plasmo test" for kwargs in kwargs_collection
     MadNLP.optimize!(graph;kwargs...);
     @test termination_status(graph.optimizer) == MadNLP.MOI.LOCALLY_SOLVED 
-    # optimize!(graph,()->MadNLP.Optimizer(kwargs...));
-    # @test termination_status(graph.optimizer) == MadNLP.MOI.LOCALLY_SOLVED 
 end
+
+optimizer_constructors = [
+    ()->MadNLP.Optimizer(),
+    ()->MadNLP.Optimizer(linear_solver="schur",schur_num_parts=2),
+    ()->MadNLP.Optimizer(linear_solver="schwarz",schwarz_num_parts=2),
+    ()->MadNLP.Optimizer(linear_solver="schwarz",schwarz_num_parts_upper=2,schwarz_num_parts=10)
+]
+@testset "Plasmo test" for optimizer_constructor in optimizer_constructors
+    optimize!(graph,optimizer_constructor);
+    @test termination_status(graph.optimizer) == MadNLP.MOI.LOCALLY_SOLVED 
+end
+
+

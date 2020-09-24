@@ -19,10 +19,9 @@ show(io::IO,::MIME"text/plain",coo::SparseMatrixCOO{Tv,Ti}) where {Tv,Ti<:Intege
 size(A::SparseMatrixCOO) = (A.m,A.n)
 getindex(A::SparseMatrixCOO{Float64,Ti},i::Int,j::Int) where Ti <: Integer = sum(A.V[(A.I.==i) .* (A.J.==j)])
 nnz(A::SparseMatrixCOO) = length(A.I)
-
-SparseMatrixCOO(csc::SparseMatrixCSC{Tv,Ti}) where {Tv,Ti<:Integer} = SparseMatrixCOO{Tv,Ti}(
-    csc.m,csc.n,findIJ(csc)...,csc.nzval)
-SparseMatrixCSC(coo::SparseMatrixCOO{Tv,Ti}) where {Tv,Ti<:Integer} = sparse(coo.I,coo.J,coo.V,coo.m,coo.n)
+# SparseMatrixCOO(csc::SparseMatrixCSC{Tv,Ti}) where {Tv,Ti<:Integer} = SparseMatrixCOO{Tv,Ti}(
+#     csc.m,csc.n,findIJ(csc)...,csc.nzval)
+# SparseMatrixCSC(coo::SparseMatrixCOO{Tv,Ti}) where {Tv,Ti<:Integer} = sparse(coo.I,coo.J,coo.V,coo.m,coo.n)
 
 symv!(y::StrideOneVector{Float64},A::SparseMatrixCSC{Float64,Int32},x::StrideOneVector{Float64}) =
     (length(y) > 0 && length(x) >0) &&
@@ -86,12 +85,12 @@ end
 function get_get_coo_to_com(mtype)
     if mtype == :csc
         get_coo_to_com = get_coo_to_csc
-    elseif mtype == :cucsc
-        get_coo_to_com = get_coo_to_cucsc
+    # elseif mtype == :cucsc
+    #     get_coo_to_com = get_coo_to_cucsc
     elseif mtype == :dense
         get_coo_to_com = get_coo_to_dense
-    elseif mtype == :cudense
-        get_coo_to_com = get_coo_to_cudense
+    # elseif mtype == :cudense
+    #     get_coo_to_com = get_coo_to_cudense
     else
         error(LOGGER,"Linear solver input type is not supported.")
     end

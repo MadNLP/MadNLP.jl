@@ -125,6 +125,20 @@ sets = [
         ["unbounded"],
         true
     ],
+    [
+        ()->MadNLP.Optimizer(
+            linear_system_scaler=MadNLP.Mc19),
+        ["eigmina"],
+        true
+    ],
+    [
+        ()->MadNLP.Optimizer(
+            diable_garbage_collector=true,
+            output_file=".test.out"
+        ),
+        ["infeasible","unbounded","eigmina"], # just checking logger; no need to test all
+        "Umfpack" in MadNLP.available_linear_solvers()
+    ],
 ]
 
 @testset "NLP test" for (optimizer_constructor,exclude,availability) in sets
