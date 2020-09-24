@@ -9,19 +9,9 @@ mutable struct SparseMatrixCOO{Tv,Ti<:Integer} <: AbstractSparseMatrixCOO{Tv,Ti}
     J::AbstractArray{Ti,1}
     V::AbstractArray{Tv,1}
 end
-function string(coo::SparseMatrixCOO{Tv,Ti}) where {Tv,Ti<:Integer}
-    """
-        SpasreMatrixCOO
-    """
-end
-print(io::IO,coo::SparseMatrixCOO{Tv,Ti}) where {Tv,Ti<:Integer} = print(io,string(coo))
-show(io::IO,::MIME"text/plain",coo::SparseMatrixCOO{Tv,Ti}) where {Tv,Ti<:Integer} = print(io,coo)
 size(A::SparseMatrixCOO) = (A.m,A.n)
 getindex(A::SparseMatrixCOO{Float64,Ti},i::Int,j::Int) where Ti <: Integer = sum(A.V[(A.I.==i) .* (A.J.==j)])
 nnz(A::SparseMatrixCOO) = length(A.I)
-# SparseMatrixCOO(csc::SparseMatrixCSC{Tv,Ti}) where {Tv,Ti<:Integer} = SparseMatrixCOO{Tv,Ti}(
-#     csc.m,csc.n,findIJ(csc)...,csc.nzval)
-# SparseMatrixCSC(coo::SparseMatrixCOO{Tv,Ti}) where {Tv,Ti<:Integer} = sparse(coo.I,coo.J,coo.V,coo.m,coo.n)
 
 symv!(y::StrideOneVector{Float64},A::SparseMatrixCSC{Float64,Int32},x::StrideOneVector{Float64}) =
     (length(y) > 0 && length(x) >0) &&
@@ -91,8 +81,6 @@ function get_get_coo_to_com(mtype)
         get_coo_to_com = get_coo_to_dense
     # elseif mtype == :cudense
     #     get_coo_to_com = get_coo_to_cudense
-    else
-        error(LOGGER,"Linear solver input type is not supported.")
     end
 end
 

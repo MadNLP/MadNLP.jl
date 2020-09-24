@@ -8,7 +8,6 @@ default_dense_solver() = LapackMKL
 # Options
 abstract type AbstractOptions end
 parse_option(::Type{Module},str::String) = eval(Symbol(str))
-parse_option(::Type{Bool},str::String) = str == "yes" ? true : false
 function set_options!(opt::AbstractOptions,option_dict::Dict{Symbol,Any})
     for (key,val) in option_dict
         hasproperty(opt,key) || continue

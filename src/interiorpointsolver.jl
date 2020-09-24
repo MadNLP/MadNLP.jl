@@ -1406,26 +1406,6 @@ function get_varphi_d_R(f_R,x,xl,xu,dx,pp,nn,dpp,dnn,mu_R,rho)
     end
     return varphi_d
 end    
-function get_F(c,f,zl,zu,jacl,x_lr,xl_r,zl_r,xu_r,x_ur,zu_r,mu)
-    F = 0.
-    for i=1:length(c)
-        @inbounds F = max(F,c[i])
-    end
-    for i=1:length(f)
-        @inbounds F = max(F,f[i]-zl[i]+zu[i]+jacl[i])
-    end
-    for i=1:length(x_lr)
-        x_lr[i] >= xl_r[i] || return Inf
-        zl_r[i] >= 0       || return Inf
-        @inbounds F = max(F,(x_lr[i]-xl_r[i])*zl_r[i]-mu)
-    end
-    for i=1:length(x_ur)
-        xu_r[i] >= x_ur[i] || return Inf
-        zu_r[i] >= 0       || return Inf
-        @inbounds F = max(F,(xu_r[i]-xu_r[i])*zu_r[i]-mu)
-    end
-    return F
-end
 function initialize_variables!(x,xl,xu,bound_push,bound_fac)
     @inbounds for i=1:length(x)
         if xl[i]!=-Inf && xu[i]!=Inf

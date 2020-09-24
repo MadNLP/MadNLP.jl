@@ -1,19 +1,15 @@
 using Test, MadNLP
 using MathOptInterface, SparseArrays, LinearAlgebra, Plasmo, JuMP 
 
-function solcmp(x,sol,atol,rtol)
+function solcmp(x,sol;atol=1e-4,rtol=1e-4)
     aerr = norm(x-sol,Inf)
     rerr = aerr/norm(sol,Inf)
     return (aerr < atol && rerr < rtol)
 end
 
 @testset "MadNLP test" begin
-    @testset "BLAS/Lapack" begin
-        include("blas_lapack_test.jl")
-    end
-
-    @testset "Linear solvers" begin
-        include("linear_solver_test.jl")
+    @testset "Matrix tools" begin
+        include("matrix_test.jl")
     end
 
     @testset "MOI interface" begin
