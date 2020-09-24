@@ -4,7 +4,7 @@
 module Schur
 
 import ..MadNLP:
-    @with_kw, Logger, @debug, @warn, @error,
+    @with_kw, Logger, @debug, @warn, @error, 
     AbstractOptions, AbstractLinearSolver, set_options!, SparseMatrixCSC, SubVector, StrideOneVector, 
     SymbolicException,FactorizationException,SolveException,InertiaException,
     introduce, factorize!, solve!, improve!, is_inertia, inertia,
@@ -62,8 +62,12 @@ function Solver(csc::SparseMatrixCSC{Float64};
                 kwargs...)
     
     set_options!(opt,option_dict,kwargs...)
-    inds = collect(1:nnz(csc))
-    
+    if string(opt.schur_subproblem_solver) == "MadNLP.Mumps"
+        @warn(logger,"When Mumps is used as a subproblem solver, Schur is run in serial.")
+        @warn(logger,"To use parallelized Schur, use Ma27 or Ma57.")
+    end
+
+    inds = collect(1:nnz(csc))    
     tsp = TwoStagePartition(csc,opt.schur_part,opt.schur_num_parts)
     
     V_0   = findall(tsp.part.==0)

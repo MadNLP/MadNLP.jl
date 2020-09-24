@@ -9,7 +9,7 @@ import ..MadNLP:
     SymbolicException,FactorizationException,SolveException,InertiaException,
     AbstractOptions, AbstractLinearSolver, set_options!,
     MonolevelPartition, MonolevelStruc, BilevelPartition, BilevelStruc,
-    expand!, get_current_V, get_current_size, get_full_size,
+    expand!, get_current_V, get_current_size, get_full_size, 
     EmptyLinearSolver, introduce, factorize!, solve!, improve!, is_inertia, inertia,
     set_blas_num_threads, blas_num_threads, @blas_safe_threads, @sprintf
 
@@ -66,6 +66,10 @@ function Solver(csc::SparseMatrixCSC{Float64};
                 kwargs...)
     
     set_options!(opt,option_dict,kwargs...)
+    if string(opt.schwarz_subproblem_solver) == "MadNLP.Mumps"
+        @warn(logger,"When Mumps is used as a subproblem solver, Schwarz is run in serial.")
+        @warn(logger,"To use parallelized Schwarz, use Ma27 or Ma57.")
+    end
 
     inds = collect(1:nnz(csc))
     

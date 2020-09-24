@@ -3,86 +3,86 @@ include("nlp_test_include.jl")
 sets = [
     [
         ()->MadNLP.Optimizer(
-            linear_solver="Umfpack",
+            linear_solver=MadNLP.Umfpack,
             print_level=MadNLP.ERROR),
         [],
-        "Umfpack" in MadNLP.available_linear_solvers()
+        isdefined(MadNLP,:Umfpack)
     ],
     [
         ()->MadNLP.Optimizer(
-            linear_solver="Mumps",
+            linear_solver=MadNLP.Mumps,
             print_level=MadNLP.ERROR),
         [],
-        "Mumps" in MadNLP.available_linear_solvers()
+        isdefined(MadNLP,:Mumps)
     ],
     [
         ()->MadNLP.Optimizer(
-            linear_solver="Ma27",
+            linear_solver=MadNLP.Ma27,
             print_level=MadNLP.ERROR),
         [],
-        "Ma27" in MadNLP.available_linear_solvers()
+        isdefined(MadNLP,:Ma27)
     ],
     [
         ()->MadNLP.Optimizer(
-            linear_solver="Ma57",
+            linear_solver=MadNLP.Ma57,
             print_level=MadNLP.ERROR),
         [],
-        "Ma57" in MadNLP.available_linear_solvers()
+        isdefined(MadNLP,:Ma57)
     ],
     [
         ()->MadNLP.Optimizer(
-            linear_solver="Ma77",
+            linear_solver=MadNLP.Ma77,
             print_level=MadNLP.ERROR),
         ["unbounded"],
-        "Ma77" in MadNLP.available_linear_solvers()
+        isdefined(MadNLP,:Ma77)
     ],
     [
         ()->MadNLP.Optimizer(
-            linear_solver="Ma86",
+            linear_solver=MadNLP.Ma86,
             print_level=MadNLP.ERROR),
         [],
-        "Ma86" in MadNLP.available_linear_solvers()
+        isdefined(MadNLP,:Ma86)
     ],
     [
         ()->MadNLP.Optimizer(
-            linear_solver="Ma97",
+            linear_solver=MadNLP.Ma97,
             print_level=MadNLP.ERROR),
         [],
-        "Ma97" in MadNLP.available_linear_solvers()
+        isdefined(MadNLP,:Ma97)
     ],
     [
         ()->MadNLP.Optimizer(
-            linear_solver="Pardiso",
+            linear_solver=MadNLP.Pardiso,
             print_level=MadNLP.ERROR),
         [],
-        "Pardiso" in MadNLP.available_linear_solvers()
+        isdefined(MadNLP,:Pardiso)
     ],
     [
         ()->MadNLP.Optimizer(
-            linear_solver="PardisoMKL",
+            linear_solver=MadNLP.PardisoMKL,
             print_level=MadNLP.ERROR),
         [],
-        "PardisoMKL" in MadNLP.available_linear_solvers()
+        isdefined(MadNLP,:PardisoMKL)
     ],
     [
         ()->MadNLP.Optimizer(
-            linear_solver="LapackMKL",
+            linear_solver=MadNLP.LapackMKL,
             lapackmkl_algorithm=MadNLP.LapackMKL.BUNCHKAUFMAN,
             print_level=MadNLP.ERROR),
         [],
-        "LapackMKL" in MadNLP.available_linear_solvers()
+        isdefined(MadNLP,:LapackMKL)
     ],
     [
         ()->MadNLP.Optimizer(
-            linear_solver="LapackMKL",
+            linear_solver=MadNLP.LapackMKL,
             lapackmkl_algorithm=MadNLP.LapackMKL.LU,
             print_level=MadNLP.ERROR),
         [],
-        "LapackMKL" in MadNLP.available_linear_solvers()
+        isdefined(MadNLP,:LapackMKL)
     ],
     [
         ()->MadNLP.Optimizer(
-            linear_solver="LapackCUDA",
+            linear_solver=MadNLP.LapackCUDA,
             lapackcuda_algorithm=MadNLP.LapackCUDA.BUNCHKAUFMAN,
             print_level=MadNLP.ERROR),
         [],
@@ -90,7 +90,7 @@ sets = [
     ],
     [
         ()->MadNLP.Optimizer(
-            linear_solver="LapackCUDA",
+            linear_solver=MadNLP.LapackCUDA,
             lapackcuda_algorithm=MadNLP.LapackCUDA.LU,
             print_level=MadNLP.ERROR),
         [],
@@ -105,7 +105,7 @@ sets = [
     ],
     [
         ()->MadNLP.Optimizer(
-            linear_solver="LapackMKL",
+            linear_solver=MadNLP.LapackMKL,
             fixed_variable_treatment=MadNLP.RELAX_BOUND,
             print_level=MadNLP.ERROR),
         [],
@@ -146,7 +146,7 @@ sets = [
             output_file=".test.out"
         ),
         ["infeasible","unbounded","eigmina"], # just checking logger; no need to test all
-        "Umfpack" in MadNLP.available_linear_solvers()
+        isdefined(MadNLP,:Umfpack )
     ],
 ]
 

@@ -2,14 +2,6 @@
 # Created by Sungho Shin (sungho.shin@wisc.edu)
 
 # Build info
-function available_linear_solvers()
-    solvers = ["Umfpack"]
-    @isdefined(libhsl) && append!(solvers,["Ma27","Ma57","Ma77","Ma86","Ma97"])
-    @isdefined(libmumps) && push!(solvers,"Mumps")
-    @isdefined(libpardiso) && push!(solvers,"Pardiso")
-    @isdefined(libmkl32) && push!(solvers,"PardisoMKL","LapackMKL")
-    return solvers
-end
 default_linear_solver() = @isdefined(libhsl) ? Ma57 : @isdefined(libmumps) ? Mumps : Umfpack
 default_dense_solver() = LapackMKL
 
