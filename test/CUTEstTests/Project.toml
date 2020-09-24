@@ -1,6 +1,5 @@
 [deps]
 CUTEst = "1b53aba6-35b6-5f92-a507-53c67d53f819"
-MadNLP = "2621e9c9-9eb4-46b1-8089-e8c72242dfb6"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [compat]
