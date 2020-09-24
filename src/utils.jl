@@ -11,7 +11,6 @@ function available_linear_solvers()
     return solvers
 end
 default_linear_solver() = @isdefined(libhsl) ? Ma57 : @isdefined(libmumps) ? Mumps : Umfpack
-default_subproblem_solver() = @isdefined(libhsl) ? Ma57 : Umfpack
 default_dense_solver() = LapackMKL
 
 # Options

@@ -23,92 +23,90 @@ const INPUT_MATRIX_TYPE = :csc
     mumps_scaling::Int = 77
 end
 
-mutable struct Struc
-    sym::Cint      
-    par::Cint      
-    job::Cint
+@with_kw mutable struct Struc
+    sym::Cint = 0      
+    par::Cint = 0      
+    job::Cint = 0
     
-    comm_fortran::Cint
+    comm_fortran::Cint = 0
     
-    icntl::SVector{40,Cint}
-    cntl::SVector{15,Cdouble}
+    icntl::SVector{40,Cint} = zeros(40)
+    cntl::SVector{15,Cdouble} = zeros(15)
     
-    n::Cint      
-    nz_alloc::Cint      
+    n::Cint = 0      
+    nz_alloc::Cint = 0      
     
-    nz::Cint      
-    irn::Ptr{Cint}
-    jcn::Ptr{Cint}
-    a::Ptr{Cdouble}
+    nz::Cint = 0      
+    irn::Ptr{Cint} = C_NULL
+    jcn::Ptr{Cint} = C_NULL
+    a::Ptr{Cdouble} = C_NULL
     
-    nz_loc::Cint      
-    irn_loc::Ptr{Cint}
-    jcn_loc::Ptr{Cint}
-    a_loc::Ptr{Cdouble}
+    nz_loc::Cint = 0      
+    irn_loc::Ptr{Cint} = C_NULL
+    jcn_loc::Ptr{Cint} = C_NULL
+    a_loc::Ptr{Cdouble} = C_NULL
     
-    nelt::Cint      
-    eltptr::Ptr{Cint}
-    eltvar::Ptr{Cint}
-    a_elt::Ptr{Cdouble}
+    nelt::Cint = 0      
+    eltptr::Ptr{Cint} = C_NULL
+    eltvar::Ptr{Cint} = C_NULL
+    a_elt::Ptr{Cdouble} = C_NULL
     
-    perm_in::Ptr{Cint}
+    perm_in::Ptr{Cint} = C_NULL
     
-    sym_perm::Ptr{Cint}
-    uns_perm::Ptr{Cint}
+    sym_perm::Ptr{Cint} = C_NULL
+    uns_perm::Ptr{Cint} = C_NULL
     
-    colsca::Ptr{Cdouble}
-    rowsca::Ptr{Cdouble}
+    colsca::Ptr{Cdouble} = C_NULL
+    rowsca::Ptr{Cdouble} = C_NULL
     
-    rhs::Ptr{Cdouble}
-    redrhs::Ptr{Cdouble}
-    rhs_sparse::Ptr{Cdouble}
-    sol_loc::Ptr{Cdouble}
+    rhs::Ptr{Cdouble} = C_NULL
+    redrhs::Ptr{Cdouble} = C_NULL
+    rhs_sparse::Ptr{Cdouble} = C_NULL
+    sol_loc::Ptr{Cdouble} = C_NULL
     
-    irhs_sparse::Ptr{Cint}
-    irhs_ptr::Ptr{Cint}
-    isol_loc::Ptr{Cint}
+    irhs_sparse::Ptr{Cint} = C_NULL
+    irhs_ptr::Ptr{Cint} = C_NULL
+    isol_loc::Ptr{Cint} = C_NULL
     
-    nrhs::Cint
-    lrhs::Cint
-    lredrhs::Cint
-    nz_rhs::Cint
-    lsol_loc::Cint
+    nrhs::Cint = 0
+    lrhs::Cint = 0
+    lredrhs::Cint = 0
+    nz_rhs::Cint = 0
+    lsol_loc::Cint = 0
     
-    schur_mloc::Cint
-    schur_nloc::Cint
-    schur_lld::Cint
+    schur_mloc::Cint = 0
+    schur_nloc::Cint = 0
+    schur_lld::Cint = 0
     
-    mblock::Cint
-    nblock::Cint
-    nprow::Cint
-    npcol::Cint
+    mblock::Cint = 0
+    nblock::Cint = 0
+    nprow::Cint = 0
+    npcol::Cint = 0
 
-    info::SVector{40,Cint}
-    infog::SVector{40,Cint}
-    rinfo::SVector{40,Cdouble}
-    rinfog::SVector{40,Cdouble}
+    info::SVector{40,Cint} = zeros(40)
+    infog::SVector{40,Cint} = zeros(40)
+    rinfo::SVector{40,Cdouble} = zeros(40)
+    rinfog::SVector{40,Cdouble} = zeros(40)
     
-    deficiency::Cint      
-    pivnul_list::Ptr{Cint}
-    mapping::Ptr{Cint}
+    deficiency::Cint = 0      
+    pivnul_list::Ptr{Cint} = C_NULL
+    mapping::Ptr{Cint} = C_NULL
     
-    size_schur::Cint      
-    listvar_schur::Ptr{Cint}
-    schur::Ptr{Cdouble}
+    size_schur::Cint = 0      
+    listvar_schur::Ptr{Cint} = C_NULL
+    schur::Ptr{Cdouble} = C_NULL
     
-    instance_number::Cint      
-    wk_user::Ptr{Cdouble}
+    instance_number::Cint = 0      
+    wk_user::Ptr{Cdouble} = C_NULL
     
-    version_number::SVector{16,Cchar}
+    version_number::SVector{16,Cchar} = zeros(16)
     
-    ooc_tmpdir::SVector{256,Cchar}
-    ooc_prefix::SVector{64,Cchar}
+    ooc_tmpdir::SVector{256,Cchar} = zeros(256)
+    ooc_prefix::SVector{64,Cchar} = zeros(64)
     
-    write_problem::SVector{256,Cchar}
-    lwk_user::Cint      
+    write_problem::SVector{256,Cchar} = zeros(256)
+    lwk_user::Cint = 0      
 end
-
-Struc()=Struc(0,0,0,0,SVector{40}(zeros(Int32,40)),SVector{15}(zeros(15)),0,0,0,C_NULL,C_NULL,C_NULL,0,C_NULL,C_NULL,C_NULL,0,C_NULL,C_NULL,C_NULL,C_NULL,C_NULL,C_NULL,C_NULL,C_NULL,C_NULL,C_NULL,C_NULL,C_NULL,C_NULL,C_NULL,C_NULL,0,0,0,0,0,0,0,0,0,0,0,0,SVector{40}(zeros(Int32,40)),SVector{40}(zeros(Int32,40)),SVector{40}(zeros(40)),SVector{40}(zeros(40)),0,C_NULL,C_NULL,0,C_NULL,C_NULL,0,C_NULL,SVector{16}(zeros(Int8,16)),SVector{256}(zeros(Int8,256)),SVector{64}(zeros(Int8,64)),SVector{256}(zeros(Int8,256)),0)
 
 mutable struct Solver <: AbstractLinearSolver
     csc::SparseMatrixCSC{Float64,Int32}
@@ -128,27 +126,39 @@ dmumps_c(mumps_struc::Struc)=ccall(
     (Ref{Struc},),
     mumps_struc)
 
+# this is necessary, when multi-threaded calls are made with Mumps, not to clash with MPI
+mumps_lock = Threads.SpinLock()
+function locked_dmumps_c(mumps_struc::Struc)
+    lock(mumps_lock)
+    try
+        dmumps_c(mumps_struc)
+    finally
+        unlock(mumps_lock)
+    end
+end
+# ---------------------------------------------------------------------------------------
+
 function Solver(csc::SparseMatrixCSC{Float64,Int32};
                 option_dict::Dict{Symbol,Any}=Dict{Symbol,Any}(),
                 opt=Options(),logger=Logger(),
                 kwargs...)
+
+    MPI.Initialized() || MPI.Init()
     
     set_options!(opt,option_dict,kwargs)
         
     I,J = findIJ(csc)
     sym_perm = zeros(Int32,csc.n)
     pivnul_list = zeros(Int32,csc.n)
-    MPI.Initialized() || MPI.Init()
     
     mumps_struc = Struc()
     
-    mumps_struc.sym=2
-    mumps_struc.par=1
-    mumps_struc.job=-1
+    mumps_struc.sym =  2
+    mumps_struc.par =  1
+    mumps_struc.job = -1
     mumps_struc.comm_fortran = -987654 # MPI.COMM_WORLD.val
 
-    dmumps_c(mumps_struc)
-    
+    locked_dmumps_c(mumps_struc)
     mumps_struc.n = csc.n;
     mumps_struc.nz= nnz(csc);
     mumps_struc.a = pointer(csc.nzval)
@@ -175,12 +185,15 @@ function Solver(csc::SparseMatrixCSC{Float64,Int32};
     a = copy(csc.nzval) # would there be a better way?
     csc.nzval.=1
     
-    dmumps_c(mumps_struc);    
+    locked_dmumps_c(mumps_struc);    
     mumps_struc.info[1] < 0 && throw(SymbolicException())
 
     csc.nzval.=a
-    
-    return Solver(csc,I,J,sym_perm,pivnul_list,mumps_struc,false,opt,logger)
+
+    M = Solver(csc,I,J,sym_perm,pivnul_list,mumps_struc,false,opt,logger)
+    finalizer(finalize,M)
+
+    return M
 end
 
 function factorize!(M::Solver)
@@ -188,7 +201,7 @@ function factorize!(M::Solver)
     M.mumps_struc.job = 2;
     cnt = 0
     while true
-        dmumps_c(M.mumps_struc)
+        locked_dmumps_c(M.mumps_struc)
         if M.mumps_struc.info[1] in [-8,-9]
             cnt >= 10 && throw(FactorizationException())
             M.mumps_struc.icntl = setindex(M.mumps_struc.icntl,M.mumps_struc.icntl[14]*2.,14)
@@ -209,7 +222,7 @@ function solve!(M::Solver,rhs::StrideOneVector{Float64})
     M.is_singular && return rhs
     M.mumps_struc.rhs = pointer(rhs)
     M.mumps_struc.job = 3
-    dmumps_c(M.mumps_struc)
+    locked_dmumps_c(M.mumps_struc)
     M.mumps_struc.info[1] < 0 && throw(SolveException())
     return rhs
 end
@@ -230,6 +243,11 @@ function improve!(M::Solver)
     M.mumps_struc.cntl = setindex(M.mumps_struc.cntl,min(M.opt.mumps_pivtolmax,M.mumps_struc.cntl[1]^.5),1)
     @debug(M.logger,"improved quality: pivtol = $(M.mumps_struc.cntl[1])")
     return true
+end
+
+function finalize(M::Solver)
+    M.mumps_struc.job = -2
+    locked_dmumps_c(M.mumps_struc);
 end
 
 introduce(::Solver)="mumps"

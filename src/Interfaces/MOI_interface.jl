@@ -883,9 +883,9 @@ const status_dual_dict = Dict(
 
 termination_status(ips::Solver) = haskey(status_moi_dict,ips.nlp.status) ?
     status_moi_dict[ips.nlp.status] : MOI.UNKNOWN_RESULT_STATUS
-primal_status(ips::Solver) = haskey(status_moi_dict,ips.nlp.status) ?
+primal_status(ips::Solver) = haskey(status_primal_dict,ips.nlp.status) ?
     status_primal_dict[ips.nlp.status] : MOI.UNKNOWN_RESULT_STATUS
-dual_status(ips::Solver) = haskey(status_moi_dict,ips.nlp.status) ?
+dual_status(ips::Solver) = haskey(status_dual_dict,ips.nlp.status) ?
     status_dual_dict[ips.nlp.status] : MOI.UNKNOWN_RESULT_STATUS
 
 

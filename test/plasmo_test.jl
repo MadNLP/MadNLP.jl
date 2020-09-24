@@ -32,18 +32,22 @@ kwargs_collection = [
 ]
 @testset "Plasmo test" for kwargs in kwargs_collection
     MadNLP.optimize!(graph;kwargs...);
-    @test termination_status(graph.optimizer) == MadNLP.MOI.LOCALLY_SOLVED 
+    @test termination_status(graph.optimizer) == MOI.LOCALLY_SOLVED 
 end
 
 optimizer_constructors = [
-    ()->MadNLP.Optimizer(),
-    ()->MadNLP.Optimizer(linear_solver="schur",schur_num_parts=2),
+    ()->MadNLP.Optimizer(print_level=MadNLP.ERROR),
+    ()->MadNLP.Optimizer(linear_solver="schur",schur_num_parts=2,print_level=MadNLP.ERROR),
     ()->MadNLP.Optimizer(linear_solver="schwarz",schwarz_num_parts=2),
     ()->MadNLP.Optimizer(linear_solver="schwarz",schwarz_num_parts_upper=2,schwarz_num_parts=10)
 ]
+
 @testset "Plasmo test" for optimizer_constructor in optimizer_constructors
-    optimize!(graph,optimizer_constructor);
-    @test termination_status(graph.optimizer) == MadNLP.MOI.LOCALLY_SOLVED 
+    node,~=combine(graph)
+    m = node.model
+    set_optimizer(m,optimizer_constructor)
+    optimize!(m);
+    @test termination_status(m) == MOI.LOCALLY_SOLVED 
 end
 
 

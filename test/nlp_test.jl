@@ -127,13 +127,14 @@ sets = [
     ],
     [
         ()->MadNLP.Optimizer(
-            linear_system_scaler=MadNLP.Mc19),
+            linear_system_scaler=isdefined(MadNLP,:Mc19) ? MadNLP.Mc19 : MadNLP.DummyModule,
+            print_level=MadNLP.ERROR),
         ["eigmina"],
         true
     ],
     [
         ()->MadNLP.Optimizer(
-            diable_garbage_collector=true,
+            disable_garbage_collector=true,
             output_file=".test.out"
         ),
         ["infeasible","unbounded","eigmina"], # just checking logger; no need to test all

@@ -8,7 +8,7 @@ import ..MadNLP:
     AbstractOptions, AbstractLinearSolver, set_options!, SparseMatrixCSC, SubVector, StrideOneVector, 
     SymbolicException,FactorizationException,SolveException,InertiaException,
     introduce, factorize!, solve!, improve!, is_inertia, inertia,
-    default_subproblem_solver, default_dense_solver, get_csc_view, get_cscsy_view, mv!, nnz,
+    default_linear_solver, default_dense_solver, get_csc_view, get_cscsy_view, mv!, nnz,
     TwoStagePartition, set_blas_num_threads, blas_num_threads, @blas_safe_threads
 
 const INPUT_MATRIX_TYPE = :csc
@@ -56,7 +56,7 @@ end
 
 function Solver(csc::SparseMatrixCSC{Float64};
                 option_dict::Dict{Symbol,Any}=Dict{Symbol,Any}(),
-                opt=Options(schur_subproblem_solver=default_subproblem_solver(),
+                opt=Options(schur_subproblem_solver=default_linear_solver(),
                             schur_dense_solver=default_dense_solver()),
                 logger=Logger(),
                 kwargs...)

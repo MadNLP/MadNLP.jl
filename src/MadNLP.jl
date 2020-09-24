@@ -57,9 +57,5 @@ function __init__()
     set_blas_num_threads(haskey(ENV,"JULIA_NUM_THREADS") ? parse(Int,ENV["JULIA_NUM_THREADS"]) : 1 ;permanent=true)
 end
 
-const DefaultLinearSolver =default_linear_solver()
-const DefaultSubproblemSolver = default_subproblem_solver()
-const DefaultDenseSolver = default_dense_solver()
-
 end # end module
 

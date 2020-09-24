@@ -5,7 +5,7 @@ module Schwarz
 
 import ..MadNLP:
     @with_kw, Logger, @debug, @warn, @error,
-    default_subproblem_solver,SparseMatrixCSC, SubVector, StrideOneVector, get_cscsy_view, nnz,
+    default_linear_solver,SparseMatrixCSC, SubVector, StrideOneVector, get_cscsy_view, nnz,
     SymbolicException,FactorizationException,SolveException,InertiaException,
     AbstractOptions, AbstractLinearSolver, set_options!,
     MonolevelPartition, MonolevelStruc, BilevelPartition, BilevelStruc,
@@ -62,7 +62,7 @@ end
 
 function Solver(csc::SparseMatrixCSC{Float64};
                 option_dict::Dict{Symbol,Any}=Dict(),
-                opt=Options(schwarz_subproblem_solver=default_subproblem_solver()),logger=Logger(),
+                opt=Options(schwarz_subproblem_solver=default_linear_solver()),logger=Logger(),
                 kwargs...)
     
     set_options!(opt,option_dict,kwargs...)
