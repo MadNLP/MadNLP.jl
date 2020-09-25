@@ -13,13 +13,13 @@
 - `disable_garbage_collector::Bool = false `\
     If `true`, Julia garbage collector is temporarily disabled while solving the problem, and then enabled back once the solution is complete.
 - `rethrow_error::Bool = true `\
-    f `false`, any internal error thrown by `PlasmoNLP` and interruption exception (triggered by the user via `^C`) is catched, and not rethrown. If an error is catched, the solver terminates with an error message.
+    If `false`, any internal error thrown by `PlasmoNLP` and interruption exception (triggered by the user via `^C`) is catched, and not rethrown. If an error is catched, the solver terminates with an error message.
 - `log_level::String = "info"`\
     Log level for PlasmoNLP. The log level set here is propagated down to the submodules (e.g., `PlasmoNLP`.{`Richardson`, `Ma57`}). Valid values are: {`"trace"`, `"debug"`, `"info"`, `"notice"`, `"warn"`, `"error"`}.
 - `print_level::String = "trace"`\
     `stdout` print level. Any message with level less than `print_level` is not printed on `stdout`. Valid values are: {`"trace"`, `"debug"`, `"info"`, `"notice"`, `"warn"`, `"error"`}.
 - `output_file::String = ""`\
-    If not `""`, the output log is teed to the file at the path specified in `output_file`. 
+    If not `""`, the output log is teed to the file at the path specified in `output_file`.
 - `file_print_level::String = "trace"`\
     File print level; any message with level less than `file_print_level` is not printed on the file specified in `output_file`. Valid values are: {`"trace"`, `"debug"`, `"info"`, `"notice"`, `"warn"`, `"error"`}.
 - `tol::Float64 = 1e-8`\
@@ -35,7 +35,7 @@
 - `max_wall_time::Float64 = 1e6`\
     Maximum wall time for interior point solver. The solver terminates with exit symbol `:Maximum_WallTime_Exceeded` if the total solver wall time exceeds `max_wall_time`.
 - `fixed_variable_treatment::String = "make_parameter"`\
-    Valid values are: {`"relax_bounds"`,`"make_parameter"`}.    
+    Valid values are: {`"relax_bounds"`,`"make_parameter"`}.
 - `jacobian_constant::Bool = false`\
     If `true`, constraint Jacobian is only evaluated once and reused.
 - `hessian_constant::Bool = false`\
@@ -46,7 +46,7 @@
     Valid values are: {`"inertia_based"`, `"inertia_free"`, `"inertia_ignored`"}.
     - `"ienrtia_based"` uses the strategy in Wächter (2006),
     - `"inertia_free`" uses the strategy in Chiang (2016)
-    - `"inertia_ignored` simply ignores inertia information. 
+    - `"inertia_ignored` simply ignores inertia information.
 - `s_max::Float64 = 100.`
 - `kappa_d::Float64 = 1e-5`
 - `constr_mult_init_max::Float64 = 1e3`
@@ -88,99 +88,99 @@
 Linear solver options are specific to the linear solver chosen at `linear_solver` option. Irrelevant options are ignored and a warning message is printed.
 #### Ma27
 - `ma27_pivtol::Float64 = 1e-8`
-- `ma27_pivtolmax::Float64 = 1e-4` 
-- `ma27_liw_init_factor::Float64 = 5.` 
-- `ma27_la_init_factor::Float64 = 5.` 
-- `ma27_meminc_factor::Float64 = 2.` 
-- `ma27_log_level::String = ""` 
+- `ma27_pivtolmax::Float64 = 1e-4`
+- `ma27_liw_init_factor::Float64 = 5.`
+- `ma27_la_init_factor::Float64 = 5.`
+- `ma27_meminc_factor::Float64 = 2.`
+- `ma27_log_level::String = ""`
    Log level for submodule `PlasmoNLP.Ma27`. Valid values are: `"trace"`, `"debug"`, `"info"`, `"notice"`, `"warn"`, `"error"`.
 
 #### Ma57
-- `ma57_pivtol::Float64 = 1e-8` 
-- `ma57_pivtolmax::Float64 = 1e-4` 
-- `ma57_pre_alloc::Float64 = 1.05` 
-- `ma57_pivot_order::Int = 5` 
-- `ma57_automatic_scaling::Bool = false` 
-- `ma57_block_size::Int = 16` 
-- `ma57_node_amalgamation::Int = 16` 
-- `ma57_small_pivot_flag::Int = 0` 
-- `ma57_log_level::String = ""` 
+- `ma57_pivtol::Float64 = 1e-8`
+- `ma57_pivtolmax::Float64 = 1e-4`
+- `ma57_pre_alloc::Float64 = 1.05`
+- `ma57_pivot_order::Int = 5`
+- `ma57_automatic_scaling::Bool = false`
+- `ma57_block_size::Int = 16`
+- `ma57_node_amalgamation::Int = 16`
+- `ma57_small_pivot_flag::Int = 0`
+- `ma57_log_level::String = ""`
    Log level for submodule `PlasmoNLP.Ma57`. Valid values are: `"trace"`, `"debug"`, `"info"`, `"notice"`, `"warn"`, `"error"`.
 
 #### Ma77
-- `ma77_buffer_lpage::Int = 4096` 
-- `ma77_buffer_npage::Int = 1600` 
-- `ma77_file_size::Int = 2097152` 
-- `ma77_maxstore::Int = 0` 
-- `ma77_nemin::Int = 8` 
-- `ma77_order::String = "metis"` 
-- `ma77_print_level::Int = -1` 
-- `ma77_small::Float64 = 1e-20` 
-- `ma77_static::Float64 = 0.` 
-- `ma77_u::Float64 = 1e-8` 
-- `ma77_umax::Float64 = 1e-4` 
-- `ma77_log_level::String = ""` 
+- `ma77_buffer_lpage::Int = 4096`
+- `ma77_buffer_npage::Int = 1600`
+- `ma77_file_size::Int = 2097152`
+- `ma77_maxstore::Int = 0`
+- `ma77_nemin::Int = 8`
+- `ma77_order::String = "metis"`
+- `ma77_print_level::Int = -1`
+- `ma77_small::Float64 = 1e-20`
+- `ma77_static::Float64 = 0.`
+- `ma77_u::Float64 = 1e-8`
+- `ma77_umax::Float64 = 1e-4`
+- `ma77_log_level::String = ""`
    Log level for submodule `PlasmoNLP.Ma77`. Valid values are: `"trace"`, `"debug"`, `"info"`, `"notice"`, `"warn"`, `"error"`.
 
 #### Ma86
-- `ma86_num_threads::Int = 1` 
-- `ma86_print_level::Float64 = -1` 
-- `ma86_nemin::Int = 32` 
-- `ma86_scaling::String = "none"` 
-- `ma86_small::Float64 = 1e-20` 
-- `ma86_static::Float64 = 0.` 
-- `ma86_u::Float64 = 1e-8` 
-- `ma86_umax::Float64 = 1e-4` 
-- `ma86_log_level::String = ""` 
+- `ma86_num_threads::Int = 1`
+- `ma86_print_level::Float64 = -1`
+- `ma86_nemin::Int = 32`
+- `ma86_scaling::String = "none"`
+- `ma86_small::Float64 = 1e-20`
+- `ma86_static::Float64 = 0.`
+- `ma86_u::Float64 = 1e-8`
+- `ma86_umax::Float64 = 1e-4`
+- `ma86_log_level::String = ""`
    Log level for submodule `PlasmoNLP.Ma86`. Valid values are: `"trace"`, `"debug"`, `"info"`, `"notice"`, `"warn"`, `"error"`.
 
 #### Ma97
-- `ma97_num_threads::Int = 1` 
-- `ma97_print_level::Int = -1` 
-- `ma97_nemin::Int = 8` 
-- `ma97_order::String = "metis"` 
-- `ma97_scaling::String = "none"` 
-- `ma97_small::Float64 = 1e-20` 
-- `ma97_u::Float64 = 1e-8` 
-- `ma97_umax::Float64 = 1e-4` 
-- `ma97_log_level::String = ""` 
+- `ma97_num_threads::Int = 1`
+- `ma97_print_level::Int = -1`
+- `ma97_nemin::Int = 8`
+- `ma97_order::String = "metis"`
+- `ma97_scaling::String = "none"`
+- `ma97_small::Float64 = 1e-20`
+- `ma97_u::Float64 = 1e-8`
+- `ma97_umax::Float64 = 1e-4`
+- `ma97_log_level::String = ""`
    Log level for submodule `PlasmoNLP.Ma97`. Valid values are: `"trace"`, `"debug"`, `"info"`, `"notice"`, `"warn"`, `"error"`.
 
 #### Mumps
-- `mumps_dep_tol::Float64 = 0.` 
-- `mumps_mem_percent::Int = 1000` 
-- `mumps_permuting_scaling::Int = 7` 
-- `mumps_pivot_order::Int = 7` 
-- `mumps_pivtol::Float64 = 1e-6` 
-- `mumps_pivtolmax::Float64 = .1` 
-- `mumps_scaling::Int = 77` 
-- `mumps_log_level::String = ""` 
+- `mumps_dep_tol::Float64 = 0.`
+- `mumps_mem_percent::Int = 1000`
+- `mumps_permuting_scaling::Int = 7`
+- `mumps_pivot_order::Int = 7`
+- `mumps_pivtol::Float64 = 1e-6`
+- `mumps_pivtolmax::Float64 = .1`
+- `mumps_scaling::Int = 77`
+- `mumps_log_level::String = ""`
    Log level for submodule `PlasmoNLP.Mumps`. Valid values are: `"trace"`, `"debug"`, `"info"`, `"notice"`, `"warn"`, `"error"`.
 
 #### Umfpack
-- `umfpack_pivtol::Float64 = 1e-4` 
-- `umfpack_pivtolmax::Float64 = 1e-1` 
-- `umfpack_sym_pivtol::Float64 = 1e-3` 
-- `umfpack_block_size::Float64 = 16` 
-- `umfpack_strategy::Float64 = 2.` 
-- `umfpack_log_level::String = ""` 
+- `umfpack_pivtol::Float64 = 1e-4`
+- `umfpack_pivtolmax::Float64 = 1e-1`
+- `umfpack_sym_pivtol::Float64 = 1e-3`
+- `umfpack_block_size::Float64 = 16`
+- `umfpack_strategy::Float64 = 2.`
+- `umfpack_log_level::String = ""`
    Log level for submodule `PlasmoNLP.Umfpack`. Valid values are: `"trace"`, `"debug"`, `"info"`, `"notice"`, `"warn"`, `"error"`.
 
 #### Pardiso
-- `pardiso_matching_strategy::String = "coplete+2x2"` 
-- `pardiso_max_inner_refinement_steps::Int = 1` 
-- `pardiso_msglvl::Int = 0` 
-- `pardiso_order::Int = 2` 
-- `pardiso_log_level::String = ""` 
+- `pardiso_matching_strategy::String = "coplete+2x2"`
+- `pardiso_max_inner_refinement_steps::Int = 1`
+- `pardiso_msglvl::Int = 0`
+- `pardiso_order::Int = 2`
+- `pardiso_log_level::String = ""`
    Log level for submodule `PlasmoNLP.Pardiso`. Valid values are: `"trace"`, `"debug"`, `"info"`, `"notice"`, `"warn"`, `"error"`.
 
 #### PardisoMKL
-- `pardisomkl_num_threads::Int = 1` 
-- `pardisomkl_matching_strategy::String = "complete+2x2"` 
-- `pardisomkl_max_iterative_refinement_steps::Int = 1` 
-- `pardisomkl_msglvl::Int = 0` 
-- `pardisomkl_order::Int = 2` 
-- `pardisomkl_log_level::String = ""` 
+- `pardisomkl_num_threads::Int = 1`
+- `pardisomkl_matching_strategy::String = "complete+2x2"`
+- `pardisomkl_max_iterative_refinement_steps::Int = 1`
+- `pardisomkl_msglvl::Int = 0`
+- `pardisomkl_order::Int = 2`
+- `pardisomkl_log_level::String = ""`
    Log level for submodule `PlasmoNLP.PardisoMKL`. Valid values are: `"trace"`, `"debug"`, `"info"`, `"notice"`, `"warn"`, `"error"`.
 
 #### LapackCUDA
@@ -195,9 +195,9 @@ Linear solver options are specific to the linear solver chosen at `linear_solver
 - `schur_subproblem_solver::Module = DefaultSubproblemSolver` \
    Linear solver used for solving subproblem. Valid values are: `PlasmoNLP`.{`Umfpack`, `PardisoMKL`, `Ma27`, `Ma57`, `Ma77`, `Ma86`, `Ma97`, `Pardiso`}.
 - `schur_dense_solver::Module = DefaultDenseSolver` \
-   Lienar solver used for solving schur complement system
+   Linear solver used for solving Schur complement system
 - `schur_custom_partition::Bool = false` \
-   If `false`, Schur solver automatically detects the partition using `Metis`. If `true`, the partition information given in `schur_part` is used. `schur_num_parts` and `schur_part` should be properly set by the user. When using with `Plasmo`, `schur_num_parts` and `schur_part` are automatically set by the `Plasmo` interface. 
+   If `false`, Schur solver automatically detects the partition using `Metis`. If `true`, the partition information given in `schur_part` is used. `schur_num_parts` and `schur_part` should be properly set by the user. When using with `Plasmo`, `schur_num_parts` and `schur_part` are automatically set by the `Plasmo` interface.
 - `schur_num_parts::Int = 2` \
    Number of parts (excluding the parent node). Valid range is ``[1,\infty)``
 - `schur_part::Vector{Int} = Int[]` \
@@ -209,15 +209,15 @@ Linear solver options are specific to the linear solver chosen at `linear_solver
 - `schwarz_subproblem_solver::Module = DefaultSubproblemSolver` \
    Linear solver used for solving subproblem. Valid values are: `PlasmoNLP`.{`Umfpack`, `PardisoMKL`, `Ma27`, `Ma57`, `Ma77`, `Ma86`, `Ma97`, `Pardiso`}.
 - `schwarz_custom_partition::Bool = false` \
-    If `false`, Schwarz solver  automatically detects the partition using `Metis`. If `true`, the partition information given in `schur_part` is used. `schur_num_parts` and `schur_part` should be properly set by the user. When using with `Plasmo`, `schur_num_parts` and `schur_part` are automatically set by the `Plasmo` interface. 
+    If `false`, Schwarz solver automatically detects the partition using `Metis`. If `true`, the partition information given in `schur_part` is used. `schur_num_parts` and `schur_part` should be properly set by the user. When using with `Plasmo`, `schur_num_parts` and `schur_part` are automatically set by the `Plasmo` interface.
 - `schwarz_num_parts::Int = 2` \
     Number of parts. Valid range is ``[1,\infty)``
 - `schwarz_part::Vector{Int} = Int[]` \
     Custom partition information in a vector form. Only valid if `schwar_custom_partition` is `true`.
 - `schwarz_num_parts_upper::Int = 0` \
-    Number of parts in upper level partition. If `schwarz_num_parts_upper!=0`, a bilevel partitioniong scheme is used. Valid range is ``[1,\infty)``
+    Number of parts in upper level partition. If `schwarz_num_parts_upper!=0`, a bilevel partitioning scheme is used. Valid range is ``[1,\infty)``
 - `schwarz_part_upper::Vector{Int} = Int[]` \
-    Custom partition for the upper level partition. 
+    Custom partition for the upper level partition.
 - `schwarz_fully_improve_subproblem_solver::Bool = true` \
     If `true`, the subproblem solvers are fully improved when the linear solver is initialized.
 - `schwarz_max_expand_factor::Int = 4` \
