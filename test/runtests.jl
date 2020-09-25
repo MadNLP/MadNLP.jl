@@ -1,5 +1,8 @@
-using Test, MadNLP
-using AmplNLReader, MathOptInterface, SparseArrays, LinearAlgebra, Plasmo, JuMP 
+using Test, MadNLP, JuMP, Plasmo
+import MathOptInterface
+import AmplNLReader: AmplModel
+import SparseArrays: sparse
+import LinearAlgebra: norm
 
 function solcmp(x,sol;atol=1e-4,rtol=1e-4)
     aerr = norm(x-sol,Inf)
@@ -24,7 +27,7 @@ end
         include("plasmo_test.jl")
     end
 
-    @testset "MadNLP test" begin # this also serves as decomposition solver test
+    @testset "MadNLP test" begin 
         include("nlp_test.jl")
     end
 end # @testset
