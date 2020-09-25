@@ -328,8 +328,8 @@ end
 
 
 function Solver(nlp::NonlinearProgram;
-                             option_dict::Dict{Symbol,Any}=Dict{Symbol,Any}(),
-                             kwargs...)
+                option_dict::Dict{Symbol,Any}=Dict{Symbol,Any}(),
+                kwargs...)
 
     cnt = Counters(start_time=time())
     opt = Options(linear_solver=default_linear_solver())
@@ -835,7 +835,7 @@ function regular!(ips::Solver)
             ips.cnt.l += 1
             if ips.alpha < alpha_min
                 @debug(ips.logger,
-                      "Cannot find an acceptable step at iteration $(ips.cnt.k). Switching to restoration phase.")
+                       "Cannot find an acceptable step at iteration $(ips.cnt.k). Switching to restoration phase.")
                 ips.cnt.k+=1
                 return ROBUST
             else
@@ -1405,6 +1405,7 @@ function get_varphi_d_R(f_R,x,xl,xu,dx,pp,nn,dpp,dnn,mu_R,rho)
         @inbounds varphi_d += (rho - mu_R/nn[i]) *dnn[i]
     end
     return varphi_d
+end
 function initialize_variables!(x,xl,xu,bound_push,bound_fac)
     @inbounds for i=1:length(x)
         if xl[i]!=-Inf && xu[i]!=Inf
@@ -1495,7 +1496,7 @@ is_barr_obj_rapid_increase(varphi,varphi_trial,obj_max_inc) =
 reset_bound_dual!(z,x,mu,kappa_sigma) = (z.=max.(min.(z,kappa_sigma.*mu./x),mu/kappa_sigma./x))
 reset_bound_dual!(z,x1,x2,mu,kappa_sigma) = (z.=max.(min.(z,(kappa_sigma*mu)./(x1.-x2)),(mu/kappa_sigma)./(x1.-x2)))
 function get_ftype(filter,theta,theta_trial,varphi,varphi_trial,switching_condition,armijo_condition,
-                            theta_min,obj_max_inc,gamma_theta,gamma_phi)
+                   theta_min,obj_max_inc,gamma_theta,gamma_phi)
     !is_filter_acceptable(filter,theta_trial,varphi_trial) || return " "
     !is_barr_obj_rapid_increase(varphi,varphi_trial,obj_max_inc) || return " "
 
@@ -1696,10 +1697,10 @@ function print_summary_1(ips::Solver)
     @notice(ips.logger,@sprintf("Dual infeasibility......:   %1.16e    %1.16e",ips.inf_du,ips.inf_du/ips.obj_scale[]))
     @notice(ips.logger,@sprintf("Constraint violation....:   %1.16e    %1.16e",norm(ips.c,Inf),ips.inf_pr))
     @notice(ips.logger,@sprintf("Complementarity.........:   %1.16e    %1.16e",
-                           ips.inf_compl*ips.obj_scale[],ips.inf_compl))
+                                ips.inf_compl*ips.obj_scale[],ips.inf_compl))
     @notice(ips.logger,@sprintf("Overall NLP error.......:   %1.16e    %1.16e\n",
-                           max(ips.inf_du*ips.obj_scale[],norm(ips.c,Inf),ips.inf_compl),
-                           max(ips.inf_du,ips.inf_pr,ips.inf_compl)))
+                                max(ips.inf_du*ips.obj_scale[],norm(ips.c,Inf),ips.inf_compl),
+                                max(ips.inf_du,ips.inf_pr,ips.inf_compl)))
     return
 end
 
@@ -1711,13 +1712,13 @@ function print_summary_2(ips::Solver)
     @notice(ips.logger,"Number of constraint Jacobian evaluations            = $(ips.cnt.con_jac_cnt)")
     @notice(ips.logger,"Number of Lagrangian Hessian evaluations          = $(ips.cnt.lag_hess_cnt)")
     @notice(ips.logger,@sprintf("Total wall-clock secs in solver (w/o fun. eval./lin. alg.)  = %6.3f",
-                           ips.cnt.solver_time))
+                                ips.cnt.solver_time))
     @notice(ips.logger,@sprintf("Total wall-clock secs in linear solver                      = %6.3f",
-                           ips.cnt.linear_solver_time))
+                                ips.cnt.linear_solver_time))
     @notice(ips.logger,@sprintf("Total wall-clock secs in NLP function evaluations           = %6.3f",
-                           ips.cnt.eval_function_time))
+                                ips.cnt.eval_function_time))
     @notice(ips.logger,@sprintf("Total wall-clock secs                                       = %6.3f\n",
-                           ips.cnt.total_time))
+                                ips.cnt.total_time))
 end
 
 function print_ignored_options(logger,option_dict)
@@ -1728,14 +1729,14 @@ function print_ignored_options(logger,option_dict)
 end
 function string(ips::Solver)
     """
-    Interior point solver
+            Interior point solver
 
-    number of variables......................: $(ips.nlp.n)
-    number of constraints....................: $(ips.nlp.m)
-    number of nonzeros in lagrangian hessian.: $(ips.nlp.nnz_hess)
-    number of nonzeros in constraint jacobian: $(ips.nlp.nnz_jac)
-    status...................................: $(ips.nlp.status)
-    """
+            number of variables......................: $(ips.nlp.n)
+            number of constraints....................: $(ips.nlp.m)
+            number of nonzeros in lagrangian hessian.: $(ips.nlp.nnz_hess)
+            number of nonzeros in constraint jacobian: $(ips.nlp.nnz_jac)
+            status...................................: $(ips.nlp.status)
+            """
 end
 print(io::IO,ips::Solver) = print(io, string(ips))
 show(io::IO,ips::Solver) = print(io,ips)
