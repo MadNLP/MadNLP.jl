@@ -555,8 +555,7 @@ macro append_to_jacobian_sparsity(array_name)
     escoffset = esc(:offset)
     quote
         for info in $(esc(array_name))
-            $escoffset += append_to_jacobian_sparsity!($(esc(:I)), $(esc(:J)),
-                                                       info.func, $escrow, $escoffset)
+            $escoffset += append_to_jacobian_sparsity!($(esc(:I)), $(esc(:J)),info.func, $escrow, $escoffset)
             $escrow += 1
         end
     end
@@ -583,11 +582,9 @@ function jacobian_structure(model::Optimizer,I,J)
     return I,J
 end
 
-append_to_hessian_sparsity!(I,J,
-                            ::Union{MOI.SingleVariable,MOI.ScalarAffineFunction},offset) = 0
+append_to_hessian_sparsity!(I,J,::Union{MOI.SingleVariable,MOI.ScalarAffineFunction},offset) = 0
 
-function append_to_hessian_sparsity!(I,J,
-                                     quad::MOI.ScalarQuadraticFunction,offset)
+function append_to_hessian_sparsity!(I,J,quad::MOI.ScalarQuadraticFunction,offset)
     cnt = 0
     for term in quad.quadratic_terms
         I[offset+cnt]=term.variable_index_1.value
@@ -596,8 +593,6 @@ function append_to_hessian_sparsity!(I,J,
     end
     return cnt
 end
-
-
 function hessian_lagrangian_structure(model::Optimizer,I,J)    
     offset = 1
     if !model.nlp_data.has_objective && model.objective !== nothing

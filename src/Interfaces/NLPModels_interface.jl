@@ -35,7 +35,6 @@ function madnlp(model::AbstractNLPModel;kwargs...)
     ips.zu.=0
     # ------------------------------------------
     optimize!(ips)
-    finalize(model)
 
     return GenericExecutionStats(
         haskey(status_translator,nlp.status) ? status_translator[nlp.status] : :unknown,

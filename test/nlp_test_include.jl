@@ -33,10 +33,10 @@ function lootsma(optimizer_constructor::Function)
 
     optimize!(m)
 
-    solcmp(value.(x),[0.07415998565403112,2.9848713863700236,4.0000304145340415])
-    solcmp(dual.(l),[2.000024518601535,2.0000305441119535])
-    solcmp(dual.(LowerBoundRef.(x)),[0.000186628762032665,4.202611521176758e-6,3.285036300951934e-6])
-    solcmp(dual.(UpperBoundRef.(x)),[-2.5466950450392374e-6,-6.034205830350869e-6,-1.2544280272965098e-5])
+    @test solcmp(value.(x),[0.07415998565403112,2.9848713863700236,4.0000304145340415])
+    @test solcmp(dual.(l),[2.000024518601535,2.0000305441119535])
+    @test solcmp(dual.(LowerBoundRef.(x)),[0.,0.,0.])
+    @test solcmp(dual.(UpperBoundRef.(x)),[0.,0.,0.])
     
     @test termination_status(m) == MOI.LOCALLY_SOLVED
 end
