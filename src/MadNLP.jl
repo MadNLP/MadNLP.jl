@@ -3,7 +3,8 @@
 
 module MadNLP
 
-import IterativeSolvers, MathOptInterface, MPI, MKL_jll, OpenBLAS32_jll
+import Pkg.Artifacts: @artifact_str
+import IterativeSolvers, MathOptInterface, MPI
 import Libdl: dlopen, dlext, RTLD_DEEPBIND, RTLD_GLOBAL
 import Metis: partition
 import Parameters: @with_kw
@@ -49,7 +50,7 @@ function __init__()
     @isdefined(libmumps) && dlopen(libmumps,RTLD_DEEPBIND)
     @isdefined(libhsl) && dlopen(libhsl,RTLD_DEEPBIND)
     @isdefined(libpardiso) && dlopen(libpardiso,RTLD_DEEPBIND)
-    @isdefined(libmkl32) && dlopen.(joinpath.(MKL_jll.artifact_dir,[
+    @isdefined(libmkl32) && dlopen.(joinpath.(artifact"MKL",[
         "lib/libmkl_core.$(dlext)",
         "lib/libmkl_sequential.$(dlext)",
         "lib/libmkl_intel_lp64.$(dlext)"]),RTLD_GLOBAL)

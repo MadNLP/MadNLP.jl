@@ -4,7 +4,8 @@
 
 Sys.iswindows() && error("Windows is currently not supported.")
 
-using BinaryProvider, METIS_jll, MUMPS_seq_jll, MKL_jll, OpenBLAS32_jll
+using Pkg.Artifacts
+using BinaryProvider
 
 # Parse some basic command-line arguments
 const verbose = "--verbose" in ARGS
@@ -21,10 +22,10 @@ const no_whole_archive = Sys.isapple() ? `-Wl,-noall_load` : `-Wl,--no-whole-arc
 const libdir     = mkpath(joinpath(@__DIR__, "lib"))
 const CC = haskey(ENV,"MADNLP_CC") ? ENV["MADNLP_CC"] : `gcc`
 const FC = haskey(ENV,"MADNLP_FC") ? ENV["MADNLP_FC"] : `gfortran`
-const libmetis_dir = joinpath(METIS_jll.artifact_dir, "lib")
+const libmetis_dir = joinpath(artifact"METIS", "lib")
 const with_metis = `-L$libmetis_dir $rpath$libmetis_dir -lmetis`
-const libmkl_dir = joinpath(MKL_jll.artifact_dir,"lib")
-const libopenblas_dir = joinpath(OpenBLAS32_jll.artifact_dir,"lib")
+const libmkl_dir = joinpath(artifact"MKL","lib")
+const libopenblas_dir = joinpath(artifact"OpenBLAS32","lib")
 const with_mkl = `-L$libmkl_dir $rpath$libmkl_dir -lmkl_intel_lp64 -lmkl_sequential -lmkl_core`
 const with_openblas = `-L$libopenblas_dir $rpath$libopenblas_dir -lopenblas`
 const openmp_flag = haskey(ENV,"MADNLP_ENABLE_OPENMP") ? ENV["MADNLP_ENABLE_OPENMP"] : `-fopenmp`
@@ -59,7 +60,7 @@ end
 
 # MUMPS_seq
 if is_FC
-    const libmumps_dir = joinpath(MUMPS_seq_jll.artifact_dir,"lib")
+    const libmumps_dir = joinpath(artifact"MUMPS_seq","lib")
     push!(products,FileProduct(prefix,joinpath(libdir,"libmumps.$so"),:libmumps))
     wait(OutputCollector(`$FC -o$(libdir)/libmumps.$so -shared $whole_archive -L$libmumps_dir $rpath$libmumps_dir -ldmumps $no_whole_archive -lmumps_common -lmpiseq -lpord $with_metis $(blasvendor == :mkl ? with_mkl : with_openblas)`,verbose=verbose))
     @info "Building Mumps (sequential) $(build_succeded(products[end]))."

@@ -26,7 +26,7 @@ end
     # General options
     rethrow_error::Bool = true
     disable_garbage_collector::Bool = false
-    blas_num_threads::Int = -1
+    blas_num_threads::Int = Threads.nthreads()
     linear_solver::Module
     iterator::Module = Richardson
     linear_system_scaler::Module = DummyModule
@@ -341,7 +341,7 @@ function Solver(nlp::NonlinearProgram;
     # generic options
     opt.disable_garbage_collector &&
         (GC.enable(false); @warn(logger,"Julia garbage collector is temporarily disabled"))
-    opt.blas_num_threads == -1 || set_blas_num_threads(opt.blas_num_threads; permanent=true)
+    set_blas_num_threads(opt.blas_num_threads; permanent=true)
 
     @trace(logger,"Initializing variables.")
     ind_ineq = findall(nlp.gl.!=nlp.gu)

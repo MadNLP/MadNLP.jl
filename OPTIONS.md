@@ -1,27 +1,25 @@
 ## MadNLP Options
 ### Interior Point Solver Options
 - `linear_solver::Module = DefaultLinearSolver`:\
-    Linear solver used for solving primal-dual system. Valid values are: `PlasmoNLP`.{`Umfpack`, `Mumps`, `PardisoMKL`, `Ma27`, `Ma57`, `Ma77`, `Ma86`, `Ma97`, `Pardiso`, `Schur`, `Schwarz`}.
+    Linear solver used for solving primal-dual system. Valid values are: `MadNLP`.{`Umfpack`, `Mumps`, `PardisoMKL`, `Ma27`, `Ma57`, `Ma77`, `Ma86`, `Ma97`, `Pardiso`, `Schur`, `Schwarz`}.
 - `iterator::Module = Richardson `\
-    Iterator used for iterative refinement. Valid values are: `PlasmoNLP`.{`Richardson`,`Krylov`}.
+    Iterator used for iterative refinement. Valid values are: `MadNLP`.{`Richardson`,`Krylov`}.
     - `Richardson` uses [Richardson iteration](https://en.wikipedia.org/wiki/Modified_Richardson_iteration)
     - `Krylov` uses [restarted Generalized Minimal Residual](https://en.wikipedia.org/wiki/Generalized_minimal_residual_method) method implemented in [IterativeSolvers.jl](https://github.com/JuliaMath/IterativeSolvers.jl).
 - `linear_system_scaler::Module = DummyModule`\
-    Linear system scaling routine used for scaling primal-dual system. `DummyModule` does not scale the system. Valid values are {`DummyModule`,`PlasmoNLP.Mc19`}.
+    Linear system scaling routine used for scaling primal-dual system. `DummyModule` does not scale the system. Valid values are {`DummyModule`,`MadNLP.Mc19`}.
 - `blas_num_threads::Int = Threads.nthreads()`\
     Number of threads used for BLAS routines. Valid range is ``[1,\infty)``.
 - `disable_garbage_collector::Bool = false `\
     If `true`, Julia garbage collector is temporarily disabled while solving the problem, and then enabled back once the solution is complete.
 - `rethrow_error::Bool = true `\
-    If `false`, any internal error thrown by `PlasmoNLP` and interruption exception (triggered by the user via `^C`) is catched, and not rethrown. If an error is catched, the solver terminates with an error message.
-- `log_level::String = "info"`\
-    Log level for PlasmoNLP. The log level set here is propagated down to the submodules (e.g., `PlasmoNLP`.{`Richardson`, `Ma57`}). Valid values are: {`"trace"`, `"debug"`, `"info"`, `"notice"`, `"warn"`, `"error"`}.
-- `print_level::String = "trace"`\
-    `stdout` print level. Any message with level less than `print_level` is not printed on `stdout`. Valid values are: {`"trace"`, `"debug"`, `"info"`, `"notice"`, `"warn"`, `"error"`}.
-- `output_file::String = ""`\
+    If `false`, any internal ERROR thrown by `MadNLP` and interruption exception (triggered by the user via `^C`) is catched, and not rethrown. If an ERROR is catched, the solver terminates with an ERROR message.
+- `print_level::String = MadNLP.INFO`\
+    `stdout` print level. Any message with level less than `print_level` is not printed on `stdout`. Valid values are: `MadNLP`.{`TRACE`, `DEBUG`, `INFO`, `NOTICE`, `WARN`, `ERROR`}.
+- `output_file::String = MadNLP.INFO`\
     If not `""`, the output log is teed to the file at the path specified in `output_file`.
-- `file_print_level::String = "trace"`\
-    File print level; any message with level less than `file_print_level` is not printed on the file specified in `output_file`. Valid values are: {`"trace"`, `"debug"`, `"info"`, `"notice"`, `"warn"`, `"error"`}.
+- `file_print_level::String = "TRACE"`\
+    File print level; any message with level less than `file_print_level` is not printed on the file specified in `output_file`. Valid values are: `MadNLP`.{`TRACE`, `DEBUG`, `INFO`, `NOTICE`, `WARN`, `ERROR`}.
 - `tol::Float64 = 1e-8`\
     Termination tolerance. The solver terminates if the scaled primal, dual, complementary infeasibility is less than `tol`. Valid range is ``(0,\infty)``.
 - `acceptable_tol::Float64 = 1e-6`\
@@ -34,19 +32,19 @@
     Maximum number of interior point iterations. The solver terminates with exit symbol `:Maximum_Iterations_Exceeded` if the interior point iteration count exceeds `max_iter`.
 - `max_wall_time::Float64 = 1e6`\
     Maximum wall time for interior point solver. The solver terminates with exit symbol `:Maximum_WallTime_Exceeded` if the total solver wall time exceeds `max_wall_time`.
-- `fixed_variable_treatment::String = "make_parameter"`\
-    Valid values are: {`"relax_bounds"`,`"make_parameter"`}.
+- `fixed_variable_treatment::String = MadNLP.MAKE_PARAMETER`\
+    Valid values are: `MadNLP`.{`RELAX_BOUNDS`,`MAKE_PARAMETER`}.
 - `jacobian_constant::Bool = false`\
     If `true`, constraint Jacobian is only evaluated once and reused.
 - `hessian_constant::Bool = false`\
     If `true`, Lagrangian Hessian is only evaluated once and reused.
 - `reduced_system::Bool = true`\
     If `true`, the primal-dual system is formulated as in Greif (2014).
-- `inertia_correction_method::String = "inertia_free"`\
-    Valid values are: {`"inertia_based"`, `"inertia_free"`, `"inertia_ignored`"}.
-    - `"ienrtia_based"` uses the strategy in Wächter (2006),
-    - `"inertia_free`" uses the strategy in Chiang (2016)
-    - `"inertia_ignored` simply ignores inertia information.
+- `inertia_correction_method::String = MadNLP.INERTIA_AUTO`\
+    Valid values are: `MadNLP`.{`INERTIA_AUTO`,`INERTIA_BASED"`, `INERTIA_FREE`}.
+    - `MadNLP.INERTIA_BASED` uses the strategy in Ipopt.
+    - `MadNLP.INERTIA_FREE` uses the strategy in Chiang (2016).
+    - `MadNLP.INERTIA_AUTO` uses `MadNLP.INERTIA_BASED` if inertia information is available and uses `MadNLP.INERTIA_FREE` otherwise.
 - `s_max::Float64 = 100.`
 - `kappa_d::Float64 = 1e-5`
 - `constr_mult_init_max::Float64 = 1e3`
@@ -92,8 +90,6 @@ Linear solver options are specific to the linear solver chosen at `linear_solver
 - `ma27_liw_init_factor::Float64 = 5.`
 - `ma27_la_init_factor::Float64 = 5.`
 - `ma27_meminc_factor::Float64 = 2.`
-- `ma27_log_level::String = ""`
-   Log level for submodule `PlasmoNLP.Ma27`. Valid values are: `"trace"`, `"debug"`, `"info"`, `"notice"`, `"warn"`, `"error"`.
 
 #### Ma57
 - `ma57_pivtol::Float64 = 1e-8`
@@ -104,8 +100,6 @@ Linear solver options are specific to the linear solver chosen at `linear_solver
 - `ma57_block_size::Int = 16`
 - `ma57_node_amalgamation::Int = 16`
 - `ma57_small_pivot_flag::Int = 0`
-- `ma57_log_level::String = ""`
-   Log level for submodule `PlasmoNLP.Ma57`. Valid values are: `"trace"`, `"debug"`, `"info"`, `"notice"`, `"warn"`, `"error"`.
 
 #### Ma77
 - `ma77_buffer_lpage::Int = 4096`
@@ -119,8 +113,7 @@ Linear solver options are specific to the linear solver chosen at `linear_solver
 - `ma77_static::Float64 = 0.`
 - `ma77_u::Float64 = 1e-8`
 - `ma77_umax::Float64 = 1e-4`
-- `ma77_log_level::String = ""`
-   Log level for submodule `PlasmoNLP.Ma77`. Valid values are: `"trace"`, `"debug"`, `"info"`, `"notice"`, `"warn"`, `"error"`.
+
 
 #### Ma86
 - `ma86_num_threads::Int = 1`
@@ -131,8 +124,6 @@ Linear solver options are specific to the linear solver chosen at `linear_solver
 - `ma86_static::Float64 = 0.`
 - `ma86_u::Float64 = 1e-8`
 - `ma86_umax::Float64 = 1e-4`
-- `ma86_log_level::String = ""`
-   Log level for submodule `PlasmoNLP.Ma86`. Valid values are: `"trace"`, `"debug"`, `"info"`, `"notice"`, `"warn"`, `"error"`.
 
 #### Ma97
 - `ma97_num_threads::Int = 1`
@@ -143,8 +134,6 @@ Linear solver options are specific to the linear solver chosen at `linear_solver
 - `ma97_small::Float64 = 1e-20`
 - `ma97_u::Float64 = 1e-8`
 - `ma97_umax::Float64 = 1e-4`
-- `ma97_log_level::String = ""`
-   Log level for submodule `PlasmoNLP.Ma97`. Valid values are: `"trace"`, `"debug"`, `"info"`, `"notice"`, `"warn"`, `"error"`.
 
 #### Mumps
 - `mumps_dep_tol::Float64 = 0.`
@@ -154,8 +143,6 @@ Linear solver options are specific to the linear solver chosen at `linear_solver
 - `mumps_pivtol::Float64 = 1e-6`
 - `mumps_pivtolmax::Float64 = .1`
 - `mumps_scaling::Int = 77`
-- `mumps_log_level::String = ""`
-   Log level for submodule `PlasmoNLP.Mumps`. Valid values are: `"trace"`, `"debug"`, `"info"`, `"notice"`, `"warn"`, `"error"`.
 
 #### Umfpack
 - `umfpack_pivtol::Float64 = 1e-4`
@@ -163,16 +150,12 @@ Linear solver options are specific to the linear solver chosen at `linear_solver
 - `umfpack_sym_pivtol::Float64 = 1e-3`
 - `umfpack_block_size::Float64 = 16`
 - `umfpack_strategy::Float64 = 2.`
-- `umfpack_log_level::String = ""`
-   Log level for submodule `PlasmoNLP.Umfpack`. Valid values are: `"trace"`, `"debug"`, `"info"`, `"notice"`, `"warn"`, `"error"`.
 
 #### Pardiso
 - `pardiso_matching_strategy::String = "coplete+2x2"`
 - `pardiso_max_inner_refinement_steps::Int = 1`
 - `pardiso_msglvl::Int = 0`
 - `pardiso_order::Int = 2`
-- `pardiso_log_level::String = ""`
-   Log level for submodule `PlasmoNLP.Pardiso`. Valid values are: `"trace"`, `"debug"`, `"info"`, `"notice"`, `"warn"`, `"error"`.
 
 #### PardisoMKL
 - `pardisomkl_num_threads::Int = 1`
@@ -180,20 +163,16 @@ Linear solver options are specific to the linear solver chosen at `linear_solver
 - `pardisomkl_max_iterative_refinement_steps::Int = 1`
 - `pardisomkl_msglvl::Int = 0`
 - `pardisomkl_order::Int = 2`
-- `pardisomkl_log_level::String = ""`
-   Log level for submodule `PlasmoNLP.PardisoMKL`. Valid values are: `"trace"`, `"debug"`, `"info"`, `"notice"`, `"warn"`, `"error"`.
 
 #### LapackCUDA
 - `lapackcuda_algorithm::String = "bunchkaufman"`
-- `lapackcuda_log_level::String = ""`
 
 #### LapackMKL
 - `lapackmkl_algorithm::String = "bunchkaufman"`
-- `lapackmkl_log_level::String = ""`
 
 #### Schur
 - `schur_subproblem_solver::Module = DefaultSubproblemSolver` \
-   Linear solver used for solving subproblem. Valid values are: `PlasmoNLP`.{`Umfpack`, `PardisoMKL`, `Ma27`, `Ma57`, `Ma77`, `Ma86`, `Ma97`, `Pardiso`}.
+   Linear solver used for solving subproblem. Valid values are: `MadNLP`.{`Umfpack`, `PardisoMKL`, `Ma27`, `Ma57`, `Ma77`, `Ma86`, `Ma97`, `Pardiso`}.
 - `schur_dense_solver::Module = DefaultDenseSolver` \
    Linear solver used for solving Schur complement system
 - `schur_custom_partition::Bool = false` \
@@ -202,12 +181,10 @@ Linear solver options are specific to the linear solver chosen at `linear_solver
    Number of parts (excluding the parent node). Valid range is ``[1,\infty)``
 - `schur_part::Vector{Int} = Int[]` \
    Custom partition information in a vector form. The parent node should be labeled as `0`. Only valid if `schur_custom_partition` is `true`.
-- `schur_log_level::String = ""` \
-   Log level for submodule `PlasmoNLP.Schur`. Valid values are: `"trace"`, `"debug"`, `"info"`, `"notice"`, `"warn"`, `"error"`.
 
 #### Schwarz
 - `schwarz_subproblem_solver::Module = DefaultSubproblemSolver` \
-   Linear solver used for solving subproblem. Valid values are: `PlasmoNLP`.{`Umfpack`, `PardisoMKL`, `Ma27`, `Ma57`, `Ma77`, `Ma86`, `Ma97`, `Pardiso`}.
+   Linear solver used for solving subproblem. Valid values are: `MadNLP`.{`Umfpack`, `PardisoMKL`, `Ma27`, `Ma57`, `Ma77`, `Ma86`, `Ma97`, `Pardiso`}.
 - `schwarz_custom_partition::Bool = false` \
     If `false`, Schwarz solver automatically detects the partition using `Metis`. If `true`, the partition information given in `schur_part` is used. `schur_num_parts` and `schur_part` should be properly set by the user. When using with `Plasmo`, `schur_num_parts` and `schur_part` are automatically set by the `Plasmo` interface.
 - `schwarz_num_parts::Int = 2` \
@@ -222,8 +199,6 @@ Linear solver options are specific to the linear solver chosen at `linear_solver
     If `true`, the subproblem solvers are fully improved when the linear solver is initialized.
 - `schwarz_max_expand_factor::Int = 4` \
     The size of overlap is fully saturated when the `improve!` is called `schwarz_max_expand_factor-1` times. Valid range is ``[2,\infty)``.
-- `schwarz_log_level::String = ""` \
-   Log level for submodule `PlasmoNLP.Schwarz`. Valid values are: `"trace"`, `"debug"`, `"info"`, `"notice"`, `"warn"`, `"error"`.
 
 ### Iterator Options
 #### Richardson
@@ -233,8 +208,6 @@ Linear solver options are specific to the linear solver chosen at `linear_solver
     Convergence tolerance of Richardson iteration. Valid range is ``(0,\infty)``.
 - `richardson_acceptable_tol::Float64 = 1e-5` \
     Acceptable convergence tolerance of Richardson iteration. If the Richardson iteration counter exceeds `richardson_max_iter` without satisfying the convergence criteria set with `richardson_tol`, the Richardson solver checks whether the acceptable convergence criteria set with `richardson_acceptable_tol` is satisfied; if the acceptable convergence criteria is satisfied, the computed step is used; otherwise, the augmented system is treated to be singular. Valid range is ``(0,\infty)``.
-- `richardson_log_level::String = ""` \
-   Log level for submodule `PlasmoNLP.Richardson`. Valid values are: `"trace"`, `"debug"`, `"info"`, `"notice"`, `"warn"`, `"error"`.
 
 #### Krylov
 - `krylov_max_iter::Int = 10` \
@@ -245,8 +218,6 @@ Linear solver options are specific to the linear solver chosen at `linear_solver
     Acceptable convergence tolerance of Krylov iteration. If the Krylov iteration counter exceeds `krylov_max_iter` without satisfying the convergence criteria set with `krylov_tol`, the Krylov solver checks whether the acceptable convergence criteria set with `krylov_acceptable_tol` is satisfied; if the acceptable convergence criteria is satisfied, the computed step is used; otherwise, the augmented system is treated to be singular. Valid range is ``(0,\infty)``.
 - `krylov_restart::Int = 5` \
     Maximum Krylov iteration before restarting. Valid range is ``[1,\infty)``.
-- `krylov_log_level::String = ""` \
-    Log level for submodule `PlasmoNLP.Krylov`. Valid values are: `"trace"`, `"debug"`, `"info"`, `"notice"`, `"warn"`, `"error"`.
 
 ### Reference
 [Bunch, 1977]: J R Bunch and L Kaufman, Some stable methods for calculating inertia and solving symmetric linear systems, Mathematics of Computation 31:137 (1977), 163-179.
