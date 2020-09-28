@@ -29,9 +29,7 @@ include("krylov.jl")
 
 # dense solvers
 include("lapackmkl.jl")
-if VERSION >= v"1.5.0"
-    include("lapackcuda.jl")
-end
+include("lapackcuda.jl")
 
 # direct solvers
 include("umfpack.jl")

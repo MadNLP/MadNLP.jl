@@ -4,7 +4,8 @@
 
 Sys.iswindows() && error("Windows is currently not supported.")
 
-using BinaryProvider, METIS_jll, MUMPS_seq_jll, MKL_jll, OpenBLAS32_jll
+using BinaryProvider
+using Pkg.Artifacts
 
 # Parse some basic command-line arguments
 const verbose = "--verbose" in ARGS
@@ -21,10 +22,10 @@ const no_whole_archive = Sys.isapple() ? `-Wl,-noall_load` : `-Wl,--no-whole-arc
 const libdir     = mkpath(joinpath(@__DIR__, "lib"))
 const CC = haskey(ENV,"MADNLP_CC") ? ENV["MADNLP_CC"] : `gcc`
 const FC = haskey(ENV,"MADNLP_FC") ? ENV["MADNLP_FC"] : `gfortran`
-const libmetis_dir = joinpath(METIS_jll.artifact_dir, "lib")
+const libmetis_dir = joinpath(artifact"METIS", "lib")
 const with_metis = `-L$libmetis_dir $rpath$libmetis_dir -lmetis`
-const libmkl_dir = joinpath(MKL_jll.artifact_dir,"lib")
-const libopenblas_dir = joinpath(OpenBLAS32_jll.artifact_dir,"lib")
+const libmkl_dir = joinpath(artifact"MKL","lib")
+const libopenblas_dir = joinpath(artifact"OpenBLAS32","lib")
 const with_mkl = `-L$libmkl_dir $rpath$libmkl_dir -lmkl_intel_lp64 -lmkl_sequential -lmkl_core`
 const with_openblas = `-L$libopenblas_dir $rpath$libopenblas_dir -lopenblas`
 const openmp_flag = haskey(ENV,"MADNLP_ENABLE_OPENMP") ? ENV["MADNLP_ENABLE_OPENMP"] : `-fopenmp`
@@ -34,43 +35,27 @@ const installer = Sys.isapple() ? "brew install" : "sudo apt install"
 products   = Product[]
 build_succeded(product::Product)=satisfied(product) ? "succeeded" : "failed"
 
-# check c compiler availability
-is_CC = true
-try 
-    run(`$CC dummy_c.c`)
-    rm("a.out",force=true)
-catch e
-    global is_CC
-    @warn "C compiler is not installed. Run $installer gcc"
-    is_CC = false
-end
-
-# check fortran compiler avilability
-is_FC = true
-try 
-    run(`$FC dummy_f.f`)
-    rm("a.out",force=true)
-catch e
-    global is_FC
-    @warn "Fortran compiler is not installed. Run $installer gfortran"
-    is_FC = false
-end
-
 
 # MUMPS_seq
-if is_FC
-    const libmumps_dir = joinpath(MUMPS_seq_jll.artifact_dir,"lib")
-    push!(products,FileProduct(prefix,joinpath(libdir,"libmumps.$so"),:libmumps))
-    wait(OutputCollector(`$FC -o$(libdir)/libmumps.$so -shared $whole_archive -L$libmumps_dir $rpath$libmumps_dir -ldmumps $no_whole_archive -lmumps_common -lmpiseq -lpord $with_metis $(blasvendor == :mkl ? with_mkl : with_openblas)`,verbose=verbose))
-    @info "Building Mumps (sequential) $(build_succeded(products[end]))."
-end
+const libmumps_dir = joinpath(artifact"MUMPS_seq","lib")
+push!(products,FileProduct(prefix,joinpath(libdir,"libmumps.$so"),:libmumps))
+@info "Building Mumps (sequential) $(build_succeded(products[end]))."
 
 # HSL
-if is_FC
-    const hsl_version = "2015.06.23"
-    const hsl_archive = joinpath(@__DIR__, "download/coinhsl-$hsl_version.tar.gz")
-    push!(products,FileProduct(prefix, "lib/libhsl.$so", :libhsl))
-    if isfile(hsl_archive)
+const hsl_version = "2015.06.23"
+const hsl_archive = joinpath(@__DIR__, "download/coinhsl-$hsl_version.tar.gz")
+push!(products,FileProduct(prefix, "lib/libhsl.$so", :libhsl))
+if isfile(hsl_archive)
+    # check fortran compiler avilability
+    is_FC = true
+    try 
+        run(`$FC dummy_f.f`)
+        rm("a.out",force=true)
+    catch e
+        global is_FC = false
+        @warn "Fortran compiler is not installed. Run $installer gfortran"
+    end
+    if is_FC
         unpack(hsl_archive,joinpath(@__DIR__, "download"))
         OC = OutputCollector[]
         cd("download/coinhsl-$hsl_version")
@@ -93,17 +78,26 @@ if is_FC
         OutputCollector(`$FC -o$(libdir)/libhsl.$so -shared -fPIC $optimization_flag common/deps90.o common/deps.o mc19/mc19d.o ma27/ma27d.o ma57/ma57d.o hsl_ma77/hsl_ma77d.o hsl_ma77/C/hsl_ma77d_ciface.o hsl_ma86/hsl_ma86d.o hsl_ma86/C/hsl_ma86d_ciface.o hsl_mc68/C/hsl_mc68i_ciface.o hsl_ma97/hsl_ma97d.o hsl_ma97/C/hsl_ma97d_ciface.o $openmp_flag $with_metis $(blasvendor == :mkl ? with_mkl : with_openblas)`,verbose=verbose)
         cd("$(@__DIR__)")
     end
-    @info "Building HSL (Ma27, Ma57, Ma77, Ma86, Ma97) $(build_succeded(products[end]))."
 end
+@info "Building HSL (Ma27, Ma57, Ma77, Ma86, Ma97) $(build_succeded(products[end]))."
 
 # Pardiso
-if is_CC
-    const libpardiso_names = Sys.isapple() ?
-        ["pardiso600-MACOS-X86-64"] : ["pardiso600-GNU720-X86-64","pardiso600-GNU800-X86-64"]
-    const libpardiso_dir = joinpath(@__DIR__,"download")
-    push!(products,FileProduct(prefix,joinpath(libdir,"libpardiso.$so"),:libpardiso))
-    for name in libpardiso_names
-        if isfile(joinpath(libpardiso_dir,"lib$name.$so"))
+const libpardiso_names = Sys.isapple() ?
+    ["pardiso600-MACOS-X86-64"] : ["pardiso600-GNU720-X86-64","pardiso600-GNU800-X86-64"]
+const libpardiso_dir = joinpath(@__DIR__,"download")
+push!(products,FileProduct(prefix,joinpath(libdir,"libpardiso.$so"),:libpardiso))
+for name in libpardiso_names
+    if isfile(joinpath(libpardiso_dir,"lib$name.$so"))
+        # check c compiler availability
+        is_CC = true
+        try 
+            run(`$CC dummy_c.c`)
+            rm("a.out",force=true)
+        catch e
+            is_CC = false
+            @warn "C compiler is not installed. Run $installer gcc"
+        end
+        if is_CC
             with_pardiso=`-L$libpardiso_dir $rpath$libpardiso_dir -l$name`
             wait(OutputCollector(`$CC -shared -olib/libpardiso.$so pardiso_dummy.c $whole_archive $with_pardiso $no_whole_archive $with_openblas -lgfortran $openmp_flag -lpthread -lm`,verbose=verbose))
             Sys.isapple() && satisfied(products[end]) &&
@@ -111,8 +105,8 @@ if is_CC
             satisfied(products[end]) && break
         end
     end
-    @info "Building Pardiso $(build_succeded(products[end]))."
 end
+@info "Building Pardiso $(build_succeded(products[end]))."
 
 # PardisoMKL
 push!(products,FileProduct(prefix,joinpath(libmkl_dir,"libmkl_intel_lp64.$so"),:libmkl32))
