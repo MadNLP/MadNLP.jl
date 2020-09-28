@@ -3,14 +3,10 @@ os:
   - linux
   - osx
 julia:
-  # - 1.0
   - 1
   - nightly
 codecov: true
 sudo: required
-addons:
-  apt_packages:
-    - gfortran
 jobs:
   allow_failures:
    - julia: nightly
