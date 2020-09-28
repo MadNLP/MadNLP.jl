@@ -38,7 +38,7 @@ build_succeded(product::Product)=satisfied(product) ? "succeeded" : "failed"
 
 # MUMPS_seq
 const libmumps_dir = joinpath(artifact"MUMPS_seq","lib")
-push!(products,FileProduct(prefix,joinpath(libdir,"libmumps.$so"),:libmumps))
+push!(products,FileProduct(prefix,joinpath(libmumps_dir,"libdmumps.$so"),:libmumps))
 @info "Building Mumps (sequential) $(build_succeded(products[end]))."
 
 # HSL
@@ -55,6 +55,7 @@ if isfile(hsl_archive)
         global is_FC = false
         @warn "Fortran compiler is not installed. Run $installer gfortran"
     end
+
     if is_FC
         unpack(hsl_archive,joinpath(@__DIR__, "download"))
         OC = OutputCollector[]
