@@ -1,24 +1,24 @@
 ## MadNLP Options
 ### Interior Point Solver Options
 - `linear_solver::Module = DefaultLinearSolver`:\
-    Linear solver used for solving primal-dual system. Valid values are: `MadNLP`.{`Umfpack`, `Mumps`, `PardisoMKL`, `Ma27`, `Ma57`, `Ma77`, `Ma86`, `Ma97`, `Pardiso`, `Schur`, `Schwarz`}.
+    Linear solver used for solving primal-dual system. Valid values are: `MadNLP`.{`Umfpack`, `Mumps`, `PardisoMKL`, `Ma27`, `Ma57`, `Ma77`, `Ma86`, `Ma97`, `Pardiso`, `Schur`, `Schwarz`, `LapackMKL`, `LapackCUDA`}. The selected solver should be properly built in the build procedure. See [README.md](https://github.com/sshin23/MadNLP.jl) file.
 - `iterator::Module = Richardson `\
     Iterator used for iterative refinement. Valid values are: `MadNLP`.{`Richardson`,`Krylov`}.
     - `Richardson` uses [Richardson iteration](https://en.wikipedia.org/wiki/Modified_Richardson_iteration)
     - `Krylov` uses [restarted Generalized Minimal Residual](https://en.wikipedia.org/wiki/Generalized_minimal_residual_method) method implemented in [IterativeSolvers.jl](https://github.com/JuliaMath/IterativeSolvers.jl).
 - `linear_system_scaler::Module = DummyModule`\
-    Linear system scaling routine used for scaling primal-dual system. `DummyModule` does not scale the system. Valid values are {`DummyModule`,`MadNLP.Mc19`}.
-- `blas_num_threads::Int = Threads.nthreads()`\
+    Linear system scaling routine used for scaling primal-dual system. `DummyModule` does not scale the system. Valid values are `MadNLP`.{`DummyModule`,`Mc19`}.
+- `blas_num_threads::Int = 1`\
     Number of threads used for BLAS routines. Valid range is ``[1,\infty)``.
 - `disable_garbage_collector::Bool = false `\
     If `true`, Julia garbage collector is temporarily disabled while solving the problem, and then enabled back once the solution is complete.
 - `rethrow_error::Bool = true `\
-    If `false`, any internal ERROR thrown by `MadNLP` and interruption exception (triggered by the user via `^C`) is catched, and not rethrown. If an ERROR is catched, the solver terminates with an ERROR message.
-- `print_level::String = MadNLP.INFO`\
+    If `false`, any internal error thrown by `MadNLP` and interruption exception (triggered by the user via `^C`) is caught, and not rethrown. If an error is caught, the solver terminates with an error message.
+- `print_level::LogLevels = INFO`\
     `stdout` print level. Any message with level less than `print_level` is not printed on `stdout`. Valid values are: `MadNLP`.{`TRACE`, `DEBUG`, `INFO`, `NOTICE`, `WARN`, `ERROR`}.
-- `output_file::String = MadNLP.INFO`\
+- `output_file::String = INFO`\
     If not `""`, the output log is teed to the file at the path specified in `output_file`.
-- `file_print_level::String = "TRACE"`\
+- `file_print_level::LogLevels = TRACE`\
     File print level; any message with level less than `file_print_level` is not printed on the file specified in `output_file`. Valid values are: `MadNLP`.{`TRACE`, `DEBUG`, `INFO`, `NOTICE`, `WARN`, `ERROR`}.
 - `tol::Float64 = 1e-8`\
     Termination tolerance. The solver terminates if the scaled primal, dual, complementary infeasibility is less than `tol`. Valid range is ``(0,\infty)``.
@@ -32,7 +32,7 @@
     Maximum number of interior point iterations. The solver terminates with exit symbol `:Maximum_Iterations_Exceeded` if the interior point iteration count exceeds `max_iter`.
 - `max_wall_time::Float64 = 1e6`\
     Maximum wall time for interior point solver. The solver terminates with exit symbol `:Maximum_WallTime_Exceeded` if the total solver wall time exceeds `max_wall_time`.
-- `fixed_variable_treatment::String = MadNLP.MAKE_PARAMETER`\
+- `fixed_variable_treatment::FixedVariableTreatments = MAKE_PARAMETER`\
     Valid values are: `MadNLP`.{`RELAX_BOUNDS`,`MAKE_PARAMETER`}.
 - `jacobian_constant::Bool = false`\
     If `true`, constraint Jacobian is only evaluated once and reused.
@@ -40,11 +40,11 @@
     If `true`, Lagrangian Hessian is only evaluated once and reused.
 - `reduced_system::Bool = true`\
     If `true`, the primal-dual system is formulated as in Greif (2014).
-- `inertia_correction_method::String = MadNLP.INERTIA_AUTO`\
-    Valid values are: `MadNLP`.{`INERTIA_AUTO`,`INERTIA_BASED"`, `INERTIA_FREE`}.
-    - `MadNLP.INERTIA_BASED` uses the strategy in Ipopt.
-    - `MadNLP.INERTIA_FREE` uses the strategy in Chiang (2016).
-    - `MadNLP.INERTIA_AUTO` uses `MadNLP.INERTIA_BASED` if inertia information is available and uses `MadNLP.INERTIA_FREE` otherwise.
+- `inertia_correction_method::InertiaCorrectionMethods = INERTIA_AUTO`\
+    Valid values are: `MadNLP`.{`INERTIA_AUTO`,`INERTIA_BASED`, `INERTIA_FREE`}.
+    - `INERTIA_BASED` uses the strategy in Ipopt.
+    - `INERTIA_FREE` uses the strategy in Chiang (2016).
+    - `INERTIA_AUTO` uses `INERTIA_BASED` if inertia information is available and uses `INERTIA_FREE` otherwise.
 - `s_max::Float64 = 100.`
 - `kappa_d::Float64 = 1e-5`
 - `constr_mult_init_max::Float64 = 1e3`
@@ -107,7 +107,7 @@ Linear solver options are specific to the linear solver chosen at `linear_solver
 - `ma77_file_size::Int = 2097152`
 - `ma77_maxstore::Int = 0`
 - `ma77_nemin::Int = 8`
-- `ma77_order::String = "metis"`
+- `ma77_order::Ma77.Ordering = Ma77.METIS`
 - `ma77_print_level::Int = -1`
 - `ma77_small::Float64 = 1e-20`
 - `ma77_static::Float64 = 0.`
@@ -119,7 +119,8 @@ Linear solver options are specific to the linear solver chosen at `linear_solver
 - `ma86_num_threads::Int = 1`
 - `ma86_print_level::Float64 = -1`
 - `ma86_nemin::Int = 32`
-- `ma86_scaling::String = "none"`
+- `ma86_order::Ma86.Ordering = Ma86.METIS`
+- `ma86_scaling::Ma86.Scaling = Ma86.SCALING_NONE`
 - `ma86_small::Float64 = 1e-20`
 - `ma86_static::Float64 = 0.`
 - `ma86_u::Float64 = 1e-8`
@@ -129,8 +130,8 @@ Linear solver options are specific to the linear solver chosen at `linear_solver
 - `ma97_num_threads::Int = 1`
 - `ma97_print_level::Int = -1`
 - `ma97_nemin::Int = 8`
-- `ma97_order::String = "metis"`
-- `ma97_scaling::String = "none"`
+- `ma97_order::Ma97.Ordering = Ma97.METIS`
+- `ma97_scaling::Ma97.Scaling = Ma97.SCALING_NONE`
 - `ma97_small::Float64 = 1e-20`
 - `ma97_u::Float64 = 1e-8`
 - `ma97_umax::Float64 = 1e-4`
@@ -152,27 +153,27 @@ Linear solver options are specific to the linear solver chosen at `linear_solver
 - `umfpack_strategy::Float64 = 2.`
 
 #### Pardiso
-- `pardiso_matching_strategy::String = "coplete+2x2"`
+- `pardiso_matching_strategy::Pardiso.MatchingStrategy = COMPLETE2x2`
 - `pardiso_max_inner_refinement_steps::Int = 1`
 - `pardiso_msglvl::Int = 0`
 - `pardiso_order::Int = 2`
 
 #### PardisoMKL
 - `pardisomkl_num_threads::Int = 1`
-- `pardisomkl_matching_strategy::String = "complete+2x2"`
+- `pardiso_matching_strategy::PardisoMKL.MatchingStrategy = COMPLETE2x2`
 - `pardisomkl_max_iterative_refinement_steps::Int = 1`
 - `pardisomkl_msglvl::Int = 0`
 - `pardisomkl_order::Int = 2`
 
 #### LapackCUDA
-- `lapackcuda_algorithm::String = "bunchkaufman"`
+- `lapackmkl_algorithm::LapackCUDA.Algorithms = BUNCHKAUFMAN`
 
 #### LapackMKL
-- `lapackmkl_algorithm::String = "bunchkaufman"`
+- `lapackmkl_algorithm::LapackMKL.Algorithms = BUNCHKAUFMAN`
 
 #### Schur
-- `schur_subproblem_solver::Module = DefaultSubproblemSolver` \
-   Linear solver used for solving subproblem. Valid values are: `MadNLP`.{`Umfpack`, `PardisoMKL`, `Ma27`, `Ma57`, `Ma77`, `Ma86`, `Ma97`, `Pardiso`}.
+- `schur_subproblem_solver::Module = DefaultLinearSolver` \
+   Linear solver used for solving subproblem. Valid values are: `MadNLP`.{`Umfpack`, `Ma27`, `Ma57`, `Ma97`, `Mumps`}.
 - `schur_dense_solver::Module = DefaultDenseSolver` \
    Linear solver used for solving Schur complement system
 - `schur_custom_partition::Bool = false` \

@@ -10,7 +10,7 @@
       WARN   = 5,
       ERROR  = 6)
 
-@enum(FixedVariableTreatment::Int,
+@enum(FixedVariableTreatments::Int,
       RELAX_BOUND = 1,
       MAKE_PARAMETER = 2)
 

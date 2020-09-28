@@ -26,7 +26,7 @@ end
     # General options
     rethrow_error::Bool = true
     disable_garbage_collector::Bool = false
-    blas_num_threads::Int = Threads.nthreads()
+    blas_num_threads::Int = 1
     linear_solver::Module
     iterator::Module = Richardson
     linear_system_scaler::Module = DummyModule
@@ -47,7 +47,7 @@ end
 
     # NLP options
     kappa_d::Float64 = 1e-5
-    fixed_variable_treatment::FixedVariableTreatment = MAKE_PARAMETER
+    fixed_variable_treatment::FixedVariableTreatments = MAKE_PARAMETER
     jacobian_constant::Bool = false
     hessian_constant::Bool = false
     reduced_system::Bool = true

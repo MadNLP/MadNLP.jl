@@ -26,9 +26,6 @@ const INPUT_MATRIX_TYPE = :csc
     schwarz_part::Vector{Int} = Int[]
 end
 
-# mutable struct EmptySolverWorker end
-# factorizeEmptySolverWorker
-
 mutable struct SolverWorker
     struc::Union{MonolevelStruc,BilevelStruc}
     
