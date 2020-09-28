@@ -3,7 +3,7 @@ MadNLP
 [![Build Status](https://travis-ci.org/sshin23/MadNLP.jl.svg?branch=master)](https://travis-ci.org/sshin23/MadNLP.jl) [![codecov](https://codecov.io/gh/sshin23/MadNLP.jl/branch/master/graph/badge.svg)](https://codecov.io/gh/sshin23/MadNLP.jl)
 
 
-MadNLP is a [nonlinear programming](https://en.wikipedia.org/wiki/Nonlinear_programming) (NLP) solver, purely implemented in [Julia](https://julialang.org/). MadNLP implements a filter line-search algorithm, as that used in [Ipopt](https://github.com/coin-or/Ipopt). MadNLP seeks to streamline the development of modeling and algorithmic paradigms in order to exploit structures and to make efficient use of high-performance computers.
+MadNLP is a [nonlinear programming](https://en.wikipedia.org/wiki/Nonlinear_programming) (NLP) solver, purely implemented in [Julia](https://julialang.org/). MadNLP implements a filter line-search algorithm, as that used in [Ipopt](https://github.com/coin-or/Ipopt). MadNLP seeks to streamline the development of modeling and algorithmic paradigms in order to exploit structures and to make efficient use of high-performance computers. 
 
 ## Installation
 ```julia
@@ -15,13 +15,8 @@ pkg> add git@github.com:sshin23/MadNLP.git
 
 The build process requires C and Fortran compilers. If they are not installed, do
 ```julia
-# Linux
-shell> sudo apt install gcc
-shell> sudo apt install gfortran
-
-# MacOS
-shell> brew install gcc
-shell> sudo apt install gfortran
+shell> sudo apt install gcc # Linux
+shell> brew install gcc # MacOS
 ```
 
 MadNLP is interfaced with non-Julia sparse/dense linear solvers:
@@ -93,6 +88,5 @@ plamonlp(model,linear_solver="pardisomkl",log_level="warn",max_wall_time=3600)
 
 ## Solver options
 To see the list of MadNLP solver options, check the [Options.md](https://github.com/sshin23/MadNLP/blob/master/OPTIONS.md) file.
-
 ## Bug reports and support
 Please report issues and feature requests via the [Github issue tracker](https://github.com/sshin23/MadNLP/issues).
