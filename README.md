@@ -87,6 +87,6 @@ plamonlp(model,linear_solver="pardisomkl",log_level="warn",max_wall_time=3600)
 ```
 
 ## Solver options
-To see the list of MadNLP solver options, check the [Options.md](https://github.com/sshin23/MadNLP/blob/master/OPTIONS.md) file.
+To see the list of MadNLP solver options, check the [OPTIONS.md](https://github.com/sshin23/MadNLP/blob/master/OPTIONS.md) file.
 ## Bug reports and support
 Please report issues and feature requests via the [Github issue tracker](https://github.com/sshin23/MadNLP/issues).
