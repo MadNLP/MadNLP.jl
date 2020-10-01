@@ -7,7 +7,7 @@ MadNLP is a [nonlinear programming](https://en.wikipedia.org/wiki/Nonlinear_prog
 
 ## Installation
 ```julia
-pkg> add git@github.com:sshin23/MadNLP.git
+pkg> add MadNLP
 ```
 
 ## Build
@@ -83,7 +83,7 @@ MadNLP.optimize!(graph,ipopt;linear_solver="ma97",log_level="debug",max_iter=100
 ```julia
 using MadNLP, CUTEst
 model = CUTEstModel("PRIMALC1")
-plamonlp(model,linear_solver="pardisomkl",log_level="warn",max_wall_time=3600)
+madnlp(model,linear_solver="pardisomkl",log_level="warn",max_wall_time=3600)
 ```
 
 ## Solver options
