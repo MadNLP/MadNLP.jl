@@ -101,7 +101,7 @@ sets = [
             lapackcuda_algorithm=MadNLP.LapackCUDA.BUNCHKAUFMAN,
             print_level=MadNLP.ERROR),
         [],
-        false
+        has_cuda_gpu()
     ],
     [
         ()->MadNLP.Optimizer(
@@ -109,7 +109,7 @@ sets = [
             lapackcuda_algorithm=MadNLP.LapackCUDA.LU,
             print_level=MadNLP.ERROR),
         [],
-        false
+        has_cuda_gpu()
     ],
     [
         ()->MadNLP.Optimizer(
