@@ -15,7 +15,7 @@ jobs:
       - if: matrix.os == 'ubuntu-latest'
         run: sudo apt-get install gfortran
       - if: matrix.os == 'macos-latest'
-        run: brew install gfortran
+        run: brew cask install gfortran
       - uses: actions/checkout@v2
       - uses: julia-actions/setup-julia@latest
         with:
@@ -53,7 +53,7 @@ jobs:
       - if: matrix.os == 'ubuntu-latest'
         run: sudo apt-get install gfortran
       - if: matrix.os == 'macos-latest'
-        run: brew install gfortran
+        run: brew cask install gfortran
       - uses: actions/checkout@v2
       - uses: julia-actions/setup-julia@latest
         with:
