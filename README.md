@@ -16,7 +16,7 @@ pkg> add MadNLP
 The build process requires C and Fortran compilers. If they are not installed, do
 ```julia
 shell> sudo apt install gcc # Linux
-shell> brew install gcc # MacOS
+shell> brew cask install gcc # MacOS
 ```
 
 MadNLP is interfaced with non-Julia sparse/dense linear solvers:
