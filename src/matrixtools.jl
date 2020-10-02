@@ -110,8 +110,8 @@ function get_coo_to_dense(coo::SparseMatrixCOO{Tv,Ti}) where {Tv,Ti<:Integer}
     return dense, ()->copyto!(dense,coo)
 end
 
-copyto!(dense::Matrix{Tv},coo::SparseMatrixCOO{Tv,Ti}) where {Tv,Ti<:Integer} = copyto!(dense,coo.I,coo.J,coo.V)
-function copyto!(dense::Matrix{Tv},I,J,V) where Tv
+copyto!(dense::Matrix{Tv},coo::SparseMatrixCOO{Tv,Ti}) where {Tv,Ti<:Integer} = _copyto!(dense,coo.I,coo.J,coo.V)
+function _copyto!(dense::Matrix{Tv},I,J,V) where Tv
     dense.=0
     for i=1:length(I)
         dense[I[i],J[i]]+=V[i]
