@@ -9,7 +9,7 @@ jobs:
       matrix:
         julia-version: ['1.5']
         julia-arch: [x64]
-        os: [ubuntu-latest]
+        os: [ubuntu-latest,macos-latest]
 
     steps:
       - uses: actions/checkout@v2
@@ -44,7 +44,7 @@ jobs:
       matrix:
         julia-version: ['1.5']
         julia-arch: [x64]
-        os: [ubuntu-latest]
+        os: [ubuntu-latest,macos-latest]
     steps:
       - uses: actions/checkout@v2
       - uses: julia-actions/setup-julia@latest
