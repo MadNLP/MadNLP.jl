@@ -3,9 +3,9 @@
 
 module Mc68
 
-import ..MadNLP: @with_kw, libhsl
+import ..MadNLP: @kwdef, libhsl
 
-@with_kw mutable struct Control
+@kwdef mutable struct Control
     f_array_in::Cint = 0
     f_array_out::Cint = 0
     min_l_workspace::Clong = 0
@@ -18,7 +18,7 @@ import ..MadNLP: @with_kw, libhsl
     row_search::Cint = 0
 end
 
-@with_kw mutable struct Info
+@kwdef mutable struct Info
     flag::Cint = 0
     iostat::Cint = 0
     stat::Cint = 0

@@ -4,7 +4,7 @@
 module Umfpack
 
 import ..MadNLP:
-    @with_kw, Logger, @debug, @warn, @error,
+    @kwdef, Logger, @debug, @warn, @error,
     SubVector, StrideOneVector, SparseMatrixCSC, get_tril_to_full,
     SymbolicException,FactorizationException,SolveException,InertiaException,
     AbstractOptions, AbstractLinearSolver, set_options!, UMFPACK,
@@ -15,7 +15,7 @@ const INPUT_MATRIX_TYPE = :csc
 const umfpack_default_ctrl = copy(UMFPACK.umf_ctrl)
 const umfpack_default_info = copy(UMFPACK.umf_info)
 
-@with_kw mutable struct Options <: AbstractOptions
+@kwdef mutable struct Options <: AbstractOptions
     umfpack_pivtol::Float64 = 1e-4
     umfpack_pivtolmax::Float64 = 1e-1
     umfpack_sym_pivtol::Float64 = 1e-3
@@ -28,7 +28,7 @@ mutable struct Solver <: AbstractLinearSolver
     tril::SparseMatrixCSC{Float64}
     full::SparseMatrixCSC{Float64}
     tril_to_full_view::SubVector{Float64}
-    
+
     p::Vector{Float64}
 
     ctrl::Vector{Float64}
@@ -52,14 +52,14 @@ function Solver(csc::SparseMatrixCSC;
                 option_dict::Dict{Symbol,Any}=Dict{Symbol,Any}(),
                 opt=Options(),logger=Logger(),
                 kwargs...)
-    
+
     set_options!(opt,option_dict,kwargs)
-    
+
     p = Vector{Float64}(undef,csc.n)
     full,tril_to_full_view = get_tril_to_full(csc)
-    
+
     full.colptr.-=1; full.rowval.-=1
-    
+
     inner = UMFPACK.UmfpackLU(C_NULL,C_NULL,full.n,full.n,full.colptr,full.rowval,full.nzval,0)
     UMFPACK.finalizer(UMFPACK.umfpack_free_symbolic,inner)
     UMFPACK.umfpack_symbolic!(inner)
@@ -102,6 +102,6 @@ end
 introduce(::Solver)="umfpack"
 
 end # module
-    
+
 # forgiving names
 const umfpack=Umfpack;

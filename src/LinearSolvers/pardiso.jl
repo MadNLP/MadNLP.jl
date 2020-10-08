@@ -6,7 +6,7 @@ module Pardiso
 const INPUT_MATRIX_TYPE = :csc
 
 import ..MadNLP:
-    @with_kw, Logger, @debug, @warn, @error,
+    @kwdef, Logger, @debug, @warn, @error,
     SubVector, StrideOneVector, SparseMatrixCSC, libpardiso,
     SymbolicException,FactorizationException,SolveException,InertiaException,
     AbstractOptions, AbstractLinearSolver, set_options!,
@@ -14,7 +14,7 @@ import ..MadNLP:
 
 @enum(MatchingStrategy::Int,COMPLETE=1,COMPLETE2x2=2,CONSTRAINTS=3)
 
-@with_kw mutable struct Options <: AbstractOptions
+@kwdef mutable struct Options <: AbstractOptions
     pardiso_matching_strategy::MatchingStrategy = COMPLETE2x2
     pardiso_max_inner_refinement_steps::Int = 1
     pardiso_msglvl::Int = 0
@@ -61,9 +61,9 @@ function Solver(csc::SparseMatrixCSC{Float64,Int32};
                 kwargs...)
     !isempty(kwargs) && (for (key,val) in kwargs; option_dict[key]=val; end)
     set_options!(opt,option_dict)
-    
-    w   = Vector{Float64}(undef,csc.n)    
-    
+
+    w   = Vector{Float64}(undef,csc.n)
+
     pt = Vector{Int}(undef,64)
     iparm = Vector{Int32}(undef,64)
     dparm = Vector{Float64}(undef,64)
@@ -73,10 +73,10 @@ function Solver(csc::SparseMatrixCSC{Float64,Int32};
 
     pt.=0
     iparm[1]=0
-    
+
     _pardisoinit(pt,Ref{Int32}(-2),Ref{Int32}(0),iparm,dparm,err)
     err.x < 0  && throw(SymbolicException())
-    
+
     iparm[1]=1
     iparm[2]=opt.pardiso_order # METIS
     iparm[3]=parse(Int32,haskey(ENV,"OMP_NUM_THREADS") ? ENV["OMP_NUM_THREADS"] : 1)
@@ -93,11 +93,11 @@ function Solver(csc::SparseMatrixCSC{Float64,Int32};
              Ref{Int32}(csc.n),csc.nzval,csc.colptr,csc.rowval,perm,
              Ref{Int32}(1),iparm,msglvl,Float64[],Float64[],err,dparm)
     err.x < 0  && throw(SymbolicException())
-    
+
     M = Solver(pt,iparm,dparm,perm,msglvl,err,csc,w,opt,logger)
 
     finalizer(finalize,M)
-    
+
     return M
 end
 function factorize!(M::Solver)

@@ -4,8 +4,8 @@
 module Ma86
 
 import ..MadNLP:
-    @with_kw, Logger, @debug, @warn, @error,
-    SparseMatrixCSC, SubVector, StrideOneVector, libhsl, Mc68, 
+    @kwdef, Logger, @debug, @warn, @error,
+    SparseMatrixCSC, SubVector, StrideOneVector, libhsl, Mc68,
     SymbolicException,FactorizationException,SolveException,InertiaException,
     AbstractOptions, AbstractLinearSolver, set_options!,
     introduce, factorize!, solve!, improve!, is_inertia, inertia
@@ -14,7 +14,7 @@ const INPUT_MATRIX_TYPE = :csc
 @enum(Ordering::Int,AMD = 1, METIS = 3)
 @enum(Scaling::Int,SCALING_NONE = 0, MC64 = 1, MC77 = 2)
 
-@with_kw mutable struct Options <: AbstractOptions
+@kwdef mutable struct Options <: AbstractOptions
     ma86_num_threads::Int = 1
     ma86_print_level::Float64 = -1
     ma86_nemin::Int = 32
@@ -26,7 +26,7 @@ const INPUT_MATRIX_TYPE = :csc
     ma86_umax::Float64 = 1e-4
 end
 
-@with_kw mutable struct Control
+@kwdef mutable struct Control
     f_arrays::Int32 = 0
     diagnostics_level::Int32 = 0
     unit_diagnostics::Int32 = 0
@@ -44,7 +44,7 @@ end
     scaling::Int32 = 0
 end
 
-@with_kw mutable struct Info
+@kwdef mutable struct Info
     detlog::Float64 = 0.
     detsign::Int32 = 0
     flag::Int32 = 0
@@ -65,13 +65,13 @@ end
 
 mutable struct Solver<:AbstractLinearSolver
     csc::SparseMatrixCSC{Float64,Int32}
-    
+
     control::Control
     info::Info
 
     mc68_control::Mc68.Control
     mc68_info::Mc68.Info
-    
+
     order::Vector{Int32}
     keep::Vector{Ptr{Nothing}}
 
@@ -125,11 +125,11 @@ function Solver(csc::SparseMatrixCSC{Float64,Int32};
                 option_dict::Dict{Symbol,Any}=Dict{Symbol,Any}(),
                 opt=Options(),logger=Logger(),
                 kwargs...)
-    
+
     set_options!(opt,option_dict,kwargs)
 
     ma86_set_num_threads(opt.ma86_num_threads)
-    
+
     order = Vector{Int32}(undef,csc.n)
 
     info=Info()
@@ -142,7 +142,7 @@ function Solver(csc::SparseMatrixCSC{Float64,Int32};
     mc68_control.f_array_in=1
     mc68_control.f_array_out=1
     Mc68.mc68_order_i(Int32(opt.ma86_order),Int32(csc.n),csc.colptr,csc.rowval,order,mc68_control,mc68_info)
-    
+
     ma86_default_control_d(control)
     control.diagnostics_level = Int32(opt.ma86_print_level)
     control.f_arrays = 1
@@ -156,7 +156,7 @@ function Solver(csc::SparseMatrixCSC{Float64,Int32};
 
     M = Solver(csc,control,info,mc68_control,mc68_info,order,keep,opt,logger)
     finalizer(finalize,M)
-    
+
     return M
 end
 function factorize!(M::Solver)

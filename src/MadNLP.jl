@@ -8,12 +8,11 @@ import Pkg.TOML: parsefile
 import IterativeSolvers, MathOptInterface, MPI
 import Libdl: dlopen, dlext, RTLD_DEEPBIND, RTLD_GLOBAL
 import Metis: partition
-import Parameters: @with_kw
 import Printf: @sprintf
 import LinearAlgebra: BLAS, Adjoint, Symmetric, mul!, ldiv!, norm, dot
 import SparseArrays: AbstractSparseMatrix, SparseMatrixCSC, sparse, getcolptr, rowvals, nnz
 import Logging: @debug, @info,  @warn, @error
-import Base: string, show, print, size, getindex, copyto!
+import Base: string, show, print, size, getindex, copyto!, @kwdef
 import StaticArrays: SVector, setindex
 import SuiteSparse: UMFPACK
 import CUDA: CUBLAS, CUSOLVER, CuVector, CuMatrix

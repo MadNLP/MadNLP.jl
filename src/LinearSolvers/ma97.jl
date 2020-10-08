@@ -4,7 +4,7 @@
 module Ma97
 
 import ..MadNLP:
-    @with_kw, Logger, @debug, @warn, @error,
+    @kwdef, Logger, @debug, @warn, @error,
     AbstractOptions, AbstractLinearSolver, set_options!, SparseMatrixCSC, SubVector, StrideOneVector,
     libhsl, SymbolicException,FactorizationException,SolveException,InertiaException,
     introduce, factorize!, solve!, improve!, is_inertia, inertia
@@ -14,7 +14,7 @@ const INPUT_MATRIX_TYPE = :csc
 @enum(Ordering::Int32,AMD = 1, METIS = 3)
 @enum(Scaling::Int32,SCALING_NONE = 0, MC64 = 1, MC77 = 2, MC30 = 4)
 
-@with_kw mutable struct Options <: AbstractOptions
+@kwdef mutable struct Options <: AbstractOptions
     ma97_num_threads::Int = 1
     ma97_print_level::Int = -1
     ma97_nemin::Int = 8
@@ -25,8 +25,8 @@ const INPUT_MATRIX_TYPE = :csc
     ma97_umax::Float64 = 1e-4
 end
 
-@with_kw mutable struct Control
-    f_arrays::Cint = 0 
+@kwdef mutable struct Control
+    f_arrays::Cint = 0
     action::Cint = 0
     nemin::Cint = 0
     multiplier::Cdouble = 0.
@@ -47,7 +47,7 @@ end
     rspare::Vector{Cdouble}
 end
 
-@with_kw mutable struct Info
+@kwdef mutable struct Info
     flag::Cint = 0
     flag68::Cint = 0
     flag77::Cint = 0
@@ -71,9 +71,9 @@ end
 
 mutable struct Solver <:AbstractLinearSolver
     n::Int32
-    
+
     csc::SparseMatrixCSC{Float64,Int32}
-    
+
     control::Control
     info::Info
 
@@ -130,17 +130,17 @@ function Solver(csc::SparseMatrixCSC{Float64,Int32};
                 option_dict::Dict{Symbol,Any}=Dict{Symbol,Any}(),
                 opt=Options(),logger=Logger(),
                 kwargs...)
-    
+
     set_options!(opt,option_dict,kwargs)
-    
+
     ma97_set_num_threads(opt.ma97_num_threads)
-    
+
     n = Int32(csc.n)
-    
+
     info = Info(ispare=zeros(Int32,5),rspare=zeros(Float64,10))
     control=Control(ispare=zeros(Int32,5),rspare=zeros(Float64,10))
     ma97_default_control_d(control)
-    
+
     control.print_level = opt.ma97_print_level
     control.f_arrays = 1
     control.nemin = opt.ma97_nemin
@@ -151,7 +151,7 @@ function Solver(csc::SparseMatrixCSC{Float64,Int32};
 
     akeep = [C_NULL]
     fkeep = [C_NULL]
-    
+
     ma97_analyse_d(Int32(1),n,csc.colptr,csc.rowval,C_NULL,akeep,control,info,C_NULL)
     info.flag<0 && throw(SymbolicException())
     M = Solver(n,csc,control,info,akeep,fkeep,opt,logger)

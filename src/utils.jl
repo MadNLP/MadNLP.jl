@@ -26,7 +26,7 @@ end
 module DummyModule end
 
 # Logger
-@with_kw mutable struct Logger
+@kwdef mutable struct Logger
     print_level::LogLevels = INFO
     file_print_level::LogLevels = INFO
     file::Union{IOStream,Nothing} = nothing

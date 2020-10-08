@@ -1,16 +1,16 @@
 module LapackCUDA
 
 import ..MadNLP:
-    @with_kw, Logger, @debug, @warn, @error,
+    @kwdef, Logger, @debug, @warn, @error,
     CUBLAS, CUSOLVER, CuVector, CuMatrix,
-    AbstractOptions, AbstractLinearSolver, set_options!, 
+    AbstractOptions, AbstractLinearSolver, set_options!,
     SymbolicException,FactorizationException,SolveException,InertiaException,
     introduce, factorize!, solve!, improve!, is_inertia, inertia, libmkl32, LapackMKL, tril_to_full!
 
 const INPUT_MATRIX_TYPE = :dense
 
 @enum(Algorithms::Int, BUNCHKAUFMAN = 1, LU = 2)
-@with_kw mutable struct Options <: AbstractOptions
+@kwdef mutable struct Options <: AbstractOptions
     lapackcuda_algorithm::Algorithms = BUNCHKAUFMAN
 end
 
@@ -30,7 +30,7 @@ function Solver(dense::Matrix{Float64};
                 option_dict::Dict{Symbol,Any}=Dict{Symbol,Any}(),
                 opt=Options(),logger=Logger(),
                 kwargs...)
-    
+
     set_options!(opt,option_dict,kwargs...)
     fact = CuMatrix{Float64}(undef,size(dense))
     rhs = CuVector{Float64}(undef,size(dense,1))
@@ -38,7 +38,7 @@ function Solver(dense::Matrix{Float64};
     lwork = Int32[1]
     info = CuVector{Int32}(undef,1)
     etc = Dict{Symbol,Any}()
-    
+
     return Solver(dense,fact,rhs,work,lwork,info,etc,opt,logger)
 end
 
@@ -68,7 +68,7 @@ introduce(M::Solver) = "Lapack-CUDA ($(M.opt.lapackcuda_algorithm))"
 
 function factorize_bunchkaufman!(M::Solver)
     haskey(M.etc,:ipiv) || (M.etc[:ipiv] = CuVector{Int32}(undef,size(M.dense,1)))
-    
+
     copyto!(M.fact,M.dense)
     CUSOLVER.cusolverDnDsytrf_bufferSize(
         CUSOLVER.dense_handle(),Int32(size(M.fact,1)),M.fact,Int32(size(M.fact,2)),M.lwork)
@@ -111,7 +111,7 @@ end
 
 function factorize_lu!(M::Solver)
     haskey(M.etc,:ipiv) || (M.etc[:ipiv] = CuVector{Int32}(undef,size(M.dense,1)))
-    
+
     tril_to_full!(M.dense)
     copyto!(M.fact,M.dense)
     CUSOLVER.cusolverDnDgetrf_bufferSize(

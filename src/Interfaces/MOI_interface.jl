@@ -1,7 +1,7 @@
 # MadNLP.jl
 # Modified from Ipopt.jl (https://github.com/jump-dev/Ipopt.jl)
 
-@with_kw mutable struct VariableInfo
+@kwdef mutable struct VariableInfo
     lower_bound::Float64 = -Inf
     has_lower_bound::Bool = false
     lower_bound_dual_start::Union{Nothing, Float64} = nothing
@@ -13,7 +13,7 @@
 end
 
 mutable struct ConstraintInfo{F, S}
-    func::F 
+    func::F
     set::S
     dual_start::Union{Nothing, Float64}
 end
@@ -29,7 +29,7 @@ mutable struct Optimizer <: MOI.AbstractOptimizer
     sense::MOI.OptimizationSense
     objective::Union{
         MOI.SingleVariable,MOI.ScalarAffineFunction{Float64},MOI.ScalarQuadraticFunction{Float64},Nothing}
-    
+
     linear_le_constraints::Vector{ConstraintInfo{MOI.ScalarAffineFunction{Float64},MOI.LessThan{Float64}}}
     linear_ge_constraints::Vector{ConstraintInfo{MOI.ScalarAffineFunction{Float64},MOI.GreaterThan{Float64}}}
     linear_eq_constraints::Vector{ConstraintInfo{MOI.ScalarAffineFunction{Float64},MOI.EqualTo{Float64}}}
@@ -169,13 +169,13 @@ end
 
 function MOI.get(model::Optimizer, ::MOI.ListOfConstraints)
     constraints = Set{Tuple{DataType, DataType}}()
-    
+
     for info in model.variable_info
         info.has_lower_bound && push!(constraints, (MOI.SingleVariable, MOI.LessThan{Float64}))
         info.has_upper_bound && push!(constraints, (MOI.SingleVariable, MOI.GreaterThan{Float64}))
         info.is_fixed && push!(constraints, (MOI.SingleVariable, MOI.EqualTo{Float64}))
     end
-    
+
     isempty(model.linear_le_constraints) ||
         push!(constraints,(MOI.ScalarAffineFunction{Float64},MOI.LessThan{Float64}))
     isempty(model.linear_ge_constraints) ||
@@ -188,7 +188,7 @@ function MOI.get(model::Optimizer, ::MOI.ListOfConstraints)
         push!(constraints, (MOI.ScalarQuadraticFunction{Float64}, MOI.GreaterThan{Float64}))
     isempty(model.quadratic_eq_constraints) ||
         push!(constraints, (MOI.ScalarQuadraticFunction{Float64}, MOI.EqualTo{Float64}))
-    
+
     return collect(constraints)
 end
 function MOI.get(
@@ -515,7 +515,7 @@ nlp_constraint_offset(model::Optimizer) = quadratic_eq_offset(model) + length(mo
 function append_to_jacobian_sparsity!(I,J,
                                       aff::MOI.ScalarAffineFunction, row, offset)
     cnt = 0
-    for term in aff.terms     
+    for term in aff.terms
         I[offset+cnt]= row
         J[offset+cnt]= term.variable_index.value
         cnt += 1
@@ -564,7 +564,7 @@ end
 function jacobian_structure(model::Optimizer,I,J)
     offset = 1
     row = 1
-    
+
     @append_to_jacobian_sparsity model.linear_le_constraints
     @append_to_jacobian_sparsity model.linear_ge_constraints
     @append_to_jacobian_sparsity model.linear_eq_constraints
@@ -578,7 +578,7 @@ function jacobian_structure(model::Optimizer,I,J)
         J[offset+cnt] = nlp_col
         cnt+=1
     end
-    
+
     return I,J
 end
 
@@ -593,7 +593,7 @@ function append_to_hessian_sparsity!(I,J,quad::MOI.ScalarQuadraticFunction,offse
     end
     return cnt
 end
-function hessian_lagrangian_structure(model::Optimizer,I,J)    
+function hessian_lagrangian_structure(model::Optimizer,I,J)
     offset = 1
     if !model.nlp_data.has_objective && model.objective !== nothing
         offset+=append_to_hessian_sparsity!(I,J,model.objective,offset)
@@ -622,7 +622,7 @@ get_nnz_hess_nonlinear(model::Optimizer) =
 get_nnz_hess_quadratic(model::Optimizer) =
     (isempty(model.quadratic_eq_constraints) ? 0 : sum(length(term.func.quadratic_terms) for term in model.quadratic_eq_constraints)) +
     (isempty(model.quadratic_le_constraints) ? 0 : sum(length(term.func.quadratic_terms) for term in model.quadratic_le_constraints)) +
-    (isempty(model.quadratic_ge_constraints) ? 0 : sum(length(term.func.quadratic_terms) for term in model.quadratic_ge_constraints)) 
+    (isempty(model.quadratic_ge_constraints) ? 0 : sum(length(term.func.quadratic_terms) for term in model.quadratic_ge_constraints))
 
 get_nnz_jac(model::Optimizer) = get_nnz_jac_linear(model) + get_nnz_jac_quadratic(model) + get_nnz_jac_nonlinear(model)
 get_nnz_jac_linear(model::Optimizer) =
@@ -1030,7 +1030,7 @@ end
 zero_if_nothing(x) = x == nothing ? 0. : x
 
 function set_x!(model,x,xl,xu,zl,zu)
-    
+
     for i=1:length(model.variable_info)
         info = model.variable_info[i]
         x[i]  = info.start == nothing ? 0. : info.start
@@ -1120,7 +1120,7 @@ function NonlinearProgram(model::Optimizer)
     xu = Vector{Float64}(undef,n)
     zl = Vector{Float64}(undef,n)
     zu = Vector{Float64}(undef,n)
-    
+
     l = Vector{Float64}(undef,m)
     gl = Vector{Float64}(undef,m)
     gu = Vector{Float64}(undef,m)
@@ -1139,7 +1139,7 @@ function NonlinearProgram(model::Optimizer)
               sig::Float64) = eval_hessian_lagrangian(model,hess,x,obj_scale*sig,l)
     hess_sparsity!(I,J)= hessian_lagrangian_structure(model,I,J)
     jac_sparsity!(I,J) = jacobian_structure(model,I,J)
-    
+
     model.option_dict[:jacobian_constant], model.option_dict[:hessian_constant] = is_jac_hess_constant(model)
     model.option_dict[:dual_initialized] = !iszero(l)
 
