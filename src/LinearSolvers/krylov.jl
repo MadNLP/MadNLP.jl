@@ -4,14 +4,14 @@
 module Krylov
 
 import ..MadNLP:
-    @with_kw, Logger, @debug, @warn, @error,
-    AbstractOptions, AbstractIterator, set_options!, @sprintf, 
+    @kwdef, Logger, @debug, @warn, @error,
+    AbstractOptions, AbstractIterator, set_options!, @sprintf,
     solve_refine!, mul!, ldiv!, size, IterativeSolvers, StrideOneVector
 import IterativeSolvers:
     FastHessenberg, ArnoldiDecomp, Residual, init!, init_residual!, expand!, Identity,
     orthogonalize_and_normalize!, update_residual!, gmres_iterable!, GMRESIterable, converged
 
-@with_kw mutable struct Options <: AbstractOptions
+@kwdef mutable struct Options <: AbstractOptions
     krylov_restart::Int = 5
     krylov_max_iter::Int = 10
     krylov_tol::Float64 = 1e-10
@@ -44,13 +44,13 @@ function Solver(res::Vector{Float64},_mul!,_ldiv!;
     !isempty(kwargs) && (for (key,val) in kwargs; option_dict[key]=val; end)
     set_options!(opt,option_dict)
 
-    g=GMRESIterable(VirtualPreconditioner(_ldiv!), 
+    g=GMRESIterable(VirtualPreconditioner(_ldiv!),
                     Identity(),Float64[],Float64[],res,
                     ArnoldiDecomp(VirtualMatrix(_mul!,length(res),length(res)),opt.krylov_restart, Float64),
                     Residual(opt.krylov_restart, Float64),
                     0,opt.krylov_restart,1,
                     opt.krylov_max_iter,opt.krylov_tol,0.)
-    
+
     return Solver(g,res,opt,logger)
 end
 
@@ -61,7 +61,7 @@ function solve_refine!(x::StridedVector{Float64},
     is.res.=0
     x.=0
     gmres_iterable_update!(is.g,x,b)
-    
+
     noprogress = 0
     oldres = Inf
     iter = 0

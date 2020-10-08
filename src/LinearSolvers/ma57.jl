@@ -4,8 +4,8 @@
 module Ma57
 
 import ..MadNLP:
-    @with_kw, Logger, @debug, @warn, @error,
-    AbstractOptions, set_options!, AbstractLinearSolver, StrideOneVector, 
+    @kwdef, Logger, @debug, @warn, @error,
+    AbstractOptions, set_options!, AbstractLinearSolver, StrideOneVector,
     SymbolicException,FactorizationException,SolveException,InertiaException,
     SparseMatrixCSC, libhsl, introduce, factorize!, solve!, improve!, is_inertia, inertia, findIJ, nnz
 
@@ -13,13 +13,13 @@ const ma57_default_icntl = Int32[0,0,6,1,0,5,1,0,10,0,16,16,10,100,0,0,0,0,0,0]
 const ma57_default_cntl  = Float64[1e-8,1.0e-20,0.5,0.0,0.0]
 const INPUT_MATRIX_TYPE = :csc
 
-@with_kw mutable struct Options <: AbstractOptions
+@kwdef mutable struct Options <: AbstractOptions
     ma57_pivtol::Float64 = 1e-8
     ma57_pivtolmax::Float64 = 1e-4
     ma57_pre_alloc::Float64 = 1.05
     ma57_pivot_order::Int = 5
     ma57_automatic_scaling::Bool =false
-    
+
     ma57_block_size::Int = 16
     ma57_node_amalgamation::Int = 16
     ma57_small_pivot_flag::Int = 0
@@ -29,7 +29,7 @@ mutable struct Solver <: AbstractLinearSolver
     csc::SparseMatrixCSC{Float64,Int32}
     I::Vector{Int32}
     J::Vector{Int32}
-    
+
     icntl::Vector{Int32}
     cntl::Vector{Float64}
 
@@ -41,7 +41,7 @@ mutable struct Solver <: AbstractLinearSolver
 
     lfact::Int32
     fact::Vector{Float64}
-    
+
     lifact::Int32
     ifact::Vector{Int32}
 
@@ -91,9 +91,9 @@ ma57cd!(job::Cint,n::Cint,fact::Vector{Cdouble},lfact::Cint,
 function Solver(csc::SparseMatrixCSC;
                 option_dict::Dict{Symbol,Any}=Dict{Symbol,Any}(),
                 opt=Options(),logger=Logger(),kwargs...)
-    
+
     set_options!(opt,option_dict,kwargs)
-    
+
     I,J=findIJ(csc)
 
     icntl= copy(ma57_default_icntl)
@@ -113,22 +113,22 @@ function Solver(csc::SparseMatrixCSC;
 
     lkeep=Int32(5*csc.n+nnz(csc)+max(csc.n,nnz(csc))+42)
     keep=Vector{Int32}(undef,lkeep)
-    
+
     ma57ad!(Int32(csc.n),Int32(nnz(csc)),I,J,lkeep,
             keep,Vector{Int32}(undef,5*csc.n),icntl,
             info,rinfo)
-    
+
     info[1]<0 && throw(SymbolicException())
 
     lfact = ceil(Int32,opt.ma57_pre_alloc*info[9])
     lifact = ceil(Int32,opt.ma57_pre_alloc*info[10])
-    
+
     fact = Vector{Float64}(undef,lfact)
     ifact= Vector{Int32}(undef,lifact)
     iwork= Vector{Int32}(undef,csc.n)
     lwork= csc.n
     work = Vector{Float64}(undef,lwork)
-    
+
     return Solver(csc,I,J,icntl,cntl,info,rinfo,lkeep,keep,lfact,fact,lifact,ifact,iwork,lwork,work,opt,logger)
 end
 

@@ -4,10 +4,10 @@
 module Ma77
 
 import ..MadNLP:
-    @with_kw, Logger, @debug, @warn, @error,
+    @kwdef, Logger, @debug, @warn, @error,
     SparseMatrixCSC, SparseMatrixCSC, SubVector, StrideOneVector,
     libhsl, Mc68, get_tril_to_full, transform!,
-    AbstractOptions, AbstractLinearSolver, set_options!, 
+    AbstractOptions, AbstractLinearSolver, set_options!,
     SymbolicException,FactorizationException,SolveException,InertiaException,
     introduce, factorize!, solve!, improve!, is_inertia, inertia
 
@@ -15,7 +15,7 @@ const INPUT_MATRIX_TYPE = :csc
 
 @enum(Ordering::Int,AMD = 1, METIS = 3)
 
-@with_kw mutable struct Options <: AbstractOptions
+@kwdef mutable struct Options <: AbstractOptions
     ma77_buffer_lpage::Int = 4096
     ma77_buffer_npage::Int = 1600
     ma77_file_size::Int = 2097152
@@ -29,54 +29,54 @@ const INPUT_MATRIX_TYPE = :csc
     ma77_umax::Float64 = 1e-4
 end
 
-@with_kw mutable struct Control
-    f_arrays::Cint = 0 
-    print_level::Cint = 0 
-    unit_diagnostics::Cint = 0 
-    unit_error::Cint = 0 
-    unit_warning::Cint = 0 
+@kwdef mutable struct Control
+    f_arrays::Cint = 0
+    print_level::Cint = 0
+    unit_diagnostics::Cint = 0
+    unit_error::Cint = 0
+    unit_warning::Cint = 0
     bits::Cint = 0
-    
+
     buffer_lpage_1::Cint = 0
     buffer_lpage_2::Cint = 0
     buffer_npage_1::Cint = 0
     buffer_npage_2::Cint = 0
-    
-    file_size::Clong = 0 
+
+    file_size::Clong = 0
     maxstore::Clong = 0
-    
+
     storage_1::Clong = 0
     storage_2::Clong = 0
     storage_3::Clong = 0
-    
-    nemin::Cint = 0 
-    maxit::Cint = 0 
-    infnorm::Cint = 0 
+
+    nemin::Cint = 0
+    maxit::Cint = 0
+    infnorm::Cint = 0
     thresh::Cdouble = 0.
-    nb54::Cint = 0 
-    action::Cint = 0 
+    nb54::Cint = 0
+    action::Cint = 0
     multiplier::Cdouble = 0.
-    nb64::Cint = 0 
-    nbi::Cint = 0 
+    nb64::Cint = 0
+    nbi::Cint = 0
     small::Cdouble = 0.
     static_::Cdouble = 0.
-    storage_indef::Clong = 0 
+    storage_indef::Clong = 0
     u::Cdouble = 0.
     umin::Cdouble = 0.
     consist_tol::Cdouble = 0.
-    
+
     ispare_1::Cint = 0
     ispare_2::Cint = 0
     ispare_3::Cint = 0
     ispare_4::Cint = 0
     ispare_5::Cint = 0
-    
+
     lspare_1::Clong = 0
     lspare_2::Clong = 0
     lspare_3::Clong = 0
     lspare_4::Clong = 0
     lspare_5::Clong = 0
-    
+
     rspare_1::Cdouble = 0.
     rspare_2::Cdouble = 0.
     rspare_3::Cdouble = 0.
@@ -84,57 +84,57 @@ end
     rspare_5::Cdouble = 0.
 end
 
-@with_kw mutable struct Info
+@kwdef mutable struct Info
     detlog::Cdouble = 0.
-    detsign::Cint = 0 
-    flag::Cint = 0 
-    iostat::Cint = 0 
-    matrix_dup::Cint = 0 
-    matrix_rank::Cint = 0 
-    matrix_outrange::Cint = 0 
-    maxdepth::Cint = 0 
-    maxfront::Cint = 0 
-    minstore::Clong = 0 
-    ndelay::Cint = 0 
-    nfactor::Clong = 0 
-    nflops::Clong = 0 
-    niter::Cint = 0 
-    nsup::Cint = 0 
-    num_neg::Cint = 0 
-    num_nothresh::Cint = 0 
-    num_perturbed::Cint = 0 
+    detsign::Cint = 0
+    flag::Cint = 0
+    iostat::Cint = 0
+    matrix_dup::Cint = 0
+    matrix_rank::Cint = 0
+    matrix_outrange::Cint = 0
+    maxdepth::Cint = 0
+    maxfront::Cint = 0
+    minstore::Clong = 0
+    ndelay::Cint = 0
+    nfactor::Clong = 0
+    nflops::Clong = 0
+    niter::Cint = 0
+    nsup::Cint = 0
+    num_neg::Cint = 0
+    num_nothresh::Cint = 0
+    num_perturbed::Cint = 0
     ntwo::Cint = 0
-    
+
     stat_1::Cint = 0
     stat_2::Cint = 0
     stat_3::Cint = 0
     stat_4::Cint = 0
-    
+
     nio_read_1::Clong = 0 # 2
     nio_read_2::Clong = 0 # 2
-    
+
     nio_write_1::Clong = 0 # 2
     nio_write_2::Clong = 0 # 2
-    
+
     nwd_read_1::Clong = 0 # 2
     nwd_read_2::Clong = 0 # 2
-    
+
     nwd_write_1::Clong = 0 # 2
     nwd_write_2::Clong = 0 # 2
-    
+
     num_file_1::Cint = 0 # 4
     num_file_2::Cint = 0 # 4
     num_file_3::Cint = 0 # 4
     num_file_4::Cint = 0 # 4
-    
+
     storage_1::Clong = 0 # 4
     storage_2::Clong = 0 # 4
     storage_3::Clong = 0 # 4
     storage_4::Clong = 0 # 4
-    
-    tree_nodes::Cint = 0 
-    unit_restart::Cint = 0 
-    unused::Cint = 0 
+
+    tree_nodes::Cint = 0
+    unit_restart::Cint = 0
+    unused::Cint = 0
     usmall::Cdouble = 0.
 
 
@@ -143,13 +143,13 @@ end
     ispare_3::Cint = 0
     ispare_4::Cint = 0
     ispare_5::Cint = 0
-    
+
     lspare_1::Clong = 0
     lspare_2::Clong = 0
     lspare_3::Clong = 0
     lspare_4::Clong = 0
     lspare_5::Clong = 0
-    
+
     rspare_1::Cdouble = 0.
     rspare_2::Cdouble = 0.
     rspare_3::Cdouble = 0.
@@ -161,13 +161,13 @@ mutable struct Solver <: AbstractLinearSolver
     tril::SparseMatrixCSC{Float64,Int32}
     full::SparseMatrixCSC{Float64,Int32}
     tril_to_full_view::SubVector{Float64}
-    
+
     control::Control
     info::Info
 
     mc68_control::Mc68.Control
     mc68_info::Mc68.Info
-    
+
     order::Vector{Int32}
     keep::Vector{Ptr{Nothing}}
 
@@ -238,9 +238,9 @@ function Solver(csc::SparseMatrixCSC{Float64,Int32};
                 option_dict::Dict{Symbol,Any}=Dict{Symbol,Any}(),
                 opt=Options(),logger=Logger(),
                 kwargs...)
-    
+
     set_options!(opt,option_dict,kwargs)
-    
+
     full,tril_to_full_view = get_tril_to_full(csc)
     order = Vector{Int32}(undef,csc.n)
 
@@ -252,7 +252,7 @@ function Solver(csc::SparseMatrixCSC{Float64,Int32};
     mc68_control.f_array_in=1
     mc68_control.f_array_out=1
     Mc68.mc68_order_i(Int32(opt.ma77_order),Int32(csc.n),csc.colptr,csc.rowval,order,mc68_control,mc68_info)
-    
+
     info=Info()
     control=Control()
     ma77_default_control_d(control)
@@ -266,7 +266,7 @@ function Solver(csc::SparseMatrixCSC{Float64,Int32};
     control.buffer_lpage_2=opt.ma77_buffer_lpage
     control.buffer_npage_1=opt.ma77_buffer_npage
     control.buffer_npage_2=opt.ma77_buffer_npage
-    
+
     control.nemin = opt.ma77_nemin
     control.small = opt.ma77_small
     control.static_ = opt.ma77_static
@@ -276,22 +276,22 @@ function Solver(csc::SparseMatrixCSC{Float64,Int32};
     isfile(".ma77_real")  && rm(".ma77_real")
     isfile(".ma77_work")  && rm(".ma77_work")
     isfile(".ma77_delay") && rm(".ma77_delay")
-    
+
     ma77_open_d(Int32(full.n),".ma77_int", ".ma77_real", ".ma77_work", ".ma77_delay",
                 keep,control,info)
-    
+
     info.flag < 0 && throw(SymbolicException())
-    
+
     for i=1:full.n
         ma77_input_vars_d(Int32(i),full.colptr[i+1]-full.colptr[i],
                           view(full.rowval,full.colptr[i]:full.colptr[i+1]-1),
                           keep,control,info);
         info.flag < 0 && throw(LinearSymbolicException())
     end
-    
+
     ma77_analyse_d(order,keep,control,info)
     info.flag<0 && throw(SymbolicException())
-    
+
     M = Solver(csc,full,tril_to_full_view,
                control,info,mc68_control,mc68_info,order,keep,opt,logger)
     finalizer(finalize,M)

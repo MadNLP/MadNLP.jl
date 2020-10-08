@@ -4,8 +4,8 @@
 module Ma27
 
 import ..MadNLP:
-    @with_kw, Logger, @debug, @warn, @error,
-    AbstractOptions, AbstractLinearSolver, set_options!, SparseMatrixCSC, SubVector, StrideOneVector, 
+    @kwdef, Logger, @debug, @warn, @error,
+    AbstractOptions, AbstractLinearSolver, set_options!, SparseMatrixCSC, SubVector, StrideOneVector,
     SymbolicException,FactorizationException,SolveException,InertiaException,
     libhsl, introduce, factorize!, solve!, improve!, is_inertia, inertia, findIJ, nnz
 
@@ -14,8 +14,8 @@ const ma27_default_icntl = Int32[
 const ma27_default_cntl  = [.1,1.0,0.,0.,0.]
 const INPUT_MATRIX_TYPE = :csc
 
-@with_kw mutable struct Options <: AbstractOptions
-    ma27_pivtol::Float64 = 1e-8 
+@kwdef mutable struct Options <: AbstractOptions
+    ma27_pivtol::Float64 = 1e-8
     ma27_pivtolmax::Float64 = 1e-4
     ma27_liw_init_factor::Float64 = 5.
     ma27_la_init_factor::Float64 =5.
@@ -26,7 +26,7 @@ mutable struct Solver <: AbstractLinearSolver
     csc::SparseMatrixCSC{Float64,Int32}
     I::Vector{Int32}
     J::Vector{Int32}
-    
+
     icntl::Vector{Int32}
     cntl::Vector{Float64}
 
@@ -86,24 +86,24 @@ ma27cd!(n::Cint,a::Vector{Cdouble},la::Cint,iw::Vector{Cint},
 function Solver(csc::SparseMatrixCSC;
                 option_dict::Dict{Symbol,Any}=Dict{Symbol,Any}(),
                 opt=Options(),logger=Logger(),kwargs...)
-    
+
     set_options!(opt,option_dict,kwargs)
-    
+
     I,J = findIJ(csc)
     nz=Int32(nnz(csc))
-    
+
     liw= Int32(2*(2*nz+3*csc.n+1))
     iw = Vector{Int32}(undef,liw)
     ikeep= Vector{Int32}(undef,3*csc.n)
     iw1  = Vector{Int32}(undef,2*csc.n)
     nsteps=Int32[1]
     iflag =Int32(0)
-    
+
     icntl= copy(ma27_default_icntl)
     icntl[1:2] .= 0
     cntl = copy(ma27_default_cntl)
     cntl[1] = opt.ma27_pivtol
-    
+
     info = Vector{Int32}(undef,20)
     ma27ad!(Int32(csc.n),nz,I,J,iw,liw,ikeep,iw1,nsteps,Int32(0),icntl,cntl,info,0.)
     info[1]<0 && throw(SymbolicException())
@@ -126,7 +126,7 @@ function factorize!(M::Solver)
         ma27bd!(Int32(M.csc.n),Int32(nnz(M.csc)),M.I,M.J,M.a,M.la,
                 M.iw,M.liw,M.ikeep,M.nsteps,M.maxfrt,
                 M.iw1,M.icntl,M.cntl,M.info)
-        if M.info[1] == -3 
+        if M.info[1] == -3
             M.liw = ceil(Int32,M.opt.ma27_meminc_factor*M.liw)
             resize!(M.iw, M.liw)
             @debug(M.logger,"Reallocating memory: liw ($(M.liw))")

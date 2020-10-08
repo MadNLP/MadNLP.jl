@@ -4,18 +4,18 @@
 module Schwarz
 
 import ..MadNLP:
-    @with_kw, Logger, @debug, @warn, @error,
+    @kwdef, Logger, @debug, @warn, @error,
     default_linear_solver,SparseMatrixCSC, SubVector, StrideOneVector, get_cscsy_view, nnz,
     SymbolicException,FactorizationException,SolveException,InertiaException,
     AbstractOptions, AbstractLinearSolver, set_options!,
     MonolevelPartition, MonolevelStruc, BilevelPartition, BilevelStruc,
-    expand!, get_current_V, get_current_size, get_full_size, 
+    expand!, get_current_V, get_current_size, get_full_size,
     EmptyLinearSolver, introduce, factorize!, solve!, improve!, is_inertia, inertia,
     set_blas_num_threads, blas_num_threads, @blas_safe_threads, @sprintf
 
 const INPUT_MATRIX_TYPE = :csc
 
-@with_kw mutable struct Options <: AbstractOptions
+@kwdef mutable struct Options <: AbstractOptions
     schwarz_num_parts_upper::Int = 0
     schwarz_num_parts::Int = 2
     schwarz_subproblem_solver::Module
@@ -28,16 +28,16 @@ end
 
 mutable struct SolverWorker
     struc::Union{MonolevelStruc,BilevelStruc}
-    
+
     max_size::Float64
     overlap_increase_factor::Float64
     restrictor::Vector{Int}
-    
+
     csc::SparseMatrixCSC{Float64,Int32}
     csc_view::SubVector{Float64}
-    
+
     M::AbstractLinearSolver
-    
+
     p::AbstractVector{Float64}
     q::AbstractVector{Float64}
     q_restricted::AbstractVector{Float64}
@@ -45,10 +45,10 @@ end
 
 mutable struct Solver <: AbstractLinearSolver
     partition::Union{MonolevelPartition,BilevelPartition}
-    
+
     csc::SparseMatrixCSC{Float64}
     inds::Vector{Int}
-    
+
     p::Vector{Float64}
     w::Vector{Float64}
     sws::Vector{SolverWorker}
@@ -61,7 +61,7 @@ function Solver(csc::SparseMatrixCSC{Float64};
                 option_dict::Dict{Symbol,Any}=Dict(),
                 opt=Options(schwarz_subproblem_solver=default_linear_solver()),logger=Logger(),
                 kwargs...)
-    
+
     set_options!(opt,option_dict,kwargs...)
     if string(opt.schwarz_subproblem_solver) == "MadNLP.Mumps"
         @warn(logger,"When Mumps is used as a subproblem solver, Schwarz is run in serial.")
@@ -69,13 +69,13 @@ function Solver(csc::SparseMatrixCSC{Float64};
     end
 
     inds = collect(1:nnz(csc))
-    
+
     p = zeros(csc.n)
     w = zeros(csc.n)
-    
+
     if opt.schwarz_num_parts_upper == 0
         partition = MonolevelPartition(
-            csc,opt.schwarz_custom_partition ? opt.schwarz_part : Int32[],opt.schwarz_num_parts) 
+            csc,opt.schwarz_custom_partition ? opt.schwarz_part : Int32[],opt.schwarz_num_parts)
     else
         partition = BilevelPartition(
             csc,
@@ -83,7 +83,7 @@ function Solver(csc::SparseMatrixCSC{Float64};
             opt.schwarz_custom_partition ? opt.schwarz_part_upper : Int32[],opt.schwarz_num_parts_upper)
     end
 
-    
+
     sws=Vector{SolverWorker}(undef,opt.schwarz_num_parts_upper == 0 ? opt.schwarz_num_parts : opt.schwarz_num_parts_upper)
     copied_option_dict = copy(option_dict)
     @blas_safe_threads for k=1:length(sws)
@@ -95,7 +95,7 @@ function Solver(csc::SparseMatrixCSC{Float64};
 
     saturation = maximum(sws[k].csc.n/csc.n*100 for k=1:length(sws))
     @debug(logger,@sprintf("overlap size initialized with %3d%% saturation.\n",saturation))
-    
+
     return Solver(partition,csc,inds,p,w,sws,opt,logger)
 end
 
@@ -107,7 +107,7 @@ function SolverWorker(
         MonolevelStruc(partition,k) : BilevelStruc(partition,k)
     overlap_increase_factor =
         (get_full_size(partition)/get_current_size(struc))^(1/max_expand_factor)
-    max_size = get_current_size(struc)*(overlap_increase_factor)    
+    max_size = get_current_size(struc)*(overlap_increase_factor)
     p = view(p,copy(get_current_V(struc)))
     restrictor = 1:length(get_current_V(struc))
     expand!(struc,partition,max_size)
@@ -118,10 +118,10 @@ function SolverWorker(
     else
         M = SubproblemSolverModule.Solver(csc;option_dict = option_dict,logger=logger)
     end
-    fully_improve_subproblem_solver && while improve!(M) end # starts with fully improved    
+    fully_improve_subproblem_solver && while improve!(M) end # starts with fully improved
     q = Vector{Float64}(undef,length(get_current_V(struc)))
     q_restricted = view(q,restrictor)
-    
+
     return SolverWorker(struc,max_size,overlap_increase_factor,restrictor,csc,csc_view,M,p,q,q_restricted)
 end
 
@@ -138,7 +138,7 @@ is_maximal_overlap(M::Solver) = all(sw.max_size>=M.csc.n for sw in M.sws)
 
 function improve!(M::Solver)
     is_maximal_overlap(M) && (@debug(M.logger,"improve quality failed.\n");return false)
-    
+
     @blas_safe_threads for k=1:length(M.sws)
         M.sws[k].max_size *= M.sws[k].overlap_increase_factor
         expand!(M.sws[k].struc,M.partition,M.sws[k].max_size)
@@ -151,13 +151,13 @@ function improve!(M::Solver)
         M.opt.schwarz_fully_improve_subproblem_solver && while improve!(M.sws[k].M) end
         resize!(M.sws[k].q,length(get_current_V(M.sws[k].struc)))
     end
-    
+
     saturation = maximum(M.sws[k].csc.n/M.csc.n*100 for k=1:length(M.sws));
     saturation == 100. ?
         @warn(M.logger,@sprintf("overlap is maximally saturated")) :
-        @debug(M.logger,@sprintf("overlap size increased to %3d%% saturation.\n",saturation)) 
-        
-    
+        @debug(M.logger,@sprintf("overlap size increased to %3d%% saturation.\n",saturation))
+
+
     return true
 end
 

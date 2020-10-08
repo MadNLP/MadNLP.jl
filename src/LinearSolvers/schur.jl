@@ -4,8 +4,8 @@
 module Schur
 
 import ..MadNLP:
-    @with_kw, Logger, @debug, @warn, @error, 
-    AbstractOptions, AbstractLinearSolver, set_options!, SparseMatrixCSC, SubVector, StrideOneVector, 
+    @kwdef, Logger, @debug, @warn, @error,
+    AbstractOptions, AbstractLinearSolver, set_options!, SparseMatrixCSC, SubVector, StrideOneVector,
     SymbolicException,FactorizationException,SolveException,InertiaException,
     introduce, factorize!, solve!, improve!, is_inertia, inertia,
     default_linear_solver, default_dense_solver, get_csc_view, get_cscsy_view, mv!, nnz,
@@ -14,12 +14,12 @@ import ..MadNLP:
 const INPUT_MATRIX_TYPE = :csc
 
 
-@with_kw mutable struct Options <: AbstractOptions
+@kwdef mutable struct Options <: AbstractOptions
     schur_custom_partition::Bool = false
     schur_num_parts::Int = 2
     schur_part::Vector{Int} = Int[]
     schur_subproblem_solver::Module
-    schur_dense_solver::Module 
+    schur_dense_solver::Module
 end
 
 mutable struct SolverWorker
@@ -37,18 +37,18 @@ mutable struct Solver <: AbstractLinearSolver
     csc::SparseMatrixCSC{Float64,Int32}
     inds::Vector{Int}
     tsp::TwoStagePartition
-    
+
     schur::Matrix{Float64}
     colors
     fact
-        
+
     V_0::Vector{Int}
     csc_0::SparseMatrixCSC{Float64,Int32}
     csc_0_view::SubVector{Float64}
     w_0::Vector{Float64}
-    
+
     sws::Vector{SolverWorker}
-    
+
     opt::Options
     logger::Logger
 end
@@ -60,26 +60,26 @@ function Solver(csc::SparseMatrixCSC{Float64};
                             schur_dense_solver=default_dense_solver()),
                 logger=Logger(),
                 kwargs...)
-    
+
     set_options!(opt,option_dict,kwargs...)
     if string(opt.schur_subproblem_solver) == "MadNLP.Mumps"
         @warn(logger,"When Mumps is used as a subproblem solver, Schur is run in serial.")
         @warn(logger,"To use parallelized Schur, use Ma27 or Ma57.")
     end
 
-    inds = collect(1:nnz(csc))    
+    inds = collect(1:nnz(csc))
     tsp = TwoStagePartition(csc,opt.schur_part,opt.schur_num_parts)
-    
+
     V_0   = findall(tsp.part.==0)
     colors = get_colors(length(V_0),opt.schur_num_parts)
 
     csc_0,csc_0_view = get_cscsy_view(csc,V_0,inds=inds)
     schur = Matrix{Float64}(undef,length(V_0),length(V_0))
-    
+
     w_0 = Vector{Float64}(undef,length(V_0))
 
     sws = Vector{Any}(undef,opt.schur_num_parts)
-    
+
     copied_option_dict = copy(option_dict)
     @blas_safe_threads for k=1:opt.schur_num_parts
         sws[k] = SolverWorker(
@@ -93,7 +93,7 @@ get_colors(n0,K) = [findall((x)->mod(x-1,K)+1==k,1:n0) for k=1:K]
 
 function SolverWorker(tsp,V_0,csc::SparseMatrixCSC{Float64},inds::Vector{Int},k,
                       SubproblemSolverModule::Module,logger::Logger,option_dict::Dict{Symbol,Any})
-    
+
     V    = findall(tsp.part.==k)
     length(V) == 0 && throw(SymbolicException())
     csc_k,csc_k_view = get_cscsy_view(csc,V,inds=inds)
@@ -133,7 +133,7 @@ function factorize!(M::Solver)
         end
     end
     factorize!(M.fact)
-    
+
     return M
 end
 
@@ -186,7 +186,7 @@ function improve!(M::Solver)
     end
     return true
 end
-        
+
 introduce(M::Solver)="schur equipped with "*introduce(M.sws[1].M)
 
 end

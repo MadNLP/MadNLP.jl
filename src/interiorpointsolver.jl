@@ -1,7 +1,7 @@
 # MadNLP.jl
 # Created by Sungho Shin (sungho.shin@wisc.edu)
 
-@with_kw mutable struct Counters
+@kwdef mutable struct Counters
     k::Int = 0 # total iteration counter
     l::Int = 0 # backtracking line search counter
     t::Int = 0 # restoration phase counter
@@ -22,7 +22,7 @@
     acceptable_cnt::Int = 0
 end
 
-@with_kw mutable struct Options <: AbstractOptions
+@kwdef mutable struct Options <: AbstractOptions
     # General options
     rethrow_error::Bool = true
     disable_garbage_collector::Bool = false
@@ -641,7 +641,7 @@ function initialize!(ips::Solver)
     # Initialize dual variables
     @trace(ips.logger,"Initializing constraint duals.")
     if !ips.opt.dual_initialized
-        if ips.opt.reduced_system 
+        if ips.opt.reduced_system
             set_initial_aug_reduced!(ips.pr_diag,ips.du_diag,ips.hess)
             set_initial_rhs_reduced!(ips.px,ips.pl,ips.f,ips.zl,ips.zu)
         else
@@ -653,7 +653,7 @@ function initialize!(ips::Solver)
         ips.solve_refine!(ips.d,ips.p)
         norm(ips.dl,Inf)>ips.opt.constr_mult_init_max ? (ips.l.= 0.) : (ips.l.= ips.dl)
     end
-    
+
     # Initializing
     ips.obj_val = ips.obj(ips.x)
     ips.con!(ips.c,ips.x)

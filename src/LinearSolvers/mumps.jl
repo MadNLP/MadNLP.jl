@@ -5,15 +5,15 @@ module Mumps
 
 import ..MadNLP:
     SVector, setindex, MPI,
-    @with_kw, Logger, @debug, @warn, @error,
-    SparseMatrixCSC, SubVector, StrideOneVector, libmumps, 
+    @kwdef, Logger, @debug, @warn, @error,
+    SparseMatrixCSC, SubVector, StrideOneVector, libmumps,
     SymbolicException,FactorizationException,SolveException,InertiaException,
     AbstractOptions, AbstractLinearSolver, set_options!,
     introduce, factorize!, solve!, improve!, is_inertia, inertia, findIJ, nnz
 
 const INPUT_MATRIX_TYPE = :csc
 
-@with_kw mutable struct Options <: AbstractOptions
+@kwdef mutable struct Options <: AbstractOptions
     mumps_dep_tol::Float64 = 0.
     mumps_mem_percent::Int = 1000
     mumps_permuting_scaling::Int = 7
@@ -23,61 +23,61 @@ const INPUT_MATRIX_TYPE = :csc
     mumps_scaling::Int = 77
 end
 
-@with_kw mutable struct Struc
-    sym::Cint = 0      
-    par::Cint = 0      
+@kwdef mutable struct Struc
+    sym::Cint = 0
+    par::Cint = 0
     job::Cint = 0
-    
+
     comm_fortran::Cint = 0
-    
+
     icntl::SVector{40,Cint} = zeros(40)
     cntl::SVector{15,Cdouble} = zeros(15)
-    
-    n::Cint = 0      
-    nz_alloc::Cint = 0      
-    
-    nz::Cint = 0      
+
+    n::Cint = 0
+    nz_alloc::Cint = 0
+
+    nz::Cint = 0
     irn::Ptr{Cint} = C_NULL
     jcn::Ptr{Cint} = C_NULL
     a::Ptr{Cdouble} = C_NULL
-    
-    nz_loc::Cint = 0      
+
+    nz_loc::Cint = 0
     irn_loc::Ptr{Cint} = C_NULL
     jcn_loc::Ptr{Cint} = C_NULL
     a_loc::Ptr{Cdouble} = C_NULL
-    
-    nelt::Cint = 0      
+
+    nelt::Cint = 0
     eltptr::Ptr{Cint} = C_NULL
     eltvar::Ptr{Cint} = C_NULL
     a_elt::Ptr{Cdouble} = C_NULL
-    
+
     perm_in::Ptr{Cint} = C_NULL
-    
+
     sym_perm::Ptr{Cint} = C_NULL
     uns_perm::Ptr{Cint} = C_NULL
-    
+
     colsca::Ptr{Cdouble} = C_NULL
     rowsca::Ptr{Cdouble} = C_NULL
-    
+
     rhs::Ptr{Cdouble} = C_NULL
     redrhs::Ptr{Cdouble} = C_NULL
     rhs_sparse::Ptr{Cdouble} = C_NULL
     sol_loc::Ptr{Cdouble} = C_NULL
-    
+
     irhs_sparse::Ptr{Cint} = C_NULL
     irhs_ptr::Ptr{Cint} = C_NULL
     isol_loc::Ptr{Cint} = C_NULL
-    
+
     nrhs::Cint = 0
     lrhs::Cint = 0
     lredrhs::Cint = 0
     nz_rhs::Cint = 0
     lsol_loc::Cint = 0
-    
+
     schur_mloc::Cint = 0
     schur_nloc::Cint = 0
     schur_lld::Cint = 0
-    
+
     mblock::Cint = 0
     nblock::Cint = 0
     nprow::Cint = 0
@@ -87,25 +87,25 @@ end
     infog::SVector{40,Cint} = zeros(40)
     rinfo::SVector{40,Cdouble} = zeros(40)
     rinfog::SVector{40,Cdouble} = zeros(40)
-    
-    deficiency::Cint = 0      
+
+    deficiency::Cint = 0
     pivnul_list::Ptr{Cint} = C_NULL
     mapping::Ptr{Cint} = C_NULL
-    
-    size_schur::Cint = 0      
+
+    size_schur::Cint = 0
     listvar_schur::Ptr{Cint} = C_NULL
     schur::Ptr{Cdouble} = C_NULL
-    
-    instance_number::Cint = 0      
+
+    instance_number::Cint = 0
     wk_user::Ptr{Cdouble} = C_NULL
-    
+
     version_number::SVector{16,Cchar} = zeros(16)
-    
+
     ooc_tmpdir::SVector{256,Cchar} = zeros(256)
     ooc_prefix::SVector{64,Cchar} = zeros(64)
-    
+
     write_problem::SVector{256,Cchar} = zeros(256)
-    lwk_user::Cint = 0      
+    lwk_user::Cint = 0
 end
 
 mutable struct Solver <: AbstractLinearSolver
@@ -144,15 +144,15 @@ function Solver(csc::SparseMatrixCSC{Float64,Int32};
                 kwargs...)
 
     MPI.Initialized() || MPI.Init()
-    
+
     set_options!(opt,option_dict,kwargs)
-        
+
     I,J = findIJ(csc)
     sym_perm = zeros(Int32,csc.n)
     pivnul_list = zeros(Int32,csc.n)
-    
+
     mumps_struc = Struc()
-    
+
     mumps_struc.sym =  2
     mumps_struc.par =  1
     mumps_struc.job = -1
@@ -166,10 +166,10 @@ function Solver(csc::SparseMatrixCSC{Float64,Int32};
     mumps_struc.jcn = pointer(J)
     mumps_struc.sym_perm = pointer(sym_perm)
     mumps_struc.pivnul_list = pointer(pivnul_list)
-    
+
     # symbolic factorization
     mumps_struc.job = 1;
-    
+
     mumps_struc.icntl = setindex(mumps_struc.icntl,0,2)
     mumps_struc.icntl = setindex(mumps_struc.icntl,0,3)
     mumps_struc.icntl = setindex(mumps_struc.icntl,0,4)
@@ -179,13 +179,13 @@ function Solver(csc::SparseMatrixCSC{Float64,Int32};
     mumps_struc.icntl = setindex(mumps_struc.icntl,0,10)
     mumps_struc.icntl = setindex(mumps_struc.icntl,1,13)
     mumps_struc.icntl = setindex(mumps_struc.icntl,opt.mumps_mem_percent,14)
-    
+
     mumps_struc.cntl = setindex(mumps_struc.cntl,opt.mumps_pivtol,1)
 
     a = copy(csc.nzval) # would there be a better way?
     csc.nzval.=1
-    
-    locked_dmumps_c(mumps_struc);    
+
+    locked_dmumps_c(mumps_struc);
     mumps_struc.info[1] < 0 && throw(SymbolicException())
 
     csc.nzval.=a

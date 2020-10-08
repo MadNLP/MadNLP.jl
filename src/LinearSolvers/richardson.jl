@@ -4,12 +4,12 @@
 module Richardson
 
 import ..MadNLP:
-    @with_kw, Logger, @debug, @warn, @error,
+    @kwdef, Logger, @debug, @warn, @error,
     norm,
     AbstractOptions, AbstractIterator, set_options!, @sprintf, StrideOneVector,
     solve_refine!
 
-@with_kw mutable struct Options <: AbstractOptions
+@kwdef mutable struct Options <: AbstractOptions
     richardson_max_iter::Int = 10
     richardson_tol::Float64 = 1e-10
     richardson_acceptable_tol::Float64 = 1e-5
@@ -46,7 +46,7 @@ function solve_refine!(x::StrideOneVector{Float64},
     iter   = 0
     residual_ratio_old = Inf
     noprogress = 0
-    
+
     while true
         mod(iter,10)==0 &&
             @debug(IS.logger,"iter ||res||")
@@ -61,21 +61,21 @@ function solve_refine!(x::StrideOneVector{Float64},
         #         iter,residual_ratio))
         #     return :Singular
         # end
-        
+
         IS.div!(IS.res)
         x.-=IS.res
         IS.mul!(IS.res,x)
         IS.res.-=b
         norm_res = norm(IS.res,Inf)
-        
+
         residual_ratio_old = residual_ratio
         residual_ratio = norm_res/(1+norm_b)
     end
-    
+
     @debug(IS.logger,@sprintf(
         "Iterative solver terminated with %4i refinement steps and residual = %6.2e",
         iter,residual_ratio))
-    
+
     return (residual_ratio < IS.opt.richardson_acceptable_tol ? :Solved : :Failed)
 end
 end # module

@@ -1,7 +1,7 @@
 module LapackMKL
 
 import ..MadNLP:
-    @with_kw, Logger, @debug, @warn, @error,
+    @kwdef, Logger, @debug, @warn, @error,
     AbstractOptions, AbstractLinearSolver, set_options!, tril_to_full!,
     SymbolicException,FactorizationException,SolveException,InertiaException,
     introduce, factorize!, solve!, improve!, is_inertia, inertia, libmkl32
@@ -9,7 +9,7 @@ import ..MadNLP:
 const INPUT_MATRIX_TYPE = :dense
 
 @enum(Algorithms::Int, BUNCHKAUFMAN = 1, LU = 2)
-@with_kw mutable struct Options <: AbstractOptions
+@kwdef mutable struct Options <: AbstractOptions
     lapackmkl_algorithm::Algorithms = BUNCHKAUFMAN
 end
 
@@ -49,14 +49,14 @@ function Solver(dense::Matrix{Float64};
                 option_dict::Dict{Symbol,Any}=Dict{Symbol,Any}(),
                 opt=Options(),logger=Logger(),
                 kwargs...)
-    
+
     set_options!(opt,option_dict,kwargs...)
     fact = copy(dense)
-    
+
     etc = Dict{Symbol,Any}()
     work = Vector{Float64}(undef, 1)
     info=Int32(0)
-    
+
     return Solver(dense,fact,work,-1,info,etc,opt,logger)
 end
 
@@ -115,7 +115,7 @@ function inertia(fact,ipiv,info)
     numneg = num_neg_ev(size(fact,1),fact,ipiv)
     numzero = info > 0 ? 1 : 0
     numpos = size(fact,1) - numneg - numzero
-    return (numpos,numzero,numneg)    
+    return (numpos,numzero,numneg)
 end
 
 improve!(M::Solver) = false
@@ -127,22 +127,22 @@ function num_neg_ev(n,D,ipiv)
     t = 0
     for k=1:n
         d = D[k,k];
-        if ipiv[k] < 0 
-            if t==0 
+        if ipiv[k] < 0
+            if t==0
                 t=abs(D[k+1,k])
                 d=(d/t)*D[k+1,k+1]-t
-            else 
+            else
                 d=t
                 t=0
             end
         end
         d<0 && (numneg += 1)
-        if d==0 
+        if d==0
             numneg = -1
             break
         end
     end
-    return numneg 
+    return numneg
 end
 
 end # module
