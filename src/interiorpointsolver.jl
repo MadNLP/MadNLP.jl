@@ -1710,7 +1710,7 @@ function print_summary_2(ips::Solver)
     @notice(ips.logger,"Number of objective gradient evaluations             = $(ips.cnt.obj_grad_cnt)")
     @notice(ips.logger,"Number of constraint evaluations                     = $(ips.cnt.con_cnt)")
     @notice(ips.logger,"Number of constraint Jacobian evaluations            = $(ips.cnt.con_jac_cnt)")
-    @notice(ips.logger,"Number of Lagrangian Hessian evaluations          = $(ips.cnt.lag_hess_cnt)")
+    @notice(ips.logger,"Number of Lagrangian Hessian evaluations             = $(ips.cnt.lag_hess_cnt)")
     @notice(ips.logger,@sprintf("Total wall-clock secs in solver (w/o fun. eval./lin. alg.)  = %6.3f",
                                 ips.cnt.solver_time))
     @notice(ips.logger,@sprintf("Total wall-clock secs in linear solver                      = %6.3f",
