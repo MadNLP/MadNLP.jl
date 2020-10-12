@@ -278,9 +278,9 @@ MOI.get(model::Optimizer,::MOI.TimeLimitSec)=get(model.option_dict,TIME_LIMIT,Fl
 
 # set/get options
 MOI.supports(::Optimizer,::MOI.RawParameter) = true
-MOI.set(model::Optimizer, p::MOI.RawParameter, value) = (model.option_dict[p.name] = value)
-MOI.get(model::Optimizer, p::MOI.RawParameter) = haskey(model.option_dict, p.name) ?
-    (return model.option_dict[p.name]) : error("RawParameter with name $(p.name) is not set.")
+MOI.set(model::Optimizer, p::MOI.RawParameter, value) = (model.option_dict[Symbol(p.name)] = value)
+MOI.get(model::Optimizer, p::MOI.RawParameter) = haskey(model.option_dict, Symbol(p.name)) ?
+    (return model.option_dict[Symbol(p.name)]) : error("RawParameter with name $(p.name) is not set.")
 
 # solve time
 MOI.get(model::Optimizer, ::MOI.SolveTime) = model.ips.cnt.total_time

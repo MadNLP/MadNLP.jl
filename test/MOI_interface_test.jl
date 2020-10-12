@@ -30,6 +30,10 @@ const config_no_duals = MOIT.TestConfig(atol=1e-4, rtol=1e-4, duals=false,
         MOI.set(optimizer, MOI.TimeLimitSec(), my_time_limit)
         @test MOI.get(optimizer, MOI.TimeLimitSec()) == my_time_limit
     end
+    @testset "MOI.MaxIter" begin
+        MOI.set(optimizer,MOI.RawParameter("max_iter"),1)
+        @test MOI.get(optimizer,MOI.RawParameter("max_iter")) == 1
+    end
 end
 
 @testset "Testing getters" begin
