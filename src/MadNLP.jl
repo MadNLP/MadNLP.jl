@@ -55,7 +55,7 @@ function __init__()
         "libmkl_sequential.$(dlext)",
         "libmkl_intel_lp64.$(dlext)"]),RTLD_GLOBAL)
     @isdefined(libopenblas32) && dlopen(libopenblas32,RTLD_GLOBAL)
-    set_blas_num_threads(haskey(ENV,"JULIA_NUM_THREADS") ? parse(Int,ENV["JULIA_NUM_THREADS"]) : 1 ;permanent=true)
+    set_blas_num_threads(Threads.nthreads() ;permanent=true)
 end
 
 end # end module
