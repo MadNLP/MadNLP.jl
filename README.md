@@ -55,7 +55,7 @@ MadNLP is interfaced with modeling packages:
 ```julia
 using MadNLP, JuMP
 
-model = Model(()->MadNLP.Optimizer(linear_solver=MadNLP.Ma57,log_level=MadNLP.INFO,max_iter=100))
+model = Model(()->MadNLP.Optimizer(linear_solver=MadNLP.Ma57,print_level=MadNLP.INFO,max_iter=100))
 @variable(model, x, start = 0.0)
 @variable(model, y, start = 0.0)
 @NLobjective(model, Min, (1 - x)^2 + 100 * (y - x^2)^2)
@@ -79,7 +79,7 @@ graph = OptiGraph()
 @NLnodeconstraint(n2,exp(x) >= 2)
 @linkconstraint(graph,n1[:x] == n2[:x])
 
-MadNLP.optimize!(graph;linear_solver=MadNLP.Ma97,log_level=MadNLP.DEBUG,max_iter=100)
+MadNLP.optimize!(graph;linear_solver=MadNLP.Ma97,print_level=MadNLP.DEBUG,max_iter=100)
 
 ```
 
@@ -87,7 +87,7 @@ MadNLP.optimize!(graph;linear_solver=MadNLP.Ma97,log_level=MadNLP.DEBUG,max_iter
 ```julia
 using MadNLP, CUTEst
 model = CUTEstModel("PRIMALC1")
-madnlp(model,linear_solver=MadNLP.PardisoMKL,log_level=MadNLP.WARN,max_wall_time=3600)
+madnlp(model,linear_solver=MadNLP.PardisoMKL,print_level=MadNLP.WARN,max_wall_time=3600)
 ```
 
 ## Solver options
