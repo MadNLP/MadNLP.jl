@@ -79,7 +79,7 @@ graph = OptiGraph()
 @NLnodeconstraint(n2,exp(x) >= 2)
 @linkconstraint(graph,n1[:x] == n2[:x])
 
-MadNLP.optimize!(graph,ipopt;linear_solver=MadNLP.Ma97,log_level=MadNLP.DEBUG,max_iter=100)
+MadNLP.optimize!(graph;linear_solver=MadNLP.Ma97,log_level=MadNLP.DEBUG,max_iter=100)
 
 ```
 
