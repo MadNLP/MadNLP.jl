@@ -15,7 +15,7 @@ import Logging: @debug, @info,  @warn, @error
 import Base: string, show, print, size, getindex, copyto!, @kwdef
 import StaticArrays: SVector, setindex
 import SuiteSparse: UMFPACK
-import CUDA: CUBLAS, CUSOLVER, CuVector, CuMatrix
+import CUDA: CUBLAS, CUSOLVER, CuVector, CuMatrix, has_cuda_gpu
 import LightGraphs: Graph, Edge, add_edge!, edges, src, dst, neighbors, nv
 import Plasmo: OptiGraph, OptiNode, OptiEdge, all_nodes, all_edges, all_variables, num_all_nodes, num_variables,
     getlinkconstraints

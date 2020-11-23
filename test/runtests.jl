@@ -3,7 +3,6 @@ import MathOptInterface
 import AmplNLReader: AmplModel
 import SparseArrays: sparse
 import LinearAlgebra: norm
-import CUDA: has_cuda_gpu
 
 function solcmp(x,sol;atol=1e-4,rtol=1e-4)
     aerr = norm(x-sol,Inf)
