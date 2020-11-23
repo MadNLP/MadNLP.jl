@@ -7,6 +7,9 @@ Sys.iswindows() && error("Windows is currently not supported.")
 using Pkg.Artifacts
 using BinaryProvider
 
+products   = Product[]
+build_succeded(product::Product)=satisfied(product) ? "succeeded" : "failed"
+
 # Parse some basic command-line arguments
 const verbose = "--verbose" in ARGS
 const blasvendor=(haskey(ENV,"MADNLP_BLAS") && ENV["MADNLP_BLAS"]=="openblas") ?
@@ -24,16 +27,18 @@ const CC = haskey(ENV,"MADNLP_CC") ? ENV["MADNLP_CC"] : `gcc`
 const FC = haskey(ENV,"MADNLP_FC") ? ENV["MADNLP_FC"] : `gfortran`
 const libmetis_dir = joinpath(artifact"METIS", "lib")
 const with_metis = `-L$libmetis_dir $rpath$libmetis_dir -lmetis`
-const libmkl_dir = joinpath(artifact"MKL","lib")
-const libopenblas_dir = joinpath(artifact"OpenBLAS32","lib")
-const with_mkl = `-L$libmkl_dir $rpath$libmkl_dir -lmkl_intel_lp64 -lmkl_sequential -lmkl_core`
-const with_openblas = `-L$libopenblas_dir $rpath$libopenblas_dir -lopenblas`
 const openmp_flag = haskey(ENV,"MADNLP_ENABLE_OPENMP") ? ENV["MADNLP_ENABLE_OPENMP"] : `-fopenmp`
 const optimization_flag = haskey(ENV,"MADNLP_OPTIMIZATION_FLAG") ? ENV["MADNLP_OPTIMIZATION_FLAG"] : `-O3`
 const installer = Sys.isapple() ? "brew install" : "sudo apt install"
-
-products   = Product[]
-build_succeded(product::Product)=satisfied(product) ? "succeeded" : "failed"
+if blasvendor == :openblas
+    const libopenblas_dir = joinpath(artifact"OpenBLAS32","lib")
+    const with_openblas = `-L$libopenblas_dir $rpath$libopenblas_dir -lopenblas`
+    push!(products,FileProduct(prefix,joinpath(libopenblas_dir,"libopenblas.$so"),:libopenblas32))
+else
+    const libmkl_dir = joinpath(artifact"MKL","lib")
+    const with_mkl = `-L$libmkl_dir $rpath$libmkl_dir -lmkl_intel_lp64 -lmkl_sequential -lmkl_core`
+    push!(products,FileProduct(prefix,joinpath(libmkl_dir,"libmkl_intel_lp64.$so"),:libmkl32))
+end
 
 # check c compiler availability
 is_CC = true
@@ -114,13 +119,6 @@ if is_CC
     end
     @info "Building Pardiso $(build_succeded(products[end]))."
 end
-
-# PardisoMKL
-push!(products,FileProduct(prefix,joinpath(libmkl_dir,"libmkl_intel_lp64.$so"),:libmkl32))
-@info "Building PardisoMKL $(build_succeded(products[end]))."
-
-# OpenBLAS32
-push!(products,FileProduct(prefix,joinpath(libopenblas_dir,"libopenblas.$so"),:libopenblas32))
 
 # write deps.jl
 write_deps_file(joinpath(@__DIR__, "deps.jl"), products[satisfied.(products)], verbose=verbose)

@@ -18,25 +18,9 @@ x = similar(b)
     @test coo[1,1] == 1.
 end
 
-
-@testset "BLAS" begin
-    sol   = [1.0,6.1]
-    solt  = [1.3,6.0]
-    sysol = [1.3,6.1]
-
-    MadNLP.mv!(x,csc,b)
-    @test solcmp(x,sol)
-
-    MadNLP.mv!(x,csc',b)
-    @test solcmp(x,solt)
-    
-    MadNLP.symv!(x,csc,b)
-    @test solcmp(x,sysol)
-end
-
 @testset "LAPACK" begin
     sol= [0.8542713567839195, 1.4572864321608041]
-    M = MadNLP.LapackMKL.Solver(dense)
+    M = MadNLP.LapackCPU.Solver(dense)
     MadNLP.introduce(M)
     MadNLP.improve!(M)
     MadNLP.factorize!(M)

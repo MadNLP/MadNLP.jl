@@ -1,16 +1,16 @@
-module LapackMKL
+module LapackCPU
 
 import ..MadNLP:
     @kwdef, Logger, @debug, @warn, @error,
-    AbstractOptions, AbstractLinearSolver, set_options!, tril_to_full!,
+    AbstractOptions, AbstractLinearSolver, set_options!, tril_to_full!, libblas,
     SymbolicException,FactorizationException,SolveException,InertiaException,
-    introduce, factorize!, solve!, improve!, is_inertia, inertia, libmkl32
+    introduce, factorize!, solve!, improve!, is_inertia, inertia
 
 const INPUT_MATRIX_TYPE = :dense
 
 @enum(Algorithms::Int, BUNCHKAUFMAN = 1, LU = 2)
 @kwdef mutable struct Options <: AbstractOptions
-    lapackmkl_algorithm::Algorithms = BUNCHKAUFMAN
+    lapackcpu_algorithm::Algorithms = BUNCHKAUFMAN
 end
 
 mutable struct Solver <: AbstractLinearSolver
@@ -24,23 +24,24 @@ mutable struct Solver <: AbstractLinearSolver
     logger::Logger
 end
 
+
 sytrf(uplo,n,a,lda,ipiv,work,lwork,info)=ccall(
-    (:dsytrf,libmkl32),
+    (:dsytrf_,libblas),
     Cvoid,
     (Ref{UInt8},Ref{Cint},Ptr{Cdouble},Ref{Cint},Ptr{Cint},Ptr{Cdouble},Ref{Cint},Ptr{Cint}),
     uplo,n,a,lda,ipiv,work,lwork,info)
 sytrs(uplo,n,nrhs,a,lda,ipiv,b,ldb,info)=ccall(
-    (:dsytrs,libmkl32),
+    (:dsytrs_,libblas),
     Cvoid,
     (Ref{Cchar},Ref{Cint},Ref{Cint},Ptr{Cdouble},Ref{Cint},Ptr{Cint},Ptr{Cdouble},Ref{Cint},Ptr{Cint}),
     uplo,n,nrhs,a,lda,ipiv,b,ldb,info)
 getrf(m,n,a,lda,ipiv,info)=ccall(
-    (:dgetrf,libmkl32),
+    (:dgetrf_,libblas),
     Cvoid,
     (Ref{Cint},Ref{Cint},Ptr{Cdouble},Ref{Cint},Ptr{Cint},Ptr{Cint}),
     m,n,a,lda,ipiv,info)
 getrs(trans,n,nrhs,a,lda,ipiv,b,ldb,info)=ccall(
-    (:dgetrs,libmkl32),
+    (:dgetrs_,libblas),
     Cvoid,
     (Ref{Cchar},Ref{Cint},Ref{Cint},Ptr{Cdouble},Ref{Cint},Ptr{Cint},Ptr{Cdouble},Ref{Cint},Ptr{Cint}),
     trans,n,nrhs,a,lda,ipiv,b,ldb,info)
@@ -61,21 +62,21 @@ function Solver(dense::Matrix{Float64};
 end
 
 function factorize!(M::Solver)
-    if M.opt.lapackmkl_algorithm == BUNCHKAUFMAN
+    if M.opt.lapackcpu_algorithm == BUNCHKAUFMAN
         factorize_bunchkaufman!(M)
-    elseif M.opt.lapackmkl_algorithm == LU
+    elseif M.opt.lapackcpu_algorithm == LU
         factorize_lu!(M)
     else
-        error(LOGGER,"Invalid lapackmkl_algorithm")
+        error(LOGGER,"Invalid lapackcpu_algorithm")
     end
 end
 function solve!(M::Solver,x)
-    if M.opt.lapackmkl_algorithm == BUNCHKAUFMAN
+    if M.opt.lapackcpu_algorithm == BUNCHKAUFMAN
         solve_bunchkaufman!(M,x)
-    elseif M.opt.lapackmkl_algorithm == LU
+    elseif M.opt.lapackcpu_algorithm == LU
         solve_lu!(M,x)
     else
-        error(LOGGER,"Invalid lapackmkl_algorithm")
+        error(LOGGER,"Invalid lapackcpu_algorithm")
     end
 end
 
@@ -109,7 +110,7 @@ function solve_lu!(M::Solver,x)
     return x
 end
 
-is_inertia(M::Solver) = M.opt.lapackmkl_algorithm == BUNCHKAUFMAN
+is_inertia(M::Solver) = M.opt.lapackcpu_algorithm == BUNCHKAUFMAN
 inertia(M::Solver) = inertia(M.fact,M.etc[:ipiv],M.info[])
 function inertia(fact,ipiv,info)
     numneg = num_neg_ev(size(fact,1),fact,ipiv)
@@ -120,7 +121,7 @@ end
 
 improve!(M::Solver) = false
 
-introduce(M::Solver) = "Lapack-MKL ($(M.opt.lapackmkl_algorithm))"
+introduce(M::Solver) = "Lapack-CPU ($(M.opt.lapackcpu_algorithm))"
 
 function num_neg_ev(n,D,ipiv)
     numneg = 0
@@ -148,5 +149,5 @@ end
 end # module
 
 # forgiving names
-lapackmkl = LapackMKL
-LAPACKMKL = LapackMKL
+lapackcpu = LapackCPU
+LAPACKCPU = LapackCPU

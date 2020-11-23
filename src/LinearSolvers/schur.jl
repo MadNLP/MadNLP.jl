@@ -8,7 +8,7 @@ import ..MadNLP:
     AbstractOptions, AbstractLinearSolver, set_options!, SparseMatrixCSC, SubVector, StrideOneVector,
     SymbolicException,FactorizationException,SolveException,InertiaException,
     introduce, factorize!, solve!, improve!, is_inertia, inertia,
-    default_linear_solver, default_dense_solver, get_csc_view, get_cscsy_view, mv!, nnz,
+    default_linear_solver, default_dense_solver, get_csc_view, get_cscsy_view, nnz, mul!,
     TwoStagePartition, set_blas_num_threads, blas_num_threads, @blas_safe_threads
 
 const INPUT_MATRIX_TYPE = :csc
@@ -143,7 +143,7 @@ function factorize_worker!(j,sw,schur)
     j in sw.V_0_nz || return
     sw.w.= view(sw.compl,:,j)
     solve!(sw.M,sw.w)
-    mv!(view(schur,:,j),sw.compl',sw.w;alpha=-1.,beta=1.)
+    mul!(view(schur,:,j),sw.compl',sw.w,-1.,1.)
 end
 
 
@@ -154,14 +154,14 @@ function solve!(M::Solver,x::AbstractVector{Float64})
         solve!(sw.M,sw.w)
     end
     for sw in M.sws
-        mv!(M.w_0,sw.compl',sw.w;alpha=-1.,beta=1.)
+        mul!(M.w_0,sw.compl',sw.w,-1.,1.)
     end
     solve!(M.fact,M.w_0)
     view(x,M.V_0).=M.w_0
     @blas_safe_threads for sw in M.sws
         x_view = view(x,sw.V)
         sw.w.= x_view
-        mv!(sw.w,sw.compl,M.w_0;alpha=1.,beta=1.)
+        mul!(sw.w,sw.compl,M.w_0,1.,1.)
         solve!(sw.M,sw.w)
         x_view.=sw.w
     end

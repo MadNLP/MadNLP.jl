@@ -1,6 +1,7 @@
 include("nlp_test_include.jl")
 
 @test begin
+    local m,x
     m=Model(MadNLP.Optimizer)
     @variable(m,x)
     @objective(m,Min,x^2)
@@ -74,42 +75,42 @@ sets = [
     ],
     [
         ()->MadNLP.Optimizer(
-            linear_solver=MadNLP.PardisoMKL,
+            linear_solver=MadNLP.PardisoCPU,
             print_level=MadNLP.ERROR),
         [],
-        isdefined(MadNLP,:PardisoMKL)
+        isdefined(MadNLP,:PardisoCPU)
     ],
     [
         ()->MadNLP.Optimizer(
-            linear_solver=MadNLP.LapackMKL,
-            lapackmkl_algorithm=MadNLP.LapackMKL.BUNCHKAUFMAN,
+            linear_solver=MadNLP.LapackCPU,
+            lapackcpu_algorithm=MadNLP.LapackCPU.BUNCHKAUFMAN,
             print_level=MadNLP.ERROR),
         [],
-        isdefined(MadNLP,:LapackMKL)
+        isdefined(MadNLP,:LapackCPU)
     ],
     [
         ()->MadNLP.Optimizer(
-            linear_solver=MadNLP.LapackMKL,
-            lapackmkl_algorithm=MadNLP.LapackMKL.LU,
+            linear_solver=MadNLP.LapackCPU,
+            lapackcpu_algorithm=MadNLP.LapackCPU.LU,
             print_level=MadNLP.ERROR),
         [],
-        isdefined(MadNLP,:LapackMKL)
+        isdefined(MadNLP,:LapackCPU)
     ],
     [
         ()->MadNLP.Optimizer(
-            linear_solver=MadNLP.LapackCUDA,
-            lapackcuda_algorithm=MadNLP.LapackCUDA.BUNCHKAUFMAN,
+            linear_solver=MadNLP.LapackGPU,
+            lapackgpu_algorithm=MadNLP.LapackGPU.BUNCHKAUFMAN,
             print_level=MadNLP.ERROR),
         [],
-        has_cuda_gpu()
+        isdefined(MadNLP,:LapackGPU)
     ],
     [
         ()->MadNLP.Optimizer(
-            linear_solver=MadNLP.LapackCUDA,
-            lapackcuda_algorithm=MadNLP.LapackCUDA.LU,
+            linear_solver=MadNLP.LapackGPU,
+            lapackgpu_algorithm=MadNLP.LapackGPU.LU,
             print_level=MadNLP.ERROR),
         [],
-        has_cuda_gpu()
+        isdefined(MadNLP,:LapackGPU)
     ],
     [
         ()->MadNLP.Optimizer(
@@ -120,15 +121,13 @@ sets = [
     ],
     [
         ()->MadNLP.Optimizer(
-            tol=1e-8,
             reduced_system=false,
             print_level=MadNLP.ERROR),
-        ["infeasible"], # numerical error at the end],
+        ["infeasible","eigmina"], # numerical errors
         true
     ],
     [
         ()->MadNLP.Optimizer(
-            tol=1e-8,
             inertia_correction_method=MadNLP.INERTIA_FREE,
             reduced_system=false),
         ["infeasible","eigmina"], # numerical errors

@@ -423,7 +423,7 @@ function Solver(nlp::NonlinearProgram;
     _w3 = Vector{Float64}(undef,aug_vec_length)
     _w3x= view(_w3,1:n)
     _w3l= view(_w3,n+1:n+m)
-    _w4 = zeros(aug_vec_length) # need to initialize to zero due to symv!
+    _w4 = zeros(aug_vec_length) # need to initialize to zero due to mul!
     _w4x= view(_w4,1:n)
     _w4l= view(_w4,n+1:n+m)
 
@@ -501,7 +501,7 @@ function Solver(nlp::NonlinearProgram;
     @trace(logger,"Initializing iterative solver.")
     iterator = opt.iterator.Solver(
         Vector{Float64}(undef,m+n),
-        (b,x)->symv!(b,aug_com,x),(x)->solve!(linear_solver,x);option_dict=option_dict)
+        (b,x)->mul!(b,Symmetric(aug_com,:L),x),(x)->solve!(linear_solver,x);option_dict=option_dict)
 
     @trace(logger,"Initializing linear system scaler.")
     linear_system_scaler = opt.linear_system_scaler == DummyModule ? nothing :
@@ -721,7 +721,7 @@ end
 function regular!(ips::Solver)
     while true
         (ips.cnt.k!=0 && !ips.opt.jacobian_constant) && ips.con_jac!(ips.x)
-        mv!(ips.jacl,ips.jac_com',ips.l)
+        mul!(ips.jacl,ips.jac_com',ips.l)
         fixed_variable_treatment_vec!(ips.jacl,ips.ind_fixed)
         fixed_variable_treatment_z!(ips.zl,ips.zu,ips.f,ips.jacl,ips.ind_fixed)
 
@@ -876,7 +876,7 @@ function robust!(ips::Solver)
     RR = ips.RR
     while true
         !ips.opt.jacobian_constant && ips.con_jac!(ips.x)
-        mv!(ips.jacl,ips.jac_com',ips.l)
+        mul!(ips.jacl,ips.jac_com',ips.l)
         fixed_variable_treatment_vec!(ips.jacl,ips.ind_fixed)
         fixed_variable_treatment_z!(ips.zl,ips.zu,ips.f,ips.jacl,ips.ind_fixed)
         # end
@@ -1133,7 +1133,7 @@ function inertia_free_reg(ips::Solver)
     ips.factorize!()
     solve_status = (ips.solve_refine!(d0,p0) && ips.solve_refine!(ips.d,ips.p))
     t .= ips.dx.-n
-    symv!(ips._w4,ips.aug_com,ips._w3) # prepartation for curv_test
+    mul!(ips._w4,Symmetric(ips.aug_com,:L),ips._w3) # prepartation for curv_test
     n_trial = 0
     ips.del_w = del_w_prev = 0.
 
@@ -1158,7 +1158,7 @@ function inertia_free_reg(ips::Solver)
         ips.factorize!()
         solve_status = (ips.solve_refine!(d0,p0) && ips.solve_refine!(ips.d,ips.p))
         t .= ips.dx.-n
-        symv!(ips._w4,ips.aug_com,ips._w3) # prepartation for curv_test
+        mul!(ips._w4,Symmetric(ips.aug_com,:L),ips._w3) # prepartation for curv_test
         n_trial += 1
     end
 

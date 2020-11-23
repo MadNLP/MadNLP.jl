@@ -3,7 +3,7 @@
 
 # Build info
 default_linear_solver() = @isdefined(libhsl) ? Ma57 : @isdefined(libmumps) ? Mumps : Umfpack
-default_dense_solver() = LapackMKL
+default_dense_solver() = LapackCPU
 
 # Options
 abstract type AbstractOptions end
@@ -63,22 +63,28 @@ for (name,level,color) in [(:trace,TRACE,7),(:debug,DEBUG,6),(:info,INFO,256),(:
 end
 
 # BLAS
+const libblas = @isdefined(libopenblas32) ? libopenblas32 : libmkl32
 const blas_num_threads = Ref{Int}()
 function set_blas_num_threads(n::Integer;permanent::Bool=false)
     permanent && (blas_num_threads[]=n)
     BLAS.set_num_threads(n) # might be mkl64 or openblas64
-    ccall((:mkl_set_dynamic, libmkl32),
-          Cvoid,
-          (Ptr{Int32},),
-          Ref{Int32}(0))
-    ccall((:mkl_set_num_threads, libmkl32),
-          Cvoid,
-          (Ptr{Int32},),
-          Ref{Int32}(n))
-    ccall((:openblas_set_num_threads, libopenblas32),
-          Cvoid,
-          (Ptr{Int32},),
-          Ref{Int32}(n))
+    if @isdefined(libopenblas32)
+        ccall(
+            (:openblas_set_num_threads, libopenblas32),
+            Cvoid,
+            (Ptr{Int32},),
+            Ref{Int32}(n))
+    else
+        ccall((:mkl_set_dynamic, libmkl32),
+              Cvoid,
+              (Ptr{Int32},),
+              Ref{Int32}(0))
+        ccall(
+            (:mkl_set_num_threads, libmkl32),
+            Cvoid,
+            (Ptr{Int32},),
+            Ref{Int32}(n))
+    end
 end
 macro blas_safe_threads(args...)
     code = quote

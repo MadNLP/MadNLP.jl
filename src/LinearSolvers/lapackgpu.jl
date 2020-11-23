@@ -1,17 +1,17 @@
-module LapackCUDA
+module LapackGPU
 
 import ..MadNLP:
     @kwdef, Logger, @debug, @warn, @error,
     CUBLAS, CUSOLVER, CuVector, CuMatrix,
     AbstractOptions, AbstractLinearSolver, set_options!,
     SymbolicException,FactorizationException,SolveException,InertiaException,
-    introduce, factorize!, solve!, improve!, is_inertia, inertia, libmkl32, LapackMKL, tril_to_full!
+    introduce, factorize!, solve!, improve!, is_inertia, inertia, LapackCPU, tril_to_full!
 
 const INPUT_MATRIX_TYPE = :dense
 
 @enum(Algorithms::Int, BUNCHKAUFMAN = 1, LU = 2)
 @kwdef mutable struct Options <: AbstractOptions
-    lapackcuda_algorithm::Algorithms = BUNCHKAUFMAN
+    lapackgpu_algorithm::Algorithms = BUNCHKAUFMAN
 end
 
 mutable struct Solver <: AbstractLinearSolver
@@ -43,28 +43,28 @@ function Solver(dense::Matrix{Float64};
 end
 
 function factorize!(M::Solver)
-    if M.opt.lapackcuda_algorithm == BUNCHKAUFMAN
+    if M.opt.lapackgpu_algorithm == BUNCHKAUFMAN
         factorize_bunchkaufman!(M)
-    elseif M.opt.lapackcuda_algorithm == LU
+    elseif M.opt.lapackgpu_algorithm == LU
         factorize_lu!(M)
     else
-        error(LOGGER,"Invalid lapackcuda_algorithm")
+        error(LOGGER,"Invalid lapackgpu_algorithm")
     end
 end
 function solve!(M::Solver,x)
-    if M.opt.lapackcuda_algorithm == BUNCHKAUFMAN
+    if M.opt.lapackgpu_algorithm == BUNCHKAUFMAN
         solve_bunchkaufman!(M,x)
-    elseif M.opt.lapackcuda_algorithm == LU
+    elseif M.opt.lapackgpu_algorithm == LU
         solve_lu!(M,x)
     else
-        error(LOGGER,"Invalid lapackcuda_algorithm")
+        error(LOGGER,"Invalid lapackgpu_algorithm")
     end
 end
 
-is_inertia(M::Solver) = M.opt.lapackcuda_algorithm == BUNCHKAUFMAN
-inertia(M::Solver) = LapackMKL.inertia(M.etc[:fact_cpu],M.etc[:ipiv_cpu],M.info[])
+is_inertia(M::Solver) = M.opt.lapackgpu_algorithm == BUNCHKAUFMAN
+inertia(M::Solver) = LapackCPU.inertia(M.etc[:fact_cpu],M.etc[:ipiv_cpu],M.info[])
 improve!(M::Solver) = false
-introduce(M::Solver) = "Lapack-CUDA ($(M.opt.lapackcuda_algorithm))"
+introduce(M::Solver) = "Lapack-GPU ($(M.opt.lapackgpu_algorithm))"
 
 function factorize_bunchkaufman!(M::Solver)
     haskey(M.etc,:ipiv) || (M.etc[:ipiv] = CuVector{Int32}(undef,size(M.dense,1)))
@@ -102,7 +102,7 @@ function solve_bunchkaufman!(M::Solver,x)
     # copyto!(x,M.rhs)
     # --------------------------------------------------------------------
 
-    LapackMKL.sytrs(
+    LapackCPU.sytrs(
         'L',Int32(size(M.fact,1)),Int32(1),M.etc[:fact_cpu],Int32(size(M.fact,2)),M.etc[:ipiv_cpu],
         x,Int32(length(x)),Int32[1])
 
@@ -139,5 +139,5 @@ end # module
 
 
 # forgiving names
-lapackcuda = LapackCUDA
-LAPACKCUDA = LapackCUDA
+lapackgpu = LapackGPU
+LAPACKGPU = LapackGPU

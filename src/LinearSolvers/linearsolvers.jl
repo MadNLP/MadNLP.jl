@@ -28,8 +28,8 @@ include("richardson.jl")
 include("krylov.jl")
 
 # dense solvers
-include("lapackmkl.jl")
-include("lapackcuda.jl")
+include("lapackcpu.jl")
+has_cuda_gpu() && include("lapackgpu.jl")
 
 # direct solvers
 include("umfpack.jl")
