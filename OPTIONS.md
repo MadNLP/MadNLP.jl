@@ -1,7 +1,7 @@
 ## MadNLP Options
 ### Interior Point Solver Options
 - `linear_solver::Module = DefaultLinearSolver`:\
-    Linear solver used for solving primal-dual system. Valid values are: `MadNLP`.{`Umfpack`, `Mumps`, `PardisoMKL`, `Ma27`, `Ma57`, `Ma77`, `Ma86`, `Ma97`, `Pardiso`, `Schur`, `Schwarz`, `LapackMKL`, `LapackCUDA`}. The selected solver should be properly built in the build procedure. See [README.md](https://github.com/sshin23/MadNLP.jl) file.
+    Linear solver used for solving primal-dual system. Valid values are: `MadNLP`.{`Umfpack`, `Mumps`, `PardisoMKL`, `Ma27`, `Ma57`, `Ma77`, `Ma86`, `Ma97`, `Pardiso`, `Schur`, `Schwarz`, `LapackCPU`, `LapackGPU`}. The selected solver should be properly built in the build procedure. See [README.md](https://github.com/sshin23/MadNLP.jl) file.
 - `iterator::Module = Richardson `\
     Iterator used for iterative refinement. Valid values are: `MadNLP`.{`Richardson`,`Krylov`}.
     - `Richardson` uses [Richardson iteration](https://en.wikipedia.org/wiki/Modified_Richardson_iteration)
@@ -165,11 +165,11 @@ Linear solver options are specific to the linear solver chosen at `linear_solver
 - `pardisomkl_msglvl::Int = 0`
 - `pardisomkl_order::Int = 2`
 
-#### LapackCUDA
-- `lapackmkl_algorithm::LapackCUDA.Algorithms = BUNCHKAUFMAN`
+#### LapackGPU
+- `lapackgpu_algorithm::LapackGPU.Algorithms = BUNCHKAUFMAN`
 
-#### LapackMKL
-- `lapackmkl_algorithm::LapackMKL.Algorithms = BUNCHKAUFMAN`
+#### LapackCPU
+- `lapackcpu_algorithm::LapackCPU.Algorithms = BUNCHKAUFMAN`
 
 #### Schur
 - `schur_subproblem_solver::Module = DefaultLinearSolver` \
