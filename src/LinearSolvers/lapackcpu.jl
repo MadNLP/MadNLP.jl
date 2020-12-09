@@ -8,7 +8,7 @@ import ..MadNLP:
 
 const INPUT_MATRIX_TYPE = :dense
 
-@enum(Algorithms::Int, BUNCHKAUFMAN = 1, LU = 2)
+@enum(Algorithms::Int, BUNCHKAUFMAN = 1, LU = 2, QR =3)
 @kwdef mutable struct Options <: AbstractOptions
     lapackcpu_algorithm::Algorithms = BUNCHKAUFMAN
 end
@@ -16,14 +16,13 @@ end
 mutable struct Solver <: AbstractLinearSolver
     dense::Matrix{Float64}
     fact::Matrix{Float64}
-    work
-    lwork
+    work::Vector{Float64}
+    lwork::Int32
     info::Ref{Int32}
     etc::Dict{Symbol,Any}
     opt::Options
     logger::Logger
 end
-
 
 sytrf(uplo,n,a,lda,ipiv,work,lwork,info)=ccall(
     (:dsytrf_,libblas),
@@ -45,6 +44,21 @@ getrs(trans,n,nrhs,a,lda,ipiv,b,ldb,info)=ccall(
     Cvoid,
     (Ref{Cchar},Ref{Cint},Ref{Cint},Ptr{Cdouble},Ref{Cint},Ptr{Cint},Ptr{Cdouble},Ref{Cint},Ptr{Cint}),
     trans,n,nrhs,a,lda,ipiv,b,ldb,info)
+geqrf(m,n,a,lda,tau,work,lwork,info)=ccall(
+    (:dgeqrf_,libblas),
+    Cvoid,
+    (Ref{Cint},Ref{Cint},Ptr{Cdouble},Ref{Cint},Ptr{Cdouble},Ptr{Cdouble},Ref{Cint},Ptr{Cint}),
+    m,n,a,lda,tau,work,lwork,info)
+ormqr(side,trans,m,n,k,a,lda,tau,c,ldc,work,lwork,info)=ccall(
+    (:dormqr_,libblas),
+    Cvoid,
+    (Ref{Cchar}, Ref{Cchar}, Ref{Cint}, Ref{Cint},Ref{Cint}, Ptr{Cdouble}, Ref{Cint}, Ptr{Cdouble},Ptr{Cdouble}, Ref{Cint}, Ptr{Cdouble}, Ref{Cint},Ptr{Cint}),
+    side,trans,m,n,k,a,lda,tau,c,ldc,work,lwork,info)
+trsm(side,uplo,transa,diag,m,n,alpha,a,lda,b,ldb)=ccall(
+    (:dtrsm_,libblas),
+    Cvoid,
+    (Ref{Cchar},Ref{Cchar},Ref{Cchar},Ref{Cchar},Ref{Cint},Ref{Cint},Ref{Cdouble},Ptr{Cdouble},Ref{Cint},Ptr{Cdouble},Ref{Cint}),
+    side,uplo,transa,diag,m,n,alpha,a,lda,b,ldb)
 
 function Solver(dense::Matrix{Float64};
                 option_dict::Dict{Symbol,Any}=Dict{Symbol,Any}(),
@@ -66,6 +80,8 @@ function factorize!(M::Solver)
         factorize_bunchkaufman!(M)
     elseif M.opt.lapackcpu_algorithm == LU
         factorize_lu!(M)
+    elseif M.opt.lapackcpu_algorithm == QR
+        factorize_qr!(M)
     else
         error(LOGGER,"Invalid lapackcpu_algorithm")
     end
@@ -75,6 +91,8 @@ function solve!(M::Solver,x)
         solve_bunchkaufman!(M,x)
     elseif M.opt.lapackcpu_algorithm == LU
         solve_lu!(M,x)
+    elseif M.opt.lapackcpu_algorithm == QR
+        solve_qr!(M,x)
     else
         error(LOGGER,"Invalid lapackcpu_algorithm")
     end
@@ -107,6 +125,29 @@ end
 function solve_lu!(M::Solver,x)
     getrs('N',Int32(size(M.fact,1)),Int32(1),M.fact,Int32(size(M.fact,2)),
           M.etc[:ipiv],x,Int32(length(x)),M.info)
+    return x
+end
+
+function factorize_qr!(M::Solver)
+    haskey(M.etc,:tau) || (M.etc[:tau] = Vector{Float64}(undef,size(M.dense,1)))
+    tril_to_full!(M.dense)
+    M.lwork = -1
+    # pointer(M.fact)==pointer(M.dense) || M.fact.=M.dense
+    M.fact .= M.dense
+    geqrf(Int32(size(M.fact,1)),Int32(size(M.fact,2)),M.fact,Int32(size(M.fact,2)),M.etc[:tau],M.work,M.lwork,M.info)
+    M.lwork = Int32(real(M.work[1]))
+    length(M.work) < M.lwork && resize!(M.work,M.lwork)
+    geqrf(Int32(size(M.fact,1)),Int32(size(M.fact,2)),M.fact,Int32(size(M.fact,2)),M.etc[:tau],M.work,M.lwork,M.info)
+    return M
+end
+
+function solve_qr!(M::Solver,x)
+    M.lwork = -1
+    ormqr('L','T',Int32(size(M.fact,1)),Int32(1),Int32(length(M.etc[:tau])),M.fact,Int32(size(M.fact,2)),M.etc[:tau],x,Int32(length(x)),M.work,M.lwork,M.info)
+    M.lwork = Int32(real(M.work[1]))
+    length(M.work) < M.lwork && resize!(M.work,M.lwork)
+    ormqr('L','T',Int32(size(M.fact,1)),Int32(1),Int32(length(M.etc[:tau])),M.fact,Int32(size(M.fact,2)),M.etc[:tau],x,Int32(length(x)),M.work,M.lwork,M.info)
+    trsm('L','U','N','N',Int32(size(M.fact,1)),Int32(1),1.,M.fact,Int32(size(M.fact,2)),x,Int32(length(x)))
     return x
 end
 

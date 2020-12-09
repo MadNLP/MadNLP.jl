@@ -9,7 +9,7 @@ import ..MadNLP:
 
 const INPUT_MATRIX_TYPE = :dense
 
-@enum(Algorithms::Int, BUNCHKAUFMAN = 1, LU = 2)
+@enum(Algorithms::Int, BUNCHKAUFMAN = 1, LU = 2, QR = 3)
 @kwdef mutable struct Options <: AbstractOptions
     lapackgpu_algorithm::Algorithms = BUNCHKAUFMAN
 end
@@ -18,9 +18,9 @@ mutable struct Solver <: AbstractLinearSolver
     dense::Matrix{Float64}
     fact::CuMatrix{Float64}
     rhs::CuVector{Float64}
-    work
+    work::CuVector{Float64}
     lwork
-    info
+    info::CuVector{Int32}
     etc::Dict{Symbol,Any} # throw some algorithm-specific things here
     opt::Options
     logger::Logger
@@ -47,6 +47,8 @@ function factorize!(M::Solver)
         factorize_bunchkaufman!(M)
     elseif M.opt.lapackgpu_algorithm == LU
         factorize_lu!(M)
+    elseif M.opt.lapackgpu_algorithm == QR
+        factorize_qr!(M)
     else
         error(LOGGER,"Invalid lapackgpu_algorithm")
     end
@@ -56,6 +58,8 @@ function solve!(M::Solver,x)
         solve_bunchkaufman!(M,x)
     elseif M.opt.lapackgpu_algorithm == LU
         solve_lu!(M,x)
+    elseif M.opt.lapackgpu_algorithm == QR
+        solve_qr!(M,x)
     else
         error(LOGGER,"Invalid lapackgpu_algorithm")
     end
@@ -111,7 +115,6 @@ end
 
 function factorize_lu!(M::Solver)
     haskey(M.etc,:ipiv) || (M.etc[:ipiv] = CuVector{Int32}(undef,size(M.dense,1)))
-
     tril_to_full!(M.dense)
     copyto!(M.fact,M.dense)
     CUSOLVER.cusolverDnDgetrf_bufferSize(
@@ -130,6 +133,30 @@ function solve_lu!(M::Solver,x)
         CUSOLVER.dense_handle(),CUBLAS.CUBLAS_OP_N,
         Int32(size(M.fact,1)),Int32(1),M.fact,Int32(size(M.fact,2)),
         M.etc[:ipiv],M.rhs,Int32(length(M.rhs)),M.info)
+    copyto!(x,M.rhs)
+    return x
+end
+
+function factorize_qr!(M::Solver)
+    haskey(M.etc,:tau) || (M.etc[:tau] = CuVector{Float64}(undef,size(M.dense,1)))
+    haskey(M.etc,:one) || (M.etc[:one] = ones(1))
+    tril_to_full!(M.dense)
+    copyto!(M.fact,M.dense)
+    CUSOLVER.cusolverDnDgeqrf_bufferSize(CUSOLVER.dense_handle(),Int32(size(M.fact,1)),Int32(size(M.fact,2)),M.fact,Int32(size(M.fact,2)),M.lwork)
+    length(M.work) < M.lwork[] && resize!(M.work,Int(M.lwork[]))
+    CUSOLVER.cusolverDnDgeqrf(CUSOLVER.dense_handle(),Int32(size(M.fact,1)),Int32(size(M.fact,2)),M.fact,Int32(size(M.fact,2)),M.etc[:tau],M.work,M.lwork[],M.info)
+    return M
+end
+
+function solve_qr!(M::Solver,x)
+    copyto!(M.rhs,x)
+    CUSOLVER.cusolverDnDormqr_bufferSize(CUSOLVER.dense_handle(),CUBLAS.CUBLAS_SIDE_LEFT,CUBLAS.CUBLAS_OP_T,
+                                         Int32(size(M.fact,1)),Int32(1),Int32(length(M.etc[:tau])),M.fact,Int32(size(M.fact,2)),M.etc[:tau],M.rhs,Int32(length(M.rhs)),M.lwork)
+    length(M.work) < M.lwork[] && resize!(M.work,Int(M.lwork[]))
+    CUSOLVER.cusolverDnDormqr(CUSOLVER.dense_handle(),CUBLAS.CUBLAS_SIDE_LEFT,CUBLAS.CUBLAS_OP_T,
+                              Int32(size(M.fact,1)),Int32(1),Int32(length(M.etc[:tau])),M.fact,Int32(size(M.fact,2)),M.etc[:tau],M.rhs,Int32(length(M.rhs)),M.work,M.lwork[],M.info)
+    CUBLAS.cublasDtrsm_v2(CUBLAS.handle(),CUBLAS.CUBLAS_SIDE_LEFT,CUBLAS.CUBLAS_FILL_MODE_UPPER,CUBLAS.CUBLAS_OP_N,CUBLAS.CUBLAS_DIAG_NON_UNIT,
+                          Int32(size(M.fact,1)),Int32(1),M.etc[:one],M.fact,Int32(size(M.fact,2)),M.rhs,Int32(length(M.rhs)))
     copyto!(x,M.rhs)
     return x
 end
