@@ -106,6 +106,14 @@ end
                "delete_soc_variables", # VectorOfVar. in SOC not supported
                "solve_result_index", # DualObjectiveValue not supported
                "time_limit_sec", #time limit given as Flaot64?
+               "solve_farkas_interval_lower",
+               "solve_farkas_lessthan",
+               "solve_farkas_interval_upper",
+               "solve_farkas_greaterthan",
+               "solve_farkas_variable_lessthan_max",
+               "solve_farkas_variable_lessthan",
+               "solve_farkas_equalto_lower",
+               "solve_farkas_equalto_upper"
                ]
     MOIT.unittest(bridged, config, exclude)
 end
