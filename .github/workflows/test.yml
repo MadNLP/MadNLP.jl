@@ -9,7 +9,7 @@ jobs:
       matrix:
         julia-version: ['1.5']
         julia-arch: [x64]
-        os: [ubuntu-latest,macos-latest,windows-latest]
+        os: [ubuntu-latest,macos-latest]
 
     steps:
       - if: matrix.os == 'ubuntu-latest'
