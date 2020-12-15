@@ -28,11 +28,11 @@ const openmp_flag = haskey(ENV,"MADNLP_ENABLE_OPENMP") ? ENV["MADNLP_ENABLE_OPEN
 const optimization_flag = haskey(ENV,"MADNLP_OPTIMIZATION_FLAG") ? ENV["MADNLP_OPTIMIZATION_FLAG"] : `-O3`
 const installer = Sys.isapple() ? "brew install" : "sudo apt install"
 if blasvendor == :openblas
-    const libopenblas_dir = joinpath(artifact"OpenBLAS32",Sys.iswindows() ? "bin" : "lib")
+    const libopenblas_dir = joinpath(artifact"OpenBLAS32","lib")
     const with_openblas = `-L$libopenblas_dir $rpath$libopenblas_dir -lopenblas`
     push!(products,FileProduct(prefix,joinpath(libopenblas_dir,"libopenblas.$so"),:libopenblas32))
 else
-    const libmkl_dir = joinpath(artifact"MKL",Sys.iswindows() ? "bin" : "lib")
+    const libmkl_dir = joinpath(artifact"MKL","lib")
     const with_mkl = `-L$libmkl_dir $rpath$libmkl_dir -lmkl_intel_lp64 -lmkl_sequential -lmkl_core`
     push!(products,FileProduct(prefix,joinpath(libmkl_dir,"libmkl_intel_lp64.$so"),:libmkl32))
 end
