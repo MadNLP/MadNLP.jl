@@ -12,7 +12,7 @@ const verbose = "--verbose" in ARGS
 const blasvendor=(haskey(ENV,"MADNLP_BLAS") && ENV["MADNLP_BLAS"]=="openblas") ?
     :openblas : :mkl
 
-@info "Building HSL with $(blasvendor == :mkl ? "MKL" : "OpenBLAS")"
+@info "Building MadNLP with $(blasvendor == :mkl ? "MKL" : "OpenBLAS")"
 
 const prefix = Prefix(@__DIR__)
 const so = BinaryProvider.platform_dlext()
