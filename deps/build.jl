@@ -9,8 +9,8 @@ build_succeded(product::Product)=satisfied(product) ? "succeeded" : "failed"
 
 # Parse some basic command-line arguments
 const verbose = "--verbose" in ARGS
-const blasvendor=(haskey(ENV,"MADNLP_BLAS") && ENV["MADNLP_BLAS"]=="openblas") ?
-    :openblas : :mkl
+const blasvendor=(haskey(ENV,"MADNLP_BLAS") && ENV["MADNLP_BLAS"]=="mkl") ?
+    :mkl : :openblas
 
 @info "Building MadNLP with $(blasvendor == :mkl ? "MKL" : "OpenBLAS")"
 

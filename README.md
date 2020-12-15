@@ -40,7 +40,7 @@ Build can be customized by setting the following environment variables.
 ```julia
 julia> ENV["MADNLP_CC"] = "/usr/local/bin/gcc-9"    # C compiler
 julia> ENV["MADNLP_FC"] = "/usr/local/bin/gfortran" # Fortran compiler
-julia> ENV["MADNLP_BLAS"] = "openblas"              # default is MKL
+julia> ENV["MADNLP_BLAS"] = "mkl"                   # default is openblas
 julia> ENV["MADNLP_ENALBE_OPENMP"] = false          # default is true
 julia> ENV["MADNLP_OPTIMIZATION_FLAG"] = "-O2"      # default is -O3
 ```
