@@ -15,7 +15,7 @@ const verbose = "--verbose" in ARGS
 const blasvendor=(haskey(ENV,"MADNLP_BLAS") && ENV["MADNLP_BLAS"]=="openblas") ?
     :openblas : :mkl
 
-@info "Building HSL and Mumps with $(blasvendor == :mkl ? "MKL" : "OpenBLAS")"
+@info "Building HSL with $(blasvendor == :mkl ? "MKL" : "OpenBLAS")"
 
 const prefix = Prefix(@__DIR__)
 const so = BinaryProvider.platform_dlext()
@@ -62,14 +62,6 @@ catch e
     is_FC = false
 end
 
-
-# MUMPS_seq
-if is_FC
-    const libmumps_dir = joinpath(artifact"MUMPS_seq","lib")
-    push!(products,FileProduct(prefix,joinpath(libdir,"libmumps.$so"),:libmumps))
-    wait(OutputCollector(`$FC -o$(libdir)/libmumps.$so -shared $whole_archive -L$libmumps_dir $rpath$libmumps_dir -ldmumps $no_whole_archive -lmumps_common -lmpiseq -lpord $with_metis $(blasvendor == :mkl ? with_mkl : with_openblas)`,verbose=verbose))
-    @info "Building Mumps (sequential) $(build_succeded(products[end]))."
-end
 
 # HSL
 if is_FC
