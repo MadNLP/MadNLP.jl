@@ -113,7 +113,7 @@ end
                "solve_farkas_variable_lessthan_max",
                "solve_farkas_variable_lessthan",
                "solve_farkas_equalto_lower",
-               "solve_farkas_equalto_upper"
+               "solve_farkas_equalto_upper",
                "Duplicate off-diagonal terms" # works in hsl but not in mumps-5
                ]
     MOIT.unittest(bridged, config, exclude)
