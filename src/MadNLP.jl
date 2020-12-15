@@ -24,10 +24,12 @@ import NLPModels: finalize, AbstractNLPModel,
     obj, grad!, cons!, jac_coord!, hess_coord!, hess_structure!, jac_structure!
 import SolverTools: GenericExecutionStats
 import MUMPS_seq_jll: libdmumps_path
+import OpenBLAS32_jll: libopenblas_path
 
 const MOI = MathOptInterface
 const MOIU = MathOptInterface.Utilities
 const libdmumps = libdmumps_path
+const libopenblas32 = libopenblas_path
 
 export madnlp
 
