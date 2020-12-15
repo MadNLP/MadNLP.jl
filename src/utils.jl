@@ -63,7 +63,6 @@ for (name,level,color) in [(:trace,TRACE,7),(:debug,DEBUG,6),(:info,INFO,256),(:
 end
 
 # BLAS
-const libblas = @isdefined(libopenblas32) ? libopenblas32 : libmkl32
 const blas_num_threads = Ref{Int}()
 function set_blas_num_threads(n::Integer;permanent::Bool=false)
     permanent && (blas_num_threads[]=n)

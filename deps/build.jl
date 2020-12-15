@@ -3,10 +3,12 @@
 
 using Pkg.Artifacts
 using BinaryProvider
+using OpenBLAS32_jll
+using MKL_jll
 
 products   = Product[]
 build_succeded(product::Product)=satisfied(product) ? "succeeded" : "failed"
-
+isvalid(cmd::Cmd)=(try run(cmd) catch e return false end; return true)
 # Parse some basic command-line arguments
 const verbose = "--verbose" in ARGS
 const blasvendor=(haskey(ENV,"MADNLP_BLAS") && ENV["MADNLP_BLAS"]=="mkl") ?
@@ -28,40 +30,15 @@ const openmp_flag = haskey(ENV,"MADNLP_ENABLE_OPENMP") ? ENV["MADNLP_ENABLE_OPEN
 const optimization_flag = haskey(ENV,"MADNLP_OPTIMIZATION_FLAG") ? ENV["MADNLP_OPTIMIZATION_FLAG"] : `-O3`
 const installer = Sys.isapple() ? "brew install" : "sudo apt install"
 if blasvendor == :openblas
-    const libopenblas_dir = joinpath(artifact"OpenBLAS32", "lib")
+    const libopenblas_dir = joinpath(OpenBLAS32_jll.artifact_dir,OpenBLAS32_jll.libopenblas_splitpath[1:end-1]...)
     const with_openblas = `-L$libopenblas_dir $rpath$libopenblas_dir -lopenblas`
-    # push!(products,FileProduct(prefix,joinpath(libopenblas_dir,"libopenblas.$so"),:libopenblas32))
 else
-    const libmkl_dir = joinpath(artifact"MKL","lib")
-    const with_mkl = `-L$libmkl_dir $rpath$libmkl_dir -lmkl_intel_lp64 -lmkl_sequential -lmkl_core`
-    # push!(products,FileProduct(prefix,joinpath(libmkl_dir,"libmkl_intel_lp64.$so"),:libmkl32))
+    const libmkl_dir = joinpath(MKL_jll.artifact_dir,MKL_jll.libmkl_rt_splitpath[1:end-1]...)
+    const with_mkl = `-L$libmkl_dir $rpath$libmkl_dir -lmkl_rt`
 end
-
-# check c compiler availability
-is_CC = true
-try 
-    run(`$CC dummy_c.c`)
-    rm("a.out",force=true)
-catch e
-    global is_CC
-    @warn "C compiler is not installed. Run $installer gcc"
-    is_CC = false
-end
-
-# check fortran compiler avilability
-is_FC = true
-try 
-    run(`$FC dummy_f.f`)
-    rm("a.out",force=true)
-catch e
-    global is_FC
-    @warn "Fortran compiler is not installed. Run $installer gfortran"
-    is_FC = false
-end
-
 
 # HSL
-if is_FC
+if isvalid(`$FC --version`)
     const hsl_version = "2015.06.23"
     const hsl_archive = joinpath(@__DIR__, "download/coinhsl-$hsl_version.tar.gz")
     push!(products,FileProduct(prefix,joinpath(libdir,"libhsl.$so"), :libhsl))
@@ -92,7 +69,7 @@ if is_FC
 end
 
 # Pardiso
-if is_CC
+if isvalid(`$CC --version`)
     const libpardiso_names = Sys.isapple() ?
         ["pardiso600-MACOS-X86-64"] : ["pardiso600-GNU720-X86-64","pardiso600-GNU800-X86-64"]
     const libpardiso_dir = joinpath(@__DIR__,"download")

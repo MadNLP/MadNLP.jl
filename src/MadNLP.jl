@@ -23,13 +23,15 @@ import JuMP: _create_nlp_block_data, set_optimizer, GenericAffExpr, backend, ter
 import NLPModels: finalize, AbstractNLPModel,
     obj, grad!, cons!, jac_coord!, hess_coord!, hess_structure!, jac_structure!
 import SolverTools: GenericExecutionStats
-import MUMPS_seq_jll: libdmumps_path
-import OpenBLAS32_jll: libopenblas_path
+import MUMPS_seq_jll, OpenBLAS32_jll, MKL_jll
 
 const MOI = MathOptInterface
 const MOIU = MathOptInterface.Utilities
-const libdmumps = libdmumps_path
-const libopenblas32 = libopenblas_path
+const libdmumps = MUMPS_seq_jll.libdmumps_path
+const libopenblas32 = OpenBLAS32_jll.libopenblas_path
+const libmkl32 = MKL_jll.libmkl_rt
+const libblas=(haskey(ENV,"MADNLP_BLAS") && ENV["MADNLP_BLAS"]=="mkl") ?
+    libmkl32 : libopenblas32
 
 export madnlp
 
@@ -53,12 +55,9 @@ function __init__()
     check_deps()
     @isdefined(libhsl) && dlopen(libhsl,RTLD_DEEPBIND)
     @isdefined(libpardiso) && dlopen(libpardiso,RTLD_DEEPBIND)
-    @isdefined(libmkl32) && dlopen.(joinpath.(artifact"MKL","lib",[
-        "libmkl_core.$(dlext)",
-        "libmkl_sequential.$(dlext)",
-        "libmkl_intel_lp64.$(dlext)"]),RTLD_GLOBAL)
+    @isdefined(libmkl32) && dlopen.(libmkl32,RTLD_GLOBAL)
     @isdefined(libopenblas32) && dlopen(libopenblas32,RTLD_GLOBAL)
-    set_blas_num_threads(Threads.nthreads() ;permanent=true)
+    set_blas_num_threads(Threads.nthreads(); permanent=true)
 end
 
 end # end module
