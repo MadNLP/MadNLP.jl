@@ -1,9 +1,6 @@
 # MadNLP.jl
 # Created by Sungho Shin (sungho.shin@wisc.edu)
 
-
-Sys.iswindows() && error("Windows is currently not supported.")
-
 using Pkg.Artifacts
 using BinaryProvider
 
