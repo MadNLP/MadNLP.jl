@@ -78,7 +78,7 @@ if isvalid(`$CC --version`)
     for name in libpardiso_names
         if isfile(joinpath(libpardiso_dir,"lib$name.$so"))
             with_pardiso=`-L$libpardiso_dir $rpath$libpardiso_dir -l$name`
-            wait(OutputCollector(`$CC -shared -olib/libpardiso.$so pardiso_dummy.c $whole_archive $with_pardiso $no_whole_archive $with_openblas -lgfortran $openmp_flag -lpthread -lm`,verbose=verbose))
+            wait(OutputCollector(`$CC -shared -olib/libpardiso.$so .pardiso_dummy.c $whole_archive $with_pardiso $no_whole_archive $with_openblas -lgfortran $openmp_flag -lpthread -lm`,verbose=verbose))
             Sys.isapple() && satisfied(products[end]) &&
                 wait(OutputCollector(`install_name_tool -change lib$name.$so @rpath/lib$name.$so lib/libpardiso.$so`,verbose=verbose))
             satisfied(products[end]) && break
