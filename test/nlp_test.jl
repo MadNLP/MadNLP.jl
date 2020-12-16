@@ -128,48 +128,48 @@ sets = [
         [],
         isdefined(MadNLP,:LapackGPU)
     ],
-    # [
-    #     ()->MadNLP.Optimizer(
-    #         fixed_variable_treatment=MadNLP.RELAX_BOUND,
-    #         print_level=MadNLP.ERROR),
-    #     [],
-    #     true
-    # ],
-    # [
-    #     ()->MadNLP.Optimizer(
-    #         reduced_system=false,
-    #         print_level=MadNLP.ERROR),
-    #     ["infeasible","eigmina"], # numerical errors
-    #     true
-    # ],
-    # [
-    #     ()->MadNLP.Optimizer(
-    #         inertia_correction_method=MadNLP.INERTIA_FREE,
-    #         reduced_system=false),
-    #     ["infeasible","eigmina"], # numerical errors
-    #     true
-    # ],
-    # [
-    #     ()->MadNLP.Optimizer(
-    #         inertia_correction_method=MadNLP.INERTIA_FREE,
-    #         print_level=MadNLP.ERROR),
-    #     [],
-    #     true
-    # ],
-    # [
-    #     ()->MadNLP.Optimizer(
-    #         iterator=MadNLP.Krylov,
-    #         print_level=MadNLP.ERROR),
-    #     ["unbounded"],
-    #     true
-    # ],
-    # [
-    #     ()->MadNLP.Optimizer(
-    #         linear_system_scaler=isdefined(MadNLP,:Mc19) ? MadNLP.Mc19 : MadNLP.DummyModule,
-    #         print_level=MadNLP.ERROR),
-    #     ["eigmina"],
-    #     true
-    # ],
+    [
+        ()->MadNLP.Optimizer(
+            fixed_variable_treatment=MadNLP.RELAX_BOUND,
+            print_level=MadNLP.ERROR),
+        [],
+        true
+    ],
+    [
+        ()->MadNLP.Optimizer(
+            reduced_system=false,
+            print_level=MadNLP.ERROR),
+        ["infeasible","eigmina"], # numerical errors
+        true
+    ],
+    [
+        ()->MadNLP.Optimizer(
+            inertia_correction_method=MadNLP.INERTIA_FREE,
+            reduced_system=false),
+        ["infeasible","eigmina"], # numerical errors
+        true
+    ],
+    [
+        ()->MadNLP.Optimizer(
+            inertia_correction_method=MadNLP.INERTIA_FREE,
+            print_level=MadNLP.ERROR),
+        [],
+        true
+    ],
+    [
+        ()->MadNLP.Optimizer(
+            iterator=MadNLP.Krylov,
+            print_level=MadNLP.ERROR),
+        ["unbounded"],
+        true
+    ],
+    [
+        ()->MadNLP.Optimizer(
+            linear_system_scaler=isdefined(MadNLP,:Mc19) ? MadNLP.Mc19 : MadNLP.DummyModule,
+            print_level=MadNLP.ERROR),
+        ["eigmina"],
+        true
+    ],
     # [
     #     ()->MadNLP.Optimizer(
     #         disable_garbage_collector=true,
