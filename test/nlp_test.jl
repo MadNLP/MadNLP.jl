@@ -80,14 +80,14 @@ sets = [
         [],
         isdefined(MadNLP,:PardisoMKL)
     ],
-    # [
-    #     ()->MadNLP.Optimizer(
-    #         linear_solver=MadNLP.LapackCPU,
-    #         lapackcpu_algorithm=MadNLP.LapackCPU.BUNCHKAUFMAN,
-    #         print_level=MadNLP.ERROR),
-    #     [],
-    #     isdefined(MadNLP,:LapackCPU)
-    # ],
+    [
+        ()->MadNLP.Optimizer(
+            linear_solver=MadNLP.LapackCPU,
+            lapackcpu_algorithm=MadNLP.LapackCPU.BUNCHKAUFMAN,
+            print_level=MadNLP.ERROR),
+        [],
+        isdefined(MadNLP,:LapackCPU)
+    ],
     # [
     #     ()->MadNLP.Optimizer(
     #         linear_solver=MadNLP.LapackCPU,

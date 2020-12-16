@@ -28,7 +28,7 @@ const libmetis_dir = joinpath(artifact"METIS", "lib")
 const with_metis = `-L$libmetis_dir $rpath$libmetis_dir -lmetis`
 const openmp_flag = haskey(ENV,"MADNLP_ENABLE_OPENMP") ? ENV["MADNLP_ENABLE_OPENMP"] : `-fopenmp`
 const optimization_flag = haskey(ENV,"MADNLP_OPTIMIZATION_FLAG") ? ENV["MADNLP_OPTIMIZATION_FLAG"] : `-O3`
-const installer = Sys.isapple() ? "brew install" : "sudo apt install"
+const installer = Sys.isapple() ? "brew install" : Sys.iswindows() ? "pacman -S" : "sudo apt install"
 if blasvendor == :openblas
     const libopenblas_dir = joinpath(OpenBLAS32_jll.artifact_dir,OpenBLAS32_jll.libopenblas_splitpath[1:end-1]...)
     const with_openblas = `-L$libopenblas_dir $rpath$libopenblas_dir -lopenblas`
