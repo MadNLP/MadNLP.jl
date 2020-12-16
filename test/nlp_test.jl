@@ -81,29 +81,29 @@ sets = [
         isdefined(MadNLP,:PardisoMKL)
     ],
     [
-        ()->MadNLP.Optimizer(
-            linear_solver=MadNLP.LapackCPU,
-            lapackcpu_algorithm=MadNLP.LapackCPU.BUNCHKAUFMAN,
-            print_level=MadNLP.ERROR),
-        [],
-        isdefined(MadNLP,:LapackCPU)
-    ],
-    [
-        ()->MadNLP.Optimizer(
-            linear_solver=MadNLP.LapackCPU,
-            lapackcpu_algorithm=MadNLP.LapackCPU.LU,
-            print_level=MadNLP.ERROR),
-        [],
-        isdefined(MadNLP,:LapackCPU)
-    ],
-    [
-        ()->MadNLP.Optimizer(
-            linear_solver=MadNLP.LapackCPU,
-            lapackcpu_algorithm=MadNLP.LapackCPU.QR,
-            print_level=MadNLP.ERROR),
-        [],
-        isdefined(MadNLP,:LapackCPU)
-    ],
+    #     ()->MadNLP.Optimizer(
+    #         linear_solver=MadNLP.LapackCPU,
+    #         lapackcpu_algorithm=MadNLP.LapackCPU.BUNCHKAUFMAN,
+    #         print_level=MadNLP.ERROR),
+    #     [],
+    #     isdefined(MadNLP,:LapackCPU)
+    # ],
+    # [
+    #     ()->MadNLP.Optimizer(
+    #         linear_solver=MadNLP.LapackCPU,
+    #         lapackcpu_algorithm=MadNLP.LapackCPU.LU,
+    #         print_level=MadNLP.ERROR),
+    #     [],
+    #     isdefined(MadNLP,:LapackCPU)
+    # ],
+    # [
+    #     ()->MadNLP.Optimizer(
+    #         linear_solver=MadNLP.LapackCPU,
+    #         lapackcpu_algorithm=MadNLP.LapackCPU.QR,
+    #         print_level=MadNLP.ERROR),
+    #     [],
+    #     isdefined(MadNLP,:LapackCPU)
+    # ],
     [
         ()->MadNLP.Optimizer(
             linear_solver=MadNLP.LapackGPU,
@@ -170,14 +170,14 @@ sets = [
         ["eigmina"],
         true
     ],
-    # [
-    #     ()->MadNLP.Optimizer(
-    #         disable_garbage_collector=true,
-    #         output_file=".test.out"
-    #     ),
-    #     ["infeasible","unbounded","eigmina"], # just checking logger; no need to test all
-    #     isdefined(MadNLP,:Umfpack )
-    # ],
+    [
+        ()->MadNLP.Optimizer(
+            disable_garbage_collector=true,
+            output_file=".test.out"
+        ),
+        ["infeasible","unbounded","eigmina"], # just checking logger; no need to test all
+        isdefined(MadNLP,:Umfpack )
+    ],
 ]
 
 @testset "NLP test" for (optimizer_constructor,exclude,availability) in sets
