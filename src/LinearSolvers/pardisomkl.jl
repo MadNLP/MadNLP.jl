@@ -5,7 +5,7 @@ module PardisoMKL
 
 import ..MadNLP:
     @kwdef, Logger, @debug, @warn, @error,
-    SubVector, StrideOneVector, SparseMatrixCSC, libmkl32,
+    SubVector, StrideOneVector, SparseMatrixCSC, libblas,
     SymbolicException,FactorizationException,SolveException,InertiaException,
     AbstractOptions, AbstractLinearSolver, set_options!,
     introduce, factorize!, solve!, improve!, is_inertia, inertia, blas_num_threads
@@ -36,7 +36,7 @@ end
 
 pardisomkl_pardisoinit(pt,mtype::Ref{Cint},iparm::Vector{Cint}) =
     ccall(
-        (:pardisoinit,libmkl32),
+        (:pardisoinit,libblas),
         Cvoid,
         (Ptr{Cvoid},Ptr{Cint},Ptr{Cint}),
         pt,mtype,iparm)
@@ -45,7 +45,7 @@ pardisomkl_pardiso(pt,maxfct::Ref{Cint},mnum::Ref{Cint},mtype::Ref{Cint},
                    perm::Vector{Cint},nrhs::Ref{Cint},iparm::Vector{Cint},msglvl::Ref{Cint},
                    b::StrideOneVector{Cdouble},x::StrideOneVector{Cdouble},err::Ref{Cint}) =
                        ccall(
-                           (:pardiso,libmkl32),
+                           (:pardiso,libblas),
                            Cvoid,
                            (Ptr{Cvoid}, Ptr{Cint}, Ptr{Cint}, Ptr{Cint}, Ptr{Cint},
                             Ptr{Cint}, Ptr{Cdouble}, Ptr{Cint}, Ptr{Cint}, Ptr{Cint},
@@ -53,11 +53,11 @@ pardisomkl_pardiso(pt,maxfct::Ref{Cint},mnum::Ref{Cint},mtype::Ref{Cint},
                            pt,maxfct,mnum,mtype,phase,n,a,ia,ja,perm,nrhs,iparm,msglvl,b,x,err)
 
 function pardisomkl_set_num_threads!(n)
-    ccall((:mkl_set_dynamic, libmkl32),
+    ccall((:mkl_set_dynamic, libblas),
          Cvoid,
          (Ptr{Cint},),
           Ref{Cint}(0))
-    ccall((:mkl_set_num_threads, libmkl32),
+    ccall((:mkl_set_num_threads, libblas),
           Cvoid,
           (Ptr{Cint},),
           Ref{Cint}(n))

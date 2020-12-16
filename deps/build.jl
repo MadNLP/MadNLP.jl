@@ -1,21 +1,14 @@
 # MadNLP.jl
 # Created by Sungho Shin (sungho.shin@wisc.edu)
 
+blasvendor=(haskey(ENV,"MADNLP_BLAS") && ENV["MADNLP_BLAS"]=="openblas") ? :openblas : :mkl
+
 using Pkg.Artifacts
 using BinaryProvider
 using OpenBLAS32_jll
-using MKL_jll
+blasvendor == :mkl && using MKL_jll
 
-products   = Product[]
-build_succeded(product::Product)=satisfied(product) ? "succeeded" : "failed"
-isvalid(cmd::Cmd)=(try run(cmd) catch e return false end; return true)
-# Parse some basic command-line arguments
 const verbose = "--verbose" in ARGS
-const blasvendor=(haskey(ENV,"MADNLP_BLAS") && ENV["MADNLP_BLAS"]=="openblas") ?
-    :openblas : :mkl
-
-@info "Building MadNLP with $(blasvendor == :mkl ? "MKL" : "OpenBLAS")"
-
 const prefix = Prefix(@__DIR__)
 const so = BinaryProvider.platform_dlext()
 const rpath = `-Wl,-rpath,`
@@ -29,18 +22,24 @@ const with_metis = `-L$libmetis_dir $rpath$libmetis_dir -lmetis`
 const openmp_flag = haskey(ENV,"MADNLP_ENABLE_OPENMP") ? ENV["MADNLP_ENABLE_OPENMP"] : `-fopenmp`
 const optimization_flag = haskey(ENV,"MADNLP_OPTIMIZATION_FLAG") ? ENV["MADNLP_OPTIMIZATION_FLAG"] : `-O3`
 const installer = Sys.isapple() ? "brew install" : Sys.iswindows() ? "pacman -S" : "sudo apt install"
-if blasvendor == :openblas
-    const libopenblas_dir = joinpath(OpenBLAS32_jll.artifact_dir,OpenBLAS32_jll.libopenblas_splitpath[1:end-1]...)
-    const with_openblas = `-L$libopenblas_dir $rpath$libopenblas_dir -lopenblas`
-else
+if blasvendor == :mkl 
     const libmkl_dir = joinpath(MKL_jll.artifact_dir,MKL_jll.libmkl_rt_splitpath[1:end-1]...)
     const with_mkl = `-L$libmkl_dir $rpath$libmkl_dir -lmkl_rt`
+else
+    const libopenblas_dir = joinpath(OpenBLAS32_jll.artifact_dir,OpenBLAS32_jll.libopenblas_splitpath[1:end-1]...)
+    const with_openblas = `-L$libopenblas_dir $rpath$libopenblas_dir -lopenblas`
 end
+
+products   = Product[]
+build_succeded(product::Product)=satisfied(product) ? "succeeded" : "failed"
+isvalid(cmd::Cmd)=(try run(cmd) catch e return false end; return true)
+
+@info "Building MadNLP with $(blasvendor == :mkl ? "MKL" : "OpenBLAS")"
 
 # HSL
 if isvalid(`$FC --version`)
     const hsl_version = "2015.06.23"
-    const hsl_archive = joinpath(@__DIR__, "download/coinhsl-$hsl_version.tar.gz")
+    const hsl_archive = joinpath(@__DIR__,"download","coinhsl-$hsl_version.tar.gz")
     push!(products,FileProduct(prefix,joinpath(libdir,"libhsl.$so"), :libhsl))
     if isfile(hsl_archive)
         unpack(hsl_archive,joinpath(@__DIR__, "download"))
@@ -62,8 +61,10 @@ if isvalid(`$FC --version`)
         push!(OC,OutputCollector(`$FC $openmp_flag -fPIC -c $optimization_flag -o hsl_mc68/C/hsl_mc68i_ciface.o hsl_mc68/C/hsl_mc68i_ciface.f90`,verbose=verbose))
         push!(OC,OutputCollector(`$FC $openmp_flag -fPIC -c $optimization_flag -o hsl_ma97/C/hsl_ma97d_ciface.o hsl_ma97/C/hsl_ma97d_ciface.f90`,verbose=verbose))
         wait.(OC); empty!(OC)
+        rm(joinpath(libdir,"libhsl.$so"),force=true)
         wait(OutputCollector(`$FC -o$(libdir)/libhsl.$so -shared -fPIC $optimization_flag common/deps90.o common/deps.o mc19/mc19d.o ma27/ma27d.o ma57/ma57d.o hsl_ma77/hsl_ma77d.o hsl_ma77/C/hsl_ma77d_ciface.o hsl_ma86/hsl_ma86d.o hsl_ma86/C/hsl_ma86d_ciface.o hsl_mc68/C/hsl_mc68i_ciface.o hsl_ma97/hsl_ma97d.o hsl_ma97/C/hsl_ma97d_ciface.o $openmp_flag $with_metis $(blasvendor == :mkl ? with_mkl : with_openblas)`,verbose=verbose))
         cd("$(@__DIR__)")
+        rm(joinpath(@__DIR__,"download","coinhsl-$hsl_version"),recursive=true,force=true)
     end
     @info "Building HSL (Ma27, Ma57, Ma77, Ma86, Ma97) $(build_succeded(products[end]))."
 end

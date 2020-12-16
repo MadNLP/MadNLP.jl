@@ -34,6 +34,7 @@ has_cuda_gpu() && include("lapackgpu.jl")
 # direct solvers
 include("umfpack.jl")
 include("mumps.jl")
+blasvendor == :mkl && include("pardisomkl.jl")
 if @isdefined libhsl
     include("mc68.jl")
     include("ma27.jl")
@@ -43,7 +44,7 @@ if @isdefined libhsl
     include("ma97.jl")
 end
 @isdefined(libpardiso) && include("pardiso.jl")
-@isdefined(libmkl32) && include("pardisomkl.jl")
+
 
 # decomposition solvers
 include("schwarz.jl")
