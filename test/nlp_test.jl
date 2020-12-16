@@ -80,54 +80,54 @@ sets = [
         [],
         isdefined(MadNLP,:PardisoMKL)
     ],
-    # [
-    #     ()->MadNLP.Optimizer(
-    #         linear_solver=MadNLP.LapackCPU,
-    #         lapackcpu_algorithm=MadNLP.LapackCPU.BUNCHKAUFMAN,
-    #         print_level=MadNLP.ERROR),
-    #     [],
-    #     isdefined(MadNLP,:LapackCPU)
-    # ],
-    # [
-    #     ()->MadNLP.Optimizer(
-    #         linear_solver=MadNLP.LapackCPU,
-    #         lapackcpu_algorithm=MadNLP.LapackCPU.LU,
-    #         print_level=MadNLP.ERROR),
-    #     [],
-    #     isdefined(MadNLP,:LapackCPU)
-    # ],
-    # [
-    #     ()->MadNLP.Optimizer(
-    #         linear_solver=MadNLP.LapackCPU,
-    #         lapackcpu_algorithm=MadNLP.LapackCPU.QR,
-    #         print_level=MadNLP.ERROR),
-    #     [],
-    #     isdefined(MadNLP,:LapackCPU)
-    # ],
-    # [
-    #     ()->MadNLP.Optimizer(
-    #         linear_solver=MadNLP.LapackGPU,
-    #         lapackgpu_algorithm=MadNLP.LapackGPU.BUNCHKAUFMAN,
-    #         print_level=MadNLP.ERROR),
-    #     [],
-    #     isdefined(MadNLP,:LapackGPU)
-    # ],
-    # [
-    #     ()->MadNLP.Optimizer(
-    #         linear_solver=MadNLP.LapackGPU,
-    #         lapackgpu_algorithm=MadNLP.LapackGPU.LU,
-    #         print_level=MadNLP.ERROR),
-    #     [],
-    #     isdefined(MadNLP,:LapackGPU)
-    # ],
-    # [
-    #     ()->MadNLP.Optimizer(
-    #         linear_solver=MadNLP.LapackGPU,
-    #         lapackgpu_algorithm=MadNLP.LapackGPU.QR,
-    #         print_level=MadNLP.ERROR),
-    #     [],
-    #     isdefined(MadNLP,:LapackGPU)
-    # ],
+    [
+        ()->MadNLP.Optimizer(
+            linear_solver=MadNLP.LapackCPU,
+            lapackcpu_algorithm=MadNLP.LapackCPU.BUNCHKAUFMAN,
+            print_level=MadNLP.ERROR),
+        [],
+        isdefined(MadNLP,:LapackCPU)
+    ],
+    [
+        ()->MadNLP.Optimizer(
+            linear_solver=MadNLP.LapackCPU,
+            lapackcpu_algorithm=MadNLP.LapackCPU.LU,
+            print_level=MadNLP.ERROR),
+        [],
+        isdefined(MadNLP,:LapackCPU)
+    ],
+    [
+        ()->MadNLP.Optimizer(
+            linear_solver=MadNLP.LapackCPU,
+            lapackcpu_algorithm=MadNLP.LapackCPU.QR,
+            print_level=MadNLP.ERROR),
+        [],
+        isdefined(MadNLP,:LapackCPU)
+    ],
+    [
+        ()->MadNLP.Optimizer(
+            linear_solver=MadNLP.LapackGPU,
+            lapackgpu_algorithm=MadNLP.LapackGPU.BUNCHKAUFMAN,
+            print_level=MadNLP.ERROR),
+        [],
+        isdefined(MadNLP,:LapackGPU)
+    ],
+    [
+        ()->MadNLP.Optimizer(
+            linear_solver=MadNLP.LapackGPU,
+            lapackgpu_algorithm=MadNLP.LapackGPU.LU,
+            print_level=MadNLP.ERROR),
+        [],
+        isdefined(MadNLP,:LapackGPU)
+    ],
+    [
+        ()->MadNLP.Optimizer(
+            linear_solver=MadNLP.LapackGPU,
+            lapackgpu_algorithm=MadNLP.LapackGPU.QR,
+            print_level=MadNLP.ERROR),
+        [],
+        isdefined(MadNLP,:LapackGPU)
+    ],
     # [
     #     ()->MadNLP.Optimizer(
     #         fixed_variable_treatment=MadNLP.RELAX_BOUND,
