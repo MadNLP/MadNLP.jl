@@ -11,8 +11,8 @@ build_succeded(product::Product)=satisfied(product) ? "succeeded" : "failed"
 isvalid(cmd::Cmd)=(try run(cmd) catch e return false end; return true)
 # Parse some basic command-line arguments
 const verbose = "--verbose" in ARGS
-const blasvendor=(haskey(ENV,"MADNLP_BLAS") && ENV["MADNLP_BLAS"]=="mkl") ?
-    :mkl : :openblas
+const blasvendor=(haskey(ENV,"MADNLP_BLAS") && ENV["MADNLP_BLAS"]=="openblas") ?
+    :openblas : :mkl
 
 @info "Building MadNLP with $(blasvendor == :mkl ? "MKL" : "OpenBLAS")"
 
@@ -88,3 +88,6 @@ end
 
 # write deps.jl
 write_deps_file(joinpath(@__DIR__, "deps.jl"), products[satisfied.(products)], verbose=verbose)
+open(joinpath(@__DIR__, "deps.jl"),write=true,append=true) do f
+    write(f,"blasvendor = :$blasvendor\n")
+end

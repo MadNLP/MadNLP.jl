@@ -3,6 +3,8 @@
 
 module MadNLP
 
+include(joinpath("..","deps","deps.jl"))
+
 import Pkg.Artifacts: @artifact_str
 import Pkg.TOML: parsefile
 import IterativeSolvers, MathOptInterface, MPI
@@ -30,8 +32,7 @@ const MOIU = MathOptInterface.Utilities
 const libdmumps = MUMPS_seq_jll.libdmumps_path
 const libopenblas32 = OpenBLAS32_jll.libopenblas_path
 const libmkl32 = MKL_jll.libmkl_rt
-const libblas=(haskey(ENV,"MADNLP_BLAS") && ENV["MADNLP_BLAS"]=="mkl") ?
-    libmkl32 : libopenblas32
+const libblas = blasvendor==:mkl ? libmkl32 : libopenblas32
 
 export madnlp
 
@@ -40,7 +41,6 @@ version() = parsefile(joinpath(@__DIR__,"..","Project.toml"))["version"]
 introduce() = "MadNLP version v$(version())"
 
 # Linear solver dependencies
-include(joinpath("..","deps","deps.jl"))
 include("enums.jl")
 include("utils.jl")
 include("nonlinearprogram.jl")

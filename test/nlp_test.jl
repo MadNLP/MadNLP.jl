@@ -88,22 +88,22 @@ sets = [
         [],
         isdefined(MadNLP,:LapackCPU)
     ],
-    # [
-    #     ()->MadNLP.Optimizer(
-    #         linear_solver=MadNLP.LapackCPU,
-    #         lapackcpu_algorithm=MadNLP.LapackCPU.LU,
-    #         print_level=MadNLP.ERROR),
-    #     [],
-    #     isdefined(MadNLP,:LapackCPU)
-    # ],
-    # [
-    #     ()->MadNLP.Optimizer(
-    #         linear_solver=MadNLP.LapackCPU,
-    #         lapackcpu_algorithm=MadNLP.LapackCPU.QR,
-    #         print_level=MadNLP.ERROR),
-    #     [],
-    #     isdefined(MadNLP,:LapackCPU)
-    # ],
+    [
+        ()->MadNLP.Optimizer(
+            linear_solver=MadNLP.LapackCPU,
+            lapackcpu_algorithm=MadNLP.LapackCPU.LU,
+            print_level=MadNLP.ERROR),
+        [],
+        isdefined(MadNLP,:LapackCPU)
+    ],
+    [
+        ()->MadNLP.Optimizer(
+            linear_solver=MadNLP.LapackCPU,
+            lapackcpu_algorithm=MadNLP.LapackCPU.QR,
+            print_level=MadNLP.ERROR),
+        [],
+        isdefined(MadNLP,:LapackCPU)
+    ],
     [
         ()->MadNLP.Optimizer(
             linear_solver=MadNLP.LapackGPU,
