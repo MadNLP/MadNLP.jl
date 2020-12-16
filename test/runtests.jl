@@ -27,7 +27,7 @@ end
         include("plasmo_test.jl")
     end
 
-    @testset "MadNLP test" begin 
-        include("nlp_test.jl")
-    end
+    # @testset "MadNLP test" begin 
+    #     include("nlp_test.jl")
+    # end
 end # @testset
