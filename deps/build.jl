@@ -1,12 +1,14 @@
 # MadNLP.jl
 # Created by Sungho Shin (sungho.shin@wisc.edu)
 
-blasvendor=(haskey(ENV,"MADNLP_BLAS") && ENV["MADNLP_BLAS"]=="mkl") ? :mkl : :openblas
 
-using Pkg.Artifacts
-using BinaryProvider
-using OpenBLAS32_jll
-blasvendor == :mkl && using MKL_jll
+using Pkg.Artifacts, BinaryProvider, OpenBLAS32_jll, MKL_jll
+
+if haskey(ENV,"MADNLP_BLAS")
+    blasvendor = ENV["MADNLP_BLAS"]=="openblas" ? :openblas : :mkl
+else
+    blasvendor = MKL_jll.best_platform == nothing ? :openblas : :mkl
+end
 
 const verbose = "--verbose" in ARGS
 const prefix = Prefix(@__DIR__)
