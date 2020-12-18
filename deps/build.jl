@@ -1,7 +1,6 @@
 # MadNLP.jl
 # Created by Sungho Shin (sungho.shin@wisc.edu)
 
-
 using Pkg.Artifacts, BinaryProvider, OpenBLAS32_jll, MKL_jll
 
 if haskey(ENV,"MADNLP_BLAS")
@@ -63,10 +62,8 @@ if isvalid(`$FC --version`)
         push!(OC,OutputCollector(`$FC $openmp_flag -fPIC -c $optimization_flag -o hsl_mc68/C/hsl_mc68i_ciface.o hsl_mc68/C/hsl_mc68i_ciface.f90`,verbose=verbose))
         push!(OC,OutputCollector(`$FC $openmp_flag -fPIC -c $optimization_flag -o hsl_ma97/C/hsl_ma97d_ciface.o hsl_ma97/C/hsl_ma97d_ciface.f90`,verbose=verbose))
         wait.(OC); empty!(OC)
-        rm(joinpath(libdir,"libhsl.$so"),force=true)
         wait(OutputCollector(`$FC -o$(libdir)/libhsl.$so -shared -fPIC $optimization_flag common/deps90.o common/deps.o mc19/mc19d.o ma27/ma27d.o ma57/ma57d.o hsl_ma77/hsl_ma77d.o hsl_ma77/C/hsl_ma77d_ciface.o hsl_ma86/hsl_ma86d.o hsl_ma86/C/hsl_ma86d_ciface.o hsl_mc68/C/hsl_mc68i_ciface.o hsl_ma97/hsl_ma97d.o hsl_ma97/C/hsl_ma97d_ciface.o $openmp_flag $with_metis $(blasvendor == :mkl ? with_mkl : with_openblas)`,verbose=verbose))
         cd("$(@__DIR__)")
-        rm(joinpath(@__DIR__,"download","coinhsl-$hsl_version"),recursive=true,force=true)
     end
     @info "Building HSL (Ma27, Ma57, Ma77, Ma86, Ma97) $(build_succeded(products[end]))."
 end

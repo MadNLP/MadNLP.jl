@@ -15,8 +15,9 @@ pkg> add MadNLP
 
 The build process requires C and Fortran compilers. If they are not installed, do
 ```julia
-shell> sudo apt install gcc # Linux
-shell> brew cask install gcc # MacOS
+shell> sudo apt install gcc gfortran # Linux
+shell> brew cask install gcc gfortran # MacOS
+shell> pacman -S gcc gfortran # MacOS
 ```
 
 MadNLP is interfaced with non-Julia sparse/dense linear solvers:
@@ -40,7 +41,7 @@ Build can be customized by setting the following environment variables.
 ```julia
 julia> ENV["MADNLP_CC"] = "/usr/local/bin/gcc-9"    # default is "gcc"
 julia> ENV["MADNLP_FC"] = "/usr/local/bin/gfortran" # default is "gfortran"
-julia> ENV["MADNLP_BLAS"] = "openblas"              # default is "mkl"
+julia> ENV["MADNLP_BLAS"] = "openblas"              # default is "mkl" if available "openblas" otherwise
 julia> ENV["MADNLP_ENALBE_OPENMP"] = false          # default is "true"
 julia> ENV["MADNLP_OPTIMIZATION_FLAG"] = "-O2"      # default is "-O3"
 ```
