@@ -24,6 +24,9 @@ SolverTools = "b5612192-2639-5dc1-abfe-fbedd65fab29"
 SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 SuiteSparse = "4607b0f0-06f3-5cda-b6b1-a6196a1729e9"
+MUMPS_seq_jll = "d7ed1dd3-d0ae-5e8e-bfb4-87a502085b8d"
+OpenBLAS32_jll = "656ef2d0-ae68-5445-9ca0-591084a874a2"
+MKL_jll = "856f044c-d86e-5d09-b602-aeab76dc8ba7"
 
 [compat]
 AmplNLReader = "~0.8"
@@ -39,6 +42,9 @@ NLPModels = "~0.13"
 Plasmo = "~0.3"
 SolverTools = "~0.3"
 StaticArrays = "~0.12"
+MUMPS_seq_jll = "~5"
+OpenBLAS32_jll = "~0.3"
+MKL_jll = "~2020"
 julia = "1.5"
 
 [extras]

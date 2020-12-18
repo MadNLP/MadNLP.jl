@@ -75,10 +75,10 @@ sets = [
     ],
     [
         ()->MadNLP.Optimizer(
-            linear_solver=MadNLP.PardisoCPU,
+            linear_solver=MadNLP.PardisoMKL,
             print_level=MadNLP.ERROR),
         [],
-        isdefined(MadNLP,:PardisoCPU)
+        isdefined(MadNLP,:PardisoMKL)
     ],
     [
         ()->MadNLP.Optimizer(

@@ -1,2 +1,0 @@
-       program dummy
-       end program

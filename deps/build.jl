@@ -1,22 +1,15 @@
 # MadNLP.jl
 # Created by Sungho Shin (sungho.shin@wisc.edu)
 
+using Pkg.Artifacts, BinaryProvider, OpenBLAS32_jll, MKL_jll
 
-Sys.iswindows() && error("Windows is currently not supported.")
+if haskey(ENV,"MADNLP_BLAS")
+    blasvendor = ENV["MADNLP_BLAS"]=="openblas" ? :openblas : :mkl
+else
+    blasvendor = MKL_jll.best_platform == nothing ? :openblas : :mkl
+end
 
-using Pkg.Artifacts
-using BinaryProvider
-
-products   = Product[]
-build_succeded(product::Product)=satisfied(product) ? "succeeded" : "failed"
-
-# Parse some basic command-line arguments
 const verbose = "--verbose" in ARGS
-const blasvendor=(haskey(ENV,"MADNLP_BLAS") && ENV["MADNLP_BLAS"]=="openblas") ?
-    :openblas : :mkl
-
-@info "Building HSL and Mumps with $(blasvendor == :mkl ? "MKL" : "OpenBLAS")"
-
 const prefix = Prefix(@__DIR__)
 const so = BinaryProvider.platform_dlext()
 const rpath = `-Wl,-rpath,`
@@ -29,52 +22,25 @@ const libmetis_dir = joinpath(artifact"METIS", "lib")
 const with_metis = `-L$libmetis_dir $rpath$libmetis_dir -lmetis`
 const openmp_flag = haskey(ENV,"MADNLP_ENABLE_OPENMP") ? ENV["MADNLP_ENABLE_OPENMP"] : `-fopenmp`
 const optimization_flag = haskey(ENV,"MADNLP_OPTIMIZATION_FLAG") ? ENV["MADNLP_OPTIMIZATION_FLAG"] : `-O3`
-const installer = Sys.isapple() ? "brew install" : "sudo apt install"
-if blasvendor == :openblas
-    const libopenblas_dir = joinpath(artifact"OpenBLAS32","lib")
-    const with_openblas = `-L$libopenblas_dir $rpath$libopenblas_dir -lopenblas`
-    push!(products,FileProduct(prefix,joinpath(libopenblas_dir,"libopenblas.$so"),:libopenblas32))
+const installer = Sys.isapple() ? "brew install" : Sys.iswindows() ? "pacman -S" : "sudo apt install"
+if blasvendor == :mkl 
+    const libmkl_dir = joinpath(MKL_jll.artifact_dir,MKL_jll.libmkl_rt_splitpath[1:end-1]...)
+    const with_mkl = `-L$libmkl_dir $rpath$libmkl_dir -lmkl_rt`
 else
-    const libmkl_dir = joinpath(artifact"MKL","lib")
-    const with_mkl = `-L$libmkl_dir $rpath$libmkl_dir -lmkl_intel_lp64 -lmkl_sequential -lmkl_core`
-    push!(products,FileProduct(prefix,joinpath(libmkl_dir,"libmkl_intel_lp64.$so"),:libmkl32))
+    const libopenblas_dir = joinpath(OpenBLAS32_jll.artifact_dir,OpenBLAS32_jll.libopenblas_splitpath[1:end-1]...)
+    const with_openblas = `-L$libopenblas_dir $rpath$libopenblas_dir -lopenblas`
 end
 
-# check c compiler availability
-is_CC = true
-try 
-    run(`$CC dummy_c.c`)
-    rm("a.out",force=true)
-catch e
-    global is_CC
-    @warn "C compiler is not installed. Run $installer gcc"
-    is_CC = false
-end
+products   = Product[]
+build_succeded(product::Product)=satisfied(product) ? "succeeded" : "failed"
+isvalid(cmd::Cmd)=(try run(cmd) catch e return false end; return true)
 
-# check fortran compiler avilability
-is_FC = true
-try 
-    run(`$FC dummy_f.f`)
-    rm("a.out",force=true)
-catch e
-    global is_FC
-    @warn "Fortran compiler is not installed. Run $installer gfortran"
-    is_FC = false
-end
-
-
-# MUMPS_seq
-if is_FC
-    const libmumps_dir = joinpath(artifact"MUMPS_seq","lib")
-    push!(products,FileProduct(prefix,joinpath(libdir,"libmumps.$so"),:libmumps))
-    wait(OutputCollector(`$FC -o$(libdir)/libmumps.$so -shared $whole_archive -L$libmumps_dir $rpath$libmumps_dir -ldmumps $no_whole_archive -lmumps_common -lmpiseq -lpord $with_metis $(blasvendor == :mkl ? with_mkl : with_openblas)`,verbose=verbose))
-    @info "Building Mumps (sequential) $(build_succeded(products[end]))."
-end
+@info "Building MadNLP with $(blasvendor == :mkl ? "MKL" : "OpenBLAS")"
 
 # HSL
-if is_FC
+if isvalid(`$FC --version`)
     const hsl_version = "2015.06.23"
-    const hsl_archive = joinpath(@__DIR__, "download/coinhsl-$hsl_version.tar.gz")
+    const hsl_archive = joinpath(@__DIR__,"download","coinhsl-$hsl_version.tar.gz")
     push!(products,FileProduct(prefix,joinpath(libdir,"libhsl.$so"), :libhsl))
     if isfile(hsl_archive)
         unpack(hsl_archive,joinpath(@__DIR__, "download"))
@@ -103,7 +69,7 @@ if is_FC
 end
 
 # Pardiso
-if is_CC
+if isvalid(`$CC --version`)
     const libpardiso_names = Sys.isapple() ?
         ["pardiso600-MACOS-X86-64"] : ["pardiso600-GNU720-X86-64","pardiso600-GNU800-X86-64"]
     const libpardiso_dir = joinpath(@__DIR__,"download")
@@ -111,7 +77,7 @@ if is_CC
     for name in libpardiso_names
         if isfile(joinpath(libpardiso_dir,"lib$name.$so"))
             with_pardiso=`-L$libpardiso_dir $rpath$libpardiso_dir -l$name`
-            wait(OutputCollector(`$CC -shared -olib/libpardiso.$so pardiso_dummy.c $whole_archive $with_pardiso $no_whole_archive $with_openblas -lgfortran $openmp_flag -lpthread -lm`,verbose=verbose))
+            wait(OutputCollector(`$CC -shared -olib/libpardiso.$so .pardiso_dummy.c $whole_archive $with_pardiso $no_whole_archive $with_openblas -lgfortran $openmp_flag -lpthread -lm`,verbose=verbose))
             Sys.isapple() && satisfied(products[end]) &&
                 wait(OutputCollector(`install_name_tool -change lib$name.$so @rpath/lib$name.$so lib/libpardiso.$so`,verbose=verbose))
             satisfied(products[end]) && break
@@ -122,3 +88,6 @@ end
 
 # write deps.jl
 write_deps_file(joinpath(@__DIR__, "deps.jl"), products[satisfied.(products)], verbose=verbose)
+open(joinpath(@__DIR__, "deps.jl"),write=true,append=true) do f
+    write(f,"blasvendor = :$blasvendor\n")
+end

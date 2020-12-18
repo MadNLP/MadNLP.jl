@@ -113,7 +113,8 @@ end
                "solve_farkas_variable_lessthan_max",
                "solve_farkas_variable_lessthan",
                "solve_farkas_equalto_lower",
-               "solve_farkas_equalto_upper"
+               "solve_farkas_equalto_upper",
+               "solve_qp_edge_cases"
                ]
     MOIT.unittest(bridged, config, exclude)
 end
