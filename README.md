@@ -17,7 +17,7 @@ The build process requires C and Fortran compilers. If they are not installed, d
 ```julia
 shell> sudo apt install gcc gfortran # Linux
 shell> brew cask install gcc gfortran # MacOS
-shell> pacman -S gcc gfortran # MacOS
+shell> pacman -S gcc gfortran # Windows (MinGW)
 ```
 
 MadNLP is interfaced with non-Julia sparse/dense linear solvers:
