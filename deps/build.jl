@@ -1,7 +1,7 @@
 # MadNLP.jl
 # Created by Sungho Shin (sungho.shin@wisc.edu)
 
-blasvendor=(haskey(ENV,"MADNLP_BLAS") && ENV["MADNLP_BLAS"]=="openblas") ? :openblas : :mkl
+blasvendor=(haskey(ENV,"MADNLP_BLAS") && ENV["MADNLP_BLAS"]=="mkl") ? :mkl : :openblas
 
 using Pkg.Artifacts
 using BinaryProvider
