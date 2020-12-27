@@ -63,7 +63,7 @@ for (name,level,color) in [(:trace,TRACE,7),(:debug,DEBUG,6),(:info,INFO,256),(:
 end
 
 # BLAS
-const blas_num_threads = Ref{Int}()
+const blas_num_threads = Ref{Int}(1)
 function set_blas_num_threads(n::Integer;permanent::Bool=false)
     permanent && (blas_num_threads[]=n)
     BLAS.set_num_threads(n) 
