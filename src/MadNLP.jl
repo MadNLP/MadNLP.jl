@@ -25,12 +25,11 @@ import JuMP: _create_nlp_block_data, set_optimizer, GenericAffExpr, backend, ter
 import NLPModels: finalize, AbstractNLPModel,
     obj, grad!, cons!, jac_coord!, hess_coord!, hess_structure!, jac_structure!
 import SolverTools: GenericExecutionStats
-import MUMPS_seq_jll: libdmumps_path
+import MUMPS_seq_jll
 blasvendor == :mkl ? (import MKL_jll: libmkl_rt_path) : (import OpenBLAS32_jll: libopenblas_path)
 
 const MOI = MathOptInterface
 const MOIU = MathOptInterface.Utilities
-const libdmumps = libdmumps_path
 const libblas = blasvendor == :mkl ? libmkl_rt_path : libopenblas_path
 
 export madnlp
