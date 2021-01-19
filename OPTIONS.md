@@ -33,7 +33,7 @@
 - `max_wall_time::Float64 = 1e6`\
     Maximum wall time for interior point solver. The solver terminates with exit symbol `:Maximum_WallTime_Exceeded` if the total solver wall time exceeds `max_wall_time`.
 - `fixed_variable_treatment::FixedVariableTreatments = MAKE_PARAMETER`\
-    Valid values are: `MadNLP`.{`RELAX_BOUNDS`,`MAKE_PARAMETER`}.
+    Valid values are: `MadNLP`.{`RELAX_BOUND`,`MAKE_PARAMETER`}.
 - `jacobian_constant::Bool = false`\
     If `true`, constraint Jacobian is only evaluated once and reused.
 - `hessian_constant::Bool = false`\
