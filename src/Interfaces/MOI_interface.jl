@@ -841,7 +841,7 @@ end
 
 
 MOI.get(model::Optimizer, ::MOI.TerminationStatus) = model.nlp === nothing ?
-    MOI.OPTIMIZE_NOT_CALLED : termination_status(model.ips)
+    MOI.OPTIMIZE_NOT_CALLED : termination_status(model.nlp)
 MOI.get(model::Optimizer, ::MOI.RawStatusString) = string(model.nlp.status)
 MOI.get(model::Optimizer, ::MOI.ResultCount) = (model.nlp !== nothing) ? 1 : 0
 MOI.get(model::Optimizer, attr::MOI.PrimalStatus) = !(1 <= attr.N <= MOI.get(model, MOI.ResultCount())) ?
@@ -873,8 +873,9 @@ const status_dual_dict = Dict(
     SOLVED_TO_ACCEPTABLE_LEVEL => MOI.NEARLY_FEASIBLE_POINT,
     INFEASIBLE_PROBLEM_DETECTED => MOI.INFEASIBLE_POINT)
 
-termination_status(ips::Solver) = haskey(status_moi_dict,ips.nlp.status) ?
-    status_moi_dict[ips.nlp.status] : MOI.UNKNOWN_RESULT_STATUS
+termination_status(nlp::NonlinearProgram) = haskey(status_moi_dict,nlp.status) ?
+    status_moi_dict[nlp.status] : MOI.UNKNOWN_RESULT_STATUS
+termination_status(ips::Solver) = termination_status(ips.nlp)
 primal_status(ips::Solver) = haskey(status_primal_dict,ips.nlp.status) ?
     status_primal_dict[ips.nlp.status] : MOI.UNKNOWN_RESULT_STATUS
 dual_status(ips::Solver) = haskey(status_dual_dict,ips.nlp.status) ?
