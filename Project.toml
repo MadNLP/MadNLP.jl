@@ -2,7 +2,7 @@ name = "MadNLP"
 uuid = "2621e9c9-9eb4-46b1-8089-e8c72242dfb6"
 authors = ["Sungho Shin"]
 repo = "https://github.com/sshin23/MadNLP.jl.git"
-version = "0.1.4"
+version = "0.1.5"
 
 [deps]
 BinaryProvider = "b99e7846-7c00-51b0-8f62-c81ae34c0232"
