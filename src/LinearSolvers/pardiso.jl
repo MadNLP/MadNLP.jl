@@ -79,12 +79,12 @@ function Solver(csc::SparseMatrixCSC{Float64,Int32};
 
     iparm[1]=1
     iparm[2]=opt.pardiso_order # METIS
-    iparm[3]=parse(Int32,haskey(ENV,"OMP_NUM_THREADS") ? ENV["OMP_NUM_THREADS"] : 1)
+    iparm[3]=haskey(ENV,"OMP_NUM_THREADS") ? parse(Int32,ENV["OMP_NUM_THREADS"]) : 1
     iparm[6]=1
     iparm[8]=opt.pardiso_max_inner_refinement_steps
     iparm[10]=12 # pivot perturbation
     iparm[11]=0 # disable scaling
-    iparm[13]=pardiso_matching_strategy_dict[opt.pardiso_matching_strategy] # matching strategy
+    iparm[13]=1 # matching strategy
     iparm[21]=3 # bunch-kaufman pivotin
     iparm[24]=1 # parallel factorization
     iparm[25]=1 # parallel solv

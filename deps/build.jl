@@ -23,17 +23,18 @@ const with_metis = `-L$libmetis_dir $rpath$libmetis_dir -lmetis`
 const openmp_flag = haskey(ENV,"MADNLP_ENABLE_OPENMP") ? ENV["MADNLP_ENABLE_OPENMP"] : `-fopenmp`
 const optimization_flag = haskey(ENV,"MADNLP_OPTIMIZATION_FLAG") ? ENV["MADNLP_OPTIMIZATION_FLAG"] : `-O3`
 const installer = Sys.isapple() ? "brew install" : Sys.iswindows() ? "pacman -S" : "sudo apt install"
+const libopenblas_dir = joinpath(OpenBLAS32_jll.artifact_dir,OpenBLAS32_jll.libopenblas_splitpath[1:end-1]...)
+const with_openblas = `-L$libopenblas_dir $rpath$libopenblas_dir -lopenblas`
 if blasvendor == :mkl 
     const libmkl_dir = joinpath(MKL_jll.artifact_dir,MKL_jll.libmkl_rt_splitpath[1:end-1]...)
     const with_mkl = `-L$libmkl_dir $rpath$libmkl_dir -lmkl_rt`
-else
-    const libopenblas_dir = joinpath(OpenBLAS32_jll.artifact_dir,OpenBLAS32_jll.libopenblas_splitpath[1:end-1]...)
-    const with_openblas = `-L$libopenblas_dir $rpath$libopenblas_dir -lopenblas`
 end
 
+rm.(filter(endswith(".so"), readdir(libdir,join=true)))
 products   = Product[]
 build_succeded(product::Product)=satisfied(product) ? "succeeded" : "failed"
 isvalid(cmd::Cmd)=(try run(cmd) catch e return false end; return true)
+
 
 @info "Building MadNLP with $(blasvendor == :mkl ? "MKL" : "OpenBLAS")"
 
@@ -70,18 +71,15 @@ end
 
 # Pardiso
 if isvalid(`$CC --version`)
-    const libpardiso_names = Sys.isapple() ?
-        ["pardiso600-MACOS-X86-64"] : ["pardiso600-GNU720-X86-64","pardiso600-GNU800-X86-64"]
     const libpardiso_dir = joinpath(@__DIR__,"download")
     push!(products,FileProduct(prefix,joinpath(libdir,"libpardiso.$so"),:libpardiso))
-    for name in libpardiso_names
-        if isfile(joinpath(libpardiso_dir,"lib$name.$so"))
-            with_pardiso=`-L$libpardiso_dir $rpath$libpardiso_dir -l$name`
-            wait(OutputCollector(`$CC -shared -olib/libpardiso.$so .pardiso_dummy.c $whole_archive $with_pardiso $no_whole_archive $with_openblas -lgfortran $openmp_flag -lpthread -lm`,verbose=verbose))
-            Sys.isapple() && satisfied(products[end]) &&
-                wait(OutputCollector(`install_name_tool -change lib$name.$so @rpath/lib$name.$so lib/libpardiso.$so`,verbose=verbose))
-            satisfied(products[end]) && break
-        end
+    for name in readdir(libpardiso_dir)[occursin.("libpardiso",readdir(libpardiso_dir))]
+        startswith(name,"lib") && endswith(name,so) ? name = splitext(name)[1][4:end] : continue
+        with_pardiso=`-L$libpardiso_dir $rpath$libpardiso_dir -l$name`
+        wait(OutputCollector(`$CC -shared -olib/libpardiso.$so .pardiso_dummy.c $whole_archive $with_pardiso $no_whole_archive $with_openblas -lgfortran $openmp_flag -lpthread -lm`,verbose=verbose))
+        Sys.isapple() && satisfied(products[end]) &&
+            wait(OutputCollector(`install_name_tool -change lib$name.$so @rpath/lib$name.$so lib/libpardiso.$so`,verbose=verbose))
+        satisfied(products[end]) && break
     end
     @info "Building Pardiso $(build_succeded(products[end]))."
 end
