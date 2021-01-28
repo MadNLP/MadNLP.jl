@@ -340,6 +340,8 @@ function optimize!(graph::OptiGraph; option_dict = Dict{Symbol,Any}(), kwargs...
     graph.optimizer = Solver(nlp;option_dict=option_dict,kwargs...)
         
     optimize!(graph.optimizer)
+
+    graph.objective_function.constant = graph.optimizer.obj_val
     
     @blas_safe_threads for modelnode in all_nodes(graph) # set outputs
         moi_optimizer(modelnode).nlp.status = graph.optimizer.status
