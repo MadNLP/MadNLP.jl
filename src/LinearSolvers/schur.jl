@@ -186,7 +186,11 @@ function improve!(M::Solver)
     return true
 end
 
-introduce(M::Solver)="schur equipped with "*introduce(M.sws[1].M)
+function introduce(M::Solver)
+    for sw in M.sws
+        sw.M isa EmptyLinearSolver || return "schur equipped with "*introduce(sw.M)
+    end
+end
 
 end
 
