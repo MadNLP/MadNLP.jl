@@ -497,7 +497,7 @@ function Solver(nlp::NonlinearProgram;
     @trace(logger,"Initializing linear solver.")
     cnt.linear_solver_time =
         @elapsed linear_solver = opt.linear_solver.Solver(aug_com;option_dict=option_dict,logger=logger)
-
+    
     @trace(logger,"Initializing iterative solver.")
     iterator = opt.iterator.Solver(
         Vector{Float64}(undef,m+n),
