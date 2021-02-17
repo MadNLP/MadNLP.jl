@@ -5,7 +5,7 @@ module Schur
 
 import ..MadNLP:
     @kwdef, Logger, @debug, @warn, @error,
-    AbstractOptions, AbstractLinearSolver, set_options!, SparseMatrixCSC, SubVector, StrideOneVector,
+    AbstractOptions, AbstractLinearSolver, EmptyLinearSolver, set_options!, SparseMatrixCSC, SubVector, StrideOneVector,
     SymbolicException,FactorizationException,SolveException,InertiaException,
     introduce, factorize!, solve!, improve!, is_inertia, inertia,
     default_linear_solver, default_dense_solver, get_csc_view, get_cscsy_view, nnz, mul!,
@@ -95,12 +95,13 @@ function SolverWorker(tsp,V_0,csc::SparseMatrixCSC{Float64},inds::Vector{Int},k,
                       SubproblemSolverModule::Module,logger::Logger,option_dict::Dict{Symbol,Any})
 
     V    = findall(tsp.part.==k)
-    length(V) == 0 && throw(SymbolicException())
+    
     csc_k,csc_k_view = get_cscsy_view(csc,V,inds=inds)
     compl,compl_view = get_csc_view(csc,V,V_0,inds=inds)
     V_0_nz = findnz(compl.colptr)
 
-    M    = SubproblemSolverModule.Solver(csc_k;option_dict=option_dict,logger=logger)
+    M    = length(V) == 0 ?
+        EmptyLinearSolver() : SubproblemSolverModule.Solver(csc_k;option_dict=option_dict,logger=logger)
     w    = Vector{Float64}(undef,csc_k.n)
 
     return SolverWorker(V,V_0_nz,csc_k,csc_k_view,compl,compl_view,M,w)
@@ -136,8 +137,6 @@ function factorize!(M::Solver)
 
     return M
 end
-
-
 
 function factorize_worker!(j,sw,schur)
     j in sw.V_0_nz || return
