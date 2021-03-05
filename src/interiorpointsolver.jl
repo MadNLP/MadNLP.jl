@@ -669,12 +669,39 @@ function initialize!(ips::Solver)
     return REGULAR
 end
 
+
+function reinitialize!(ips::Solver)
+    ips.obj_val = ips.nlp.obj_val*ips.obj_scale[]
+    view(ips.x,1:ips.nlp.n) .= ips.nlp.x
+    view(ips.zl,1:ips.nlp.n) .= ips.nlp.zl 
+    view(ips.zu,1:ips.nlp.n) .= ips.nlp.zu
+
+    ips.obj_val = ips.obj(ips.x)
+    ips.obj_grad!(ips.f,ips.x)
+    ips.con!(ips.c,ips.x)
+    ips.con_jac!(ips.x)
+    ips.lag_hess!(ips.x,ips.l)
+
+    theta = get_theta(ips.c)
+    ips.theta_max=1e4*max(1,theta)
+    ips.theta_min=1e-4*max(1,theta)
+    ips.mu=ips.opt.mu_init
+    ips.tau=max(ips.opt.tau_min,1-ips.opt.mu_init)
+    ips.filter = [(ips.theta_max,-Inf)]
+
+    return REGULAR
+end
+
 # major loops ---------------------------------------------------------
 function optimize!(ips::Solver)
     try
-        @notice(ips.logger,"This is $(introduce()), running with $(introduce(ips.linear_solver))\n")
-        print_init(ips)
-        ips.status == INITIAL && (ips.status = initialize!(ips))
+        if ips.status == INITIAL
+            @notice(ips.logger,"This is $(introduce()), running with $(introduce(ips.linear_solver))\n")
+            print_init(ips)
+            ips.status = initialize!(ips)
+        else # resolving the problem
+            ips.status = reinitialize!(ips)
+        end
 
         while ips.status >= REGULAR
             ips.status == REGULAR && (ips.status = regular!(ips))
