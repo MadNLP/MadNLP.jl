@@ -43,6 +43,13 @@ julia> ENV["MADNLP_ENALBE_OPENMP"] = false          # default is "true"
 julia> ENV["MADNLP_OPTIMIZATION_FLAG"] = "-O2"      # default is "-O3"
 ```
 
+Alternatively, if the user has already installed HSL/pardiso library, one can simply specify the library path as follows:
+```julia
+julia> ENV["MADNLP_HSL_LIBRARY_PATH"] = "/opt/lib/libcoinhsl.so"
+julia> ENV["MADNLP_PARDISO_LIBRARY_PATH"] = "/opt/lib/libpardiso.so" 
+```
+In this case, the source code is not compiled and the provided shared library is directly used.
+
 ## Usage
 MadNLP is interfaced with modeling packages: 
 - [JuMP](https://github.com/jump-dev/JuMP.jl)
