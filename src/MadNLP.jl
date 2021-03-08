@@ -7,7 +7,7 @@ include(joinpath("..","deps","deps.jl"))
 
 import Pkg.Artifacts: @artifact_str
 import Pkg.TOML: parsefile
-import IterativeSolvers, MathOptInterface, MPI
+import IterativeSolvers, MathOptInterface
 import Libdl: dlopen, dlext, RTLD_DEEPBIND, RTLD_GLOBAL
 import Metis: partition
 import Printf: @sprintf
@@ -17,16 +17,14 @@ import Logging: @debug, @info,  @warn, @error
 import Base: string, show, print, size, getindex, copyto!, @kwdef
 import StaticArrays: SVector, setindex
 import SuiteSparse: UMFPACK
-import CUDA: CUBLAS, CUSOLVER, CuVector, CuMatrix, has_cuda_gpu
 import LightGraphs: Graph, Edge, add_edge!, edges, src, dst, neighbors, nv
-import Plasmo: OptiGraph, OptiNode, OptiEdge, all_nodes, all_edges, all_variables, num_all_nodes, num_variables,
-    getlinkconstraints
+import Plasmo: OptiGraph, OptiNode, OptiEdge, all_nodes, all_edges, all_variables, num_all_nodes, num_variables, getlinkconstraints
 import JuMP: _create_nlp_block_data, set_optimizer, GenericAffExpr, backend, termination_status
-import NLPModels: finalize, AbstractNLPModel,
-    obj, grad!, cons!, jac_coord!, hess_coord!, hess_structure!, jac_structure!
+import NLPModels: finalize, AbstractNLPModel, obj, grad!, cons!, jac_coord!, hess_coord!, hess_structure!, jac_structure!
 import SolverTools: GenericExecutionStats
 import MUMPS_seq_jll
 blasvendor == :mkl ? (import MKL_jll: libmkl_rt_path) : (import OpenBLAS32_jll: libopenblas_path)
+import Requires: @require
 
 const MOI = MathOptInterface
 const MOIU = MathOptInterface.Utilities
@@ -54,6 +52,12 @@ function __init__()
     @isdefined(libhsl) && dlopen(libhsl,RTLD_DEEPBIND)
     @isdefined(libpardiso) && dlopen(libpardiso,RTLD_DEEPBIND)
     set_blas_num_threads(Threads.nthreads(); permanent=true)
+
+    # Lazy loading
+    @require CUDA="052768ef-5323-5732-b1bb-66c8b64840ba" begin
+        import ..CUDA: CUBLAS, CUSOLVER, CuVector, CuMatrix, has_cuda_gpu
+        has_cuda_gpu() && include(joinpath("LinearSolvers","lapackgpu.jl"))
+    end
 end
 
 end # end module

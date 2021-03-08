@@ -338,8 +338,6 @@ dmumps_c(mumps_struc::Struc)=ccall(
     (Ref{Struc},),
     mumps_struc)
 
-# mpi_init() = ccall((:MPI_Init,libmpiseq), Cint, (Ptr{Cint},Ptr{Cint}), C_NULL, C_NULL)
-
 # this is necessary, when multi-threaded calls are made with Mumps, not to clash with MPI
 mumps_lock = Threads.SpinLock()
 function locked_dmumps_c(mumps_struc::Struc)
@@ -356,9 +354,6 @@ function Solver(csc::SparseMatrixCSC{Float64,Int32};
                 option_dict::Dict{Symbol,Any}=Dict{Symbol,Any}(),
                 opt=Options(),logger=Logger(),
                 kwargs...)
-
-    # MPI.Initialized() || MPI.Init()
-    # mpi_init()
 
     set_options!(opt,option_dict,kwargs)
 

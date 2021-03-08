@@ -6,7 +6,6 @@ version = "0.1.5"
 
 [deps]
 BinaryProvider = "b99e7846-7c00-51b0-8f62-c81ae34c0232"
-CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
 IterativeSolvers = "42fd0dbc-a981-5370-80f2-aaf504508153"
 JuMP = "4076af6c-e467-56ae-b986-b466b2749572"
 Libdl = "8f399da3-3557-5675-b5ff-fb832c97cbdb"
@@ -14,7 +13,6 @@ LightGraphs = "093fc24a-ae57-5d10-9952-331d41423f4d"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 Logging = "56ddb016-857b-54e1-b83d-db4d58db5568"
 MKL_jll = "856f044c-d86e-5d09-b602-aeab76dc8ba7"
-MPI = "da04e1cc-30fd-572f-bb4f-1f8673147195"
 MUMPS_seq_jll = "d7ed1dd3-d0ae-5e8e-bfb4-87a502085b8d"
 MathOptInterface = "b8f27783-ece8-5eb3-8dc8-9495eed66fee"
 Metis = "2679e427-3c69-5b7f-982b-ece356f1e94b"
@@ -27,6 +25,7 @@ SolverTools = "b5612192-2639-5dc1-abfe-fbedd65fab29"
 SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 SuiteSparse = "4607b0f0-06f3-5cda-b6b1-a6196a1729e9"
+Requires = "ae029012-a4dd-5104-9daa-d747884805df"
 
 [compat]
 AmplNLReader = "~0.8"
@@ -36,7 +35,6 @@ IterativeSolvers = "~0.8, 0.9"
 JuMP = "~0.21"
 LightGraphs = "~1.3"
 MKL_jll = "~2020"
-MPI = "~0.15, 0.16"
 MUMPS_seq_jll = "5.2.1, 5.3.5"
 MathOptInterface = "~0.9"
 Metis = "~1.0"
@@ -50,6 +48,7 @@ julia = "1.5"
 [extras]
 AmplNLReader = "77dd3d4c-cb1d-5e09-9340-85030ff7ba66"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
 
 [targets]
-test = ["Test", "AmplNLReader"]
+test = ["Test", "AmplNLReader", "CUDA"]

@@ -1,4 +1,4 @@
-using Test, MadNLP, JuMP, Plasmo
+using Test, MadNLP, JuMP, Plasmo, CUDA
 import MathOptInterface
 import AmplNLReader: AmplModel
 import SparseArrays: sparse
