@@ -4,13 +4,14 @@
 module Mumps
 
 import ..MadNLP:
-    parsefile, SVector, setindex, MPI,
+    parsefile, SVector, setindex, dlopen,
     @kwdef, Logger, @debug, @warn, @error,
     SparseMatrixCSC, SubVector, StrideOneVector, MUMPS_seq_jll,
     SymbolicException,FactorizationException,SolveException,InertiaException,
     AbstractOptions, AbstractLinearSolver, set_options!,
     introduce, factorize!, solve!, improve!, is_inertia, inertia, findIJ, nnz
 
+# const libmpiseq = joinpath(MUMPS_seq_jll.artifact_dir,"lib","libmpiseq.so")
 const INPUT_MATRIX_TYPE = :csc
 const version = parsefile(joinpath(dirname(pathof(MUMPS_seq_jll)),"..","Project.toml"))["version"]
 
@@ -337,6 +338,8 @@ dmumps_c(mumps_struc::Struc)=ccall(
     (Ref{Struc},),
     mumps_struc)
 
+# mpi_init() = ccall((:MPI_Init,libmpiseq), Cint, (Ptr{Cint},Ptr{Cint}), C_NULL, C_NULL)
+
 # this is necessary, when multi-threaded calls are made with Mumps, not to clash with MPI
 mumps_lock = Threads.SpinLock()
 function locked_dmumps_c(mumps_struc::Struc)
@@ -354,7 +357,8 @@ function Solver(csc::SparseMatrixCSC{Float64,Int32};
                 opt=Options(),logger=Logger(),
                 kwargs...)
 
-    MPI.Initialized() || MPI.Init()
+    # MPI.Initialized() || MPI.Init()
+    # mpi_init()
 
     set_options!(opt,option_dict,kwargs)
 
