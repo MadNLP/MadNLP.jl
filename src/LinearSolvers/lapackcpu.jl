@@ -2,7 +2,8 @@ module LapackCPU
 
 import ..MadNLP:
     @kwdef, Logger, @debug, @warn, @error,
-    AbstractOptions, AbstractLinearSolver, set_options!, tril_to_full!, libblas,
+    AbstractOptions, AbstractLinearSolver, set_options!, tril_to_full!,
+    libblas, BlasInt, @blasfunc,
     SymbolicException,FactorizationException,SolveException,InertiaException,
     introduce, factorize!, solve!, improve!, is_inertia, inertia
 
@@ -17,47 +18,47 @@ mutable struct Solver <: AbstractLinearSolver
     dense::Matrix{Float64}
     fact::Matrix{Float64}
     work::Vector{Float64}
-    lwork::Int32
-    info::Ref{Int32}
+    lwork::BlasInt
+    info::Ref{BlasInt}
     etc::Dict{Symbol,Any}
     opt::Options
     logger::Logger
 end
 
 sytrf(uplo,n,a,lda,ipiv,work,lwork,info)=ccall(
-    (:dsytrf_,libblas),
+    (@blasfunc(dsytrf_),libblas),
     Cvoid,
-    (Ref{UInt8},Ref{Cint},Ptr{Cdouble},Ref{Cint},Ptr{Cint},Ptr{Cdouble},Ref{Cint},Ptr{Cint}),
+    (Ref{Cchar},Ref{BlasInt},Ptr{Cdouble},Ref{BlasInt},Ptr{BlasInt},Ptr{Cdouble},Ref{BlasInt},Ptr{BlasInt}),
     uplo,n,a,lda,ipiv,work,lwork,info)
 sytrs(uplo,n,nrhs,a,lda,ipiv,b,ldb,info)=ccall(
-    (:dsytrs_,libblas),
+    (@blasfunc(dsytrs_),libblas),
     Cvoid,
-    (Ref{Cchar},Ref{Cint},Ref{Cint},Ptr{Cdouble},Ref{Cint},Ptr{Cint},Ptr{Cdouble},Ref{Cint},Ptr{Cint}),
+    (Ref{Cchar},Ref{BlasInt},Ref{BlasInt},Ptr{Cdouble},Ref{BlasInt},Ptr{BlasInt},Ptr{Cdouble},Ref{BlasInt},Ptr{BlasInt}),
     uplo,n,nrhs,a,lda,ipiv,b,ldb,info)
 getrf(m,n,a,lda,ipiv,info)=ccall(
-    (:dgetrf_,libblas),
+    (@blasfunc(dgetrf_),libblas),
     Cvoid,
-    (Ref{Cint},Ref{Cint},Ptr{Cdouble},Ref{Cint},Ptr{Cint},Ptr{Cint}),
+    (Ref{BlasInt},Ref{BlasInt},Ptr{Cdouble},Ref{BlasInt},Ptr{BlasInt},Ptr{BlasInt}),
     m,n,a,lda,ipiv,info)
 getrs(trans,n,nrhs,a,lda,ipiv,b,ldb,info)=ccall(
-    (:dgetrs_,libblas),
+    (@blasfunc(dgetrs_),libblas),
     Cvoid,
-    (Ref{Cchar},Ref{Cint},Ref{Cint},Ptr{Cdouble},Ref{Cint},Ptr{Cint},Ptr{Cdouble},Ref{Cint},Ptr{Cint}),
+    (Ref{Cchar},Ref{BlasInt},Ref{BlasInt},Ptr{Cdouble},Ref{BlasInt},Ptr{BlasInt},Ptr{Cdouble},Ref{BlasInt},Ptr{BlasInt}),
     trans,n,nrhs,a,lda,ipiv,b,ldb,info)
 geqrf(m,n,a,lda,tau,work,lwork,info)=ccall(
-    (:dgeqrf_,libblas),
+    (@blasfunc(dgeqrf_),libblas),
     Cvoid,
-    (Ref{Cint},Ref{Cint},Ptr{Cdouble},Ref{Cint},Ptr{Cdouble},Ptr{Cdouble},Ref{Cint},Ptr{Cint}),
+    (Ref{BlasInt},Ref{BlasInt},Ptr{Cdouble},Ref{BlasInt},Ptr{Cdouble},Ptr{Cdouble},Ref{BlasInt},Ptr{BlasInt}),
     m,n,a,lda,tau,work,lwork,info)
 ormqr(side,trans,m,n,k,a,lda,tau,c,ldc,work,lwork,info)=ccall(
-    (:dormqr_,libblas),
+    (@blasfunc(dormqr_),libblas),
     Cvoid,
-    (Ref{Cchar}, Ref{Cchar}, Ref{Cint}, Ref{Cint},Ref{Cint}, Ptr{Cdouble}, Ref{Cint}, Ptr{Cdouble},Ptr{Cdouble}, Ref{Cint}, Ptr{Cdouble}, Ref{Cint},Ptr{Cint}),
+    (Ref{Cchar}, Ref{Cchar}, Ref{BlasInt}, Ref{BlasInt},Ref{BlasInt}, Ptr{Cdouble}, Ref{BlasInt}, Ptr{Cdouble},Ptr{Cdouble}, Ref{BlasInt}, Ptr{Cdouble}, Ref{BlasInt},Ptr{BlasInt}),
     side,trans,m,n,k,a,lda,tau,c,ldc,work,lwork,info)
 trsm(side,uplo,transa,diag,m,n,alpha,a,lda,b,ldb)=ccall(
-    (:dtrsm_,libblas),
+    (@blasfunc(dtrsm_),libblas),
     Cvoid,
-    (Ref{Cchar},Ref{Cchar},Ref{Cchar},Ref{Cchar},Ref{Cint},Ref{Cint},Ref{Cdouble},Ptr{Cdouble},Ref{Cint},Ptr{Cdouble},Ref{Cint}),
+    (Ref{Cchar},Ref{Cchar},Ref{Cchar},Ref{Cchar},Ref{BlasInt},Ref{BlasInt},Ref{Cdouble},Ptr{Cdouble},Ref{BlasInt},Ptr{Cdouble},Ref{BlasInt}),
     side,uplo,transa,diag,m,n,alpha,a,lda,b,ldb)
 
 function Solver(dense::Matrix{Float64};
@@ -70,7 +71,7 @@ function Solver(dense::Matrix{Float64};
 
     etc = Dict{Symbol,Any}()
     work = Vector{Float64}(undef, 1)
-    info=Int32(0)
+    info=0
 
     return Solver(dense,fact,work,-1,info,etc,opt,logger)
 end
@@ -99,32 +100,32 @@ function solve!(M::Solver,x)
 end
 
 function factorize_bunchkaufman!(M::Solver)
-    haskey(M.etc,:ipiv) || (M.etc[:ipiv] = Vector{Int32}(undef,size(M.dense,1)))
+    haskey(M.etc,:ipiv) || (M.etc[:ipiv] = Vector{BlasInt}(undef,size(M.dense,1)))
     M.lwork = -1
     # pointer(M.fact)==pointer(M.dense) || M.fact.=M.dense
     M.fact .= M.dense
-    sytrf('L',Int32(size(M.fact,1)),M.fact,Int32(size(M.fact,2)),M.etc[:ipiv],M.work,M.lwork,M.info)
-    M.lwork = Int32(real(M.work[1]))
+    sytrf('L',size(M.fact,1),M.fact,size(M.fact,2),M.etc[:ipiv],M.work,M.lwork,M.info)
+    M.lwork = BlasInt(real(M.work[1]))
     length(M.work) < M.lwork && resize!(M.work,M.lwork)
-    sytrf('L',Int32(size(M.fact,1)),M.fact,Int32(size(M.fact,2)),M.etc[:ipiv],M.work,M.lwork,M.info)
+    sytrf('L',size(M.fact,1),M.fact,size(M.fact,2),M.etc[:ipiv],M.work,M.lwork,M.info)
     return M
 end
 function solve_bunchkaufman!(M::Solver,x)
-    sytrs('L',Int32(size(M.fact,1)),Int32(1),M.fact,Int32(size(M.fact,2)),M.etc[:ipiv],x,Int32(length(x)),M.info)
+    sytrs('L',size(M.fact,1),1,M.fact,size(M.fact,2),M.etc[:ipiv],x,length(x),M.info)
     return x
 end
 
 function factorize_lu!(M::Solver)
-    haskey(M.etc,:ipiv) || (M.etc[:ipiv] = Vector{Int32}(undef,size(M.dense,1)))
+    haskey(M.etc,:ipiv) || (M.etc[:ipiv] = Vector{BlasInt}(undef,size(M.dense,1)))
     tril_to_full!(M.dense)
     # pointer(M.fact)==pointer(M.dense) || M.fact.=M.dense
     M.fact .= M.dense
-    getrf(Int32(size(M.fact,1)),Int32(size(M.fact,2)),M.fact,Int32(size(M.fact,2)),M.etc[:ipiv],M.info)
+    getrf(size(M.fact,1),size(M.fact,2),M.fact,size(M.fact,2),M.etc[:ipiv],M.info)
     return M
 end
 function solve_lu!(M::Solver,x)
-    getrs('N',Int32(size(M.fact,1)),Int32(1),M.fact,Int32(size(M.fact,2)),
-          M.etc[:ipiv],x,Int32(length(x)),M.info)
+    getrs('N',size(M.fact,1),1,M.fact,size(M.fact,2),
+          M.etc[:ipiv],x,length(x),M.info)
     return x
 end
 
@@ -134,20 +135,20 @@ function factorize_qr!(M::Solver)
     M.lwork = -1
     # pointer(M.fact)==pointer(M.dense) || M.fact.=M.dense
     M.fact .= M.dense
-    geqrf(Int32(size(M.fact,1)),Int32(size(M.fact,2)),M.fact,Int32(size(M.fact,2)),M.etc[:tau],M.work,M.lwork,M.info)
-    M.lwork = Int32(real(M.work[1]))
+    geqrf(size(M.fact,1),size(M.fact,2),M.fact,size(M.fact,2),M.etc[:tau],M.work,M.lwork,M.info)
+    M.lwork = BlasInt(real(M.work[1]))
     length(M.work) < M.lwork && resize!(M.work,M.lwork)
-    geqrf(Int32(size(M.fact,1)),Int32(size(M.fact,2)),M.fact,Int32(size(M.fact,2)),M.etc[:tau],M.work,M.lwork,M.info)
+    geqrf(size(M.fact,1),size(M.fact,2),M.fact,size(M.fact,2),M.etc[:tau],M.work,M.lwork,M.info)
     return M
 end
 
 function solve_qr!(M::Solver,x)
     M.lwork = -1
-    ormqr('L','T',Int32(size(M.fact,1)),Int32(1),Int32(length(M.etc[:tau])),M.fact,Int32(size(M.fact,2)),M.etc[:tau],x,Int32(length(x)),M.work,M.lwork,M.info)
-    M.lwork = Int32(real(M.work[1]))
+    ormqr('L','T',size(M.fact,1),1,length(M.etc[:tau]),M.fact,size(M.fact,2),M.etc[:tau],x,length(x),M.work,M.lwork,M.info)
+    M.lwork = BlasInt(real(M.work[1]))
     length(M.work) < M.lwork && resize!(M.work,M.lwork)
-    ormqr('L','T',Int32(size(M.fact,1)),Int32(1),Int32(length(M.etc[:tau])),M.fact,Int32(size(M.fact,2)),M.etc[:tau],x,Int32(length(x)),M.work,M.lwork,M.info)
-    trsm('L','U','N','N',Int32(size(M.fact,1)),Int32(1),1.,M.fact,Int32(size(M.fact,2)),x,Int32(length(x)))
+    ormqr('L','T',size(M.fact,1),1,length(M.etc[:tau]),M.fact,size(M.fact,2),M.etc[:tau],x,length(x),M.work,M.lwork,M.info)
+    trsm('L','U','N','N',size(M.fact,1),1,1.,M.fact,size(M.fact,2),x,length(x))
     return x
 end
 
