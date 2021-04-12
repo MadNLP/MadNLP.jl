@@ -29,7 +29,7 @@ include("krylov.jl")
 
 # dense solvers
 include("lapackcpu.jl")
-include("lapackgpu.jl")
+has_cuda_gpu() && include("lapackgpu.jl")
 
 # direct solvers
 include("umfpack.jl")
