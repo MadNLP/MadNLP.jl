@@ -5,7 +5,6 @@ module MadNLP
 
 include(joinpath("..","deps","deps.jl"))
 
-import Pkg.Artifacts: @artifact_str
 import Pkg.TOML: parsefile
 import IterativeSolvers, MathOptInterface
 import Libdl: dlopen, dlext, RTLD_DEEPBIND, RTLD_GLOBAL
