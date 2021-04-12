@@ -47,8 +47,16 @@ include(joinpath("Interfaces","interfaces.jl"))
 # Initialize
 function __init__()
     check_deps()
-    @isdefined(libhsl) && dlopen(libhsl,RTLD_DEEPBIND)
-    @isdefined(libpardiso) && dlopen(libpardiso,RTLD_DEEPBIND)
+    try 
+        @isdefined(libhsl) && dlopen(libhsl,RTLD_DEEPBIND)
+    catch e
+        println("HSL shared library cannot be loaded")
+    end
+    try
+        @isdefined(libpardiso) && dlopen(libpardiso,RTLD_DEEPBIND)
+    catch e
+        println("Pardiso shared library cannot be loaded")
+    end
     set_blas_num_threads(Threads.nthreads(); permanent=true)
 
     # Lazy loading
