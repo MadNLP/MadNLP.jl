@@ -103,7 +103,7 @@ model = Model(()->MadNLP.Optimizer(linear_solver=MadNLP.LapackGPU))
 # ...
 ```
 
-In order to use multi-threaded solvers (`Schur` and `Schwawrz`), julia sesseion should be started with `-t` flag.
+In order to use multi-threaded solvers (`Schur` and `Schwawrz`), julia session should be started with `-t` flag.
 ```sh
 julia -t 16 # to use 16 threads
 ```

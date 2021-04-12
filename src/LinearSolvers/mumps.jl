@@ -11,7 +11,6 @@ import ..MadNLP:
     AbstractOptions, AbstractLinearSolver, set_options!,
     introduce, factorize!, solve!, improve!, is_inertia, inertia, findIJ, nnz
 
-# const libmpiseq = joinpath(MUMPS_seq_jll.artifact_dir,"lib","libmpiseq.so")
 const INPUT_MATRIX_TYPE = :csc
 const version = parsefile(joinpath(dirname(pathof(MUMPS_seq_jll)),"..","Project.toml"))["version"]
 
