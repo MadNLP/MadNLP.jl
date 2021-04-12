@@ -23,7 +23,7 @@ import JuMP: _create_nlp_block_data, set_optimizer, GenericAffExpr, backend, ter
 import NLPModels: finalize, AbstractNLPModel, obj, grad!, cons!, jac_coord!, hess_coord!, hess_structure!, jac_structure!
 import SolverTools: GenericExecutionStats
 import MUMPS_seq_jll
-import Requires: @require
+import CUDA: CUBLAS, CUSOLVER, CuVector, CuMatrix, has_cuda_gpu
 
 const MOI = MathOptInterface
 const MOIU = MathOptInterface.Utilities
@@ -58,12 +58,6 @@ function __init__()
         println("Pardiso shared library cannot be loaded")
     end
     set_blas_num_threads(Threads.nthreads(); permanent=true)
-
-    # Lazy loading
-    @require CUDA="052768ef-5323-5732-b1bb-66c8b64840ba" begin
-        import ..CUDA: CUBLAS, CUSOLVER, CuVector, CuMatrix, has_cuda_gpu
-        has_cuda_gpu() && include(joinpath("LinearSolvers","lapackgpu.jl"))
-    end
 end
 
 end # end module

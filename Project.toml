@@ -6,6 +6,7 @@ version = "0.1.5"
 
 [deps]
 BinaryProvider = "b99e7846-7c00-51b0-8f62-c81ae34c0232"
+CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
 IterativeSolvers = "42fd0dbc-a981-5370-80f2-aaf504508153"
 JuMP = "4076af6c-e467-56ae-b986-b466b2749572"
 Libdl = "8f399da3-3557-5675-b5ff-fb832c97cbdb"
@@ -25,7 +26,6 @@ SolverTools = "b5612192-2639-5dc1-abfe-fbedd65fab29"
 SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 SuiteSparse = "4607b0f0-06f3-5cda-b6b1-a6196a1729e9"
-Requires = "ae029012-a4dd-5104-9daa-d747884805df"
 
 [compat]
 AmplNLReader = "~0.8"
@@ -48,7 +48,6 @@ julia = "1.5"
 [extras]
 AmplNLReader = "77dd3d4c-cb1d-5e09-9340-85030ff7ba66"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
-CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
 
 [targets]
-test = ["Test", "AmplNLReader", "CUDA"]
+test = ["Test", "AmplNLReader"]

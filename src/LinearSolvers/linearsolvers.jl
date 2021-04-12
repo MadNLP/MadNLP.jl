@@ -29,6 +29,7 @@ include("krylov.jl")
 
 # dense solvers
 include("lapackcpu.jl")
+include("lapackgpu.jl")
 
 # direct solvers
 include("umfpack.jl")
