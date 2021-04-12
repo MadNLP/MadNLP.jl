@@ -4,7 +4,7 @@
 module Mumps
 
 import ..MadNLP:
-    parsefile, SVector, setindex, MPI,
+    parsefile, SVector, setindex, dlopen,
     @kwdef, Logger, @debug, @warn, @error,
     SparseMatrixCSC, SubVector, StrideOneVector, MUMPS_seq_jll,
     SymbolicException,FactorizationException,SolveException,InertiaException,
@@ -353,8 +353,6 @@ function Solver(csc::SparseMatrixCSC{Float64,Int32};
                 option_dict::Dict{Symbol,Any}=Dict{Symbol,Any}(),
                 opt=Options(),logger=Logger(),
                 kwargs...)
-
-    MPI.Initialized() || MPI.Init()
 
     set_options!(opt,option_dict,kwargs)
 

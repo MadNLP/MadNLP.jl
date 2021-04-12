@@ -27,10 +27,8 @@ const optimization_flag = haskey(ENV,"MADNLP_OPTIMIZATION_FLAG") ? ENV["MADNLP_O
 const installer = Sys.isapple() ? "brew install" : Sys.iswindows() ? "pacman -S" : "sudo apt install"
 const libopenblas_dir = splitdir(OpenBLAS32_jll.libopenblas_path)[1]
 const with_openblas = `-L$libopenblas_dir $rpath$libopenblas_dir -lopenblas`
-if blasvendor == :mkl 
-    const libmkl_dir = joinpath(MKL_jll.artifact_dir,MKL_jll.libmkl_rt_splitpath[1:end-1]...)
-    const with_mkl = `-L$libmkl_dir $rpath$libmkl_dir -lmkl_rt`
-end
+const libmkl_dir = joinpath(MKL_jll.artifact_dir,MKL_jll.libmkl_rt_splitpath[1:end-1]...)
+const with_mkl = `-L$libmkl_dir $rpath$libmkl_dir -lmkl_rt`
 
 rm.(filter(endswith(".so"), readdir(libdir,join=true)))
 products   = Product[]
@@ -98,6 +96,3 @@ end
 
 # write deps.jl
 write_deps_file(joinpath(@__DIR__, "deps.jl"), products[satisfied.(products)], verbose=verbose)
-open(joinpath(@__DIR__, "deps.jl"),write=true,append=true) do f
-    write(f,"blasvendor = :$blasvendor\n")
-end

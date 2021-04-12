@@ -67,23 +67,6 @@ const blas_num_threads = Ref{Int}(1)
 function set_blas_num_threads(n::Integer;permanent::Bool=false)
     permanent && (blas_num_threads[]=n)
     BLAS.set_num_threads(n) 
-    if blasvendor == :mkl
-        ccall((:mkl_set_dynamic, libblas),
-              Cvoid,
-              (Ptr{Int32},),
-              Ref{Int32}(0))
-        ccall(
-            (:mkl_set_num_threads, libblas),
-            Cvoid,
-            (Ptr{Int32},),
-            Ref{Int32}(n))
-    else
-        ccall(
-            (:openblas_set_num_threads, libblas),
-            Cvoid,
-            (Ptr{Int32},),
-            Ref{Int32}(n))
-    end
 end
 macro blas_safe_threads(args...)
     code = quote

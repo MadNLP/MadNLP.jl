@@ -95,6 +95,19 @@ model = CUTEstModel("PRIMALC1")
 madnlp(model,linear_solver=MadNLP.PardisoMKL,print_level=MadNLP.WARN,max_wall_time=3600)
 ```
 
+### Using special linear solvers
+In order to use GPU solvers, `CUDA` should be imported to the `Main` module.
+```julia
+using MadNLP, CUDA
+model = Model(()->MadNLP.Optimizer(linear_solver=MadNLP.LapackGPU))
+# ...
+```
+
+In order to use multi-threaded solvers (`Schur` and `Schwawrz`), julia session should be started with `-t` flag.
+```sh
+julia -t 16 # to use 16 threads
+```
+
 ## Solver options
 To see the list of MadNLP solver options, check the [OPTIONS.md](https://github.com/sshin23/MadNLP/blob/master/OPTIONS.md) file.
 ## Bug reports and support

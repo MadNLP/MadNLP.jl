@@ -34,7 +34,7 @@ has_cuda_gpu() && include("lapackgpu.jl")
 # direct solvers
 include("umfpack.jl")
 include("mumps.jl")
-blasvendor == :mkl && include("pardisomkl.jl")
+BLAS.vendor() == :mkl && include("pardisomkl.jl")
 if @isdefined libhsl
     include("mc68.jl")
     include("ma27.jl")

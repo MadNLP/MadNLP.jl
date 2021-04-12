@@ -84,7 +84,7 @@ function factorize_bunchkaufman!(M::Solver)
 
     # need to send the factorization back to cpu to call mkl sytrs --------------
     haskey(M.etc,:fact_cpu) || (M.etc[:fact_cpu] = Matrix{Float64}(undef,size(M.dense)))
-    haskey(M.etc,:ipiv_cpu) || (M.etc[:ipiv_cpu] = Vector{Int32}(undef,size(M.dense,1)))
+    haskey(M.etc,:ipiv_cpu) || (M.etc[:ipiv_cpu] = Vector{Int}(undef,size(M.dense,1)))
     copyto!(M.etc[:fact_cpu],M.fact)
     copyto!(M.etc[:ipiv_cpu],M.etc[:ipiv])
     # ---------------------------------------------------------------------------
@@ -106,10 +106,12 @@ function solve_bunchkaufman!(M::Solver,x)
     # copyto!(x,M.rhs)
     # --------------------------------------------------------------------
 
-    LapackCPU.sytrs(
-        'L',Int32(size(M.fact,1)),Int32(1),M.etc[:fact_cpu],Int32(size(M.fact,2)),M.etc[:ipiv_cpu],
-        x,Int32(length(x)),Int32[1])
-
+    ccall(
+        (:dsytrs_64_,"libopenblas64_"), # MKL doesn't work for some reason...
+        Cvoid,
+        (Ref{Cchar},Ref{Int},Ref{Int},Ptr{Cdouble},Ref{Int},Ptr{Int},Ptr{Cdouble},Ref{Int},Ptr{Int}),
+        'L',size(M.fact,1),1,M.etc[:fact_cpu],size(M.fact,2),M.etc[:ipiv_cpu],x,length(x),[1])
+    
     return x
 end
 
