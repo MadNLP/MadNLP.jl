@@ -4,7 +4,15 @@
 const dummy_function = ()->nothing
 
 num_linkconstraints(modeledge::OptiEdge) = length(modeledge.linkconstraints)
-moi_optimizer(modelnode::OptiNode) = modelnode.model.moi_backend.optimizer.model
+function _caching_optimizer(modelnode::OptiNode)
+    if isa(modelnode.model.moi_backend,MOIU.CachingOptimizer)
+        return modelnode.model.moi_backend
+    else
+        return modelnode.model.moi_backend.optimizer
+    end
+end
+moi_optimizer(modelnode::OptiNode) = _caching_optimizer(modelnode).optimizer.model
+_caching_optimizer(model::Any) = model.moi_backend
 function set_g_link!(linkedge::OptiEdge,l,gl,gu)
     cnt = 1
     for (ind,linkcon) in linkedge.linkconstraints
@@ -165,9 +173,9 @@ function NonlinearProgram(graph::OptiGraph)
     for modelnode in modelnodes
         num_variables(modelnode) == 0 && error("Empty node exist! Delete the empty nodes.")
     end
-    
+
     @blas_safe_threads for k=1:length(modelnodes)
-        set_optimizer(modelnodes[k].model,Optimizer)
+        set_optimizer(modelnodes[k],Optimizer)
         if modelnodes[k].model.nlp_data !== nothing
             MOI.set(modelnodes[k].model, MOI.NLPBlock(),
                     _create_nlp_block_data(modelnodes[k].model))
@@ -234,7 +242,8 @@ function NonlinearProgram(graph::OptiGraph)
 
     modelmap=Dict(modelnodes[k].model=> k for k=1:K)
     x_index_map = Dict(
-        var=>ninds[modelmap[var.model]][backend(var.model).model_to_optimizer_map[var.index].value]
+        # var=>ninds[modelmap[var.model]][backend(var.model).optimizer.model_to_optimizer_map[var.index].value]
+        var=>ninds[modelmap[var.model]][_caching_optimizer(getnode(var)).model_to_optimizer_map[var.index].value]
         for modelnode in modelnodes for var in all_variables(modelnode))
     cnt = 0
     g_index_map = Dict(con=> m + (cnt+=1) for linkedge in linkedges for (ind,con) in linkedge.linkconstraints)
