@@ -72,7 +72,8 @@ end
         "feasibility_sense_with_objective_and_no_hessian", # we need Hessians
         "feasibility_sense_with_no_objective_and_no_hessian", # we need Hessians
         "hs071_no_hessian", # we need Hessians
-    ] 
+        "hs071_hessian_vector_product_test", # Hessian-vector product is needed
+    ]
     MOIT.nlptest(optimizer,config,exclude)
 end
 
