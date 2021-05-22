@@ -9,7 +9,8 @@ import ..MadNLP:
     solve_refine!, mul!, ldiv!, size, IterativeSolvers, StrideOneVector
 import IterativeSolvers:
     FastHessenberg, ArnoldiDecomp, Residual, init!, init_residual!, expand!, Identity,
-    orthogonalize_and_normalize!, update_residual!, gmres_iterable!, GMRESIterable, converged
+    orthogonalize_and_normalize!, update_residual!, gmres_iterable!, GMRESIterable, converged,
+    ModifiedGramSchmidt
 
 @kwdef mutable struct Options <: AbstractOptions
     krylov_restart::Int = 5
@@ -44,12 +45,13 @@ function Solver(res::Vector{Float64},_mul!,_ldiv!;
     !isempty(kwargs) && (for (key,val) in kwargs; option_dict[key]=val; end)
     set_options!(opt,option_dict)
 
-    g=GMRESIterable(VirtualPreconditioner(_ldiv!),
-                    Identity(),Float64[],Float64[],res,
-                    ArnoldiDecomp(VirtualMatrix(_mul!,length(res),length(res)),opt.krylov_restart, Float64),
-                    Residual(opt.krylov_restart, Float64),
-                    0,opt.krylov_restart,1,
-                    opt.krylov_max_iter,opt.krylov_tol,0.)
+    g = GMRESIterable(VirtualPreconditioner(_ldiv!),
+                      Identity(),Float64[],Float64[],res,
+                      ArnoldiDecomp(VirtualMatrix(_mul!,length(res),length(res)),opt.krylov_restart, Float64),
+                      Residual(opt.krylov_restart, Float64),
+                      0,opt.krylov_restart,1,
+                      opt.krylov_max_iter,opt.krylov_tol,0.,
+                      ModifiedGramSchmidt())
 
     return Solver(g,res,opt,logger)
 end
