@@ -82,9 +82,9 @@ end
 
 copyto!(dense::Matrix{Tv},coo::SparseMatrixCOO{Tv,Ti}) where {Tv,Ti<:Integer} = _copyto!(dense,coo.I,coo.J,coo.V)
 function _copyto!(dense::Matrix{Tv},I,J,V) where Tv
-    dense.=0
+    fill!(dense, zero(Tv))
     for i=1:length(I)
-        dense[I[i],J[i]]+=V[i]
+        @inbounds dense[I[i], J[i]] += V[i]
     end
     return dense
 end
@@ -96,7 +96,7 @@ function get_cscsy_view(csc::SparseMatrixCSC{Tv,Ti},Ix;inds=collect(1:nnz(csc)))
     return SparseMatrixCSC{Tv,Ti}(
         cscindsub.m,cscindsub.n,cscindsub.colptr,
         cscindsub.rowval,Vector{Tv}(undef,nnz(cscindsub))), view(csc.nzval,cscindsub.nzval)
-                                  
+
 end
 function get_csc_view(csc::SparseMatrixCSC{Tv,Ti},Ix,Jx;inds=collect(1:nnz(csc))) where {Tv,Ti<:Integer}
     cscind = Symmetric(SparseMatrixCSC{Int,Ti}(csc.m,csc.n,csc.colptr,csc.rowval,inds),:L)
