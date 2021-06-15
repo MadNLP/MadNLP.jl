@@ -7,7 +7,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        julia-version: ['1.5']
+        julia-version: ['1.6']
         julia-arch: [x64]
         os: [ubuntu-latest,macos-latest,windows-latest]
 
@@ -27,7 +27,7 @@ jobs:
     runs-on: self-hosted
     strategy:
       matrix:
-        julia-version: ['1.5']
+        julia-version: ['1.6']
         julia-arch: [x64]
         os: [ubuntu-latest]
     steps:
@@ -42,7 +42,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        julia-version: ['1.5']
+        julia-version: ['1.6']
         julia-arch: [x64]
         os: [ubuntu-latest]
     steps:
