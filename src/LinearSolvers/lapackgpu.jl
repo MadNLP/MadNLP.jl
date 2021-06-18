@@ -125,7 +125,7 @@ if toolkit_version() >= v"11.3.1"
     end
 else
     is_inertia(M::Solver) = M.opt.lapackgpu_algorithm == BUNCHKAUFMAN
-    inertia(M::Solver) = LapackCPU.inertia(M.etc[:fact_cpu],M.etc[:ipiv_cpu],M.info[])
+    inertia(M::Solver) = LapackCPU.inertia(M.etc[:fact_cpu],M.etc[:ipiv_cpu],M.etc[:info_cpu][])
 
     function factorize_bunchkaufman!(M::Solver)
         haskey(M.etc,:ipiv) || (M.etc[:ipiv] = CuVector{Int32}(undef,size(M.dense,1)))
@@ -141,9 +141,11 @@ else
 
         # need to send the factorization back to cpu to call mkl sytrs --------------
         haskey(M.etc,:fact_cpu) || (M.etc[:fact_cpu] = Matrix{Float64}(undef,size(M.dense)))
-        haskey(M.etc,:ipiv_cpu) || (M.etc[:ipiv_cpu] = Vector{Int}(undef,size(M.dense,1)))
+        haskey(M.etc,:ipiv_cpu) || (M.etc[:ipiv_cpu] = Vector{Int}(undef,length(M.etc[:ipiv])))
+        haskey(M.etc,:info_cpu) || (M.etc[:info_cpu] = Vector{Int}(undef,length(M.info)))
         copyto!(M.etc[:fact_cpu],M.fact)
         copyto!(M.etc[:ipiv_cpu],M.etc[:ipiv])
+        copyto!(M.etc[:info_cpu],M.info)
         # ---------------------------------------------------------------------------
         return M
     end
