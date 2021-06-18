@@ -23,7 +23,7 @@ import JuMP: _create_nlp_block_data, set_optimizer, GenericAffExpr, backend, ter
 import NLPModels: finalize, AbstractNLPModel, obj, grad!, cons!, jac_coord!, hess_coord!, hess_structure!, jac_structure!
 import SolverCore: GenericExecutionStats
 import MUMPS_seq_jll
-import CUDA: CUBLAS, CUSOLVER, CuVector, CuMatrix, has_cuda_gpu, R_64F
+import CUDA: CUBLAS, CUSOLVER, CuVector, CuMatrix, has_cuda_gpu, toolkit_version, R_64F
 
 const MOI = MathOptInterface
 const MOIU = MathOptInterface.Utilities

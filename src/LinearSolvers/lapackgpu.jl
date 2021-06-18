@@ -5,7 +5,7 @@ import ..MadNLP:
     CUBLAS, CUSOLVER, CuVector, CuMatrix, R_64F,
     AbstractOptions, AbstractLinearSolver, set_options!,
     SymbolicException,FactorizationException,SolveException,InertiaException,
-    introduce, factorize!, solve!, improve!, is_inertia, inertia, LapackCPU, tril_to_full!
+    introduce, factorize!, solve!, improve!, is_inertia, inertia, LapackCPU, tril_to_full!, toolkit_version
 import .CUSOLVER: cusolverDnDsytrf_bufferSize, cusolverDnDsytrf,
     cusolverDnDgetrf_bufferSize, cusolverDnDgetrf, cusolverDnDgetrs,
     cusolverDnDgeqrf_bufferSize, cusolverDnDgeqrf, cusolverDnDgeqrf_bufferSize,
@@ -76,56 +76,87 @@ function solve!(M::Solver,x)
     end
 end
 
-is_inertia(M::Solver) = false # TODO: implement inertia(M::Solver) for BUNCHKAUFMAN 
 improve!(M::Solver) = false
 introduce(M::Solver) = "Lapack-GPU ($(M.opt.lapackgpu_algorithm))"
 
-function factorize_bunchkaufman!(M::Solver)
-    haskey(M.etc,:ipiv) || (M.etc[:ipiv] = CuVector{Int32}(undef,size(M.dense,1)))    
-    haskey(M.etc,:ipiv64) || (M.etc[:ipiv64] = CuVector{Int64}(undef,length(M.etc[:ipiv]))) 
+if toolkit_version() >= v"11.3.1"
 
-    copyto!(M.fact,M.dense)
-    cusolverDnDsytrf_bufferSize(
-        dense_handle(),Int32(size(M.fact,1)),M.fact,Int32(size(M.fact,2)),M.lwork)
-    length(M.work) < M.lwork[] && resize!(M.work,Int(M.lwork[]))
-    cusolverDnDsytrf(
-        dense_handle(),CUBLAS_FILL_MODE_LOWER,
-        Int32(size(M.fact,1)),M.fact,Int32(size(M.fact,2)),
-        M.etc[:ipiv],M.work,M.lwork[],M.info)
+    is_inertia(M::Solver) = false # TODO: implement inertia(M::Solver) for BUNCHKAUFMAN
+    
+    function factorize_bunchkaufman!(M::Solver)
+        haskey(M.etc,:ipiv) || (M.etc[:ipiv] = CuVector{Int32}(undef,size(M.dense,1)))    
+        haskey(M.etc,:ipiv64) || (M.etc[:ipiv64] = CuVector{Int64}(undef,length(M.etc[:ipiv]))) 
 
-    # # need to send the factorization back to cpu to call mkl sytrs --------------
-    # haskey(M.etc,:fact_cpu) || (M.etc[:fact_cpu] = Matrix{Float64}(undef,size(M.dense)))
-    # haskey(M.etc,:ipiv_cpu) || (M.etc[:ipiv_cpu] = Vector{Int}(undef,size(M.dense,1)))
-    # copyto!(M.etc[:fact_cpu],M.fact)
-    # copyto!(M.etc[:ipiv_cpu],M.etc[:ipiv])
-    # # ---------------------------------------------------------------------------
-    return M
+        copyto!(M.fact,M.dense)
+        cusolverDnDsytrf_bufferSize(
+            dense_handle(),Int32(size(M.fact,1)),M.fact,Int32(size(M.fact,2)),M.lwork)
+        length(M.work) < M.lwork[] && resize!(M.work,Int(M.lwork[]))
+        cusolverDnDsytrf(
+            dense_handle(),CUBLAS_FILL_MODE_LOWER,
+            Int32(size(M.fact,1)),M.fact,Int32(size(M.fact,2)),
+            M.etc[:ipiv],M.work,M.lwork[],M.info)
+        return M
+    end
+
+    function solve_bunchkaufman!(M::Solver,x)
+        
+        copyto!(M.etc[:ipiv64],M.etc[:ipiv])
+        copyto!(M.rhs,x)
+        ccall((:cusolverDnXsytrs_bufferSize, libcusolver()), cusolverStatus_t,
+              (cusolverDnHandle_t, cublasFillMode_t, Int64, Int64, cudaDataType,
+               CuPtr{Cdouble}, Int64, CuPtr{Int64}, cudaDataType,
+               CuPtr{Cdouble}, Int64, Ptr{Int64}, Ptr{Int64}),
+              dense_handle(), CUBLAS_FILL_MODE_LOWER,
+              size(M.fact,1),1,R_64F,M.fact,size(M.fact,2),
+              M.etc[:ipiv64],R_64F,M.rhs,length(M.rhs),M.lwork,M.lwork_host)
+        length(M.work) < M.lwork[] && resize!(M.work,Int(M.lwork[]))
+        length(M.work_host) < M.lwork_host[] && resize!(work_host,Int(M.lwork_host[]))
+        ccall((:cusolverDnXsytrs, libcusolver()), cusolverStatus_t,
+              (cusolverDnHandle_t, cublasFillMode_t, Int64, Int64, cudaDataType,
+               CuPtr{Cdouble}, Int64, CuPtr{Int64}, cudaDataType,
+               CuPtr{Cdouble}, Int64, CuPtr{Cdouble}, Int64, Ptr{Cdouble}, Int64,
+               CuPtr{Int64}),
+              dense_handle(),CUBLAS_FILL_MODE_LOWER,
+              size(M.fact,1),1,R_64F,M.fact,size(M.fact,2),
+              M.etc[:ipiv64],R_64F,M.rhs,length(M.rhs),M.work,M.lwork[],M.work_host,M.lwork_host[],M.info)
+        copyto!(x,M.rhs)
+        
+        return x
+    end
+else
+    is_inertia(M::Solver) = M.opt.lapackgpu_algorithm == BUNCHKAUFMAN
+    inertia(M::Solver) = LapackCPU.inertia(M.etc[:fact_cpu],M.etc[:ipiv_cpu],M.info[])
+
+    function factorize_bunchkaufman!(M::Solver)
+        haskey(M.etc,:ipiv) || (M.etc[:ipiv] = CuVector{Int32}(undef,size(M.dense,1)))
+
+        copyto!(M.fact,M.dense)
+        CUSOLVER.cusolverDnDsytrf_bufferSize(
+            CUSOLVER.dense_handle(),Int32(size(M.fact,1)),M.fact,Int32(size(M.fact,2)),M.lwork)
+        length(M.work) < M.lwork[] && resize!(M.work,Int(M.lwork[]))
+        CUSOLVER.cusolverDnDsytrf(
+            CUSOLVER.dense_handle(),CUBLAS.CUBLAS_FILL_MODE_LOWER,
+            Int32(size(M.fact,1)),M.fact,Int32(size(M.fact,2)),
+            M.etc[:ipiv],M.work,M.lwork[],M.info)
+
+        # need to send the factorization back to cpu to call mkl sytrs --------------
+        haskey(M.etc,:fact_cpu) || (M.etc[:fact_cpu] = Matrix{Float64}(undef,size(M.dense)))
+        haskey(M.etc,:ipiv_cpu) || (M.etc[:ipiv_cpu] = Vector{Int}(undef,size(M.dense,1)))
+        copyto!(M.etc[:fact_cpu],M.fact)
+        copyto!(M.etc[:ipiv_cpu],M.etc[:ipiv])
+        # ---------------------------------------------------------------------------
+        return M
+    end
+
+    function solve_bunchkaufman!(M::Solver,x)
+        ccall(
+            (:dsytrs_64_,"libopenblas64_"), # MKL doesn't work for some reason...
+            Cvoid,
+            (Ref{Cchar},Ref{Int},Ref{Int},Ptr{Cdouble},Ref{Int},Ptr{Int},Ptr{Cdouble},Ref{Int},Ptr{Int}),
+            'L',size(M.fact,1),1,M.etc[:fact_cpu],size(M.fact,2),M.etc[:ipiv_cpu],x,length(x),[1])
+        
+        return x
 end
-
-function solve_bunchkaufman!(M::Solver,x)
-    
-    copyto!(M.etc[:ipiv64],M.etc[:ipiv])
-    copyto!(M.rhs,x)
-    ccall((:cusolverDnXsytrs_bufferSize, libcusolver()), cusolverStatus_t,
-          (cusolverDnHandle_t, cublasFillMode_t, Int64, Int64, cudaDataType,
-           CuPtr{Cdouble}, Int64, CuPtr{Int64}, cudaDataType,
-           CuPtr{Cdouble}, Int64, Ptr{Int64}, Ptr{Int64}),
-          dense_handle(), CUBLAS_FILL_MODE_LOWER,
-          size(M.fact,1),1,R_64F,M.fact,size(M.fact,2),
-          M.etc[:ipiv64],R_64F,M.rhs,length(M.rhs),M.lwork,M.lwork_host)
-    length(M.work) < M.lwork[] && resize!(M.work,Int(M.lwork[]))
-    length(M.work_host) < M.lwork_host[] && resize!(work_host,Int(M.lwork_host[]))
-    ccall((:cusolverDnXsytrs, libcusolver()), cusolverStatus_t,
-          (cusolverDnHandle_t, cublasFillMode_t, Int64, Int64, cudaDataType,
-           CuPtr{Cdouble}, Int64, CuPtr{Int64}, cudaDataType,
-           CuPtr{Cdouble}, Int64, CuPtr{Cdouble}, Int64, Ptr{Cdouble}, Int64,
-           CuPtr{Int64}),
-          dense_handle(),CUBLAS_FILL_MODE_LOWER,
-          size(M.fact,1),1,R_64F,M.fact,size(M.fact,2),
-          M.etc[:ipiv64],R_64F,M.rhs,length(M.rhs),M.work,M.lwork[],M.work_host,M.lwork_host[],M.info)
-    copyto!(x,M.rhs)
-    
-    return x
 end
 
 function factorize_lu!(M::Solver)
