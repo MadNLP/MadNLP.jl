@@ -1,5 +1,6 @@
 module MadNLPHSL
 
+import Libdl: dlopen, RTLD_DEEPBIND
 import MadNLP: @kwdef, Logger, @debug, @warn, @error, 
     AbstractOptions, AbstractLinearSolver, set_options!, SparseMatrixCSC, SubVector, StrideOneVector,
     SymbolicException,FactorizationException,SolveException,InertiaException,
@@ -17,11 +18,11 @@ include("ma97.jl")
 
 function __init__()
     check_deps()
-    # try
-    #     @isdefined(libhsl) && dlopen(libhsl,RTLD_DEEPBIND)
-    # catch e
-    #     println("HSL shared library cannot be loaded")
-    # end
+    try
+        @isdefined(libhsl) && dlopen(libhsl,RTLD_DEEPBIND)
+    catch e
+        println("HSL shared library cannot be loaded")
+    end
 end
 
 end # module

@@ -41,12 +41,12 @@ isvalid(cmd::Cmd)=(try run(cmd) catch e return false end; return true)
 if hsl_shared_library == ""
     if isvalid(`$FC --version`)
         const hsl_version = "2015.06.23"
-        const hsl_archive = joinpath(@__DIR__,"download","coinhsl-$hsl_version.tar.gz")
+        const hsl_archive = joinpath(@__DIR__,"downloads","coinhsl-$hsl_version.tar.gz")
         push!(products,FileProduct(prefix,joinpath(libdir,"libhsl.$so"), :libhsl))
         if isfile(hsl_archive)
-            unpack(hsl_archive,joinpath(@__DIR__, "download"))
+            unpack(hsl_archive,joinpath(@__DIR__, "downloads"))
             OC = OutputCollector[]
-            cd("download/coinhsl-$hsl_version")
+            cd("downloads/coinhsl-$hsl_version")
             push!(OC,OutputCollector(`$FC $openmp_flag -fPIC -c $optimization_flag -o common/deps.o common/deps.f`,verbose=verbose))
             push!(OC,OutputCollector(`$FC $openmp_flag -fPIC -c $optimization_flag -o common/deps90.o common/deps90.f90`,verbose=verbose))
             wait.(OC); empty!(OC)

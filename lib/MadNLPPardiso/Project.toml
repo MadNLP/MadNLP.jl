@@ -1,0 +1,15 @@
+name = "MadNLPPardiso"
+uuid = "312ee924-cb12-49df-b284-7304c3902fc0"
+authors = ["Sungho Shin <sungho.shin.ss@gmail.com>"]
+version = "0.1.0"
+
+[deps]
+MadNLP = "2621e9c9-9eb4-46b1-8089-e8c72242dfb6"
+Pkg = "44cfe95a-1eb2-52ea-b672-e2afdf69b78f"
+BinaryProvider = "b99e7846-7c00-51b0-8f62-c81ae34c0232"
+OpenBLAS32_jll = "656ef2d0-ae68-5445-9ca0-591084a874a2"
+Libdl = "8f399da3-3557-5675-b5ff-fb832c97cbdb"
+
+[compat]
+OpenBLAS32_jll = "~0.3"
+MadNLP = "~0.1.5"
