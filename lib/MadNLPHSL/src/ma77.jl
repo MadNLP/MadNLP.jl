@@ -3,13 +3,14 @@
 
 module Ma77
 
-import ..MadNLP:
-    @kwdef, Logger, @debug, @warn, @error,
+import ..MadNLPHSL:
+    @kwdef, Logger, @debug, @warn, @error, libhsl,
     SparseMatrixCSC, SparseMatrixCSC, SubVector, StrideOneVector,
-    libhsl, Mc68, get_tril_to_full, transform!,
+    get_tril_to_full, transform!,
     AbstractOptions, AbstractLinearSolver, set_options!,
     SymbolicException,FactorizationException,SolveException,InertiaException,
     introduce, factorize!, solve!, improve!, is_inertia, inertia
+import ..MadNLPHSL: Mc68
 
 const INPUT_MATRIX_TYPE = :csc
 

@@ -1,12 +1,11 @@
-# MadNLP.jl
-# Created by Sungho Shin (sungho.shin@wisc.edu)
+module MadNLPMumps
 
-module Mumps
-
-import ..MadNLP:
-    parsefile, SVector, setindex, dlopen,
+import StaticArrays: SVector, setindex
+import MUMPS_seq_jll
+import MadNLP:
+    parsefile, dlopen,
     @kwdef, Logger, @debug, @warn, @error,
-    SparseMatrixCSC, SubVector, StrideOneVector, MUMPS_seq_jll,
+    SparseMatrixCSC, SubVector, StrideOneVector, 
     SymbolicException,FactorizationException,SolveException,InertiaException,
     AbstractOptions, AbstractLinearSolver, set_options!,
     introduce, factorize!, solve!, improve!, is_inertia, inertia, findIJ, nnz
@@ -462,8 +461,3 @@ end
 introduce(::Solver)="mumps"
 
 end # module
-
-# forgiving names
-const mumps=Mumps;
-const MUMPS=Mumps;
-

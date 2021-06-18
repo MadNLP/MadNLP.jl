@@ -3,11 +3,11 @@
 
 module Ma27
 
-import ..MadNLP:
-    @kwdef, Logger, @debug, @warn, @error,
+import ..MadNLPHSL:
+    @kwdef, Logger, @debug, @warn, @error, libhsl,
     AbstractOptions, AbstractLinearSolver, set_options!, SparseMatrixCSC, SubVector, StrideOneVector,
     SymbolicException,FactorizationException,SolveException,InertiaException,
-    libhsl, introduce, factorize!, solve!, improve!, is_inertia, inertia, findIJ, nnz
+    introduce, factorize!, solve!, improve!, is_inertia, inertia, findIJ, nnz
 
 const ma27_default_icntl = Int32[
     6,6,0,2139062143,1,32639,32639,32639,32639,14,9,8,8,9,10,32639,32639,32639,32689,24,11,9,8,9,10,0,0,0,0,0]

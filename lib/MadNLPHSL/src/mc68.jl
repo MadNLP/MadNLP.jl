@@ -3,7 +3,7 @@
 
 module Mc68
 
-import ..MadNLP: @kwdef, libhsl
+import ..MadNLPHSL: @kwdef, libhsl
 
 @kwdef mutable struct Control
     f_array_in::Cint = 0

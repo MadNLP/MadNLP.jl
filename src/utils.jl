@@ -2,7 +2,7 @@
 # Created by Sungho Shin (sungho.shin@wisc.edu)
 
 # Build info
-default_linear_solver() = @isdefined(libhsl) ? Ma57 : Mumps
+default_linear_solver() = Umfpack
 default_dense_solver() = LapackCPU
 
 # Options

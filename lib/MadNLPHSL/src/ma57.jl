@@ -3,11 +3,11 @@
 
 module Ma57
 
-import ..MadNLP:
-    @kwdef, Logger, @debug, @warn, @error,
+import ..MadNLPHSL:
+    @kwdef, Logger, @debug, @warn, @error, libhsl,
     AbstractOptions, set_options!, AbstractLinearSolver, StrideOneVector,
     SymbolicException,FactorizationException,SolveException,InertiaException,
-    SparseMatrixCSC, libhsl, introduce, factorize!, solve!, improve!, is_inertia, inertia, findIJ, nnz
+    SparseMatrixCSC, introduce, factorize!, solve!, improve!, is_inertia, inertia, findIJ, nnz
 
 const ma57_default_icntl = Int32[0,0,6,1,0,5,1,0,10,0,16,16,10,100,0,0,0,0,0,0]
 const ma57_default_cntl  = Float64[1e-8,1.0e-20,0.5,0.0,0.0]

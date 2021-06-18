@@ -1,0 +1,5 @@
+# Deps source code and shared libraray
+deps/deps.jl
+deps/lib/*
+deps/download/*
+deps/build.log

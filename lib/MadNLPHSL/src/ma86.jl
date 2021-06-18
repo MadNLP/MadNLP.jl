@@ -3,12 +3,13 @@
 
 module Ma86
 
-import ..MadNLP:
-    @kwdef, Logger, @debug, @warn, @error,
-    SparseMatrixCSC, SubVector, StrideOneVector, libhsl, Mc68,
+import ..MadNLPHSL:
+    @kwdef, Logger, @debug, @warn, @error, libhsl,
+    SparseMatrixCSC, SubVector, StrideOneVector,
     SymbolicException,FactorizationException,SolveException,InertiaException,
     AbstractOptions, AbstractLinearSolver, set_options!,
     introduce, factorize!, solve!, improve!, is_inertia, inertia
+import ..MadNLPHSL: Mc68
 
 const INPUT_MATRIX_TYPE = :csc
 @enum(Ordering::Int,AMD = 1, METIS = 3)

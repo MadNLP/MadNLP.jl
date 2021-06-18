@@ -33,25 +33,13 @@ has_cuda_gpu() && include("lapackgpu.jl")
 
 # direct solvers
 include("umfpack.jl")
-include("mumps.jl")
 BLAS.vendor() == :mkl && include("pardisomkl.jl")
-if @isdefined libhsl
-    include("mc68.jl")
-    include("ma27.jl")
-    include("ma57.jl")
-    include("ma77.jl")
-    include("ma86.jl")
-    include("ma97.jl")
-end
 @isdefined(libpardiso) && include("pardiso.jl")
 
 
 # decomposition solvers
 include("schwarz.jl")
 include("schur.jl")
-
-# scalers
-@isdefined(libhsl) && include("mc19.jl")
 
 # generic functions - scalers
 scale!(csc::SparseMatrixCSC{Float64},S::AbstractLinearSystemScaler)=scale!(csc.n,csc.colptr,csc.rowval,csc.nzval,S.s)
