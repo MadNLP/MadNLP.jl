@@ -43,7 +43,7 @@ NLPModels = "~0.14, ~0.15"
 OpenBLAS32_jll = "~0.3"
 Plasmo = "~0.3, ~0.4"
 SolverCore = "~0.1"
-StaticArrays = "~0.12, ~1.0"
+StaticArrays = "~0.12, ~1.0, 1"
 julia = "1.6"
 
 [extras]
