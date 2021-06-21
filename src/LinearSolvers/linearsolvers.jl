@@ -28,7 +28,7 @@ include("richardson.jl")
 include("krylov.jl")
 
 # dense solvers
-include("lapackcpu.jl")
+include("lapack.jl")
 
 # direct solvers
 include("umfpack.jl")
