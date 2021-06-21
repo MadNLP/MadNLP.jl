@@ -17,13 +17,13 @@ function set_g_link!(linkedge::OptiEdge,l,gl,gu)
     cnt = 1
     for (ind,linkcon) in linkedge.linkconstraints
         l[cnt] = 0. # need to implement dual start later
-        if linkcon.set isa MathOptInterface.EqualTo
+        if linkcon.set isa MOI.EqualTo
             gl[cnt] = linkcon.set.value
             gu[cnt] = linkcon.set.value
-        elseif linkcon.set isa MathOptInterface.GreaterThan
+        elseif linkcon.set isa MOI.GreaterThan
             gl[cnt] = linkcon.set.lower
             gu[cnt] = Inf
-        elseif linkcon.set isa MathOptInterface.LessThan
+        elseif linkcon.set isa MOI.LessThan
             gl[cnt] = -Inf
             gu[cnt] = linkcon.set.upper
         else
@@ -186,10 +186,10 @@ function NonlinearProgram(graph::OptiGraph)
     end
 
     K = length(modelnodes)
-    ns= [num_variables(moi_optimizer(modelnode)) for modelnode in modelnodes]
+    ns= [num_variables(modelnode) for modelnode in modelnodes]
     n = sum(ns)
     ns_cumsum = cumsum(ns)
-    ms= [num_constraints(moi_optimizer(modelnode)) for modelnode in modelnodes]
+    ms= [num_constraints(modelnode) for modelnode in modelnodes]
     ms_cumsum = cumsum(ms)
     m = sum(ms)
 

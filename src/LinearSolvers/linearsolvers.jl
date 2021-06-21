@@ -29,25 +29,7 @@ include("krylov.jl")
 
 # dense solvers
 include("lapackcpu.jl")
-has_cuda_gpu() && include("lapackgpu.jl")
 
 # direct solvers
 include("umfpack.jl")
 BLAS.vendor() == :mkl && include("pardisomkl.jl")
-@isdefined(libpardiso) && include("pardiso.jl")
-
-
-# decomposition solvers
-include("schwarz.jl")
-include("schur.jl")
-
-# generic functions - scalers
-scale!(csc::SparseMatrixCSC{Float64},S::AbstractLinearSystemScaler)=scale!(csc.n,csc.colptr,csc.rowval,csc.nzval,S.s)
-scale!(vec::AbstractArray{Float64,1},S::AbstractLinearSystemScaler) = (vec.*=S.s)
-function scale!(n,colptr,rowval,nzval,s) where {Ti<:Integer}
-    for i=1:n
-        for j=colptr[i]:colptr[i+1]-1
-            @inbounds nzval[j]*=s[i]*s[rowval[j]]
-        end
-    end
-end

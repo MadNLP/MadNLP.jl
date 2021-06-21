@@ -14,4 +14,4 @@ Libdl = "8f399da3-3557-5675-b5ff-fb832c97cbdb"
 [compat]
 OpenBLAS32_jll = "~0.3"
 MKL_jll = "~2020"
-MadNLP = "~0.1.5"
+MadNLP = "~0.2"

@@ -31,6 +31,7 @@ mutable struct Solver <: AbstractLinearSolver
 
     p::Vector{Float64}
 
+    tmp::Vector{Ptr{Cvoid}}
     ctrl::Vector{Float64}
     info::Vector{Float64}
 
@@ -47,6 +48,14 @@ umfpack_di_numeric(colptr::StrideOneVector{Int32},rowval::StrideOneVector{Int32}
                        (Ptr{Int32},Ptr{Int32},Ptr{Float64},Ptr{Cvoid},Ptr{Cvoid},
                         Ptr{Float64},Ptr{Float64}),
                        colptr,rowval,nzval,symbolic,tmp,ctrl,info)
+umfpack_di_solve(typ,colptr,rowval,nzval,x,b,numeric,ctrl,info) = ccall(
+    (:umfpack_di_solve,:libumfpack),
+    Int32,
+    (Int32, Ptr{Int32}, Ptr{Int32}, Ptr{Float64},Ptr{Float64},
+     Ptr{Float64}, Ptr{Cvoid}, Ptr{Float64},Ptr{Float64}),
+    typ,colptr,rowval,nzval,x,b,numeric,ctrl,info)
+
+
 
 function Solver(csc::SparseMatrixCSC;
                 option_dict::Dict{Symbol,Any}=Dict{Symbol,Any}(),
@@ -69,20 +78,24 @@ function Solver(csc::SparseMatrixCSC;
     ctrl[12]=opt.umfpack_sym_pivtol
     ctrl[5]=opt.umfpack_block_size
     ctrl[6]=opt.umfpack_strategy
-    return Solver(inner,csc,full,tril_to_full_view,p,ctrl,info,opt,logger)
+    
+    tmp = Vector{Ptr{Cvoid}}(undef, 1)
+
+    return Solver(inner,csc,full,tril_to_full_view,p,tmp,ctrl,info,opt,logger)
 end
+
 function factorize!(M::Solver)
     UMFPACK.umfpack_free_numeric(M.inner)
     M.full.nzval.=M.tril_to_full_view
-    tmp = Vector{Ptr{Cvoid}}(undef, 1)
-    status=umfpack_di_numeric(M.inner.colptr,M.inner.rowval,M.inner.nzval,
-                              M.inner.symbolic,tmp,M.ctrl,M.info)
-    M.inner.numeric = tmp[1]
+    status = umfpack_di_numeric(M.inner.colptr,M.inner.rowval,M.inner.nzval,M.inner.symbolic,M.tmp,M.ctrl,M.info)
+    M.inner.numeric = M.tmp[]
+
     M.inner.status = status
     return M
 end
 function solve!(M::Solver,rhs::StrideOneVector{Float64})
-    rhs.=UMFPACK.solve!(M.p,M.inner,rhs,1)
+    status = umfpack_di_solve(1,M.inner.colptr,M.inner.rowval,M.inner.nzval,M.p,rhs,M.inner.numeric,M.ctrl,M.info)
+    rhs .= M.p
     return rhs
 end
 is_inertia(::Solver) = false

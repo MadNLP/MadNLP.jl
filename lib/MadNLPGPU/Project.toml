@@ -1,0 +1,12 @@
+name = "MadNLPGPU"
+uuid = "d72a61cc-809d-412f-99be-fd81f4b8a598"
+authors = ["Sungho Shin <sungho.shin.ss@gmail.com>"]
+version = "0.1.0"
+
+[deps]
+CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
+MadNLP = "2621e9c9-9eb4-46b1-8089-e8c72242dfb6"
+
+[compat]
+CUDA = "~3"
+MadNLP = "~0.2"

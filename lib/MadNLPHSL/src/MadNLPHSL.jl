@@ -25,4 +25,6 @@ function __init__()
     end
 end
 
+export MadNLPMa27, MadNLPMa57, MadNLPMa77, MadNLPMa86, MadNLPMa97
+
 end # module

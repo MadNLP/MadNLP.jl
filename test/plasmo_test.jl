@@ -1,6 +1,6 @@
 atol = rtol = 1e-8
 n_nodes=2
-M = 100
+M = 200
 d = sin.((0:M*n_nodes).*pi/100)
     
 graph = OptiGraph()
@@ -26,30 +26,34 @@ end
 
 #First node gets initial condition
 kwargs_collection = [
-    Dict(:print_level=>MadNLP.ERROR),
-    Dict(:linear_solver=>"schur",  :schur_custom_partition=>true,:print_level=>MadNLP.ERROR),
-    Dict(:linear_solver=>"schwarz",:schwarz_custom_partition=>true,:print_level=>MadNLP.ERROR)
+    ("default",Dict(:print_level=>MadNLP.ERROR)),
+    ("schur",Dict(:linear_solver=>MadNLPSchur,  :schur_custom_partition=>true,:print_level=>MadNLP.ERROR)),
+    ("schwarz",Dict(:linear_solver=>MadNLPSchwarz,:schwarz_custom_partition=>true,:print_level=>MadNLP.ERROR))
 ]
-@testset "Plasmo test" for kwargs in kwargs_collection
-    MadNLP.optimize!(graph;kwargs...);
-    @test termination_status(graph.optimizer) == MOI.LOCALLY_SOLVED 
+for (name,kwargs) in kwargs_collection
+    @testset "plasmo-$name" begin
+        MadNLP.optimize!(graph;kwargs...);
+        @test MadNLP.termination_status(graph.optimizer) == MOI.LOCALLY_SOLVED
+    end
 end
 
 optimizer_constructors = [
-    ()->MadNLP.Optimizer(print_level=MadNLP.ERROR),
-    ()->MadNLP.Optimizer(linear_solver="schur",schur_num_parts=2,print_level=MadNLP.ERROR),
-    ()->MadNLP.Optimizer(linear_solver="schwarz",schwarz_num_parts=2,print_level=MadNLP.ERROR),
-    ()->MadNLP.Optimizer(linear_solver="schwarz",schwarz_num_parts_upper=2,schwarz_num_parts=10,
-                         print_level=MadNLP.ERROR)
+    ("default",()->MadNLP.Optimizer(print_level=MadNLP.ERROR)),
+    ("schur",()->MadNLP.Optimizer(linear_solver=MadNLPSchur,schur_num_parts=2,print_level=MadNLP.ERROR)),
+    ("schwarz-single",()->MadNLP.Optimizer(linear_solver=MadNLPSchwarz,schwarz_num_parts=2,print_level=MadNLP.ERROR)),
+    ("schwarz-double",()->MadNLP.Optimizer(linear_solver=MadNLPSchwarz,schwarz_num_parts_upper=2,schwarz_num_parts=10,
+                             print_level=MadNLP.ERROR))
 ]
 
-@testset "Plasmo test" for optimizer_constructor in optimizer_constructors
-    node,~=combine(graph)
-    m = node.model
-    set_optimizer(m,optimizer_constructor)
-    optimize!(m);
-    @test solcmp([0.0,0.03137979101284875,0.0627286139604959,0.09401553133948139,0.12520966673966746,0.15628023531552773,0.18719657416707308,0.21792817260043182,0.24844470223822107,0.2787160469499936], value.(getnode(graph,1)[:x][1:10]))
-    @test termination_status(m) == MOI.LOCALLY_SOLVED 
+for (name,optimizer_constructor) in optimizer_constructors
+    @testset "jump-$name" begin
+        node,~=combine(graph)
+        m = node.model
+        set_optimizer(m,optimizer_constructor)
+        optimize!(m);
+        @test solcmp([0.0,0.03137979101284875,0.0627286139604959,0.09401553133948139,0.12520966673966746,0.15628023531552773,0.18719657416707308,0.21792817260043182,0.24844470223822107,0.2787160469499936], value.(getnode(graph,1)[:x][1:10]))
+        @test termination_status(m) == MOI.LOCALLY_SOLVED
+    end
 end
 
 

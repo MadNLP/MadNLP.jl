@@ -1,9 +1,6 @@
-# MadNLP.jl
-# Created by Sungho Shin (sungho.shin@wisc.edu)
+module MadNLPSchwarz
 
-module Schwarz
-
-import ..MadNLP:
+import ..MadNLPGraphs:
     @kwdef, Logger, @debug, @warn, @error,
     default_linear_solver,SparseMatrixCSC, SubVector, StrideOneVector, get_cscsy_view, nnz,
     SymbolicException,FactorizationException,SolveException,InertiaException,
@@ -178,8 +175,3 @@ end
 introduce(M::Solver)="schwarz equipped with "*introduce(M.sws[1].M)
 
 end # module
-
-# forgiving names
-const schwarz=Schwarz;
-const SCHWARZ=Schwarz;
-

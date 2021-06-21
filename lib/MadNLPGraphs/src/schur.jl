@@ -1,9 +1,6 @@
-# MadNLP.jl
-# Created by Sungho Shin (sungho.shin@wisc.edu)
+module MadNLPSchur
 
-module Schur
-
-import ..MadNLP:
+import ..MadNLPGraphs:
     @kwdef, Logger, @debug, @warn, @error,
     AbstractOptions, AbstractLinearSolver, EmptyLinearSolver, set_options!, SparseMatrixCSC, SubVector, StrideOneVector,
     SymbolicException,FactorizationException,SolveException,InertiaException,
@@ -192,8 +189,4 @@ function introduce(M::Solver)
     end
 end
 
-end
-
-# forgiving names
-const schur=Schur;
-const SCHUR=Schur;
+end # module

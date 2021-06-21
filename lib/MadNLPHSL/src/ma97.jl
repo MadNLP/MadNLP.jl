@@ -1,7 +1,7 @@
 # MadNLP.jl
 # Created by Sungho Shin (sungho.shin@wisc.edu)
 
-module Ma97
+module MadNLPMa97
 
 import ..MadNLPHSL:
     @kwdef, Logger, @debug, @warn, @error, libhsl,
@@ -187,7 +187,3 @@ end
 introduce(::Solver)="ma97"
 
 end
-# forgiving names
-const ma97=Ma97;
-const MA97=Ma97;
-

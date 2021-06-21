@@ -1,11 +1,6 @@
-module LapackGPU
+module MadNLPCUDA
 
-import ..MadNLP:
-    @kwdef, Logger, @debug, @warn, @error,
-    CUBLAS, CUSOLVER, CuVector, CuMatrix, R_64F,
-    AbstractOptions, AbstractLinearSolver, set_options!,
-    SymbolicException,FactorizationException,SolveException,InertiaException,
-    introduce, factorize!, solve!, improve!, is_inertia, inertia, LapackCPU, tril_to_full!, toolkit_version
+import CUDA: CUBLAS, CUSOLVER, CuVector, CuMatrix, toolkit_version, R_64F
 import .CUSOLVER: cusolverDnDsytrf_bufferSize, cusolverDnDsytrf,
     cusolverDnDgetrf_bufferSize, cusolverDnDgetrf, cusolverDnDgetrs,
     cusolverDnDgeqrf_bufferSize, cusolverDnDgeqrf, cusolverDnDgeqrf_bufferSize,
@@ -13,6 +8,11 @@ import .CUSOLVER: cusolverDnDsytrf_bufferSize, cusolverDnDsytrf,
     libcusolver, cusolverStatus_t, CuPtr, cudaDataType, cublasFillMode_t, cusolverDnHandle_t, dense_handle
 import .CUBLAS: cublasDtrsm_v2, handle, CUBLAS_DIAG_NON_UNIT,
     CUBLAS_FILL_MODE_LOWER, CUBLAS_FILL_MODE_UPPER, CUBLAS_SIDE_LEFT, CUBLAS_OP_N, CUBLAS_OP_T
+import MadNLP:
+    @kwdef, Logger, @debug, @warn, @error,
+    AbstractOptions, AbstractLinearSolver, set_options!,
+    SymbolicException,FactorizationException,SolveException,InertiaException,
+    introduce, factorize!, solve!, improve!, is_inertia, inertia, LapackCPU, tril_to_full!
 
 const INPUT_MATRIX_TYPE = :dense
 
@@ -210,9 +210,3 @@ function solve_qr!(M::Solver,x)
 end
 
 end # module
-
-
-
-# forgiving names
-lapackgpu = LapackGPU
-LAPACKGPU = LapackGPU

@@ -1,7 +1,7 @@
 # MadNLP.jl
 # Created by Sungho Shin (sungho.shin@wisc.edu)
 
-module Ma86
+module MadNLPMa86
 
 import ..MadNLPHSL:
     @kwdef, Logger, @debug, @warn, @error, libhsl,
@@ -189,7 +189,3 @@ function improve!(M::Solver)
 end
 introduce(::Solver)="ma86"
 end # module
-
-# forgiving names
-const ma86=Ma86;
-const MA86=Ma86;

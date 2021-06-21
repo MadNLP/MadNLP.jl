@@ -100,6 +100,7 @@ function solve!(M::Solver,x)
 end
 
 function factorize_bunchkaufman!(M::Solver)
+    size(M.fact,1) == 0 && return M
     haskey(M.etc,:ipiv) || (M.etc[:ipiv] = Vector{BlasInt}(undef,size(M.dense,1)))
     M.lwork = -1
     # pointer(M.fact)==pointer(M.dense) || M.fact.=M.dense
@@ -111,11 +112,13 @@ function factorize_bunchkaufman!(M::Solver)
     return M
 end
 function solve_bunchkaufman!(M::Solver,x)
+    size(M.fact,1) == 0 && return M
     sytrs('L',size(M.fact,1),1,M.fact,size(M.fact,2),M.etc[:ipiv],x,length(x),M.info)
     return x
 end
 
 function factorize_lu!(M::Solver)
+    size(M.fact,1) == 0 && return M
     haskey(M.etc,:ipiv) || (M.etc[:ipiv] = Vector{BlasInt}(undef,size(M.dense,1)))
     tril_to_full!(M.dense)
     # pointer(M.fact)==pointer(M.dense) || M.fact.=M.dense
@@ -124,12 +127,14 @@ function factorize_lu!(M::Solver)
     return M
 end
 function solve_lu!(M::Solver,x)
+    size(M.fact,1) == 0 && return M
     getrs('N',size(M.fact,1),1,M.fact,size(M.fact,2),
           M.etc[:ipiv],x,length(x),M.info)
     return x
 end
 
 function factorize_qr!(M::Solver)
+    size(M.fact,1) == 0 && return M
     haskey(M.etc,:tau) || (M.etc[:tau] = Vector{Float64}(undef,size(M.dense,1)))
     tril_to_full!(M.dense)
     M.lwork = -1
@@ -143,6 +148,7 @@ function factorize_qr!(M::Solver)
 end
 
 function solve_qr!(M::Solver,x)
+    size(M.fact,1) == 0 && return M
     M.lwork = -1
     ormqr('L','T',size(M.fact,1),1,length(M.etc[:tau]),M.fact,size(M.fact,2),M.etc[:tau],x,length(x),M.work,M.lwork,M.info)
     M.lwork = BlasInt(real(M.work[1]))
