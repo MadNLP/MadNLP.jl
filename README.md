@@ -1,4 +1,4 @@
-![Logo](logo-full.svg) 
+![Logo](logo-full.svg)
 ---
 
 [![build](https://github.com/sshin23/MadNLP.jl/workflows/build/badge.svg?branch=dev%2Fgithub_actions)](https://github.com/sshin23/MadNLP.jl/actions?query=workflow%3Abuild) [![codecov](https://codecov.io/gh/sshin23/MadNLP.jl/branch/master/graph/badge.svg)](https://codecov.io/gh/sshin23/MadNLP.jl)
