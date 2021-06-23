@@ -1,19 +1,3 @@
-include("nlp_test_include.jl")
-
-@test begin
-    local m,x
-    m=Model(MadNLP.Optimizer)
-    @variable(m,x)
-    @objective(m,Min,x^2)
-    MOIU.attach_optimizer(m)
-
-    nlp = MadNLP.NonlinearProgram(m.moi_backend.optimizer.model)
-    ips = MadNLP.Solver(nlp)
-    
-    show(stdout, "text/plain",nlp)
-    show(stdout, "text/plain",ips)
-    true
-end
 
 
 sets = [
@@ -163,16 +147,8 @@ sets = [
         ["unbounded"],
         @isdefined(MadNLPKrylov)
     ],
-    [
-        ()->MadNLP.Optimizer(
-            disable_garbage_collector=true,
-            output_file=".test.out"
-        ),
-        ["infeasible","unbounded","eigmina"], # just checking logger; no need to test all
-        true
-    ],
 ]
 
 @testset "NLP test" for (optimizer_constructor,exclude,availability) in sets
-    availability && nlp_test(optimizer_constructor,exclude)
+    availability && madnlp_test(optimizer_constructor,exclude)
 end

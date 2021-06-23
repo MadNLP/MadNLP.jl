@@ -1,3 +1,5 @@
+module MadNLPTest
+
 function nlp_test(optimizer_constructor::Function,exclude)
     for f in [infeasible,unbounded,lootsma,eigmina]
         !(string(f) in exclude) && f(optimizer_constructor)
@@ -166,3 +168,5 @@ function eigmina(optimizer_constructor::Function)
 
     @test termination_status(m) == MOI.LOCALLY_SOLVED
 end
+
+end # module

@@ -21,27 +21,14 @@ MathOptInterface = "~0.9"
 NLPModels = "~0.14, ~0.15"
 SolverCore = "~0.1"
 julia = "~1"
-JuMP = "~0.21"
-Plasmo = "~0.3, ~0.4"
 AmplNLReader = "~0.9"
-MadNLPGPU = "~0.1" 
-MadNLPHSL = "~0.1" 
-MadNLPIterative = "~0.1" 
-MadNLPMumps = "~0.1" 
-MadNLPPardiso = "~0.1" 
-MadNLPGraphs = "~0.1"
+MINLPTests = "~0.5"
 
 [extras]
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
-JuMP = "4076af6c-e467-56ae-b986-b466b2749572"
-Plasmo = "d3f7391f-f14a-50cc-bbe4-76a32d1bad3c"
 AmplNLReader = "77dd3d4c-cb1d-5e09-9340-85030ff7ba66"
-MadNLPGPU = "d72a61cc-809d-412f-99be-fd81f4b8a598"
-MadNLPHSL = "7fb6135f-58fe-4112-84ca-653cf5be0c77"
-MadNLPIterative = "1888cb03-ce40-4a36-8d45-ae8231a0e17c"
-MadNLPMumps = "3b83494e-c0a4-4895-918b-9157a7a085a1"
-MadNLPPardiso = "312ee924-cb12-49df-b284-7304c3902fc0"
-MadNLPGraphs = "2f590f30-ea46-438a-a78d-e5bfe3109704"
+MadNLPTests = "b52a2a03-04ab-4a5f-9698-6a2deff93217"
+MINLPTests = "ee0a3090-8ee9-5cdb-b8cb-8eeba3165522"
 
 [targets]
-test = ["Test", "JuMP", "Plasmo", "AmplNLReader", "MadNLPGPU", "MadNLPHSL", "MadNLPIterative", "MadNLPMumps", "MadNLPPardiso", "MadNLPGraphs"]
+test = ["Test", "AmplNLReader", "MadNLPTests", "MINLPTests"]
