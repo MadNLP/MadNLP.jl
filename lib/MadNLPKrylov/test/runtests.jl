@@ -1,4 +1,4 @@
-using Test, MadNLP, MadNLPIterative, MadNLPTests
+using Test, MadNLP, MadNLPKrylov, MadNLPTests
 
 testset = [
     [
@@ -10,7 +10,7 @@ testset = [
     ],
 ]
 
-@testset "MadNLPIterative test" begin
+@testset "MadNLPKrylov test" begin
     for (name,optimizer_constructor,exclude) in testset
         test_madnlp(name,optimizer_constructor,exclude)
     end

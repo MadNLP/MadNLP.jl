@@ -139,11 +139,7 @@ introduce(::Solver)="pardiso"
 
 function __init__()
     check_deps()
-    # try
-        @isdefined(libpardiso) && dlopen(libpardiso,RTLD_DEEPBIND)
-    # catch e
-    #     println("Pardiso shared library cannot be loaded")
-    # end
+    @isdefined(libpardiso) && dlopen(libpardiso,RTLD_DEEPBIND)
 end
 
 end # module

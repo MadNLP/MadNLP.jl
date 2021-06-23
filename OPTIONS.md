@@ -1,13 +1,11 @@
 ## MadNLP Options
 ### Interior Point Solver Options
 - `linear_solver::Module = DefaultLinearSolver`:\
-    Linear solver used for solving primal-dual system. Valid values are: `MadNLP`.{`Umfpack`, `Mumps`, `PardisoMKL`, `Ma27`, `Ma57`, `Ma77`, `Ma86`, `Ma97`, `Pardiso`, `Schur`, `Schwarz`, `LapackCPU`, `LapackGPU`}. The selected solver should be properly built in the build procedure. See [README.md](https://github.com/sshin23/MadNLP.jl) file.
+    Linear solver used for solving primal-dual system. Valid values are: {`MadNLPUmfpack`, `MadNLPMumps`, `MadNLPPardisoMKL`, `MadNLPMa27`, `MadNLPMa57`, `MadNLPMa77`, `MadNLPMa86`, `MadNLPMa97`, `MadNLPPardiso`, `MadNLPSchur`, `MadNLPSchwarz`, `MadNLPLapackCPU`, `MadNLPLapackGPU`} (some may require using extension packages). The selected solver should be properly built in the build procedure. See [README.md](https://github.com/sshin23/MadNLP.jl) file.
 - `iterator::Module = Richardson `\
-    Iterator used for iterative refinement. Valid values are: `MadNLP`.{`Richardson`,`Krylov`}.
+    Iterator used for iterative refinement. Valid values are: {`MadNLPRichardson`,`MadNLPKrylov`}.
     - `Richardson` uses [Richardson iteration](https://en.wikipedia.org/wiki/Modified_Richardson_iteration)
     - `Krylov` uses [restarted Generalized Minimal Residual](https://en.wikipedia.org/wiki/Generalized_minimal_residual_method) method implemented in [IterativeSolvers.jl](https://github.com/JuliaMath/IterativeSolvers.jl).
-- `linear_system_scaler::Module = DummyModule`\
-    Linear system scaling routine used for scaling primal-dual system. `DummyModule` does not scale the system. Valid values are `MadNLP`.{`DummyModule`,`Mc19`}.
 - `blas_num_threads::Int = 1`\
     Number of threads used for BLAS routines. Valid range is ``[1,\infty)``.
 - `disable_garbage_collector::Bool = false `\
@@ -84,14 +82,14 @@
 
 ### Linear Solver Options
 Linear solver options are specific to the linear solver chosen at `linear_solver` option. Irrelevant options are ignored and a warning message is printed.
-#### Ma27
+#### Ma27 (requires `MadNLPHSL`)
 - `ma27_pivtol::Float64 = 1e-8`
 - `ma27_pivtolmax::Float64 = 1e-4`
 - `ma27_liw_init_factor::Float64 = 5.`
 - `ma27_la_init_factor::Float64 = 5.`
 - `ma27_meminc_factor::Float64 = 2.`
 
-#### Ma57
+#### Ma57 (requires `MadNLPHSL`)
 - `ma57_pivtol::Float64 = 1e-8`
 - `ma57_pivtolmax::Float64 = 1e-4`
 - `ma57_pre_alloc::Float64 = 1.05`
@@ -101,7 +99,7 @@ Linear solver options are specific to the linear solver chosen at `linear_solver
 - `ma57_node_amalgamation::Int = 16`
 - `ma57_small_pivot_flag::Int = 0`
 
-#### Ma77
+#### Ma77 (requires `MadNLPHSL`)
 - `ma77_buffer_lpage::Int = 4096`
 - `ma77_buffer_npage::Int = 1600`
 - `ma77_file_size::Int = 2097152`
@@ -114,8 +112,7 @@ Linear solver options are specific to the linear solver chosen at `linear_solver
 - `ma77_u::Float64 = 1e-8`
 - `ma77_umax::Float64 = 1e-4`
 
-
-#### Ma86
+#### Ma86 (requires `MadNLPHSL`)
 - `ma86_num_threads::Int = 1`
 - `ma86_print_level::Float64 = -1`
 - `ma86_nemin::Int = 32`
@@ -126,7 +123,7 @@ Linear solver options are specific to the linear solver chosen at `linear_solver
 - `ma86_u::Float64 = 1e-8`
 - `ma86_umax::Float64 = 1e-4`
 
-#### Ma97
+#### Ma97 (requires `MadNLPHSL`)
 - `ma97_num_threads::Int = 1`
 - `ma97_print_level::Int = -1`
 - `ma97_nemin::Int = 8`
@@ -136,7 +133,7 @@ Linear solver options are specific to the linear solver chosen at `linear_solver
 - `ma97_u::Float64 = 1e-8`
 - `ma97_umax::Float64 = 1e-4`
 
-#### Mumps
+#### Mumps (requires `MadNLPMumps`)
 - `mumps_dep_tol::Float64 = 0.`
 - `mumps_mem_percent::Int = 1000`
 - `mumps_permuting_scaling::Int = 7`
@@ -145,14 +142,14 @@ Linear solver options are specific to the linear solver chosen at `linear_solver
 - `mumps_pivtolmax::Float64 = .1`
 - `mumps_scaling::Int = 77`
 
-#### Umfpack
+#### Umfpack (requires `MadNLPUmfpack`)
 - `umfpack_pivtol::Float64 = 1e-4`
 - `umfpack_pivtolmax::Float64 = 1e-1`
 - `umfpack_sym_pivtol::Float64 = 1e-3`
 - `umfpack_block_size::Float64 = 16`
 - `umfpack_strategy::Float64 = 2.`
 
-#### Pardiso
+#### Pardiso (requires `MadNLPPardiso`)
 - `pardiso_matching_strategy::Pardiso.MatchingStrategy = COMPLETE2x2`
 - `pardiso_max_inner_refinement_steps::Int = 1`
 - `pardiso_msglvl::Int = 0`
@@ -165,15 +162,15 @@ Linear solver options are specific to the linear solver chosen at `linear_solver
 - `pardisomkl_msglvl::Int = 0`
 - `pardisomkl_order::Int = 2`
 
-#### LapackGPU
+#### LapackGPU (requires `MadNLPGPU`)
 - `lapackgpu_algorithm::LapackGPU.Algorithms = BUNCHKAUFMAN`
 
 #### LapackCPU
 - `lapackcpu_algorithm::LapackCPU.Algorithms = BUNCHKAUFMAN`
 
-#### Schur
+#### Schur (requires `MadNLPGraphs`)
 - `schur_subproblem_solver::Module = DefaultLinearSolver` \
-   Linear solver used for solving subproblem. Valid values are: `MadNLP`.{`Umfpack`, `Ma27`, `Ma57`, `Ma97`, `Mumps`}.
+   Linear solver used for solving subproblem. Valid values are: {`MadNLPUmfpack`, `MadNLPMa27`, `MadNLPMa57`, `MadNLPMa97`, `MadNLPMumps`}.
 - `schur_dense_solver::Module = DefaultDenseSolver` \
    Linear solver used for solving Schur complement system
 - `schur_custom_partition::Bool = false` \
@@ -183,9 +180,9 @@ Linear solver options are specific to the linear solver chosen at `linear_solver
 - `schur_part::Vector{Int} = Int[]` \
    Custom partition information in a vector form. The parent node should be labeled as `0`. Only valid if `schur_custom_partition` is `true`.
 
-#### Schwarz
+#### Schwarz (requires `MadNLPGraphs`)
 - `schwarz_subproblem_solver::Module = DefaultSubproblemSolver` \
-   Linear solver used for solving subproblem. Valid values are: `MadNLP`.{`Umfpack`, `PardisoMKL`, `Ma27`, `Ma57`, `Ma77`, `Ma86`, `Ma97`, `Pardiso`}.
+   Linear solver used for solving subproblem. Valid values are: {`MadNLPUmfpack`, `MadNLPPardisoMKL`, `MadNLPMa27`, `MadNLPMa57`, `MadNLPMa77`, `MadNLPMa86`, `MadNLPMa97`, `MadNLPPardiso`}.
 - `schwarz_custom_partition::Bool = false` \
     If `false`, Schwarz solver automatically detects the partition using `Metis`. If `true`, the partition information given in `schur_part` is used. `schur_num_parts` and `schur_part` should be properly set by the user. When using with `Plasmo`, `schur_num_parts` and `schur_part` are automatically set by the `Plasmo` interface.
 - `schwarz_num_parts::Int = 2` \
@@ -210,7 +207,7 @@ Linear solver options are specific to the linear solver chosen at `linear_solver
 - `richardson_acceptable_tol::Float64 = 1e-5` \
     Acceptable convergence tolerance of Richardson iteration. If the Richardson iteration counter exceeds `richardson_max_iter` without satisfying the convergence criteria set with `richardson_tol`, the Richardson solver checks whether the acceptable convergence criteria set with `richardson_acceptable_tol` is satisfied; if the acceptable convergence criteria is satisfied, the computed step is used; otherwise, the augmented system is treated to be singular. Valid range is ``(0,\infty)``.
 
-#### Krylov
+#### Krylov (requires `MadNLPIterative`)
 - `krylov_max_iter::Int = 10` \
     Maximum number of Krylov iteration steps. Valid range is ``[1,\infty)``.
 - `krylov_tol::Float64 = 1e-10` \

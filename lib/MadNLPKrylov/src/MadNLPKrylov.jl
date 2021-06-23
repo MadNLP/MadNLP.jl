@@ -1,9 +1,10 @@
 module MadNLPKrylov
 
-import ..MadNLPIterative:
+import MadNLP:
     @kwdef, Logger, @debug, @warn, @error,
     AbstractOptions, AbstractIterator, set_options!, @sprintf,
-    solve_refine!, mul!, ldiv!, size, StrideOneVector,
+    solve_refine!, mul!, ldiv!, size, StrideOneVector
+import IterativeSolvers:
     FastHessenberg, ArnoldiDecomp, Residual, init!, init_residual!, expand!, Identity,
     orthogonalize_and_normalize!, update_residual!, gmres_iterable!, GMRESIterable, converged,
     ModifiedGramSchmidt
@@ -94,5 +95,4 @@ function gmres_iterable_update!(g,x,b)
     g.β=g.residual.current
 end
 
-
-end
+end # module
