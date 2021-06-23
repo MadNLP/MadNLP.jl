@@ -1,5 +1,5 @@
-# Deps source code and shared libraray
 deps/deps.jl
-deps/lib/*
-deps/downloads/*
 deps/build.log
+deps/lib/
+
+test/Project.toml

@@ -1,4 +1,0 @@
-ignore:
-  - "src/LinearSolvers/ma*.jl"  # cannot test due to HSL dependencies
-  - "src/LinearSolvers/mc*.jl"  # cannot test due to HSL dependencies
-  - "src/LinearSolvers/pardiso.jl"  # cannot test due to Pardiso Project dependencies
