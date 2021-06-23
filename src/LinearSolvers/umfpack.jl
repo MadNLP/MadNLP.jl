@@ -1,7 +1,7 @@
 # MadNLP.jl
 # Created by Sungho Shin (sungho.shin@wisc.edu)
 
-module Umfpack
+module MadNLPUmfpack
 
 import ..MadNLP:
     @kwdef, Logger, @debug, @warn, @error,
@@ -115,6 +115,3 @@ end
 introduce(::Solver)="umfpack"
 
 end # module
-
-# forgiving names
-const umfpack=Umfpack;

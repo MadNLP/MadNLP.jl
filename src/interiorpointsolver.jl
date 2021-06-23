@@ -28,7 +28,7 @@ end
     disable_garbage_collector::Bool = false
     blas_num_threads::Int = 1
     linear_solver::Module
-    iterator::Module = Richardson
+    iterator::Module = default_iterator()
     linear_system_scaler::Module = DummyModule
 
     # Output options

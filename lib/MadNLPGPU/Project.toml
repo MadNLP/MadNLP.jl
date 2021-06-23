@@ -10,3 +10,4 @@ MadNLP = "2621e9c9-9eb4-46b1-8089-e8c72242dfb6"
 [compat]
 CUDA = "~2,~3"
 MadNLP = "~0.2"
+julia = "^1.5"

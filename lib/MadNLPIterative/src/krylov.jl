@@ -1,13 +1,9 @@
-# MadNLP.jl
-# Created by Sungho Shin (sungho.shin@wisc.edu)
+module MadNLPKrylov
 
-module Krylov
-
-import ..MadNLP:
+import ..MadNLPIterative:
     @kwdef, Logger, @debug, @warn, @error,
     AbstractOptions, AbstractIterator, set_options!, @sprintf,
-    solve_refine!, mul!, ldiv!, size, IterativeSolvers, StrideOneVector
-import IterativeSolvers:
+    solve_refine!, mul!, ldiv!, size, StrideOneVector,
     FastHessenberg, ArnoldiDecomp, Residual, init!, init_residual!, expand!, Identity,
     orthogonalize_and_normalize!, update_residual!, gmres_iterable!, GMRESIterable, converged,
     ModifiedGramSchmidt
@@ -100,7 +96,3 @@ end
 
 
 end
-
-# forgiving names
-krylov = Krylov
-KRYLOV = Krylov

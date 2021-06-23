@@ -1,4 +1,5 @@
-using Test, MadNLP, MadNLPGraphs, JuMP, Plasmo 
+using Test, MadNLP, JuMP, Plasmo
+using MadNLPMumps, MadNLPHSL, MadNLPPardiso, MadNLPGraphs, MadNLPGPU, MadNLPIterative
 import MathOptInterface
 import AmplNLReader: AmplModel
 import SparseArrays: sparse

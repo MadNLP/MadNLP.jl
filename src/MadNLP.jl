@@ -4,7 +4,7 @@
 module MadNLP
 
 import Pkg.TOML: parsefile
-import IterativeSolvers, MathOptInterface
+import MathOptInterface
 import Libdl: dlopen, dlext, RTLD_DEEPBIND, RTLD_GLOBAL
 import Printf: @sprintf
 import LinearAlgebra: BLAS, Adjoint, Symmetric, mul!, ldiv!, norm, dot
@@ -19,7 +19,7 @@ import SolverCore: GenericExecutionStats
 const MOI = MathOptInterface
 const MOIU = MathOptInterface.Utilities
 
-export madnlp
+export MadNLPUmfpack, MadNLPLapackCPU, MadNLPPardisoMKL, madnlp
 
 # Version info
 version() = parsefile(joinpath(@__DIR__,"..","Project.toml"))["version"]

@@ -25,7 +25,6 @@ LinearSolverException=Union{SymbolicException,FactorizationException,SolveExcept
 
 # iterative solvers
 include("richardson.jl")
-include("krylov.jl")
 
 # dense solvers
 include("lapack.jl")

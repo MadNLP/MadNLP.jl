@@ -19,114 +19,114 @@ end
 sets = [
     [
         ()->MadNLP.Optimizer(
-            linear_solver=MadNLP.Umfpack,
+            linear_solver=MadNLPUmfpack,
             print_level=MadNLP.ERROR),
         [],
-        isdefined(MadNLP,:Umfpack)
+        @isdefined(MadNLPUmfpack)
     ],
     [
         ()->MadNLP.Optimizer(
-            linear_solver=MadNLP.Mumps,
+            linear_solver=MadNLPMumps,
             print_level=MadNLP.ERROR),
         [],
-        isdefined(MadNLP,:Mumps)
+        @isdefined(MadNLPMumps)
     ],
     [
         ()->MadNLP.Optimizer(
-            linear_solver=MadNLP.Ma27,
+            linear_solver=MadNLPMa27,
             print_level=MadNLP.ERROR),
         [],
-        isdefined(MadNLP,:Ma27)
+        @isdefined(MadNLPMa27)
     ],
     [
         ()->MadNLP.Optimizer(
-            linear_solver=MadNLP.Ma57,
+            linear_solver=MadNLPMa57,
             print_level=MadNLP.ERROR),
         [],
-        isdefined(MadNLP,:Ma57)
+        @isdefined(MadNLPMa57)
     ],
     [
         ()->MadNLP.Optimizer(
-            linear_solver=MadNLP.Ma77,
+            linear_solver=MadNLPMa77,
             print_level=MadNLP.ERROR),
         ["unbounded"],
-        isdefined(MadNLP,:Ma77)
+        @isdefined(MadNLPMa77)
     ],
     [
         ()->MadNLP.Optimizer(
-            linear_solver=MadNLP.Ma86,
+            linear_solver=MadNLPMa86,
             print_level=MadNLP.ERROR),
         [],
-        isdefined(MadNLP,:Ma86)
+        @isdefined(MadNLPMa86)
     ],
     [
         ()->MadNLP.Optimizer(
-            linear_solver=MadNLP.Ma97,
+            linear_solver=MadNLPMa97,
             print_level=MadNLP.ERROR),
         [],
-        isdefined(MadNLP,:Ma97)
+        @isdefined(MadNLPMa97)
     ],
     [
         ()->MadNLP.Optimizer(
-            linear_solver=MadNLP.Pardiso,
+            linear_solver=MadNLPPardiso,
             print_level=MadNLP.ERROR),
         [],
-        isdefined(MadNLP,:Pardiso)
+        @isdefined(MadNLPPardiso)
     ],
     [
         ()->MadNLP.Optimizer(
-            linear_solver=MadNLP.PardisoMKL,
+            linear_solver=MadNLPPardisoMKL,
             print_level=MadNLP.ERROR),
         [],
-        isdefined(MadNLP,:PardisoMKL)
+        @isdefined(MadNLPPardisoMKL)
     ],
     [
         ()->MadNLP.Optimizer(
-            linear_solver=MadNLP.LapackCPU,
-            lapackcpu_algorithm=MadNLP.LapackCPU.BUNCHKAUFMAN,
+            linear_solver=MadNLPLapackCPU,
+            lapackcpu_algorithm=MadNLPLapackCPU.BUNCHKAUFMAN,
             print_level=MadNLP.ERROR),
         [],
-        isdefined(MadNLP,:LapackCPU)
+        @isdefined(MadNLPLapackCPU)
     ],
     [
         ()->MadNLP.Optimizer(
-            linear_solver=MadNLP.LapackCPU,
-            lapackcpu_algorithm=MadNLP.LapackCPU.LU,
+            linear_solver=MadNLPLapackCPU,
+            lapackcpu_algorithm=MadNLPLapackCPU.LU,
             print_level=MadNLP.ERROR),
         [],
-        isdefined(MadNLP,:LapackCPU)
+        @isdefined(MadNLPLapackCPU)
     ],
     [
         ()->MadNLP.Optimizer(
-            linear_solver=MadNLP.LapackCPU,
-            lapackcpu_algorithm=MadNLP.LapackCPU.QR,
+            linear_solver=MadNLPLapackCPU,
+            lapackcpu_algorithm=MadNLPLapackCPU.QR,
             print_level=MadNLP.ERROR),
         [],
-        isdefined(MadNLP,:LapackCPU)
+        @isdefined(MadNLPLapackCPU)
     ],
     [
         ()->MadNLP.Optimizer(
-            linear_solver=MadNLP.LapackGPU,
-            lapackgpu_algorithm=MadNLP.LapackGPU.BUNCHKAUFMAN,
+            linear_solver=MadNLPLapackGPU,
+            lapackgpu_algorithm=MadNLPLapackGPU.BUNCHKAUFMAN,
             print_level=MadNLP.ERROR),
         [],
-        isdefined(MadNLP,:LapackGPU)
+        @isdefined(MadNLPLapackGPU)
     ],
     [
         ()->MadNLP.Optimizer(
-            linear_solver=MadNLP.LapackGPU,
-            lapackgpu_algorithm=MadNLP.LapackGPU.LU,
+            linear_solver=MadNLPLapackGPU,
+            lapackgpu_algorithm=MadNLPLapackGPU.LU,
             print_level=MadNLP.ERROR),
         [],
-        isdefined(MadNLP,:LapackGPU)
+        @isdefined(MadNLPLapackGPU)
     ],
     [
         ()->MadNLP.Optimizer(
-            linear_solver=MadNLP.LapackGPU,
-            lapackgpu_algorithm=MadNLP.LapackGPU.QR,
+            linear_solver=MadNLPLapackGPU,
+            lapackgpu_algorithm=MadNLPLapackGPU.QR,
             print_level=MadNLP.ERROR),
         [],
-        isdefined(MadNLP,:LapackGPU)
+        @isdefined(MadNLPLapackGPU)
     ],
     [
         ()->MadNLP.Optimizer(
@@ -158,17 +158,10 @@ sets = [
     ],
     [
         ()->MadNLP.Optimizer(
-            iterator=MadNLP.Krylov,
+            iterator=MadNLPKrylov,
             print_level=MadNLP.ERROR),
         ["unbounded"],
-        true
-    ],
-    [
-        ()->MadNLP.Optimizer(
-            linear_system_scaler=isdefined(MadNLP,:Mc19) ? MadNLP.Mc19 : MadNLP.DummyModule,
-            print_level=MadNLP.ERROR),
-        ["eigmina"],
-        true
+        @isdefined(MadNLPKrylov)
     ],
     [
         ()->MadNLP.Optimizer(
@@ -176,7 +169,7 @@ sets = [
             output_file=".test.out"
         ),
         ["infeasible","unbounded","eigmina"], # just checking logger; no need to test all
-        isdefined(MadNLP,:Umfpack )
+        true
     ],
 ]
 

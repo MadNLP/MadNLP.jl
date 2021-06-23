@@ -1,4 +1,4 @@
-module LapackCPU
+module MadNLPLapackCPU
 
 import ..MadNLP:
     @kwdef, Logger, @debug, @warn, @error,
@@ -195,7 +195,3 @@ function num_neg_ev(n,D,ipiv)
 end
 
 end # module
-
-# forgiving names
-lapackcpu = LapackCPU
-LAPACKCPU = LapackCPU
