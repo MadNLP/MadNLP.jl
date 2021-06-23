@@ -18,5 +18,5 @@ jobs:
           version: ${{ matrix.julia-version }}
       - uses: julia-actions/julia-buildpkg@latest
       - run: |
-          julia --project=test -e 'using Pkg; Pkg.develop(PackageSpec(path=joinpath(pwd(),"lib","MadNLPTests")))'
+          julia --project=test -e 'using Pkg; Pkg.develop(PackageSpec(path=joinpath(pwd(),"lib","MadNLPTests"))); Pkg.instantiate()'
           julia --project=test --color=yes test/runtests.jl

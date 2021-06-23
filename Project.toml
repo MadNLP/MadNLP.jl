@@ -21,14 +21,3 @@ MathOptInterface = "~0.9"
 NLPModels = "~0.14, ~0.15"
 SolverCore = "~0.1"
 julia = "~1"
-AmplNLReader = "~0.9"
-MINLPTests = "~0.5"
-
-[extras]
-Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
-AmplNLReader = "77dd3d4c-cb1d-5e09-9340-85030ff7ba66"
-MadNLPTests = "b52a2a03-04ab-4a5f-9698-6a2deff93217"
-MINLPTests = "ee0a3090-8ee9-5cdb-b8cb-8eeba3165522"
-
-[targets]
-test = ["Test", "AmplNLReader", "MadNLPTests", "MINLPTests"]
