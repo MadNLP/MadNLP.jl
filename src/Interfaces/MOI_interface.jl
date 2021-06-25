@@ -168,7 +168,7 @@ end
 
 
 
-function MOI.get(model::Optimizer, ::MOI.ListOfConstraints)
+function MOI.get(model::Optimizer, ::MOI.ListOfConstraintTypesPresent)
     constraints = Set{Tuple{DataType, DataType}}()
 
     for info in model.variable_info
@@ -253,7 +253,7 @@ function MOI.set(model::Optimizer, ::MOI.ConstraintSet,
 end
 
 # default_copy_to
-MOIU.supports_default_copy_to(model::Optimizer, copy_names::Bool) = !copy_names
+MOI.supports_incremental_interface(model::Optimizer, copy_names::Bool) = !copy_names
 MOI.copy_to(model::Optimizer, src::MOI.ModelLike; copy_names = false) = MOIU.default_copy_to(model, src, copy_names)
 
 # objective sense
@@ -266,25 +266,25 @@ const SILENT_KEY = :log_level
 const SILENT_VAL = ERROR
 MOI.supports(::Optimizer,::MOI.Silent) = true
 MOI.set(model::Optimizer, ::MOI.Silent, value::Bool)= value ?
-    MOI.set(model,MOI.RawParameter(SILENT_KEY),SILENT_VAL) : delete!(model.option_dict,SILENT_KEY)
+    MOI.set(model,MOI.RawOptimizerAttribute(String(SILENT_KEY)),SILENT_VAL) : delete!(model.option_dict,SILENT_KEY)
 MOI.get(model::Optimizer, ::MOI.Silent) = get(model.option_dict,SILENT_KEY,String) == SILENT_VAL
 
 # time limit
 const TIME_LIMIT = :max_wall_time
 MOI.supports(::Optimizer,::MOI.TimeLimitSec) = true
 MOI.set(model::Optimizer,::MOI.TimeLimitSec,value)= value isa Real ?
-    MOI.set(model,MOI.RawParameter(TIME_LIMIT),Float64(value)) : error("Invalid time limit: $value")
+    MOI.set(model,MOI.RawOptimizerAttribute(String(TIME_LIMIT)),Float64(value)) : error("Invalid time limit: $value")
 MOI.set(model::Optimizer,::MOI.TimeLimitSec,::Nothing)=delete!(model.option_dict,TIME_LIMIT)
 MOI.get(model::Optimizer,::MOI.TimeLimitSec)=get(model.option_dict,TIME_LIMIT,Float64)
 
 # set/get options
-MOI.supports(::Optimizer,::MOI.RawParameter) = true
-MOI.set(model::Optimizer, p::MOI.RawParameter, value) = (model.option_dict[Symbol(p.name)] = value)
-MOI.get(model::Optimizer, p::MOI.RawParameter) = haskey(model.option_dict, Symbol(p.name)) ?
-    (return model.option_dict[Symbol(p.name)]) : error("RawParameter with name $(p.name) is not set.")
+MOI.supports(::Optimizer,::MOI.RawOptimizerAttribute) = true
+MOI.set(model::Optimizer, p::MOI.RawOptimizerAttribute, value) = (model.option_dict[Symbol(p.name)] = value)
+MOI.get(model::Optimizer, p::MOI.RawOptimizerAttribute) = haskey(model.option_dict, Symbol(p.name)) ?
+    (return model.option_dict[Symbol(p.name)]) : error("RawOptimizerAttribute with name $(p.name) is not set.")
 
 # solve time
-MOI.get(model::Optimizer, ::MOI.SolveTime) = model.ips.cnt.total_time
+MOI.get(model::Optimizer, ::MOI.SolveTimeSec) = model.ips.cnt.total_time
 
 function MOI.empty!(model::Optimizer)
     # empty!(model.option_dict)
@@ -331,16 +331,16 @@ end
 check_inbounds(model::Optimizer, var::MOI.SingleVariable) = check_inbounds(model, var.variable)
 function check_inbounds(model::Optimizer, aff::MOI.ScalarAffineFunction)
     for term in aff.terms
-        check_inbounds(model, term.variable_index)
+        check_inbounds(model, term.variable)
     end
 end
 function check_inbounds(model::Optimizer, quad::MOI.ScalarQuadraticFunction)
     for term in quad.affine_terms
-        check_inbounds(model, term.variable_index)
+        check_inbounds(model, term.variable)
     end
     for term in quad.quadratic_terms
-        check_inbounds(model, term.variable_index_1)
-        check_inbounds(model, term.variable_index_2)
+        check_inbounds(model, term.variable_1)
+        check_inbounds(model, term.variable_2)
     end
 end
 
@@ -518,7 +518,7 @@ function append_to_jacobian_sparsity!(I,J,
     cnt = 0
     for term in aff.terms
         I[offset+cnt]= row
-        J[offset+cnt]= term.variable_index.value
+        J[offset+cnt]= term.variable.value
         cnt += 1
     end
     return cnt
@@ -529,12 +529,12 @@ function append_to_jacobian_sparsity!(I,J,
     cnt = 0
     for term in quad.affine_terms
         I[offset+cnt]= row
-        J[offset+cnt]= term.variable_index.value
+        J[offset+cnt]= term.variable.value
         cnt += 1
     end
     for term in quad.quadratic_terms
-        row_idx = term.variable_index_1
-        col_idx = term.variable_index_2
+        row_idx = term.variable_1
+        col_idx = term.variable_2
         if row_idx == col_idx
             I[offset+cnt]= row
             J[offset+cnt]= row_idx.value
@@ -588,8 +588,8 @@ append_to_hessian_sparsity!(I,J,::Union{MOI.SingleVariable,MOI.ScalarAffineFunct
 function append_to_hessian_sparsity!(I,J,quad::MOI.ScalarQuadraticFunction,offset)
     cnt = 0
     for term in quad.quadratic_terms
-        I[offset+cnt]=term.variable_index_1.value
-        J[offset+cnt]=term.variable_index_2.value
+        I[offset+cnt]=term.variable_1.value
+        J[offset+cnt]=term.variable_2.value
         cnt+=1
     end
     return cnt
@@ -632,11 +632,11 @@ get_nnz_jac_linear(model::Optimizer) =
     (isempty(model.linear_ge_constraints) ? 0 : sum(length(info.func.terms) for info in model.linear_ge_constraints))
 get_nnz_jac_quadratic(model::Optimizer) =
     (isempty(model.quadratic_eq_constraints) ? 0 : sum(length(info.func.affine_terms) for info in model.quadratic_eq_constraints)) +
-    (isempty(model.quadratic_eq_constraints) ? 0 : sum(isempty(info.func.quadratic_terms) ? 0 : sum(term.variable_index_1 == term.variable_index_2 ? 1 : 2 for term in info.func.quadratic_terms) for info in model.quadratic_eq_constraints)) +
+    (isempty(model.quadratic_eq_constraints) ? 0 : sum(isempty(info.func.quadratic_terms) ? 0 : sum(term.variable_1 == term.variable_2 ? 1 : 2 for term in info.func.quadratic_terms) for info in model.quadratic_eq_constraints)) +
     (isempty(model.quadratic_le_constraints) ? 0 : sum(length(info.func.affine_terms) for info in model.quadratic_le_constraints)) +
-    (isempty(model.quadratic_le_constraints) ? 0 : sum(isempty(info.func.quadratic_terms) ? 0 : sum(term.variable_index_1 == term.variable_index_2 ? 1 : 2 for term in info.func.quadratic_terms) for info in model.quadratic_le_constraints)) +
+    (isempty(model.quadratic_le_constraints) ? 0 : sum(isempty(info.func.quadratic_terms) ? 0 : sum(term.variable_1 == term.variable_2 ? 1 : 2 for term in info.func.quadratic_terms) for info in model.quadratic_le_constraints)) +
     (isempty(model.quadratic_ge_constraints) ? 0 : sum(length(info.func.affine_terms) for info in model.quadratic_ge_constraints)) +
-    (isempty(model.quadratic_ge_constraints) ? 0 : sum(isempty(info.func.quadratic_terms) ? 0 : sum(term.variable_index_1 == term.variable_index_2 ? 1 : 2 for term in info.func.quadratic_terms) for info in model.quadratic_ge_constraints))
+    (isempty(model.quadratic_ge_constraints) ? 0 : sum(isempty(info.func.quadratic_terms) ? 0 : sum(term.variable_1 == term.variable_2 ? 1 : 2 for term in info.func.quadratic_terms) for info in model.quadratic_ge_constraints))
 get_nnz_jac_nonlinear(model::Optimizer) =
     (isempty(model.nlp_data.constraint_bounds) ? 0 : length(MOI.jacobian_structure(model.nlp_data.evaluator)))
 
@@ -648,7 +648,7 @@ end
 function eval_function(aff::MOI.ScalarAffineFunction, x)
     function_value = aff.constant
     for term in aff.terms
-        function_value += term.coefficient*x[term.variable_index.value]
+        function_value += term.coefficient*x[term.variable.value]
     end
     return function_value
 end
@@ -656,11 +656,11 @@ end
 function eval_function(quad::MOI.ScalarQuadraticFunction, x)
     function_value = quad.constant
     for term in quad.affine_terms
-        function_value += term.coefficient*x[term.variable_index.value]
+        function_value += term.coefficient*x[term.variable.value]
     end
     for term in quad.quadratic_terms
-        row_idx = term.variable_index_1
-        col_idx = term.variable_index_2
+        row_idx = term.variable_1
+        col_idx = term.variable_2
         coefficient = term.coefficient
         if row_idx == col_idx
             function_value += 0.5*coefficient*x[row_idx.value]*x[col_idx.value]
@@ -692,18 +692,18 @@ end
 function fill_gradient!(grad, x, aff::MOI.ScalarAffineFunction{Float64})
     fill!(grad, 0.0)
     for term in aff.terms
-        grad[term.variable_index.value] += term.coefficient
+        grad[term.variable.value] += term.coefficient
     end
 end
 
 function fill_gradient!(grad, x, quad::MOI.ScalarQuadraticFunction{Float64})
     fill!(grad, 0.0)
     for term in quad.affine_terms
-        grad[term.variable_index.value] += term.coefficient
+        grad[term.variable.value] += term.coefficient
     end
     for term in quad.quadratic_terms
-        row_idx = term.variable_index_1
-        col_idx = term.variable_index_2
+        row_idx = term.variable_1
+        col_idx = term.variable_2
         coefficient = term.coefficient
         if row_idx == col_idx
             grad[row_idx.value] += coefficient*x[row_idx.value]
@@ -763,8 +763,8 @@ function fill_constraint_jacobian!(values, start_offset, x, quad::MOI.ScalarQuad
     end
     num_quadratic_coefficients = 0
     for term in quad.quadratic_terms
-        row_idx = term.variable_index_1
-        col_idx = term.variable_index_2
+        row_idx = term.variable_1
+        col_idx = term.variable_2
         coefficient = term.coefficient
         if row_idx == col_idx
             values[start_offset+num_affine_coefficients+num_quadratic_coefficients+1] = coefficient*x[col_idx.value]
@@ -845,9 +845,9 @@ MOI.get(model::Optimizer, ::MOI.TerminationStatus) = model.nlp === nothing ?
     MOI.OPTIMIZE_NOT_CALLED : termination_status(model.nlp)
 MOI.get(model::Optimizer, ::MOI.RawStatusString) = string(model.nlp.status)
 MOI.get(model::Optimizer, ::MOI.ResultCount) = (model.nlp !== nothing) ? 1 : 0
-MOI.get(model::Optimizer, attr::MOI.PrimalStatus) = !(1 <= attr.N <= MOI.get(model, MOI.ResultCount())) ?
+MOI.get(model::Optimizer, attr::MOI.PrimalStatus) = !(1 <= attr.result_index <= MOI.get(model, MOI.ResultCount())) ?
     MOI.NO_SOLUTION : primal_status(model.ips)
-MOI.get(model::Optimizer, attr::MOI.DualStatus) = !(1 <= attr.N <= MOI.get(model, MOI.ResultCount())) ?
+MOI.get(model::Optimizer, attr::MOI.DualStatus) = !(1 <= attr.result_index <= MOI.get(model, MOI.ResultCount())) ?
     MOI.NO_SOLUTION : dual_status(model.ips)
 
 const status_moi_dict = Dict(
