@@ -1,13 +1,13 @@
 using MathOptInterface
 const MOI = MathOptInterface
-const MOIT = MOI.Test
+const MOIT = MOI.DeprecatedTest
 const MOIU = MOI.Utilities
 const MOIB = MOI.Bridges
 
-const config = MOIT.TestConfig(atol=1e-4, rtol=1e-4,
-                               optimal_status=MOI.LOCALLY_SOLVED)
-const config_no_duals = MOIT.TestConfig(atol=1e-4, rtol=1e-4, duals=false,
-                                        optimal_status=MOI.LOCALLY_SOLVED)
+const config = MOIT.Config(atol=1e-4, rtol=1e-4,
+                           optimal_status=MOI.LOCALLY_SOLVED)
+const config_no_duals = MOIT.Config(atol=1e-4, rtol=1e-4, duals=false,
+                                    optimal_status=MOI.LOCALLY_SOLVED)
 
 @testset "MOI utils" begin
     optimizer = MadNLP.Optimizer()
@@ -15,8 +15,7 @@ const config_no_duals = MOIT.TestConfig(atol=1e-4, rtol=1e-4, duals=false,
         @test MOI.get(optimizer, MOI.SolverName()) == "MadNLP"
     end
     @testset "supports_default_copy_to" begin
-        @test MOIU.supports_default_copy_to(optimizer, false)
-        @test !MOIU.supports_default_copy_to(optimizer, true)
+        @test MOI.supports_incremental_interface(optimizer)
     end
     @testset "MOI.Silent" begin
         @test MOI.supports(optimizer, MOI.Silent())
@@ -31,15 +30,17 @@ const config_no_duals = MOIT.TestConfig(atol=1e-4, rtol=1e-4, duals=false,
         @test MOI.get(optimizer, MOI.TimeLimitSec()) == my_time_limit
     end
     @testset "MOI.MaxIter" begin
-        MOI.set(optimizer,MOI.RawParameter("max_iter"),1)
-        @test MOI.get(optimizer,MOI.RawParameter("max_iter")) == 1
+        MOI.set(optimizer,MOI.RawOptimizerAttribute("max_iter"),1)
+        @test MOI.get(optimizer,MOI.RawOptimizerAttribute("max_iter")) == 1
     end
 end
 
-@testset "Testing getters" begin
-    MOIT.copytest(MOI.instantiate(()->MadNLP.Optimizer(print_level=MadNLP.ERROR),
-                                  with_bridge_type=Float64), MOIU.Model{Float64}())
-end
+# Currently broken on MOI 0.10
+# See: https://github.com/jump-dev/MathOptInterface.jl/pull/1591
+# @testset "Testing getters" begin
+#     MOIT.copytest(MOI.instantiate(()->MadNLP.Optimizer(print_level=MadNLP.ERROR),
+#                                   with_bridge_type=Float64), MOIU.Model{Float64}())
+# end
 
 @testset "Bounds set twice" begin
     optimizer = MadNLP.Optimizer(print_level=MadNLP.ERROR)
