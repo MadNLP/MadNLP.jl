@@ -1,4 +1,4 @@
-module MadNLPGraphs
+module MadNLPGraph
 
 import MadNLP:
     optimize!, NonlinearProgram, Optimizer, Solver,

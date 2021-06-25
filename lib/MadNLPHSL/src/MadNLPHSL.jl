@@ -9,12 +9,15 @@ import MadNLP: @kwdef, Logger, @debug, @warn, @error,
 
 include(joinpath("..","deps","deps.jl"))
 
-include("mc68.jl")
-include("ma27.jl")
-include("ma57.jl")
-include("ma77.jl")
-include("ma86.jl")
-include("ma97.jl")
+if @isdefined(libhsl)
+    include("mc68.jl")
+    include("ma27.jl")
+    include("ma57.jl")
+    include("ma77.jl")
+    include("ma86.jl")
+    include("ma97.jl")
+    export MadNLPMa27, MadNLPMa57, MadNLPMa77, MadNLPMa86, MadNLPMa97
+end
 
 function __init__()
     check_deps()
@@ -25,6 +28,5 @@ function __init__()
     end
 end
 
-export MadNLPMa27, MadNLPMa57, MadNLPMa77, MadNLPMa86, MadNLPMa97
 
 end # module

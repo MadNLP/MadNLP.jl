@@ -25,7 +25,7 @@ mkpath(libdir)
 isvalid(cmd::Cmd)=(try run(cmd) catch e return false end; return true)
 
 # HSL
-if hsl_library_path == ""
+if hsl_source_path != ""
     if isvalid(`$FC --version`)
         OC = OutputCollector[]
         cd(hsl_source_path)
@@ -52,11 +52,13 @@ if hsl_library_path == ""
 else
     product = FileProduct(hsl_library_path, :libhsl)
 end
+    
 
 # write deps.jl
 if satisfied(product)
     @info "Building HSL (Ma27, Ma57, Ma77, Ma86, Ma97) succeeded."
-    write_deps_file(joinpath(@__DIR__, "deps.jl"),[product], verbose=verbose)
+    write_deps_file(joinpath(@__DIR__, "deps.jl"),Product[product], verbose=verbose)
 else
     @info "Building HSL (Ma27, Ma57, Ma77, Ma86, Ma97) failed."
+    write_deps_file(joinpath(@__DIR__, "deps.jl"),Product[], verbose=verbose)
 end

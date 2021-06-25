@@ -1,6 +1,6 @@
 module MadNLPSchur
 
-import ..MadNLPGraphs:
+import ..MadNLPGraph:
     @kwdef, Logger, @debug, @warn, @error,
     AbstractOptions, AbstractLinearSolver, EmptyLinearSolver, set_options!, SparseMatrixCSC, SubVector, StrideOneVector,
     SymbolicException,FactorizationException,SolveException,InertiaException,

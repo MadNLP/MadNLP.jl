@@ -2,9 +2,10 @@
 # Created by Sungho Shin (sungho.shin@wisc.edu)
 
 abstract type AbstractLinearSolver end
-mutable struct EmptyLinearSolver <: AbstractLinearSolver end
 abstract type AbstractIterator end
-abstract type AbstractLinearSystemScaler end
+
+# dummy solver type
+mutable struct EmptyLinearSolver <: AbstractLinearSolver end
 
 # dummy functions
 introduce(::EmptyLinearSolver) = ""
@@ -13,7 +14,6 @@ solve!(::EmptyLinearSolver,x) = x
 is_inertia(::EmptyLinearSolver) = false
 inertia(::EmptyLinearSolver) = (0,0,0)
 improve!(::EmptyLinearSolver) = false
-rescale!(::AbstractLinearSystemScaler) = nothing
 solve_refine!(y,::AbstractIterator,x) = nothing
 
 # LinearSolverExceptions 

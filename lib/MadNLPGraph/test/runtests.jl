@@ -1,4 +1,4 @@
-using Test, Plasmo, MadNLP, MadNLPTests, MadNLPGraphs
+using Test, Plasmo, MadNLP, MadNLPTests, MadNLPGraph
 
 @testset "MadNLPGraphs test" begin
     
