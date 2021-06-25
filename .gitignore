@@ -28,3 +28,7 @@ deps/deps.jl
 deps/lib/*
 deps/download/*
 deps/build.log
+
+# Test byproduct
+.ci/Project.toml
+.ci/Manifest.toml

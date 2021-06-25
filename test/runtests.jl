@@ -20,7 +20,7 @@ import SparseArrays: sparse
         include("madnlp_test.jl")
     end
 
-    @testset "MINNLP test" begin 
+    @testset "MINLP test" begin 
         include("minlp_test.jl")
     end
 end # @testset

@@ -125,7 +125,7 @@ if toolkit_version() >= v"11.3.1"
     end
 else
     is_inertia(M::Solver) = M.opt.lapackgpu_algorithm == BUNCHKAUFMAN
-    inertia(M::Solver) = MadNLPLapackCPU.inertia(M.etc[:fact_cpu],M.etc[:ipiv_cpu],M.etc[:info_cpu][])
+    inertia(M::Solver) = inertia(M.etc[:fact_cpu],M.etc[:ipiv_cpu],M.etc[:info_cpu][])
 
     function factorize_bunchkaufman!(M::Solver)
         haskey(M.etc,:ipiv) || (M.etc[:ipiv] = CuVector{Int32}(undef,size(M.dense,1)))
@@ -158,7 +158,7 @@ else
             'L',size(M.fact,1),1,M.etc[:fact_cpu],size(M.fact,2),M.etc[:ipiv_cpu],x,length(x),[1])
         
         return x
-end
+    end
 end
 
 function factorize_lu!(M::Solver)
@@ -199,12 +199,12 @@ end
 function solve_qr!(M::Solver,x)
     copyto!(M.rhs,x)
     cusolverDnDormqr_bufferSize(dense_handle(),CUBLAS_SIDE_LEFT,CUBLAS_OP_T,
-                                         Int32(size(M.fact,1)),Int32(1),Int32(length(M.etc[:tau])),M.fact,Int32(size(M.fact,2)),M.etc[:tau],M.rhs,Int32(length(M.rhs)),M.lwork)
+                                Int32(size(M.fact,1)),Int32(1),Int32(length(M.etc[:tau])),M.fact,Int32(size(M.fact,2)),M.etc[:tau],M.rhs,Int32(length(M.rhs)),M.lwork)
     length(M.work) < M.lwork[] && resize!(M.work,Int(M.lwork[]))
     cusolverDnDormqr(dense_handle(),CUBLAS_SIDE_LEFT,CUBLAS_OP_T,
-                              Int32(size(M.fact,1)),Int32(1),Int32(length(M.etc[:tau])),M.fact,Int32(size(M.fact,2)),M.etc[:tau],M.rhs,Int32(length(M.rhs)),M.work,M.lwork[],M.info)
+                     Int32(size(M.fact,1)),Int32(1),Int32(length(M.etc[:tau])),M.fact,Int32(size(M.fact,2)),M.etc[:tau],M.rhs,Int32(length(M.rhs)),M.work,M.lwork[],M.info)
     cublasDtrsm_v2(handle(),CUBLAS_SIDE_LEFT,CUBLAS_FILL_MODE_UPPER,CUBLAS_OP_N,CUBLAS_DIAG_NON_UNIT,
-                          Int32(size(M.fact,1)),Int32(1),M.etc[:one],M.fact,Int32(size(M.fact,2)),M.rhs,Int32(length(M.rhs)))
+                   Int32(size(M.fact,1)),Int32(1),M.etc[:one],M.fact,Int32(size(M.fact,2)),M.rhs,Int32(length(M.rhs)))
     copyto!(x,M.rhs)
     return x
 end
