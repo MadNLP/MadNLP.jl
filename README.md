@@ -1,3 +1,5 @@
+NOTICE: MadNLP.jl is currently undergoing a major refactoring. Until the new extension packages are registered, it is recommended to use the v0.1.6 version.
+
 ![Logo](logo-full.svg)
 ---
 
