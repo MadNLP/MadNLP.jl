@@ -1,2 +1,0 @@
-ignore:
-  - "src/LinearSolvers/pardisomkl.jl"  # cannot test because the default BLAS vendor is OpenBLAS
