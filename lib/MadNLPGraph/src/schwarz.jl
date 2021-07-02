@@ -1,6 +1,6 @@
 module MadNLPSchwarz
 
-import ..MadNLPGraphs:
+import ..MadNLPGraph:
     @kwdef, Logger, @debug, @warn, @error,
     default_linear_solver,SparseMatrixCSC, SubVector, StrideOneVector, get_cscsy_view, nnz,
     SymbolicException,FactorizationException,SolveException,InertiaException,

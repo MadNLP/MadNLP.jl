@@ -1,9 +1,9 @@
 using Pkg
 
 if ARGS[1] == "full"
-    pkgs = ["MadNLPHSL","MadNLPPardiso","MadNLPMumps","MadNLPGPU","MadNLPGraphs","MadNLPKrylov"]
+    pkgs = ["MadNLPHSL","MadNLPPardiso","MadNLPMumps","MadNLPGPU","MadNLPGraph","MadNLPKrylov"]
 elseif ARGS[1] == "basic"
-    pkgs = ["MadNLPMumps","MadNLPGraphs","MadNLPKrylov"]
+    pkgs = ["MadNLPMumps","MadNLPGraph","MadNLPKrylov"]
 else
     error("proper argument should be given - full or basic")
 end

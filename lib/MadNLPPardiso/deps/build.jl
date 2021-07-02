@@ -30,11 +30,12 @@ if pardiso_library_path != ""
     end
 end
 
-if satisfied(product)
+if @isdefined(product) && satisfied(product)
     @info "Building Pardiso succeded."
-    write_deps_file(joinpath(@__DIR__, "deps.jl"),[product], verbose=verbose)
+    write_deps_file(joinpath(@__DIR__, "deps.jl"),Product[product], verbose=verbose)
 else
-    error("Building Pardiso failed.")
+    @error "Building Pardiso failed."
+    write_deps_file(joinpath(@__DIR__, "deps.jl"),Product[], verbose=verbose)
 end
 
 # write deps.jl
