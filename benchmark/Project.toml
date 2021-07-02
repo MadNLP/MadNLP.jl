@@ -1,6 +1,0 @@
-[deps]
-CUTEst = "1b53aba6-35b6-5f92-a507-53c67d53f819"
-JLD2 = "033835bb-8acc-5ee8-8aae-3f567f8a3819"
-MadNLP = "2621e9c9-9eb4-46b1-8089-e8c72242dfb6"
-MadNLPHSL = "7fb6135f-58fe-4112-84ca-653cf5be0c77"
-NLPModelsIpopt = "f4238b75-b362-5c4c-b852-0801c9a21d71"
