@@ -1,7 +1,7 @@
 # MadNLP.jl
 # Created by Sungho Shin (sungho.shin@wisc.edu)
 
-module Richardson
+module MadNLPRichardson
 
 import ..MadNLP:
     @kwdef, Logger, @debug, @warn, @error,
@@ -79,7 +79,3 @@ function solve_refine!(x::StrideOneVector{Float64},
     return (residual_ratio < IS.opt.richardson_acceptable_tol ? :Solved : :Failed)
 end
 end # module
-
-# forgiving names
-richardson = Richardson
-RICHARDSON = Richardson

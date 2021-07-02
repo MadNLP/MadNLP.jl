@@ -1,7 +1,0 @@
-[deps]
-MINLPTests = "ee0a3090-8ee9-5cdb-b8cb-8eeba3165522"
-Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
-
-[compat]
-MINLPTests = "0.5"
-julia = "1"

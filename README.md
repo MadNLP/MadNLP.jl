@@ -11,58 +11,26 @@ MadNLP is a [nonlinear programming](https://en.wikipedia.org/wiki/Nonlinear_prog
 ```julia
 pkg> add MadNLP
 ```
+Optionally, various extension packages can be installed together:
+```julia
+pkg> add MadNLPHSL, MadNLPPardiso, MadNLPMumps, MadNLPGPU, MadNLPGraphs, MadNLPIterative
+```
+These packages are stored in the `lib` subdirectory within the main MadNLP repository. Some extension packages may require additional dependencies or specific hardware. For the instructions for the build procedure, see the following links: [MadNLPHSL](https://github.com/sshin23/MadNLP.jl/tree/master/lib/MadNLPHSL), [MadNLPPardiso](https://github.com/sshin23/MadNLP.jl/tree/master/lib/MadNLPHSL), [MadNLPGPU](https://github.com/sshin23/MadNLP.jl/tree/master/lib/MadNLPGPU).
 
-## Build
-The build process requires C and Fortran compilers. If they are not installed, do
-```julia
-shell> sudo apt install gcc gfortran # Linux
-shell> brew cask install gcc gfortran # MacOS
-```
-
-MadNLP is interfaced with non-Julia sparse/dense linear solvers:
-- [Umfpack](https://people.engr.tamu.edu/davis/suitesparse.html)
-- [Mumps](http://mumps.enseeiht.fr/) 
-- [MKL-Pardiso](https://software.intel.com/content/www/us/en/develop/documentation/mkl-developer-reference-fortran/top/sparse-solver-routines/intel-mkl-pardiso-parallel-direct-sparse-solver-interface.html) 
-- [HSL solvers](http://www.hsl.rl.ac.uk/ipopt/) (optional) 
-- [Pardiso](https://www.pardiso-project.org/) (optional) 
-- [MKL-Lapack](https://software.intel.com/content/www/us/en/develop/documentation/mkl-developer-reference-fortran/top/lapack-routines.html)
-- [cuSOLVER](https://docs.nvidia.com/cuda/cusolver/index.html) (optional)
-
-All the dependencies except for HSL solvers, Pardiso, and CUDA are automatically installed. To build MadNLP with HSL linear solvers (Ma27, Ma57, Ma77, Ma86, Ma97), the source codes need to be obtained by the user from <http://www.hsl.rl.ac.uk/ipopt/> under Coin-HSL Full (Stable). Then, the tarball `coinhsl-2015.06.23.tar.gz` should be placed at `deps/download`. To use Pardiso, the user needs to obtain the Paridso shared libraries from <https://www.pardiso-project.org/>, place the shared library file (e.g., `libpardiso600-GNU720-X86-64.so`) at `deps/download`, and place the license file in the home directory. The absolute path for `deps/download` can be obtained by:
-```julia
-julia> import MadNLP; joinpath(dirname(pathof(MadNLP)),"..","deps","download")
-```
-To use cuSOLVER, functional NVIDIA driver and corresponding CUDA toolkit need to be installed by the user. After obtaining the files, run
-```julia
-pkg> build MadNLP
-```
-Build can be customized by setting the following environment variables.
-```julia
-julia> ENV["MADNLP_CC"] = "/usr/local/bin/gcc-9"    # default is "gcc"
-julia> ENV["MADNLP_FC"] = "/usr/local/bin/gfortran" # default is "gfortran"
-julia> ENV["MADNLP_BLAS"] = "openblas"              # default is "mkl" if available "openblas" otherwise
-julia> ENV["MADNLP_ENALBE_OPENMP"] = false          # default is "true"
-julia> ENV["MADNLP_OPTIMIZATION_FLAG"] = "-O2"      # default is "-O3"
-```
-
-Alternatively, if the user has already installed HSL/pardiso library, one can simply specify the library path as follows:
-```julia
-julia> ENV["MADNLP_HSL_LIBRARY_PATH"] = "/opt/lib/libcoinhsl.so"
-julia> ENV["MADNLP_PARDISO_LIBRARY_PATH"] = "/opt/lib/libpardiso.so" 
-```
-In this case, the source code is not compiled and the provided shared library is directly used.
 
 ## Usage
+### Interfaces
 MadNLP is interfaced with modeling packages: 
 - [JuMP](https://github.com/jump-dev/JuMP.jl)
 - [Plasmo](https://github.com/zavalab/Plasmo.jl)
 - [NLPModels](https://github.com/JuliaSmoothOptimizers/NLPModels.jl).
+Users can pass various options to MadNLP also through the modeling packages. The interface-specific syntaxes are shown below. To see the list of MadNLP solver options, check the [OPTIONS.md](https://github.com/sshin23/MadNLP/blob/master/OPTIONS.md) file.
 
-### JuMP interface
+#### JuMP interface
 ```julia
 using MadNLP, JuMP
 
-model = Model(()->MadNLP.Optimizer(linear_solver=MadNLP.Ma57,print_level=MadNLP.INFO,max_iter=100))
+model = Model(()->MadNLP.Optimizer(print_level=MadNLP.INFO,max_iter=100))
 @variable(model, x, start = 0.0)
 @variable(model, y, start = 0.0)
 @NLobjective(model, Min, (1 - x)^2 + 100 * (y - x^2)^2)
@@ -71,9 +39,16 @@ optimize!(model)
 
 ```
 
-### Plasmo interface
+#### NLPModels interface
 ```julia
-using MadNLP, Plasmo
+using MadNLP, CUTEst
+model = CUTEstModel("PRIMALC1")
+madnlp(model,print_level=MadNLP.WARN,max_wall_time=3600)
+```
+
+#### Plasmo interface (requires extension `MadNLPGraphs`)
+```julia
+using MadNLP, MadNLPGraphs, Plasmo
 
 graph = OptiGraph()
 @optinode(graph,n1)
@@ -86,31 +61,75 @@ graph = OptiGraph()
 @NLnodeconstraint(n2,exp(x) >= 2)
 @linkconstraint(graph,n1[:x] == n2[:x])
 
-MadNLP.optimize!(graph;linear_solver=MadNLP.Ma97,print_level=MadNLP.DEBUG,max_iter=100)
+MadNLP.optimize!(graph;print_level=MadNLP.DEBUG,max_iter=100)
 
 ```
 
-### NLPModels interface
-```julia
-using MadNLP, CUTEst
-model = CUTEstModel("PRIMALC1")
-madnlp(model,linear_solver=MadNLP.PardisoMKL,print_level=MadNLP.WARN,max_wall_time=3600)
-```
+### Linear Solvers
+MadNLP is interfaced with non-Julia sparse/dense linear solvers:
+- [Umfpack](https://people.engr.tamu.edu/davis/suitesparse.html)
+- [MKL-Pardiso](https://software.intel.com/content/www/us/en/develop/documentation/mkl-developer-reference-fortran/top/sparse-solver-routines/intel-mkl-pardiso-parallel-direct-sparse-solver-interface.html)
+- [MKL-Lapack](https://software.intel.com/content/www/us/en/develop/documentation/mkl-developer-reference-fortran/top/lapack-routines.html)
+- [HSL solvers](http://www.hsl.rl.ac.uk/ipopt/) (requires extension)
+- [Pardiso](https://www.pardiso-project.org/) (requires extension)
+- [Mumps](http://mumps.enseeiht.fr/)  (requires extension)
+- [cuSOLVER](https://docs.nvidia.com/cuda/cusolver/index.html) (requires extension)
 
-### Using special linear solvers
-In order to use GPU solvers, `CUDA` should be imported to the `Main` module.
+Each linear solver in MadNLP is a julia module, and the `linear_solver` option should be specified by the actual module. Note that the linear solver modules are always exported to `Main`.
+
+#### Built-in Solvers: Umfpack, PardisoMKL, LapackCPU
 ```julia
-using MadNLP, CUDA
-model = Model(()->MadNLP.Optimizer(linear_solver=MadNLP.LapackGPU))
+using MadNLP, JuMP
 # ...
+model = Model(()->MadNLP.Optimizer(linear_solver=MadNLPUmfpack)) # default
+model = Model(()->MadNLP.Optimizer(linear_solver=MadNLPPardisoMKL))
+model = Model(()->MadNLP.Optimizer(linear_solver=MadNLPLapackCPU))
 ```
 
-In order to use multi-threaded solvers (`Schur` and `Schwawrz`), julia session should be started with `-t` flag.
+#### HSL (requires extension `MadNLPHSL`)
+```julia
+using MadNLP, MadNLPHSL, JuMP
+# ...
+model = Model(()->MadNLP.Optimizer(linear_solver=MadNLPMa27))
+model = Model(()->MadNLP.Optimizer(linear_solver=MadNLPMa57))
+model = Model(()->MadNLP.Optimizer(linear_solver=MadNLPMa77))
+model = Model(()->MadNLP.Optimizer(linear_solver=MadNLPMa86))
+model = Model(()->MadNLP.Optimizer(linear_solver=MadNLPMa97))
+```
+
+#### Mumps (requires extension `MadNLPMumps`)
+```julia
+using MadNLP, MadNLPMumps, JuMP
+# ...
+model = Model(()->MadNLP.Optimizer(linear_solver=MadNLPMumps))
+```
+
+#### Pardiso (requires extension `MadNLPPardiso`)
+```julia
+using MadNLP, MadNLPPardiso, JuMP
+# ...
+model = Model(()->MadNLP.Optimizer(linear_solver=MadNLPPardiso))
+```
+
+#### LapackGPU (requires extension `MadNLPGPU`)
+```julia
+using MadNLP, MadNLPGPU, JuMP
+# ...
+model = Model(()->MadNLP.Optimizer(linear_solver=MadNLPLapackGPU))
+```
+
+
+#### Schur and Schwarz (requires extension `MadNLPGraphs`)
+```julia
+using MadNLP, MadNLPGraphs, JuMP
+# ...
+model = Model(()->MadNLP.Optimizer(linear_solver=MadNLPSchwarz))
+model = Model(()->MadNLP.Optimizer(linear_solver=MadNLPSchur))
+```
+The solvers in `MadNLPGraphs` (`Schur` and `Schwawrz`) use multi-thread parallelism; thus, julia session should be started with `-t` flag.
 ```sh
 julia -t 16 # to use 16 threads
 ```
 
-## Solver options
-To see the list of MadNLP solver options, check the [OPTIONS.md](https://github.com/sshin23/MadNLP/blob/master/OPTIONS.md) file.
 ## Bug reports and support
 Please report issues and feature requests via the [Github issue tracker](https://github.com/sshin23/MadNLP/issues).

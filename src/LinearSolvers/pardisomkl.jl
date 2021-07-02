@@ -1,7 +1,7 @@
 # MadNLP.jl
 # Created by Sungho Shin (sungho.shin@wisc.edu)
 
-module PardisoMKL
+module MadNLPPardisoMKL
 
 import ..MadNLP:
     @kwdef, Logger, @debug, @warn, @error,
@@ -157,7 +157,3 @@ end
 introduce(::Solver)="pardiso-mkl"
 
 end # module
-
-const pardisomkl=PardisoMKL;
-const pardisoMKL=PardisoMKL;
-const PARDISOMKL=PardisoMKL;

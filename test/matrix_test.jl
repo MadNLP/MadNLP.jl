@@ -20,7 +20,7 @@ end
 
 @testset "LAPACK" begin
     sol= [0.8542713567839195, 1.4572864321608041]
-    M = MadNLP.LapackCPU.Solver(dense)
+    M = MadNLPLapackCPU.Solver(dense)
     MadNLP.introduce(M)
     MadNLP.improve!(M)
     MadNLP.factorize!(M)

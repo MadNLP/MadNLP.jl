@@ -1,0 +1,23 @@
+name = "MadNLPMumps"
+uuid = "3b83494e-c0a4-4895-918b-9157a7a085a1"
+authors = ["Sungho Shin <sungho.shin.ss@gmail.com>"]
+version = "0.1.0"
+
+[deps]
+MadNLP = "2621e9c9-9eb4-46b1-8089-e8c72242dfb6"
+MUMPS_seq_jll = "d7ed1dd3-d0ae-5e8e-bfb4-87a502085b8d"
+StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
+
+[compat]
+MadNLP = "~0.2"
+MUMPS_seq_jll = "~5.2.1, ~5.3.5"
+StaticArrays = "~0.12, ~1.0"
+MadNLPTests = "~0.1"
+julia = "1.3"
+
+[extras]
+MadNLPTests = "b52a2a03-04ab-4a5f-9698-6a2deff93217"
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[targets]
+test = ["Test", "MadNLPTests"]

@@ -28,8 +28,7 @@ end
     disable_garbage_collector::Bool = false
     blas_num_threads::Int = 1
     linear_solver::Module
-    iterator::Module = Richardson
-    linear_system_scaler::Module = DummyModule
+    iterator::Module = default_iterator()
 
     # Output options
     output_file::String = ""
@@ -236,7 +235,6 @@ mutable struct Solver
 
     linear_solver::AbstractLinearSolver
     iterator::AbstractIterator
-    linear_system_scaler::Union{Nothing,AbstractLinearSystemScaler}
 
     obj_scale::Vector{Float64}
     con_scale::Vector{Float64}
@@ -503,10 +501,6 @@ function Solver(nlp::NonlinearProgram;
         Vector{Float64}(undef,m+n),
         (b,x)->mul!(b,Symmetric(aug_com,:L),x),(x)->solve!(linear_solver,x);option_dict=option_dict)
 
-    @trace(logger,"Initializing linear system scaler.")
-    linear_system_scaler = opt.linear_system_scaler == DummyModule ? nothing :
-        opt.linear_system_scaler.Scaler(aug_com)
-
     @trace(logger,"Initializing fixed variable treatment scheme.")
     fixed_variable_treatment_aug = get_fixed_variable_treatment_aug(aug_com,ind_fixed)
 
@@ -518,15 +512,12 @@ function Solver(nlp::NonlinearProgram;
         @trace(logger,"Factorization started.")
         aug_compress()
         fixed_variable_treatment_aug()
-        linear_system_scaler == nothing ||
-            (rescale!(linear_system_scaler); scale!(aug_com,linear_system_scaler))
         cnt.linear_solver_time += @elapsed factorize!(linear_solver)
     end
 
     function solve_refine_wrapper!(x,b)
         @trace(logger,"Iterative solution started.")
         fixed_variable_treatment_vec!(b,ind_fixed)
-        linear_system_scaler == nothing || scale!(b,linear_system_scaler)
 
         cnt.linear_solver_time += @elapsed (result = solve_refine!(x,iterator,b))
         if result == :Solved
@@ -541,7 +532,6 @@ function Solver(nlp::NonlinearProgram;
                 solve_status = false
             end
         end
-        linear_system_scaler == nothing || scale!(x,linear_system_scaler)
         fixed_variable_treatment_vec!(x,ind_fixed)
         return solve_status
     end
@@ -602,7 +592,7 @@ function Solver(nlp::NonlinearProgram;
                   x_trial,c_trial,0.,x_slk,c_slk,rhs,ind_fixed,ind_llb,ind_uub,
                   x_lr,x_ur,xl_r,xu_r,zl_r,zu_r,dx_lr,dx_ur,x_trial_lr,x_trial_ur,
                   factorize_wrapper!,solve_refine_wrapper!,
-                  linear_solver,iterator,linear_system_scaler,
+                  linear_solver,iterator,
                   obj_scale,con_scale,con_jac_scale,
                   obj,obj_grad!,con!,con_jac!,lag_hess!,
                   0.,0.,0.,0.,0.,0.,0.,0.,0.," ",0.,0.,0.,
@@ -774,7 +764,7 @@ function regular!(ips::Solver)
 
         # update the barrier parameter
         @trace(ips.logger,"Updating the barrier parameter.")
-        while ips.mu != ips.opt.mu_min &&
+        while ips.mu != max(ips.opt.mu_min,ips.opt.tol/10) &&
             max(ips.inf_pr,ips.inf_du,inf_compl_mu) <= ips.opt.barrier_tol_factor*ips.mu
             mu_new = get_mu(ips.mu,ips.opt.mu_min,
                             ips.opt.mu_linear_decrease_factor,ips.opt.mu_superlinear_decrease_power,ips.opt.tol)
