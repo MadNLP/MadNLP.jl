@@ -25,11 +25,7 @@ mkpath(libdir)
 isvalid(cmd::Cmd)=(try run(cmd) catch e return false end; return true)
 
 # HSL
-<<<<<<< HEAD
-if hsl_library_path == ""
-=======
 if hsl_source_path != ""
->>>>>>> master
     if isvalid(`$FC --version`)
         OC = OutputCollector[]
         cd(hsl_source_path)
