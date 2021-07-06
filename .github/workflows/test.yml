@@ -21,7 +21,7 @@ jobs:
     runs-on: self-hosted
     strategy:
       matrix:
-        julia-version: ['1.6.1']
+        julia-version: ['1.6']
     env:
       JULIA_VERSION: ${{matrix.julia-version}}
     steps:
