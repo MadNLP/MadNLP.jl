@@ -1,3 +1,5 @@
+rm("Manifest.toml";force=true)
+
 using Pkg
 
 if ARGS[1] == "full"
