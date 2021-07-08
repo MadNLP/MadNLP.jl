@@ -1,4 +1,4 @@
-![Logo](logo-full.svg) 
+![Logo](logo-full.svg)  
 ---
 
 [![build](https://github.com/sshin23/MadNLP.jl/workflows/build/badge.svg?branch=dev%2Fgithub_actions)](https://github.com/sshin23/MadNLP.jl/actions?query=workflow%3Abuild) [![codecov](https://codecov.io/gh/sshin23/MadNLP.jl/branch/master/graph/badge.svg)](https://codecov.io/gh/sshin23/MadNLP.jl)
@@ -11,7 +11,7 @@ pkg> add MadNLP
 ```
 Optionally, various extension packages can be installed together:
 ```julia
-pkg> add MadNLPHSL, MadNLPPardiso, MadNLPMumps, MadNLPGPU, MadNLPGraphs, MadNLPIterative
+pkg> add MadNLPHSL, MadNLPPardiso, MadNLPMumps, MadNLPGPU, MadNLPGraph, MadNLPIterative
 ```
 These packages are stored in the `lib` subdirectory within the main MadNLP repository. Some extension packages may require additional dependencies or specific hardware. For the instructions for the build procedure, see the following links: [MadNLPHSL](https://github.com/sshin23/MadNLP.jl/tree/master/lib/MadNLPHSL), [MadNLPPardiso](https://github.com/sshin23/MadNLP.jl/tree/master/lib/MadNLPHSL), [MadNLPGPU](https://github.com/sshin23/MadNLP.jl/tree/master/lib/MadNLPGPU).
 
@@ -44,9 +44,9 @@ model = CUTEstModel("PRIMALC1")
 madnlp(model,print_level=MadNLP.WARN,max_wall_time=3600)
 ```
 
-#### Plasmo interface (requires extension `MadNLPGraphs`)
+#### Plasmo interface (requires extension `MadNLPGraph`)
 ```julia
-using MadNLP, MadNLPGraphs, Plasmo
+using MadNLP, MadNLPGraph, Plasmo
 
 graph = OptiGraph()
 @optinode(graph,n1)
@@ -117,14 +117,14 @@ model = Model(()->MadNLP.Optimizer(linear_solver=MadNLPLapackGPU))
 ```
 
 
-#### Schur and Schwarz (requires extension `MadNLPGraphs`)
+#### Schur and Schwarz (requires extension `MadNLPGraph`)
 ```julia
-using MadNLP, MadNLPGraphs, JuMP
+using MadNLP, MadNLPGraph, JuMP
 # ...
 model = Model(()->MadNLP.Optimizer(linear_solver=MadNLPSchwarz))
 model = Model(()->MadNLP.Optimizer(linear_solver=MadNLPSchur))
 ```
-The solvers in `MadNLPGraphs` (`Schur` and `Schwawrz`) use multi-thread parallelism; thus, julia session should be started with `-t` flag.
+The solvers in `MadNLPGraph` (`Schur` and `Schwawrz`) use multi-thread parallelism; thus, julia session should be started with `-t` flag.
 ```sh
 julia -t 16 # to use 16 threads
 ```
