@@ -66,6 +66,6 @@ if satisfied(product)
     @info "Building HSL (Ma27, Ma57, Ma77, Ma86, Ma97) succeeded."
     write_deps_file(joinpath(@__DIR__, "deps.jl"),Product[product], verbose=verbose)
 else
-    @info "Building HSL (Ma27, Ma57, Ma77, Ma86, Ma97) failed."
+    @error "Building HSL (Ma27, Ma57, Ma77, Ma86, Ma97) failed."
     write_deps_file(joinpath(@__DIR__, "deps.jl"),Product[], verbose=verbose)
 end
