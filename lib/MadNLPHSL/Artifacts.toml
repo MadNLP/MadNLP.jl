@@ -573,3 +573,52 @@ os = "windows"
     [[OpenBLAS32.download]]
     sha256 = "499fd4686fcf399113eadc4a6e23149147952a4a13fa57231ab72d4c73b1acb6"
     url = "https://github.com/JuliaBinaryWrappers/OpenBLAS32_jll.jl/releases/download/OpenBLAS32-v0.3.13+4/OpenBLAS32.v0.3.13.x86_64-w64-mingw32-libgfortran5.tar.gz"
+
+# MKL
+[[MKL]]
+arch = "i686"
+git-tree-sha1 = "51c68267c3ef9625c44f086a8211376f9e10aaff"
+lazy = true
+os = "windows"
+
+    [[MKL.download]]
+    sha256 = "693a00fe1c2fef57891617b023bcbe2e40955ca55df930e0b6be5435c26f04fa"
+    url = "https://github.com/JuliaBinaryWrappers/MKL_jll.jl/releases/download/MKL-v2021.1.1+1/MKL.v2021.1.1.i686-w64-mingw32.tar.gz"
+[[MKL]]
+arch = "x86_64"
+git-tree-sha1 = "073ff95e2c63501547247d6e1321bf4ee2a78933"
+lazy = true
+os = "macos"
+
+    [[MKL.download]]
+    sha256 = "b7a5dd32e4a005a752bc4c3e6d425bf3b5bb1861730bbc4214216aa2c520f42d"
+    url = "https://github.com/JuliaBinaryWrappers/MKL_jll.jl/releases/download/MKL-v2021.1.1+1/MKL.v2021.1.1.x86_64-apple-darwin.tar.gz"
+[[MKL]]
+arch = "x86_64"
+git-tree-sha1 = "b30e86ec62f2d592fcea7086c63f61ebecd6f83e"
+lazy = true
+os = "windows"
+
+    [[MKL.download]]
+    sha256 = "56e783ad5f4f96ce6545b870ad80c4d6865129a59d6f7b317c6b14bda9d157ad"
+    url = "https://github.com/JuliaBinaryWrappers/MKL_jll.jl/releases/download/MKL-v2021.1.1+1/MKL.v2021.1.1.x86_64-w64-mingw32.tar.gz"
+[[MKL]]
+arch = "i686"
+git-tree-sha1 = "7f8c7caca0280096e7c4348da12931ae0c8a7dce"
+lazy = true
+libc = "glibc"
+os = "linux"
+
+    [[MKL.download]]
+    sha256 = "3280ae5ce7209f184b4d948b85dcb86f0cd124385d92d8ccbaa640b42d92b158"
+    url = "https://github.com/JuliaBinaryWrappers/MKL_jll.jl/releases/download/MKL-v2021.1.1+1/MKL.v2021.1.1.i686-linux-gnu.tar.gz"
+[[MKL]]
+arch = "x86_64"
+git-tree-sha1 = "a8e009985328801a84c9af6610f94f77a7c12852"
+lazy = true
+libc = "glibc"
+os = "linux"
+
+    [[MKL.download]]
+    sha256 = "70800f6e75e8ac3a0ff66069bec20ef410e9b240ef4a0f3b96cbbab3df81700f"
+    url = "https://github.com/JuliaBinaryWrappers/MKL_jll.jl/releases/download/MKL-v2021.1.1+1/MKL.v2021.1.1.x86_64-linux-gnu.tar.gz" 
