@@ -621,4 +621,51 @@ os = "linux"
 
     [[MKL.download]]
     sha256 = "70800f6e75e8ac3a0ff66069bec20ef410e9b240ef4a0f3b96cbbab3df81700f"
-    url = "https://github.com/JuliaBinaryWrappers/MKL_jll.jl/releases/download/MKL-v2021.1.1+1/MKL.v2021.1.1.x86_64-linux-gnu.tar.gz" 
+    url = "https://github.com/JuliaBinaryWrappers/MKL_jll.jl/releases/download/MKL-v2021.1.1+1/MKL.v2021.1.1.x86_64-linux-gnu.tar.gz"
+    
+[[IntelOpenMP]]
+arch = "x86_64"
+git-tree-sha1 = "e76af028a823f7e7c18226c8079d03035c2e4c46"
+os = "macos"
+
+[[IntelOpenMP.download]]
+sha256 = "a6b58de42a450fa0253bbd417572e8f1549ebe5aaddae3bf088b2e29007de1bd"
+url = "https://github.com/JuliaBinaryWrappers/IntelOpenMP_jll.jl/releases/download/IntelOpenMP-v2018.0.3+2/IntelOpenMP.v2018.0.3.x86_64-apple-darwin.tar.gz"
+
+[[IntelOpenMP]]
+arch = "i686"
+git-tree-sha1 = "2abeb9a6b565e7cb08542447d6c05b28c638f4a1"
+libc = "glibc"
+os = "linux"
+
+[[IntelOpenMP.download]]
+sha256 = "9e5659180ce6f80e771f436a840de8355f998fe3cae8dbfc1f9634c9dabca7ae"
+url = "https://github.com/JuliaBinaryWrappers/IntelOpenMP_jll.jl/releases/download/IntelOpenMP-v2018.0.3+2/IntelOpenMP.v2018.0.3.i686-linux-gnu.tar.gz"
+
+[[IntelOpenMP]]
+arch = "i686"
+git-tree-sha1 = "1aef321e2cf79fc656be96b261396342d8f6d017"
+os = "windows"
+
+[[IntelOpenMP.download]]
+sha256 = "f9999c7d9ccc222f90db23513dc0b28d19bd9b92015d24b16640378e2a753b5b"
+url = "https://github.com/JuliaBinaryWrappers/IntelOpenMP_jll.jl/releases/download/IntelOpenMP-v2018.0.3+2/IntelOpenMP.v2018.0.3.i686-w64-mingw32.tar.gz"
+
+[[IntelOpenMP]]
+arch = "x86_64"
+git-tree-sha1 = "947793e42b663bacd09f00d96aa96a47095f3b1c"
+libc = "glibc"
+os = "linux"
+
+[[IntelOpenMP.download]]
+sha256 = "f40e3d5f625eb5ba907c9b73fd8d4adf5e74dadbc0022f5be2185e93228d0703"
+url = "https://github.com/JuliaBinaryWrappers/IntelOpenMP_jll.jl/releases/download/IntelOpenMP-v2018.0.3+2/IntelOpenMP.v2018.0.3.x86_64-linux-gnu.tar.gz"
+
+[[IntelOpenMP]]
+arch = "x86_64"
+git-tree-sha1 = "e32fbb6cb3c81caf8ba4aecdf54a6fc215996b78"
+os = "windows"
+
+[[IntelOpenMP.download]]
+sha256 = "684f9554587017d5487a9121ff10c173b4e232842f462fe25ce4fb279e84a5e7"
+url = "https://github.com/JuliaBinaryWrappers/IntelOpenMP_jll.jl/releases/download/IntelOpenMP-v2018.0.3+2/IntelOpenMP.v2018.0.3.x86_64-w64-mingw32.tar.gz"

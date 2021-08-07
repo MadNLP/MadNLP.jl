@@ -23,8 +23,12 @@ const FC = haskey(ENV,"MADNLP_FC") ? ENV["MADNLP_FC"] : `gfortran`
 const libmetis_dir = joinpath(artifact"METIS", "lib")
 const with_metis = `-L$libmetis_dir $rpath$libmetis_dir -lmetis`
 const libblas_dir = joinpath(blasvendor == :mkl ? artifact"MKL" : artifact"OpenBLAS32","lib")
-const with_blas = blasvendor == :mkl ? `-L$libblas_dir $rpath$libblas_dir -lmkl_rt` :
-    `-L$libblas_dir $rpath$libblas_dir -lopenblas`
+if blasvendor == :mkl
+    const libopenmp_dir = joinpath(artifact"IntelOpenMP","lib")
+    const with_blas = `-L$libblas_dir $rpath$libblas_dir -lmkl_rt -L$libopenmp_dir $rpath$libopenmp_dir -liomp5 `
+else
+    const with_blas = `-L$libblas_dir $rpath$libblas_dir -lopenblas`
+end
 const installer = Sys.isapple() ? "brew install" : Sys.iswindows() ? "pacman -S" : "sudo apt install"
 
 rm(libdir;recursive=true,force=true)
