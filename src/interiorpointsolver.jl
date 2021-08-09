@@ -107,7 +107,7 @@ mutable struct Solver{KKTSystem} <: AbstractInteriorPointSolver
     _w2l::StrideOneVector{Float64}
     _w2zl::Union{Nothing,StrideOneVector{Float64}}
     _w2zu::Union{Nothing,StrideOneVector{Float64}}
-    
+
     _w3::Vector{Float64}
     _w3x::StrideOneVector{Float64}
     _w3l::StrideOneVector{Float64}
@@ -286,31 +286,32 @@ function eval_cons_wrapper!(ips::Solver, c::Vector{Float64},x::Vector{Float64})
     return c
 end
 
-function eval_jac_wrapper!(ips::Solver, kkt::AbstractKKTSystem, x::Vector{Float64})
-    nlp = ips.nlp
-    cnt = ips.cnt
-    n_jac = length(kkt.jac)
-    ns = length(ips.ind_ineq)
-    @trace(ips.logger, "Evaluating constraint Jacobian.")
-    cnt.eval_function_time += @elapsed nlp.con_jac!(kkt.jac,view(x,1:nlp.n))
-    cnt.con_jac_cnt+=1
-    cnt.con_jac_cnt==1 && (is_valid(kkt.jac) || throw(InvalidNumberException()))
+function eval_jac_wrapper!(ipp::Solver, kkt::AbstractKKTSystem, x::Vector{Float64})
+    nlp = ipp.nlp
+    cnt = ipp.cnt
+    ns = length(ipp.ind_ineq)
+    @trace(ipp.logger, "Evaluating constraint Jacobian.")
+    jac = get_jacobian(kkt)
+    cnt.eval_function_time += @elapsed nlp.con_jac!(jac, view(x,1:nlp.n))
     compress_jacobian!(kkt)
-    @trace(ips.logger,"Constraint jacobian evaluation started.")
-    return kkt.jac
+    cnt.con_jac_cnt+=1
+    cnt.con_jac_cnt==1 && (is_valid(jac) || throw(InvalidNumberException()))
+    @trace(ipp.logger,"Constraint jacobian evaluation started.")
+    return jac
 end
 
-function eval_lag_hess_wrapper!(ips::Solver, kkt::AbstractKKTSystem, x::Vector{Float64},l::Vector{Float64};is_resto=false)
-    nlp = ips.nlp
-    cnt = ips.cnt
-    @trace(ips.logger,"Evaluating Lagrangian Hessian.")
-    ips._w1l .= l.*ips.con_scale
+function eval_lag_hess_wrapper!(ipp::Solver, kkt::AbstractKKTSystem, x::Vector{Float64},l::Vector{Float64};is_resto=false)
+    nlp = ipp.nlp
+    cnt = ipp.cnt
+    @trace(ipp.logger,"Evaluating Lagrangian Hessian.")
+    ipp._w1l .= l.*ipp.con_scale
+    hess = get_hessian(kkt)
     cnt.eval_function_time += @elapsed nlp.lag_hess!(
-        kkt.hess, view(x,1:nlp.n), ips._w1l, is_resto ? 0.0 : ips.obj_scale[])
+        hess, view(x,1:nlp.n), ipp._w1l, is_resto ? 0.0 : ipp.obj_scale[])
     compress_hessian!(kkt)
     cnt.lag_hess_cnt+=1
-    cnt.lag_hess_cnt==1 && (is_valid(kkt.hess) || throw(InvalidNumberException()))
-    return kkt.hess
+    cnt.lag_hess_cnt==1 && (is_valid(hess) || throw(InvalidNumberException()))
+    return hess
 end
 
 function Solver(nlp::NonlinearProgram;
@@ -332,13 +333,26 @@ function Solver(nlp::NonlinearProgram;
     set_blas_num_threads(opt.blas_num_threads; permanent=true)
 
     @trace(logger,"Initializing variables.")
-    ind_ineq = findall(nlp.gl.!=nlp.gu)
-    ns = length(ind_ineq)
+    info_constraints = get_index_constraints(nlp; fixed_variable_treatment=opt.fixed_variable_treatment)
+    ns = length(info_constraints.ind_ineq)
     n = nlp.n+ns
     m = nlp.m
 
-    xl = [nlp.xl;view(nlp.gl,ind_ineq)]
-    xu = [nlp.xu;view(nlp.gu,ind_ineq)]
+    # Initialize KKT
+    kkt = if opt.kkt_system == SPARSE_KKT_SYSTEM
+        MT = (opt.linear_solver.INPUT_MATRIX_TYPE == :csc) ? SparseMatrixCSC{Float64, Int32} : Matrix{Float64}
+        SparseKKTSystem{Float64, MT}(nlp, info_constraints)
+    elseif opt.kkt_system == SPARSE_UNREDUCED_KKT_SYSTEM
+        MT = (opt.linear_solver.INPUT_MATRIX_TYPE == :csc) ? SparseMatrixCSC{Float64, Int32} : Matrix{Float64}
+        SparseUnreducedKKTSystem{Float64, MT}(nlp, info_constraints)
+    elseif opt.kkt_system == DENSE_KKT_SYSTEM
+        MT = Matrix{Float64}
+        VT = Vector{Float64}
+        DenseKKTSystem{Float64, VT, MT}(nlp, info_constraints)
+    end
+
+    xl = [nlp.xl;view(nlp.gl,info_constraints.ind_ineq)]
+    xu = [nlp.xu;view(nlp.gu,info_constraints.ind_ineq)]
     x = [nlp.x;zeros(ns)]
     l = nlp.l
     zl= [nlp.zl;zeros(ns)]
@@ -347,74 +361,26 @@ function Solver(nlp::NonlinearProgram;
     f = zeros(n) # not sure why, but seems necessary to initialize to 0 when used with Plasmo interface
     c = nlp.g
 
-    jac_sparsity_I = Vector{Int32}(undef,nlp.nnz_jac)
-    jac_sparsity_J = Vector{Int32}(undef,nlp.nnz_jac)
-    nlp.jac_sparsity!(jac_sparsity_I,jac_sparsity_J)
+    n_jac = nnz_jacobian(kkt)
 
-    hess_sparsity_I = Vector{Int32}(undef,nlp.nnz_hess)
-    hess_sparsity_J = Vector{Int32}(undef,nlp.nnz_hess)
-    nlp.hess_sparsity!(hess_sparsity_I,hess_sparsity_J)
-
-    force_lower_triangular!(hess_sparsity_I,hess_sparsity_J)
-    append!(jac_sparsity_I,ind_ineq)
-    append!(jac_sparsity_J,nlp.n+1:nlp.n+ns)
-
-    n_jac = length(jac_sparsity_I)
-    n_hess= length(hess_sparsity_I)
-
-    if opt.fixed_variable_treatment == MAKE_PARAMETER
-        ind_fixed = findall(xl.==xu)
-        ind_lb = findall((xl.!=-Inf) .* (xl.!=xu))
-        ind_ub = findall((xu.!= Inf) .* (xl.!=xu))
-    else
-        ind_fixed = Int[]
-        ind_lb = findall(xl.!=-Inf)
-        ind_ub = findall(xu.!= Inf)
-    end
-
-    ind_llb = findall((nlp.xl.==-Inf).*(nlp.xu.!=Inf))
-    ind_uub = findall((nlp.xl.!=-Inf).*(nlp.xu.==Inf))
-
-    nlb = length(ind_lb)
-    nub = length(ind_ub)
+    nlb = length(info_constraints.ind_lb)
+    nub = length(info_constraints.ind_ub)
 
     x_trial=Vector{Float64}(undef,n)
     c_trial=Vector{Float64}(undef,m)
 
     x_slk= view(x,nlp.n+1:n)
-    c_slk= view(c,ind_ineq)
+    c_slk= view(c,info_constraints.ind_ineq)
     rhs = (nlp.gl.==nlp.gu).*nlp.gl
 
-    x_lr = view(x,ind_lb)
-    x_ur = view(x,ind_ub)
-    xl_r = view(xl,ind_lb)
-    xu_r = view(xu,ind_ub)
-    zl_r = view(zl,ind_lb)
-    zu_r = view(zu,ind_ub)
-    x_trial_lr = view(x_trial,ind_lb)
-    x_trial_ur = view(x_trial,ind_ub)
-
-    #=
-        Build KKT System
-    =#
-    kkt = if opt.kkt_system == SPARSE_KKT_SYSTEM
-        MT = (opt.linear_solver.INPUT_MATRIX_TYPE == :csc) ? SparseMatrixCSC{Float64, Int32} : Matrix{Float64}
-        SparseKKTSystem{Float64, MT}(
-            n, m, nlb, nub, ind_ineq, ind_fixed,
-            hess_sparsity_I, hess_sparsity_J, jac_sparsity_I, jac_sparsity_J,
-        )
-    elseif opt.kkt_system == SPARSE_UNREDUCED_KKT_SYSTEM
-        MT = (opt.linear_solver.INPUT_MATRIX_TYPE == :csc) ? SparseMatrixCSC{Float64, Int32} : Matrix{Float64}
-        SparseUnreducedKKTSystem{Float64, MT}(
-            n, m, nlb, nub, ind_ineq, ind_fixed,
-            hess_sparsity_I, hess_sparsity_J, jac_sparsity_I, jac_sparsity_J,
-            ind_lb, ind_ub,
-        )        
-    elseif opt.kkt_system == DENSE_KKT_SYSTEM
-        MT = Matrix{Float64}
-        VT = Vector{Float64}
-        DenseKKTSystem{Float64, VT, MT}(nlp.n, ns, m, ind_ineq)
-    end
+    x_lr = view(x, info_constraints.ind_lb)
+    x_ur = view(x, info_constraints.ind_ub)
+    xl_r = view(xl, info_constraints.ind_lb)
+    xu_r = view(xu, info_constraints.ind_ub)
+    zl_r = view(zl, info_constraints.ind_lb)
+    zu_r = view(zu, info_constraints.ind_ub)
+    x_trial_lr = view(x_trial, info_constraints.ind_lb)
+    x_trial_ur = view(x_trial, info_constraints.ind_ub)
 
     aug_vec_length = is_reduced(kkt) ? n+m : n+m+nlb+nub
 
@@ -430,7 +396,7 @@ function Solver(nlp::NonlinearProgram;
     _w2l= view(_w2,n+1:n+m)
     _w2zl = is_reduced(kkt) ? nothing : view(_w2,n+m+1:n+m+nlb)
     _w2zu = is_reduced(kkt) ? nothing : view(_w2,n+m+nlb+1:n+m+nlb+nub)
-    
+
     _w3 = Vector{Float64}(undef,aug_vec_length)
     _w3x= view(_w3,1:n)
     _w3l= view(_w3,n+1:n+m)
@@ -445,8 +411,8 @@ function Solver(nlp::NonlinearProgram;
     dl= view(d,n+1:n+m)
     dzl= is_reduced(kkt) ? Vector{Float64}(undef,nlb) : view(d,n+m+1:n+m+nlb)
     dzu= is_reduced(kkt) ? Vector{Float64}(undef,nub) : view(d,n+m+nlb+1:n+m+nlb+nub)
-    dx_lr = view(dx,ind_lb)
-    dx_ur = view(dx,ind_ub)
+    dx_lr = view(dx,info_constraints.ind_lb)
+    dx_ur = view(dx,info_constraints.ind_ub)
 
     p = Vector{Float64}(undef,aug_vec_length)
     px= view(p,1:n)
@@ -458,7 +424,6 @@ function Solver(nlp::NonlinearProgram;
     con_scale = ones(m)
     con_jac_scale = ones(n_jac)
 
-
     @trace(logger,"Initializing linear solver.")
     cnt.linear_solver_time =
         @elapsed linear_solver = opt.linear_solver.Solver(get_kkt(kkt) ; option_dict=option_dict,logger=logger)
@@ -466,7 +431,7 @@ function Solver(nlp::NonlinearProgram;
     @trace(logger,"Initializing iterative solver.")
     iterator = opt.iterator.Solver(
         similar(d),
-        (b,x)->mul!(b,kkt,x),(x)->solve!(linear_solver,x);option_dict=option_dict)
+        (b, x)->mul!(b, kkt, x), (x)->solve!(linear_solver, x) ; option_dict=option_dict)
 
     @trace(logger,"Initializing fixed variable treatment scheme.")
 
@@ -481,7 +446,8 @@ function Solver(nlp::NonlinearProgram;
                   jacl,
                   d,dx,dl,dzl,dzu,p,px,pl,pzl,pzu,
                   _w1,_w1x,_w1l,_w1zl,_w1zu,_w2,_w2x,_w2l,_w2zl,_w2zu,_w3,_w3x,_w3l,_w4,_w4x,_w4l,
-                  x_trial,c_trial,0.,x_slk,c_slk,rhs,ind_ineq,ind_fixed,ind_llb,ind_uub,
+                  x_trial,c_trial,0.,x_slk,c_slk,rhs,
+                  info_constraints.ind_ineq,info_constraints.ind_fixed,info_constraints.ind_llb,info_constraints.ind_uub,
                   x_lr,x_ur,xl_r,xu_r,zl_r,zu_r,dx_lr,dx_ur,x_trial_lr,x_trial_ur,
                   linear_solver,iterator,
                   obj_scale,con_scale,con_jac_scale,
@@ -510,7 +476,8 @@ function initialize!(ips::AbstractInteriorPointSolver)
     eval_jac_wrapper!(ips, ips.kkt, ips.x)
     compress_jacobian!(ips.kkt)
     if ips.opt.nlp_scaling
-        set_con_scale!(ips.con_scale,ips.con_jac_scale,ips.kkt.jac,ips.kkt.jac_raw.I,ips.opt.nlp_scaling_max_gradient)
+        jac = get_raw_jacobian(ips.kkt)
+        set_con_scale!(ips.con_scale, jac, ips.opt.nlp_scaling_max_gradient)
         set_jacobian_scaling!(ips.kkt, ips.con_scale)
         ips.l./=ips.con_scale
     end
@@ -698,7 +665,7 @@ function regular!(ips::AbstractInteriorPointSolver)
         varphi= get_varphi(ips.obj_val,ips.x_lr,ips.xl_r,ips.xu_r,ips.x_ur,ips.mu)
         varphi_d = get_varphi_d(ips.f,ips.x,ips.xl,ips.xu,ips.dx,ips.mu)
 
-        
+
         alpha_max = get_alpha_max(ips.x,ips.xl,ips.xu,ips.dx,ips.tau)
         ips.alpha_z = get_alpha_z(ips.zl_r,ips.zu_r,ips.dzl,ips.dzu,ips.tau)
         alpha_min = get_alpha_min(theta,varphi_d,ips.theta_min,ips.opt.gamma_theta,ips.opt.gamma_phi,
@@ -713,7 +680,7 @@ function regular!(ips::AbstractInteriorPointSolver)
         while true
             copyto!(ips.x_trial,ips.x)
             axpy!(ips.alpha,ips.dx,ips.x_trial)
-            
+
             ips.obj_val_trial = eval_f_wrapper(ips, ips.x_trial)
             eval_cons_wrapper!(ips, ips.c_trial, ips.x_trial)
 
@@ -837,7 +804,6 @@ function robust!(ips::Solver)
 
         finish_aug_solve!(ips, ips.kkt, RR.mu_R)
         finish_aug_solve_RR!(RR.dpp,RR.dnn,RR.dzp,RR.dzn,ips.l,ips.dl,RR.pp,RR.nn,RR.zp,RR.zn,RR.mu_R,ips.opt.rho)
-
 
 
         theta_R = get_theta_R(ips.c,RR.pp,RR.nn)
@@ -1386,15 +1352,23 @@ function initialize_variables!(x,xl,xu,bound_push,bound_fac)
         end
     end
 end
-function set_con_scale!(con_scale,con_jac_scale,jac,jac_sparsity_I,nlp_scaling_max_gradient)
-    @simd for i=1:length(jac)
-        @inbounds con_scale[jac_sparsity_I[i]]=max(con_scale[jac_sparsity_I[i]],abs(jac[i]))
+
+function set_con_scale!(con_scale::AbstractVector, jac::SparseMatrixCOO, nlp_scaling_max_gradient)
+    @simd for i in 1:nnz(jac)
+        row = jac.I[i]
+        @inbounds con_scale[row] = max(con_scale[row], abs(jac.V[i]))
     end
-    con_scale.=min.(1,nlp_scaling_max_gradient./con_scale)
-    @simd for i=1:length(jac_sparsity_I)
-        @inbounds con_jac_scale[i]=con_scale[jac_sparsity_I[i]]
-    end
+    con_scale .= min.(1.0, nlp_scaling_max_gradient ./ con_scale)
 end
+function set_con_scale!(con_scale::AbstractVector, jac::Matrix, nlp_scaling_max_gradient)
+    for row in 1:size(jac, 1)
+        for col in 1:size(jac, 2)
+            @inbounds con_scale[row] = max(con_scale[row], abs(jac[row, col]))
+        end
+    end
+    con_scale .= min.(1.0, nlp_scaling_max_gradient ./ con_scale)
+end
+
 function adjust_boundary!(x_lr,xl_r,x_ur,xu_r,mu)
     adjusted = 0
     c1 = eps(Float64)*mu
@@ -1494,7 +1468,6 @@ function fixed_variable_treatment_z!(zl,zu,f,jacl,ind_fixed)
         z >=0 ? (zl[i] = z; zu[i] = 0.) : (zl[i] = 0.; zu[i] = -z)
     end
 end
-
 
 function dual_inf_perturbation!(px,ind_llb,ind_uub,mu,kappa_d)
     @simd for i in ind_llb

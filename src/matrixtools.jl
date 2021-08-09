@@ -61,15 +61,6 @@ function SparseMatrixCSC{Tv, Ti}(coo::SparseMatrixCOO{Tv,Ti}) where {Tv,Ti <: In
     )
 end
 
-function get_coo_to_csc(coo::SparseMatrixCOO{Tv,Ti}) where {Tv,Ti <: Integer}
-    map = Vector{Ti}(undef,nnz(coo))
-    cscind = sparse(coo.I,coo.J,ones(Ti,nnz(coo)),coo.m,coo.n)
-    cscind.nzval.= 1:nnz(cscind)
-    _get_coo_to_csc(coo.I,coo.J,cscind,map)
-    nzval = Vector{Tv}(undef,nnz(cscind))
-    return SparseMatrixCSC{Tv,Ti}(
-        coo.m,coo.n,cscind.colptr,cscind.rowval,nzval), ()->_transfer!(nzval,coo.V,map)
-end
 function _get_coo_to_csc(I,J,cscind,map)
     for i=1:length(I)
         @inbounds map[i] = cscind[I[i],J[i]]
