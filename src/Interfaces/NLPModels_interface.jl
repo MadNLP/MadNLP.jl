@@ -23,14 +23,13 @@ status_translator = Dict(
     MAXIMUM_WALLTIME_EXCEEDED=>:max_time)
 
 function madnlp(model::AbstractNLPModel;kwargs...)
-    
+
     nlp = NonlinearProgram(model)
     ips = Solver(nlp;kwargs...)
     # seems that some CUTEst model requires this
-    ips.f.=0 
+    ips.f.=0
     ips.c.=0
-    ips.jac.=0
-    ips.hess.=0
+    initialize!(ips.kkt)
     ips.zl.=0
     ips.zu.=0
     # ------------------------------------------

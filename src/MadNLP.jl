@@ -28,9 +28,11 @@ introduce() = "MadNLP version v$(version())"
 # Linear solver dependencies
 include("enums.jl")
 include("utils.jl")
+include("options.jl")
 include("nonlinearprogram.jl")
 include("matrixtools.jl")
 include(joinpath("LinearSolvers","linearsolvers.jl"))
+include(joinpath("kktsystem.jl"))
 include(joinpath("interiorpointsolver.jl"))
 include(joinpath("Interfaces","interfaces.jl"))
 

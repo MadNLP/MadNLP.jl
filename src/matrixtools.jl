@@ -2,6 +2,7 @@
 # Created by Sungho Shin (sungho.shin@wisc.edu)
 
 abstract type AbstractSparseMatrixCOO{Tv,Ti<:Integer} <: AbstractSparseMatrix{Tv,Ti} end
+
 mutable struct SparseMatrixCOO{Tv,Ti<:Integer} <: AbstractSparseMatrixCOO{Tv,Ti}
     m::Int
     n::Int
@@ -28,6 +29,15 @@ function findIJ(S::SparseMatrixCSC{Tv,Ti}) where {Tv,Ti}
     return I,J
 end
 
+get_mapping(dest::AbstractMatrix, src::SparseMatrixCOO) = nothing
+
+function diag!(dest::AbstractVector{T}, src::AbstractMatrix{T}) where T
+    @assert length(dest) == size(src, 1)
+    @inbounds for i in eachindex(dest)
+        dest[i] = src[i, i]
+    end
+end
+
 function get_tril_to_full(csc::SparseMatrixCSC{Tv,Ti}) where {Tv,Ti<:Integer}
     cscind = SparseMatrixCSC{Int,Ti}(Symmetric(
         SparseMatrixCSC{Int,Ti}(csc.m,csc.n,csc.colptr,csc.rowval,collect(1:nnz(csc))),:L))
@@ -42,16 +52,13 @@ function tril_to_full!(dense::Matrix)
     end
 end
 
-function get_get_coo_to_com(mtype)
-    if mtype == :csc
-        get_coo_to_com = get_coo_to_csc
-    # elseif mtype == :cucsc
-    #     get_coo_to_com = get_coo_to_cucsc
-    elseif mtype == :dense
-        get_coo_to_com = get_coo_to_dense
-    # elseif mtype == :cudense
-    #     get_coo_to_com = get_coo_to_cudense
-    end
+function SparseMatrixCSC{Tv, Ti}(coo::SparseMatrixCOO{Tv,Ti}) where {Tv,Ti <: Integer}
+    cscind = sparse(coo.I,coo.J,ones(Ti,nnz(coo)),coo.m,coo.n)
+    nzval = Vector{Tv}(undef,nnz(cscind))
+    fill!(nzval, zero(Tv))
+    return SparseMatrixCSC{Tv, Ti}(
+        coo.m,coo.n,cscind.colptr,cscind.rowval,nzval,
+    )
 end
 
 function get_coo_to_csc(coo::SparseMatrixCOO{Tv,Ti}) where {Tv,Ti <: Integer}
@@ -61,26 +68,36 @@ function get_coo_to_csc(coo::SparseMatrixCOO{Tv,Ti}) where {Tv,Ti <: Integer}
     _get_coo_to_csc(coo.I,coo.J,cscind,map)
     nzval = Vector{Tv}(undef,nnz(cscind))
     return SparseMatrixCSC{Tv,Ti}(
-        coo.m,coo.n,cscind.colptr,cscind.rowval,nzval), ()->transform!(nzval,coo.V,map)
+        coo.m,coo.n,cscind.colptr,cscind.rowval,nzval), ()->_transfer!(nzval,coo.V,map)
 end
 function _get_coo_to_csc(I,J,cscind,map)
     for i=1:length(I)
         @inbounds map[i] = cscind[I[i],J[i]]
     end
 end
-function transform!(vec1,vec2,map)
-    vec1.=0;
+function _transfer!(vec1, vec2, map)
+    fill!(vec1, 0.0)
     for i=1:length(map)
         @inbounds vec1[map[i]] += vec2[i]
     end
 end
 
-function get_coo_to_dense(coo::SparseMatrixCOO{Tv,Ti}) where {Tv,Ti<:Integer}
-    dense = Matrix{Float64}(undef,coo.m,coo.n)
-    return dense, ()->copyto!(dense,coo)
+function transfer!(dest::SparseMatrixCSC, src::SparseMatrixCOO, map::Vector{Int})
+    _transfer!(dest.nzval, src.V, map)
 end
 
-copyto!(dense::Matrix{Tv},coo::SparseMatrixCOO{Tv,Ti}) where {Tv,Ti<:Integer} = _copyto!(dense,coo.I,coo.J,coo.V)
+function get_mapping(dest::SparseMatrixCSC, src::SparseMatrixCOO)
+    map = Vector{Int}(undef,nnz(src))
+    dest.nzval .= 1:nnz(dest)
+    _get_coo_to_csc(src.I, src.J, dest, map)
+    return map
+end
+
+function Matrix{Tv}(coo::SparseMatrixCOO{Tv,Ti}) where {Tv,Ti<:Integer}
+    return Matrix{Tv}(undef,coo.m,coo.n)
+end
+
+Base.copyto!(dense::Matrix{Tv},coo::SparseMatrixCOO{Tv,Ti}) where {Tv,Ti<:Integer} = _copyto!(dense,coo.I,coo.J,coo.V)
 function _copyto!(dense::Matrix{Tv},I,J,V) where Tv
     fill!(dense, zero(Tv))
     for i=1:length(I)
@@ -88,7 +105,6 @@ function _copyto!(dense::Matrix{Tv},I,J,V) where Tv
     end
     return dense
 end
-
 
 function get_cscsy_view(csc::SparseMatrixCSC{Tv,Ti},Ix;inds=collect(1:nnz(csc))) where {Tv,Ti<:Integer}
     cscind = SparseMatrixCSC{Int,Ti}(csc.m,csc.n,csc.colptr,csc.rowval,inds)
@@ -98,6 +114,7 @@ function get_cscsy_view(csc::SparseMatrixCSC{Tv,Ti},Ix;inds=collect(1:nnz(csc)))
         cscindsub.rowval,Vector{Tv}(undef,nnz(cscindsub))), view(csc.nzval,cscindsub.nzval)
 
 end
+
 function get_csc_view(csc::SparseMatrixCSC{Tv,Ti},Ix,Jx;inds=collect(1:nnz(csc))) where {Tv,Ti<:Integer}
     cscind = Symmetric(SparseMatrixCSC{Int,Ti}(csc.m,csc.n,csc.colptr,csc.rowval,inds),:L)
     cscindsub = cscind[Ix,Jx]
@@ -107,3 +124,4 @@ function get_csc_view(csc::SparseMatrixCSC{Tv,Ti},Ix,Jx;inds=collect(1:nnz(csc))
         cscindsub.m,cscindsub.n,cscindsub.colptr,
         cscindsub.rowval,Vector{Tv}(undef,nnz(cscindsub))), view(csc.nzval,cscindsub.nzval)
 end
+
