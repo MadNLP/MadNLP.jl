@@ -57,6 +57,7 @@ end
     constr_mult_init_max::Float64 = 1e3
     bound_push::Float64 = 1e-2
     bound_fac::Float64 = 1e-2
+    nlp_scaling::Bool = true
     nlp_scaling_max_gradient::Float64 = 100.
     inertia_free_tol::Float64 = 0.
 
@@ -617,16 +618,20 @@ function initialize!(ips::Solver)
     # Automatic scaling (constraints)
     @trace(ips.logger,"Computing constraint scaling.")
     ips.con_jac!(ips.x)
-    set_con_scale!(ips.con_scale,ips.con_jac_scale,ips.jac,ips.jac_raw.I,ips.opt.nlp_scaling_max_gradient)
-    ips.l./=ips.con_scale
-    ips.jac.*=ips.con_jac_scale
+    if ips.opt.nlp_scaling
+        set_con_scale!(ips.con_scale,ips.con_jac_scale,ips.jac,ips.jac_raw.I,ips.opt.nlp_scaling_max_gradient)
+        ips.l./=ips.con_scale
+        ips.jac.*=ips.con_jac_scale
+    end
     ips.jac_compress()
 
     # Automatic scaling (objective)
     ips.obj_grad!(ips.f,ips.x)
     @trace(ips.logger,"Computing objective scaling.")
-    ips.obj_scale[] = min(1,ips.opt.nlp_scaling_max_gradient/norm(ips.f,Inf))
-    ips.f.*=ips.obj_scale[]
+    if ips.opt.nlp_scaling
+        ips.obj_scale[] = min(1,ips.opt.nlp_scaling_max_gradient/norm(ips.f,Inf))
+        ips.f.*=ips.obj_scale[]
+    end
 
     # Initialize dual variables
     @trace(ips.logger,"Initializing constraint duals.")
