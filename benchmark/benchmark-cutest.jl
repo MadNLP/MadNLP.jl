@@ -74,6 +74,6 @@ filter!(e->!(e in exclude),probs)
 
 time,status = benchmark(solver,probs;warm_up_probs = ["EIGMINA"])
 
-save_object("name-cutest.jld2",probs)
-save_object("time-cutest-$(SOLVER).jld2",time)
-save_object("status-cutest-$(SOLVER).jld2",status) 
+writedlm("name-cutest.csv",probs,',')
+writedlm("time-cutest-$(SOLVER).csv",time,',')
+writedlm("status-cutest-$(SOLVER).csv",status),',' 

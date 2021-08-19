@@ -71,6 +71,6 @@ name =  ["$case-$type" for case in cases for type in types]
 
 time,status = benchmark(solver,probs;warm_up_probs = [("pglib_opf_case1888_rte.m", ACPPowerModel)])
 
-save_object("name-power.jld2",name)
-save_object("time-power-$(SOLVER).jld2",time)
-save_object("status-power-$(SOLVER).jld2",status) 
+writedlm("name-power.csv",name,',')
+writedlm("time-power-$(SOLVER).csv",time)
+writedlm("status-power-$(SOLVER).csv",status) 

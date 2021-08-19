@@ -1,4 +1,4 @@
-using Plots, JLD2
+using Plots, DelimitedFiles
 
 const CLASSES = filter(e-> e in ["cutest","power"], ARGS)
 const SOLVERS = filter(e-> e in ["current","master","ipopt","knitro"], ARGS)
@@ -10,15 +10,15 @@ const LABELS = Dict(
     "knitro" => "Knitro",
 )
 
-# for class in CLASSES
+for class in CLASSES
     
     time = Dict()
     status = Dict()
 
-    name = load_object("name-$class.jld2")
+    name = readdlm("name-$class.csv")[:]
     for solver in SOLVERS
-        time[solver] = load_object("time-$class-$solver.jld2")
-        status[solver] = load_object("status-$class-$solver.jld2")
+        time[solver] = readdlm("time-$class-$solver.csv")[:]
+        status[solver] = readdlm("status-$class-$solver.csv")[:]
     end
     
     reltime = deepcopy(time)
@@ -54,9 +54,6 @@ const LABELS = Dict(
         filter!(a->!isnan(a),reltime[solver])
     end
 
-    mm = maximum(maximum(reltime[s]) for s in SOLVERS)
-    println(mm)
-    
     p = plot(;
              ylim=(0,1),
              xlim=(
@@ -69,11 +66,11 @@ const LABELS = Dict(
              legend=:bottomright)
     for solver in SOLVERS
         y = [1:length(reltime[solver]);length(reltime[solver])]/length(name)
-        push!(reltime[solver],mm)
+        push!(reltime[solver],maximum(maximum(reltime[s]) for s in SOLVERS))
         plot!(p,sort(reltime[solver]),y;
               qqline=:none,
               linetype=:steppost,
               label=LABELS[solver])
     end
     savefig(p,"$class.pdf")
-# end
+end
