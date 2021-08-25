@@ -1,9 +1,16 @@
-const PGLIB_PATH = ENV["PGLIB_PATH"]
+if haskey(ENV, "PGLIB_PATH")
+    const PGLIB_PATH = ENV["PGLIB_PATH"]
+else
+    error("Unable to find path to PGLIB benchmark.\n"*
+          "Please set environment variable `PGLIB_PATH` to run benchmark with PowerModels.jl")
+end
 
 include("config.jl")
 
-using MathOptInterface; const MOI=MathOptInterface
-function get_status(code::MOI.TerminationStatusCode) 
+using MathOptInterface
+const MOI = MathOptInterface
+
+function get_status(code::MOI.TerminationStatusCode)
     if code == MOI.LOCALLY_SOLVED
         return 1
     elseif code == MOI.ALMOST_OPTIMAL
@@ -19,17 +26,17 @@ end
 if SOLVER == "master"
     @everywhere solver = prob ->
         run_opf(joinpath(PGLIB_PATH,prob[1]), prob[2],
-                ()->MadNLP.Optimizer(linear_solver=MadNLPMa57,max_wall_time=900.,tol=1e-6))
+                ()->MadNLP.Optimizer(linear_solver=MadNLPMa57,max_wall_time=900.,tol=1e-6, print_level=PRINT_LEVEL))
     @everywhere using MadNLP, MadNLPHSL
 elseif SOLVER == "current"
     @everywhere solver = prob ->
         run_opf(joinpath(PGLIB_PATH,prob[1]), prob[2],
-                ()->MadNLP.Optimizer(linear_solver=MadNLPMa57,max_wall_time=900.,tol=1e-6))
+                ()->MadNLP.Optimizer(linear_solver=MadNLPMa57,max_wall_time=900.,tol=1e-6, print_level=PRINT_LEVEL))
     @everywhere using MadNLP, MadNLPHSL
 elseif SOLVER == "ipopt"
     @everywhere solver = prob ->
         run_opf(joinpath(PGLIB_PATH,prob[1]), prob[2],
-                ()->Ipopt.Optimizer(linear_solver="ma57",max_cpu_time=900.,tol=1e-6))
+                ()->Ipopt.Optimizer(linear_solver="ma57",max_cpu_time=900.,tol=1e-6, print_level=PRINT_LEVEL))
     @everywhere using Ipopt
 elseif SOLVER == "knitro"
     # TODO
@@ -53,7 +60,7 @@ function benchmark(solver,probs;warm_up_probs = [])
     rs = [remotecall.(solver,i,warm_up_probs) for i in procs() if i!= 1]
     ws = [wait.(r) for r in rs]
     fs= [fetch.(r) for r in rs]
-    
+
     println("Solving problems")
     retvals = pmap(prob->evalmodel(prob,solver),probs)
     time   = [retval["solve_time"] for retval in retvals]
@@ -73,4 +80,4 @@ time,status = benchmark(solver,probs;warm_up_probs = [("pglib_opf_case1888_rte.m
 
 writedlm("name-power.csv",name,',')
 writedlm("time-power-$(SOLVER).csv",time)
-writedlm("status-power-$(SOLVER).csv",status) 
+writedlm("status-power-$(SOLVER).csv",status)
