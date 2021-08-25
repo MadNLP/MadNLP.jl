@@ -13,13 +13,13 @@ end
 @everywhere using CUTEst
 
 if SOLVER == "master"
-    @everywhere solver = nlp -> madnlp(nlp,linear_solver=MadNLPMa57,max_wall_time=900.,tol=1e-6, print_level=MadNLP.ERROR)
+    @everywhere solver = nlp -> madnlp(nlp,linear_solver=MadNLPMa57,max_wall_time=900.,tol=1e-6, print_level=PRINT_LEVEL)
     @everywhere using MadNLP, MadNLPHSL
 elseif SOLVER == "current"
-    @everywhere solver = nlp -> madnlp(nlp,linear_solver=MadNLPMa57,max_wall_time=900.,tol=1e-6, print_level=MadNLP.ERROR)
+    @everywhere solver = nlp -> madnlp(nlp,linear_solver=MadNLPMa57,max_wall_time=900.,tol=1e-6, print_level=PRINT_LEVEL)
     @everywhere using MadNLP, MadNLPHSL
 elseif SOLVER == "ipopt"
-    @everywhere solver = nlp -> ipopt(nlp,linear_solver="ma57",max_cpu_time=900.,tol=1e-6, print_level=0)
+    @everywhere solver = nlp -> ipopt(nlp,linear_solver="ma57",max_cpu_time=900.,tol=1e-6, print_level=PRINT_LEVEL)
     @everywhere using NLPModelsIpopt
 elseif SOLVER == "knitro"
     # TODO
