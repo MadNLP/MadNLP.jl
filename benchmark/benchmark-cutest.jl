@@ -1,6 +1,6 @@
 include("config.jl")
 
-function get_status(code::Symbol) 
+function get_status(code::Symbol)
     if code == :first_order
         return 1
     elseif code == :acceptable
@@ -13,13 +13,13 @@ end
 @everywhere using CUTEst
 
 if SOLVER == "master"
-    @everywhere solver = nlp -> madnlp(nlp,linear_solver=MadNLPMa57,max_wall_time=900.,tol=1e-6)
+    @everywhere solver = nlp -> madnlp(nlp,linear_solver=MadNLPMa57,max_wall_time=900.,tol=1e-6, print_level=PRINT_LEVEL)
     @everywhere using MadNLP, MadNLPHSL
 elseif SOLVER == "current"
-    @everywhere solver = nlp -> madnlp(nlp,linear_solver=MadNLPMa57,max_wall_time=900.,tol=1e-6)
+    @everywhere solver = nlp -> madnlp(nlp,linear_solver=MadNLPMa57,max_wall_time=900.,tol=1e-6, print_level=PRINT_LEVEL)
     @everywhere using MadNLP, MadNLPHSL
 elseif SOLVER == "ipopt"
-    @everywhere solver = nlp -> ipopt(nlp,linear_solver="ma57",max_cpu_time=900.,tol=1e-6)
+    @everywhere solver = nlp -> ipopt(nlp,linear_solver="ma57",max_cpu_time=900.,tol=1e-6, print_level=PRINT_LEVEL)
     @everywhere using NLPModelsIpopt
 elseif SOLVER == "knitro"
     # TODO
@@ -51,7 +51,7 @@ function benchmark(solver,probs;warm_up_probs = [])
 
     println("Decoding problems")
     broadcast(decodemodel,probs)
-    
+
     println("Solving problems")
     retvals = pmap(prob->evalmodel(prob,solver),probs)
     time   = [retval.elapsed_time for retval in retvals]
@@ -63,7 +63,7 @@ exclude = [
     "PFIT1","PFIT2","PFIT4","DENSCHNE","SPECANNE","DJTL", "EG3","OET7",
     "PRIMAL3","TAX213322","TAXR213322","TAX53322","TAXR53322","HIMMELP2","MOSARQP2","LUKVLE11",
     "CYCLOOCT","CYCLOOCF","LIPPERT1","GAUSSELM","A2NSSSSL",
-    "YATP1LS","YATP2LS","YATP1CLS","YATP2CLS","BA-L52LS","BA-L73LS","BA-L21LS","CRESC132"    
+    "YATP1LS","YATP2LS","YATP1CLS","YATP2CLS","BA-L52LS","BA-L73LS","BA-L21LS","CRESC132"
 ]
 
 
@@ -76,4 +76,4 @@ time,status = benchmark(solver,probs;warm_up_probs = ["EIGMINA"])
 
 writedlm("name-cutest.csv",probs,',')
 writedlm("time-cutest-$(SOLVER).csv",time,',')
-writedlm("status-cutest-$(SOLVER).csv",status),',' 
+writedlm("status-cutest-$(SOLVER).csv",status),','
