@@ -7,37 +7,72 @@ end
 
 include("config.jl")
 
-using MathOptInterface
-const MOI = MathOptInterface
+@everywhere begin
+    using PowerModels, MathOptInterface, JuMP
+    const MOI = MathOptInterface
+    
+    PowerModels.silence()
 
-function get_status(code::MOI.TerminationStatusCode)
-    if code == MOI.LOCALLY_SOLVED
-        return 1
-    elseif code == MOI.ALMOST_OPTIMAL
-        return 2
-    else
-        return 3
+    function evalmodel(prob,solver;gcoff=false)
+        println("Solving $(get_name(prob))")
+        gcoff && GC.enable(false);
+        return solver(prob)
     end
+
+    function get_status(code::MOI.TerminationStatusCode)
+        if code == MOI.LOCALLY_SOLVED
+            return 1
+        elseif code == MOI.ALMOST_OPTIMAL
+            return 2
+        else
+            return 3
+        end
+    end
+
+    get_name(pm) = "$(pm.data["name"])-$(typeof(pm))"
 end
 
-@everywhere using PowerModels
-@everywhere PowerModels.silence()
-
-if SOLVER == "master"
-    @everywhere solver = prob ->
-        run_opf(joinpath(PGLIB_PATH,prob[1]), prob[2],
-                ()->MadNLP.Optimizer(linear_solver=MadNLPMa57,max_wall_time=900.,tol=1e-6, print_level=PRINT_LEVEL))
-    @everywhere using MadNLP, MadNLPHSL
-elseif SOLVER == "current"
-    @everywhere solver = prob ->
-        run_opf(joinpath(PGLIB_PATH,prob[1]), prob[2],
-                ()->MadNLP.Optimizer(linear_solver=MadNLPMa57,max_wall_time=900.,tol=1e-6, print_level=PRINT_LEVEL))
-    @everywhere using MadNLP, MadNLPHSL
+if SOLVER == "master" || SOLVER == "current"
+    @everywhere begin
+        using MadNLP, MadNLPHSL
+        solver = pm -> begin
+            set_optimizer(pm.model,()->
+                MadNLP.Optimizer(linear_solver=MadNLPMa57,max_wall_time=900.,tol=1e-6, print_level=PRINT_LEVEL))
+            mem=@allocated begin
+                t=@elapsed begin
+                    optimize_model!(pm)
+                end
+            end
+            return get_status(termination_status(pm.model)),t,mem,barrier_iterations(pm.model)
+        end
+    end
 elseif SOLVER == "ipopt"
-    @everywhere solver = prob ->
-        run_opf(joinpath(PGLIB_PATH,prob[1]), prob[2],
-                ()->Ipopt.Optimizer(linear_solver="ma57",max_cpu_time=900.,tol=1e-6, print_level=PRINT_LEVEL))
-    @everywhere using Ipopt
+    @everywhere begin
+        using Ipopt
+        
+        const ITER = [-1]
+        function ipopt_callback(
+            prob::IpoptProblem,alg_mod::Cint,iter_count::Cint,obj_value::Float64,
+            inf_pr::Float64,inf_du::Float64,mu::Float64,d_norm::Float64,
+            regularization_size::Float64,alpha_du::Float64,alpha_pr::Float64,ls_trials::Cint)
+            
+            ITER[] += 1
+            return true
+        end
+
+        solver = pm -> begin
+            ITER[] = 0
+            set_optimizer(pm.model,()->
+                Ipopt.Optimizer(linear_solver="ma57",max_cpu_time=900.,tol=1e-6, print_level=PRINT_LEVEL))
+            MOI.set(pm.model, Ipopt.CallbackFunction(), ipopt_callback)
+            mem=@allocated begin
+                t=@elapsed begin
+                    optimize_model!(pm)
+                end
+            end
+            return get_status(termination_status(pm.model)),t,mem,ITER[]
+        end
+    end
 elseif SOLVER == "knitro"
     # TODO
 else
@@ -45,39 +80,43 @@ else
 end
 
 
-@everywhere function evalmodel(prob,solver)
-    println("Solving $prob")
-    t = @elapsed begin
-        retval = solver(prob)
-    end
-    retval["solve_time"] = t
-    return retval
-end
-
 function benchmark(solver,probs;warm_up_probs = [])
     println("Warming up (forcing JIT compile)")
-    println(warm_up_probs)
+    println(get_name.(warm_up_probs))
     rs = [remotecall.(solver,i,warm_up_probs) for i in procs() if i!= 1]
     ws = [wait.(r) for r in rs]
     fs= [fetch.(r) for r in rs]
 
     println("Solving problems")
-    retvals = pmap(prob->evalmodel(prob,solver),probs)
-    time   = [retval["solve_time"] for retval in retvals]
-    status = [get_status(retval["termination_status"]) for retval in retvals]
-    time,status
+    retvals = pmap(prob->evalmodel(prob,solver;gcoff=GCOFF),probs)
+    
+    status = [status for (status,time,mem,iter) in retvals]
+    time   = [time for (status,time,mem,iter) in retvals]
+    mem    = [mem for (status,time,mem,iter) in retvals]
+    iter   = [iter for (status,time,mem,iter) in retvals]
+        
+    return status,time,mem,iter
 end
 
-cases = filter!(e->occursin("pglib_opf_case",e),readdir(PGLIB_PATH))
-types = [ACPPowerModel, ACRPowerModel, ACTPowerModel,
-         DCPPowerModel, DCMPPowerModel, NFAPowerModel,
-         DCPLLPowerModel,LPACCPowerModel, SOCWRPowerModel,
-         QCRMPowerModel,QCLSPowerModel]
-probs = [(case,type) for case in cases for type in types]
+if QUICK
+    cases = filter!(e->(occursin("pglib_opf_case",e) && occursin("pegase",e)),readdir(PGLIB_PATH))
+    types = [ACPPowerModel, ACRPowerModel]
+else
+    cases = filter!(e->occursin("pglib_opf_case",e),readdir(PGLIB_PATH))
+    types = [ACPPowerModel, ACRPowerModel, ACTPowerModel,
+             DCPPowerModel, DCMPPowerModel, NFAPowerModel,
+             DCPLLPowerModel,LPACCPowerModel, SOCWRPowerModel,
+             QCRMPowerModel,QCLSPowerModel]
+end
+probs = [instantiate_model(joinpath(PGLIB_PATH,case),type,PowerModels.build_opf) for case in cases for type in types]
 name =  ["$case-$type" for case in cases for type in types]
 
-time,status = benchmark(solver,probs;warm_up_probs = [("pglib_opf_case1888_rte.m", ACPPowerModel)])
+status,time,mem,iter = benchmark(solver,probs;warm_up_probs = [
+    instantiate_model(joinpath(PGLIB_PATH,"pglib_opf_case1888_rte.m"), ACPPowerModel,PowerModels.build_opf)
+])
 
 writedlm("name-power.csv",name,',')
-writedlm("time-power-$(SOLVER).csv",time)
 writedlm("status-power-$(SOLVER).csv",status)
+writedlm("time-power-$(SOLVER).csv",time)
+writedlm("mem-power-$(SOLVER).csv",mem)
+writedlm("iter-power-$(SOLVER).csv",iter)

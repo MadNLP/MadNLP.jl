@@ -2,7 +2,9 @@ using Pkg, Distributed, DelimitedFiles
 
 const NP = ARGS[1]
 const SOLVER = ARGS[2]
-
+const VERBOSE = ARGS[3] == "true"
+const QUICK = ARGS[4] == "true"
+const GCOFF = ARGS[5] == "true"
 
 addprocs(parse(Int,NP),exeflags="--project=.")
 Pkg.instantiate()
@@ -23,10 +25,13 @@ end
 
 # Set verbose option
 if SOLVER == "ipopt"
-    const PRINT_LEVEL = (ARGS[3] == "verbose") ? 5 : 0
+    const PRINT_LEVEL = VERBOSE ? 5 : 0
 elseif SOLVER == "knitro"
-    const PRINT_LEVEL = (ARGS[3] == "verbose") ? 3 : 0
+    const PRINT_LEVEL = VERBOSE ? 3 : 0
 else
     using MadNLP
-    const PRINT_LEVEL = (ARGS[3] == "verbose") ? MadNLP.INFO : MadNLP.ERROR
+    const PRINT_LEVEL = VERBOSE ? MadNLP.INFO : MadNLP.ERROR
 end
+
+# Set quick option
+
