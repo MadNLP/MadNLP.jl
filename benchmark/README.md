@@ -1,10 +1,9 @@
-To run benchmarks, run the following script.
+Running benchmark requires pacakge ArgParse. First install ArgParse with:
 ```
-# to compare current version and master using 10 cores and CUTEst and PowerModels.jl problems,
-julia runbenchmarks.jl 10 power cutest current master
+julia -e 'import Pkg; Pkg.add("ArgParse")'
 ```
 
-By default, logs are deactivated. To active them, please add `verbose` to the options:
+To get a help for running benchmark, run:
 ```
-julia runbenchmarks.jl 10 power cutest current master verbose
+julia runbenchmark.jl --help
 ```
