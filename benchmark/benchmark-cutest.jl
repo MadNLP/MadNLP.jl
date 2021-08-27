@@ -12,12 +12,9 @@ end
 
 @everywhere using CUTEst
 
-if SOLVER == "master"
-    @everywhere solver = nlp -> madnlp(nlp,linear_solver=MadNLPMa57,max_wall_time=900.,tol=1e-6, print_level=PRINT_LEVEL)
+if SOLVER == "master" || SOLVER == "current"
     @everywhere using MadNLP, MadNLPHSL
-elseif SOLVER == "current"
     @everywhere solver = nlp -> madnlp(nlp,linear_solver=MadNLPMa57,max_wall_time=900.,tol=1e-6, print_level=PRINT_LEVEL)
-    @everywhere using MadNLP, MadNLPHSL
 elseif SOLVER == "ipopt"
     @everywhere solver = nlp -> ipopt(nlp,linear_solver="ma57",max_cpu_time=900.,tol=1e-6, print_level=PRINT_LEVEL)
     @everywhere using NLPModelsIpopt
@@ -33,30 +30,42 @@ end
     finalize(CUTEstModel(name))
 end
 
-@everywhere function evalmodel(name,solver)
+@everywhere function evalmodel(name,solver;gcoff=false)
     println("Solving $name")
     nlp = CUTEstModel(name; decode=false)
-    t = @elapsed begin
-        retval = solver(nlp)
+    try
+        gcoff && GC.enable(false);
+        mem = @allocated begin
+            t = @elapsed begin
+                retval = solver(nlp)
+            end
+        end
+        gcoff && GC.enable(true);
+        retval.elapsed_time = t
+        retval.solver_specific[:mem] = mem
+        finalize(nlp)
+        return retval
+    catch e
+        finalize(nlp)
+        throw(e)
     end
-    retval.elapsed_time = t
-    finalize(nlp)
-    return retval
 end
 
 function benchmark(solver,probs;warm_up_probs = [])
     println("Warming up (forcing JIT compile)")
     broadcast(decodemodel,warm_up_probs)
-    [remotecall_fetch.(prob->evalmodel(prob,solver),i,warm_up_probs) for i in procs() if i!= 1]
+    [remotecall_fetch.(prob->evalmodel(prob,solver;gcoff=GCOFF),i,warm_up_probs) for i in procs() if i!= 1]
 
     println("Decoding problems")
     broadcast(decodemodel,probs)
 
     println("Solving problems")
     retvals = pmap(prob->evalmodel(prob,solver),probs)
-    time   = [retval.elapsed_time for retval in retvals]
     status = [get_status(retval.status) for retval in retvals]
-    time,status
+    time   = [retval.elapsed_time for retval in retvals]
+    mem    = [retval.solver_specific[:mem] for retval in retvals]
+    iter   = [retval.iter for retval in retvals]
+    status,time,mem,iter
 end
 
 exclude = [
@@ -67,13 +76,18 @@ exclude = [
 ]
 
 
-probs = CUTEst.select()
+if QUICK
+    probs = readdlm("cutest-quick-names.csv")[:]
+else
+    probs = CUTEst.select()
+end
 
-println(probs)
 filter!(e->!(e in exclude),probs)
 
-time,status = benchmark(solver,probs;warm_up_probs = ["EIGMINA"])
+time,status,mem,iter = benchmark(solver,probs;warm_up_probs = ["EIGMINA"])
 
 writedlm("name-cutest.csv",probs,',')
-writedlm("time-cutest-$(SOLVER).csv",time,',')
 writedlm("status-cutest-$(SOLVER).csv",status),','
+writedlm("time-cutest-$(SOLVER).csv",time,',')
+writedlm("mem-cutest-$(SOLVER).csv",mem,',')
+writedlm("iter-cutest-$(SOLVER).csv",iter,',')
