@@ -84,7 +84,7 @@ end
 
 filter!(e->!(e in exclude),probs)
 
-time,status,mem,iter = benchmark(solver,probs;warm_up_probs = ["EIGMINA"])
+status,time,mem,iter = benchmark(solver,probs;warm_up_probs = ["EIGMINA"])
 
 writedlm("name-cutest.csv",probs,',')
 writedlm("status-cutest-$(SOLVER).csv",status),','
