@@ -32,8 +32,8 @@ include("options.jl")
 include("nonlinearprogram.jl")
 include("matrixtools.jl")
 include(joinpath("LinearSolvers","linearsolvers.jl"))
-include(joinpath("kktsystem.jl"))
-include(joinpath("interiorpointsolver.jl"))
+include("kktsystem.jl")
+include("interiorpointsolver.jl")
 include(joinpath("Interfaces","interfaces.jl"))
 
 # Initialize

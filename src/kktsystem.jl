@@ -84,8 +84,8 @@ function build_kkt!(kkt::AbstractSparseKKTSystem{T, MT}) where {T, MT<:SparseMat
     treat_fixed_variable!(kkt)
 end
 
-function set_jacobian_scaling!(kkt::AbstractSparseKKTSystem, constraint_scaling::AbstractVector)
-    nnzJ = length(kkt.jac)
+function set_jacobian_scaling!(kkt::AbstractSparseKKTSystem{T, MT}, constraint_scaling::AbstractVector) where {T, MT}
+    nnzJ = length(kkt.jac)::Int
     for i in 1:nnzJ
         index = kkt.jac_raw.I[i]
         kkt.jacobian_scaling[i] = constraint_scaling[index]

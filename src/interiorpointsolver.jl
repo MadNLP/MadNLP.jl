@@ -255,7 +255,7 @@ function eval_f_wrapper(ipp::Solver, x::Vector{Float64})
     nlp = ipp.nlp
     cnt = ipp.cnt
     @trace(ipp.logger,"Evaluating objective.")
-    cnt.eval_function_time += @elapsed obj_val = nlp.obj(view(x,1:nlp.n))
+    cnt.eval_function_time += @elapsed obj_val = nlp.obj(view(x,1:nlp.n))::Float64
     cnt.obj_cnt+=1
     cnt.obj_cnt==1 && (is_valid(obj_val) || throw(InvalidNumberException()))
     return obj_val*ipp.obj_scale[]
@@ -1093,17 +1093,26 @@ end
 
 # KKT system updates -------------------------------------------------------
 # Set diagonal
+# TODO: Temporary solution --> create auxiliary functions to force specialization
+function _set_aug_diagonal_reduced!(pr_diag, du_diag, x, xl, xu, zl, zu)
+    pr_diag .= zl./(x.-xl) .+ zu./(xu.-x)
+    fill!(du_diag, 0.0)
+end
+function _set_aug_diagonal_unreduced!(pr_diag, du_diag, l_lower, u_lower, l_diag, u_diag, zl_r, zu_r, xl_r, xu_r, x_lr, x_ur)
+    pr_diag .= 0.0
+    du_diag .= 0.0
+    l_lower .= .-sqrt.(zl_r)
+    u_lower .= .-sqrt.(zu_r)
+    l_diag  .= xl_r .- x_lr
+    u_diag  .= x_ur .- xu_r
+end
 function set_aug_diagonal!(kkt::AbstractKKTSystem, ips::Solver)
-    copyto!(kkt.pr_diag, ips.zl./(ips.x.-ips.xl) .+ ips.zu./(ips.xu.-ips.x))
-    fill!(kkt.du_diag, 0.0)
+    _set_aug_diagonal_reduced!(kkt.pr_diag, kkt.du_diag, ips.x, ips.xl, ips.xu, ips.zl, ips.zu)
 end
 function set_aug_diagonal!(kkt::SparseUnreducedKKTSystem, ips::Solver)
-    kkt.pr_diag .= 0.0
-    kkt.du_diag .= 0.0
-    kkt.l_lower .= .-sqrt.(ips.zl_r)
-    kkt.u_lower .= .-sqrt.(ips.zu_r)
-    kkt.l_diag  .= ips.xl_r .- ips.x_lr
-    kkt.u_diag  .= ips.x_ur .- ips.xu_r
+    _set_aug_diagonal_unreduced!(kkt.pr_diag, kkt.du_diag, kkt.l_lower, kkt.u_lower, kkt.l_diag, kkt.u_diag,
+        ips.zl_r, ips.zu_r, ips.xl_r, ips.xu_r, ips.x_lr, ips.x_ur,
+    )
 end
 
 # Robust restoration
@@ -1121,15 +1130,24 @@ function set_aug_RR!(kkt::SparseUnreducedKKTSystem, ips::Solver, RR::RobustResto
 end
 
 # Set RHS
+# TODO: Temporary solution --> create auxiliary functions to force specialization
+function _set_aug_rhs_reduced!(px, pl, x, xl, xu, c, f, jacl, mu)
+    px.=.-f.+mu./(x.-xl).-mu./(xu.-x).-jacl
+    pl.=.-c
+end
+function _set_aug_rhs_unreduced!(px, pl, pzl, pzu, c, f, zl, zu, jacl, xl_r, xu_r, x_lr, x_ur, l_lower, u_lower, mu)
+    px.=.-f.+zl.-zu.-jacl
+    pl.=.-c
+    pzl.=(xl_r-x_lr).*l_lower .+ mu./l_lower
+    pzu.=(xu_r-x_ur).*u_lower .- mu./u_lower
+end
 function set_aug_rhs!(ips::Solver, kkt::AbstractKKTSystem, c)
-    ips.px.=.-ips.f.+ips.mu./(ips.x.-ips.xl).-ips.mu./(ips.xu.-ips.x).-ips.jacl
-    ips.pl.=.-c
+    _set_aug_rhs_reduced!(ips.px, ips.pl, ips.x, ips.xl, ips.xu, c, ips.f, ips.jacl, ips.mu)
 end
 function set_aug_rhs!(ips::Solver, kkt::SparseUnreducedKKTSystem, c)
-    ips.px.=.-ips.f.+ips.zl.-ips.zu.-ips.jacl
-    ips.pl.=.-c
-    ips.pzl.=(ips.xl_r-ips.x_lr).*kkt.l_lower.+ips.mu./kkt.l_lower
-    ips.pzu.=(ips.xu_r-ips.x_ur).*kkt.u_lower.-ips.mu./kkt.u_lower
+    _set_aug_rhs_unreduced!(ips.px, ips.pl, ips.pzl, ips.pzu, c, ips.f, ips.zl, ips.zu,
+                            ips.jacl, ips.xl_r, ips.xu_r, ips.x_lr, ips.x_ur,
+                            kkt.l_lower, kkt.u_lower, ips.mu)
 end
 
 # Set RHS RR
@@ -1149,10 +1167,14 @@ function set_aug_rhs_RR!(
 end
 
 # Finish
-function finish_aug_solve!(ips::Solver, kkt::AbstractKKTSystem, mu)
-    ips.dzl.= (mu.-ips.zl_r.*ips.dx_lr)./(ips.x_lr.-ips.xl_r).-ips.zl_r
-    ips.dzu.= (mu.+ips.zu_r.*ips.dx_ur)./(ips.xu_r.-ips.x_ur).-ips.zu_r
+function _finish_aug_solve_reduced!(dzl, dzu, zl_r, zu_r, dx_lr, dx_ur, x_lr, x_ur, xl_r, xu_r, mu)
+    dzl.= (mu.-zl_r.*dx_lr)./(x_lr.-xl_r).-zl_r
+    dzu.= (mu.+zu_r.*dx_ur)./(xu_r.-x_ur).-zu_r
 end
+function finish_aug_solve!(ips::Solver, kkt::AbstractKKTSystem, mu)
+    _finish_aug_solve_reduced!(ips.dzl, ips.dzu, ips.zl_r, ips.zu_r, ips.dx_lr, ips.dx_ur, ips.x_lr, ips.x_ur, ips.xl_r, ips.xu_r, mu)
+end
+# Note: No need to force specialization here.
 function finish_aug_solve!(ips::Solver, kkt::SparseUnreducedKKTSystem, mu)
     ips.dzl.*=.-kkt.l_lower
     ips.dzu.*=kkt.u_lower
