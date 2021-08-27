@@ -114,6 +114,7 @@ MOI.get(model::Optimizer,::MOI.NumberOfConstraints{MOI.SingleVariable,MOI.EqualT
 MOI.get(model::Optimizer,::MOI.NumberOfConstraints{MOI.SingleVariable,MOI.GreaterThan{Float64}})=count(e->e.has_lower_bound,model.variable_info)
 MOI.get(model::Optimizer,::MOI.ObjectiveFunction) = model.objective
 MOI.get(model::Optimizer,::MOI.ListOfVariableIndices) = [MOI.VariableIndex(i) for i in 1:length(model.variable_info)]
+MOI.get(model::Optimizer,::MOI.BarrierIterations) = model.ips.cnt.k
 
 macro define_get_con_attr(attr,function_type, set_type, prefix, attrfield)
     array_name = Symbol(string(prefix) * "_constraints")
