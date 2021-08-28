@@ -6,9 +6,9 @@ abstract type AbstractSparseMatrixCOO{Tv,Ti<:Integer} <: AbstractSparseMatrix{Tv
 mutable struct SparseMatrixCOO{Tv,Ti<:Integer} <: AbstractSparseMatrixCOO{Tv,Ti}
     m::Int
     n::Int
-    I::AbstractArray{Ti,1}
-    J::AbstractArray{Ti,1}
-    V::AbstractArray{Tv,1}
+    I::StrideOneVector{Ti}
+    J::StrideOneVector{Ti}
+    V::StrideOneVector{Tv}
 end
 size(A::SparseMatrixCOO) = (A.m,A.n)
 getindex(A::SparseMatrixCOO{Float64,Ti},i::Int,j::Int) where Ti <: Integer = sum(A.V[(A.I.==i) .* (A.J.==j)])
@@ -29,7 +29,7 @@ function findIJ(S::SparseMatrixCSC{Tv,Ti}) where {Tv,Ti}
     return I,J
 end
 
-get_mapping(dest::AbstractMatrix, src::SparseMatrixCOO) = nothing
+get_mapping(dest::Matrix{Tv}, src::SparseMatrixCOO{Tv,Ti}) where {Tv,Ti} = nothing
 
 function diag!(dest::AbstractVector{T}, src::AbstractMatrix{T}) where T
     @assert length(dest) == size(src, 1)
@@ -44,7 +44,7 @@ function get_tril_to_full(csc::SparseMatrixCSC{Tv,Ti}) where {Tv,Ti<:Integer}
     return SparseMatrixCSC{Tv,Ti}(
         csc.m,csc.n,cscind.colptr,cscind.rowval,Vector{Tv}(undef,nnz(cscind))),view(csc.nzval,cscind.nzval)
 end
-function tril_to_full!(dense::Matrix)
+function tril_to_full!(dense::Matrix{T}) where T
     for i=1:size(dense,1)
         Threads.@threads for j=i:size(dense,2)
             @inbounds dense[i,j]=dense[j,i]
@@ -86,7 +86,7 @@ function transfer!(dest::SparseMatrixCSC, src::SparseMatrixCOO, map::Vector{Int}
     _transfer!(dest.nzval, src.V, map)
 end
 
-function get_mapping(dest::SparseMatrixCSC, src::SparseMatrixCOO)
+function get_mapping(dest::SparseMatrixCSC{Tv1,Ti1}, src::SparseMatrixCOO{Tv2,Ti2}) where {Tv1,Tv2,Ti1,Ti2}
     map = Vector{Int}(undef,nnz(src))
     dest.nzval .= 1:nnz(dest)
     _get_coo_to_csc(src.I, src.J, dest, map)

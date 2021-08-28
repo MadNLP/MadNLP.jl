@@ -62,7 +62,7 @@ end
 function treat_fixed_variable!(kkt::AbstractKKTSystem{T, MT}) where {T, MT<:Matrix{T}}
     length(kkt.ind_fixed) == 0 && return
     aug = kkt.aug_com
-    for i in kkt.ind_fixed
+    @inbounds for i in kkt.ind_fixed
         aug[i, :] .= 0.0
         aug[:, i] .= 0.0
         aug[i, i]  = 1.0
@@ -86,7 +86,7 @@ end
 
 function set_jacobian_scaling!(kkt::AbstractSparseKKTSystem{T, MT}, constraint_scaling::AbstractVector) where {T, MT}
     nnzJ = length(kkt.jac)::Int
-    for i in 1:nnzJ
+    @inbounds for i in 1:nnzJ
         index = kkt.jac_raw.I[i]
         kkt.jacobian_scaling[i] = constraint_scaling[index]
     end

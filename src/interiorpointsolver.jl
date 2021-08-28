@@ -119,8 +119,8 @@ mutable struct Solver{KKTSystem} <: AbstractInteriorPointSolver
     c_trial::Vector{Float64}
     obj_val_trial::Float64
 
-    x_slk::SubVector{Float64}
-    c_slk::SubVector{Float64}
+    x_slk::StrideOneVector{Float64}
+    c_slk::SubArray{Float64, 1, Vector{Float64}, Tuple{Vector{Int64}}, false}
     rhs::Vector{Float64}
 
     ind_ineq::Vector{Int}
@@ -128,17 +128,17 @@ mutable struct Solver{KKTSystem} <: AbstractInteriorPointSolver
     ind_llb::Vector{Int}
     ind_uub::Vector{Int}
 
-    x_lr::SubVector{Float64}
-    x_ur::SubVector{Float64}
-    xl_r::SubVector{Float64}
-    xu_r::SubVector{Float64}
-    zl_r::SubVector{Float64}
-    zu_r::SubVector{Float64}
+    x_lr::SubArray{Float64, 1, Vector{Float64}, Tuple{Vector{Int64}}, false}
+    x_ur::SubArray{Float64, 1, Vector{Float64}, Tuple{Vector{Int64}}, false}
+    xl_r::SubArray{Float64, 1, Vector{Float64}, Tuple{Vector{Int64}}, false}
+    xu_r::SubArray{Float64, 1, Vector{Float64}, Tuple{Vector{Int64}}, false}
+    zl_r::SubArray{Float64, 1, Vector{Float64}, Tuple{Vector{Int64}}, false}
+    zu_r::SubArray{Float64, 1, Vector{Float64}, Tuple{Vector{Int64}}, false}
 
-    dx_lr::SubVector{Float64}
-    dx_ur::SubVector{Float64}
-    x_trial_lr::SubVector{Float64}
-    x_trial_ur::SubVector{Float64}
+    dx_lr::SubArray{Float64, 1, Vector{Float64}, Tuple{Vector{Int64}}, false}
+    dx_ur::SubArray{Float64, 1, Vector{Float64}, Tuple{Vector{Int64}}, false}
+    x_trial_lr::SubArray{Float64, 1, Vector{Float64}, Tuple{Vector{Int64}}, false}
+    x_trial_ur::SubArray{Float64, 1, Vector{Float64}, Tuple{Vector{Int64}}, false}
 
     linear_solver::AbstractLinearSolver
     iterator::AbstractIterator
@@ -265,9 +265,8 @@ function eval_grad_f_wrapper!(ipp::Solver, f::Vector{Float64},x::Vector{Float64}
     nlp = ipp.nlp
     cnt = ipp.cnt
     @trace(ipp.logger,"Evaluating objective gradient.")
-    ∇f = view(f, 1:nlp.n)
-    cnt.eval_function_time += @elapsed nlp.obj_grad!(∇f,view(x,1:nlp.n))
-    ∇f.*=ipp.obj_scale[]
+    cnt.eval_function_time += @elapsed nlp.obj_grad!(f,view(x,1:nlp.n))
+    f.*=ipp.obj_scale[]
     cnt.obj_grad_cnt+=1
     cnt.obj_grad_cnt==1 && (is_valid(f)  || throw(InvalidNumberException()))
     return f
@@ -648,7 +647,7 @@ function regular!(ips::AbstractInteriorPointSolver)
         max(ips.inf_pr,ips.inf_du,ips.inf_compl) <= ips.opt.tol && return SOLVE_SUCCEEDED
         max(ips.inf_pr,ips.inf_du,ips.inf_compl) <= ips.opt.acceptable_tol ?
             (ips.cnt.acceptable_cnt < ips.opt.acceptable_iter ?
-             ips.cnt.acceptable_cnt+=1 : return SOLVED_TO_ACCEPTABLE_LEVEL) : (ips.cnt.acceptable_cnt = 0)
+            ips.cnt.acceptable_cnt+=1 : return SOLVED_TO_ACCEPTABLE_LEVEL) : (ips.cnt.acceptable_cnt = 0)
         max(ips.inf_pr,ips.inf_du,ips.inf_compl) >= ips.opt.diverging_iterates_tol && return DIVERGING_ITERATES
         ips.cnt.k>=ips.opt.max_iter && return MAXIMUM_ITERATIONS_EXCEEDED
         time()-ips.cnt.start_time>=ips.opt.max_wall_time && return MAXIMUM_WALLTIME_EXCEEDED
@@ -691,23 +690,22 @@ function regular!(ips::AbstractInteriorPointSolver)
 
         finish_aug_solve!(ips, ips.kkt, ips.mu)
 
-
         # filter start
         @trace(ips.logger,"Backtracking line search initiated.")
         theta = get_theta(ips.c)
         varphi= get_varphi(ips.obj_val,ips.x_lr,ips.xl_r,ips.xu_r,ips.x_ur,ips.mu)
         varphi_d = get_varphi_d(ips.f,ips.x,ips.xl,ips.xu,ips.dx,ips.mu)
 
+        
         alpha_max = get_alpha_max(ips.x,ips.xl,ips.xu,ips.dx,ips.tau)
         ips.alpha_z = get_alpha_z(ips.zl_r,ips.zu_r,ips.dzl,ips.dzu,ips.tau)
         alpha_min = get_alpha_min(theta,varphi_d,ips.theta_min,ips.opt.gamma_theta,ips.opt.gamma_phi,
                                   ips.opt.alpha_min_frac,ips.opt.delta,ips.opt.s_theta,ips.opt.s_phi)
-
         ips.cnt.l = 1
         ips.alpha = alpha_max
         varphi_trial= 0.
-        theta_trial = 0.
-        small_search_norm = get_rel_search_norm(ips.x,ips.dx) < 10*eps(Float64)
+            theta_trial = 0.
+            small_search_norm = get_rel_search_norm(ips.x,ips.dx) < 10*eps(Float64)
         switching_condition = is_switching(varphi_d,ips.alpha,ips.opt.s_phi,ips.opt.delta,2.,ips.opt.s_theta)
         armijo_condition = false
         while true
@@ -1091,6 +1089,8 @@ function second_order_correction(ips::AbstractInteriorPointSolver,alpha_max::Flo
     return false
 end
 
+
+
 # KKT system updates -------------------------------------------------------
 # Set diagonal
 # TODO: Temporary solution --> create auxiliary functions to force specialization
@@ -1212,7 +1212,6 @@ function finish_aug_solve_RR!(dpp,dnn,dzp,dzn,l,dl,pp,nn,zp,zn,mu_R,rho)
     dzn .= (mu_R.-zn.*dnn)./nn.-zn
 end
 
-
 # Kernel functions ---------------------------------------------------------
 is_valid(val::Real) = !(isnan(val) || isinf(val))
 function is_valid(vec)
@@ -1274,7 +1273,7 @@ function get_alpha_z(zl_r,zu_r,dzl,dzu,tau)
     alpha_z = 1.
     for i=1:length(zl_r)
         @inbounds dzl[i]<0 && (alpha_z=min(alpha_z,-zl_r[i]/dzl[i]))
-    end
+     end
     for i=1:length(zu_r)
         @inbounds dzu[i]<0 && (alpha_z=min(alpha_z,-zu_r[i]/dzu[i]))
     end
@@ -1500,7 +1499,7 @@ function get_ftype(filter,theta,theta_trial,varphi,varphi_trial,switching_condit
 end
 
 # fixed variable treatment ----------------------------------------------------
-function _get_fixed_variable_index(mat::SparseMatrixCSC, ind_fixed::AbstractVector)
+function _get_fixed_variable_index(mat::SparseMatrixCSC{Tv,Ti1}, ind_fixed::Vector{Ti2}) where {Tv,Ti1,Ti2}
     fixed_aug_index = Int[]
     for i in ind_fixed
         append!(fixed_aug_index,
