@@ -5,7 +5,7 @@ import MadNLP: @kwdef, Logger, @debug, @warn, @error,
     AbstractOptions, AbstractLinearSolver, set_options!, SparseMatrixCSC, SubVector, StrideOneVector,
     SymbolicException,FactorizationException,SolveException,InertiaException,
     introduce, factorize!, solve!, improve!, is_inertia, inertia, findIJ, nnz,
-    get_tril_to_full, transform!
+    get_tril_to_full, transfer!
 
 include(joinpath("..","deps","deps.jl"))
 

@@ -6,22 +6,6 @@ default_linear_solver() = MadNLPUmfpack
 default_dense_solver() = MadNLPLapackCPU
 default_iterator() = MadNLPRichardson
 
-# Options
-abstract type AbstractOptions end
-parse_option(::Type{Module},str::String) = eval(Symbol(str))
-function set_options!(opt::AbstractOptions,option_dict::Dict{Symbol,Any})
-    for (key,val) in option_dict
-        hasproperty(opt,key) || continue
-        T = fieldtype(typeof(opt),key)
-        val isa T ? setproperty!(opt,key,val) :
-            setproperty!(opt,key,parse_option(T,val))
-        pop!(option_dict,key)
-    end
-end
-function set_options!(opt::AbstractOptions,option_dict::Dict{Symbol,Any},kwargs)
-    !isempty(kwargs) && (for (key,val) in kwargs; option_dict[key]=val; end)
-    set_options!(opt,option_dict)
-end
 
 # Dummy module
 module DummyModule end
@@ -67,7 +51,7 @@ end
 const blas_num_threads = Ref{Int}(1)
 function set_blas_num_threads(n::Integer;permanent::Bool=false)
     permanent && (blas_num_threads[]=n)
-    BLAS.set_num_threads(n) 
+    BLAS.set_num_threads(n)
 end
 macro blas_safe_threads(args...)
     code = quote
@@ -79,8 +63,9 @@ macro blas_safe_threads(args...)
 end
 
 # Type definitions
-SubVector{T}=SubArray{T,1}
-StrideOneVector{T}=Union{
-    Vector{T},SubArray{T,1,Array{T,1},Tuple{UnitRange{U}},true} where {U<:Integer},
-    SubArray{Float64,1,Array{Float64,2},Tuple{Base.Slice{Base.OneTo{U}},U},true} where {U<:Integer}}
-
+SubVector{Tv}=SubArray{Tv, 1, Vector{Tv}, Tuple{Vector{Int}}, false}
+StrideOneVector{Tv}=Union{
+    Vector{Tv},
+    SubArray{Tv,1,Vector{Tv},Tuple{UnitRange{Int}},true},
+    SubArray{Tv, 1, Matrix{Tv}, Tuple{Base.Slice{Base.OneTo{Int}}, Int}, true}
+}

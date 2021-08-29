@@ -19,6 +19,11 @@
       INERTIA_BASED = 2,
       INERTIA_FREE = 3)
 
+@enum(KKTLinearSystem::Int,
+      SPARSE_KKT_SYSTEM = 1,
+      SPARSE_UNREDUCED_KKT_SYSTEM = 2,
+      DENSE_KKT_SYSTEM = 3)
+
 @enum(Status::Int,
       SOLVE_SUCCEEDED = 1,
       SOLVED_TO_ACCEPTABLE_LEVEL = 2,

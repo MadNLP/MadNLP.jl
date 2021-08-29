@@ -22,83 +22,6 @@
     acceptable_cnt::Int = 0
 end
 
-@kwdef mutable struct Options <: AbstractOptions
-    # General options
-    rethrow_error::Bool = true
-    disable_garbage_collector::Bool = false
-    blas_num_threads::Int = 1
-    linear_solver::Module
-    iterator::Module = default_iterator()
-
-    # Output options
-    output_file::String = ""
-    print_level::LogLevels = INFO
-    file_print_level::LogLevels = INFO
-
-    # Termination options
-    tol::Float64 = 1e-8
-    acceptable_tol::Float64 = 1e-6
-    acceptable_iter::Int = 15
-    diverging_iterates_tol::Float64 = 1e20
-    max_iter::Int = 3000
-    max_wall_time::Float64 = 1e6
-    s_max::Float64 = 100.
-
-    # NLP options
-    kappa_d::Float64 = 1e-5
-    fixed_variable_treatment::FixedVariableTreatments = MAKE_PARAMETER
-    jacobian_constant::Bool = false
-    hessian_constant::Bool = false
-    reduced_system::Bool = true
-
-    # initialization options
-    dual_initialized::Bool = false
-    inertia_correction_method::InertiaCorrectionMethod = INERTIA_AUTO
-    constr_mult_init_max::Float64 = 1e3
-    bound_push::Float64 = 1e-2
-    bound_fac::Float64 = 1e-2
-    nlp_scaling::Bool = true
-    nlp_scaling_max_gradient::Float64 = 100.
-    inertia_free_tol::Float64 = 0.
-
-    # Hessian Perturbation
-    min_hessian_perturbation::Float64 = 1e-20
-    first_hessian_perturbation::Float64 = 1e-4
-    max_hessian_perturbation::Float64 = 1e20
-    perturb_inc_fact_first::Float64 = 1e2
-    perturb_inc_fact::Float64 = 8.
-    perturb_dec_fact::Float64 = 1/3
-    jacobian_regularization_exponent::Float64 = 1/4
-    jacobian_regularization_value::Float64 = 1e-8
-
-    # restoration options
-    soft_resto_pderror_reduction_factor::Float64 = 0.9999
-    required_infeasibility_reduction::Float64 = 0.9
-
-    # Line search
-    obj_max_inc::Float64 = 5.
-    kappha_soc::Float64 = 0.99
-    max_soc::Int = 4
-    alpha_min_frac::Float64 = 0.05
-    s_theta::Float64 = 1.1
-    s_phi::Float64 = 2.3
-    eta_phi::Float64 = 1e-4
-    kappa_soc::Float64 = 0.99
-    gamma_theta::Float64 = 1e-5
-    gamma_phi::Float64 = 1e-5
-    delta::Float64 = 1
-    kappa_sigma::Float64 = 1e10
-    barrier_tol_factor::Float64 = 10.
-    rho::Float64 = 1000.
-
-    # Barrier
-    mu_init::Float64 = 1e-1
-    mu_min::Float64 = 1e-11
-    mu_superlinear_decrease_power::Float64 = 1.5
-    tau_min::Float64 = 0.99
-    mu_linear_decrease_factor::Float64 = .2
-end
-
 mutable struct RobustRestorer
     obj_val_R::Float64
     f_R::Vector{Float64}
@@ -132,8 +55,11 @@ mutable struct RobustRestorer
     filter::Vector{Tuple{Float64,Float64}}
 end
 
-mutable struct Solver
+abstract type AbstractInteriorPointSolver end
+
+mutable struct Solver{KKTSystem} <: AbstractInteriorPointSolver
     nlp::NonlinearProgram
+    kkt::KKTSystem
 
     opt::Options
     cnt::Counters
@@ -154,24 +80,6 @@ mutable struct Solver
     obj_val::Float64
     f::Vector{Float64}
     c::Vector{Float64}
-
-    hess::StrideOneVector{Float64}
-    jac::StrideOneVector{Float64}
-    pr_diag::StrideOneVector{Float64}
-    du_diag::StrideOneVector{Float64}
-
-    l_diag::Union{Nothing,StrideOneVector{Float64}}
-    u_diag::Union{Nothing,StrideOneVector{Float64}}
-    l_lower::Union{Nothing,StrideOneVector{Float64}}
-    u_lower::Union{Nothing,StrideOneVector{Float64}}
-
-    aug_raw::SparseMatrixCOO{Float64,Int32}
-    aug_com
-    aug_compress::Function
-
-    jac_raw::SparseMatrixCOO{Float64,Int32}
-    jac_com
-    jac_compress::Function
 
     jacl::Vector{Float64}
 
@@ -211,10 +119,11 @@ mutable struct Solver
     c_trial::Vector{Float64}
     obj_val_trial::Float64
 
-    x_slk::SubVector{Float64}
+    x_slk::StrideOneVector{Float64}
     c_slk::SubVector{Float64}
     rhs::Vector{Float64}
 
+    ind_ineq::Vector{Int}
     ind_fixed::Vector{Int}
     ind_llb::Vector{Int}
     ind_uub::Vector{Int}
@@ -231,22 +140,12 @@ mutable struct Solver
     x_trial_lr::SubVector{Float64}
     x_trial_ur::SubVector{Float64}
 
-    factorize!::Function
-    solve_refine!::Function
-
     linear_solver::AbstractLinearSolver
     iterator::AbstractIterator
 
     obj_scale::Vector{Float64}
     con_scale::Vector{Float64}
     con_jac_scale::Vector{Float64}
-
-    obj::Function
-    obj_grad!::Function
-    con!::Function
-    con_jac!::Function
-    lag_hess!::Function
-
     inf_pr::Float64
     inf_du::Float64
     inf_compl::Float64
@@ -274,7 +173,7 @@ end
 struct InvalidNumberException <: Exception end
 struct NotEnoughDegreesOfFreedomException <: Exception end
 
-function RobustRestorer(ips::Solver)
+function RobustRestorer(ips::AbstractInteriorPointSolver)
 
     nn = Vector{Float64}(undef,ips.m)
     zp = Vector{Float64}(undef,ips.m)
@@ -291,8 +190,7 @@ function RobustRestorer(ips::Solver)
                           0.,0.,0.,0.,0.,0.,Tuple{Float64,Float64}[])
 end
 
-
-function initialize_robust_restorer!(ips::Solver)
+function initialize_robust_restorer!(ips::AbstractInteriorPointSolver)
     @trace(ips.logger,"Initializing restoration phase variables.")
     ips.RR == nothing && (ips.RR = RobustRestorer(ips))
     RR = ips.RR
@@ -325,6 +223,94 @@ function initialize_robust_restorer!(ips::Solver)
     ips.del_w = 0
 end
 
+function factorize_wrapper!(ipp::Solver)
+    @trace(ipp.logger,"Factorization started.")
+    build_kkt!(ipp.kkt)
+    ipp.cnt.linear_solver_time += @elapsed factorize!(ipp.linear_solver)
+end
+
+function solve_refine_wrapper!(ipp::Solver, x,b)
+    cnt = ipp.cnt
+    @trace(ipp.logger,"Iterative solution started.")
+    fixed_variable_treatment_vec!(b, ipp.ind_fixed)
+
+    cnt.linear_solver_time += @elapsed (result = solve_refine!(x, ipp.iterator, b))
+    if result == :Solved
+        solve_status =  true
+    else
+        if improve!(ipp.linear_solver)
+            cnt.linear_solver_time += @elapsed begin
+                factorize!(ipp.linear_solver)
+                solve_status = (solve_refine!(x, ipp.iterator, b) == :Solved ? true : false)
+            end
+        else
+            solve_status = false
+        end
+    end
+    fixed_variable_treatment_vec!(x, ipp.ind_fixed)
+    return solve_status
+end
+
+function eval_f_wrapper(ipp::Solver, x::Vector{Float64})
+    nlp = ipp.nlp
+    cnt = ipp.cnt
+    @trace(ipp.logger,"Evaluating objective.")
+    cnt.eval_function_time += @elapsed obj_val = nlp.obj(view(x,1:nlp.n))::Float64
+    cnt.obj_cnt+=1
+    cnt.obj_cnt==1 && (is_valid(obj_val) || throw(InvalidNumberException()))
+    return obj_val*ipp.obj_scale[]
+end
+
+function eval_grad_f_wrapper!(ipp::Solver, f::Vector{Float64},x::Vector{Float64})
+    nlp = ipp.nlp
+    cnt = ipp.cnt
+    @trace(ipp.logger,"Evaluating objective gradient.")
+    cnt.eval_function_time += @elapsed nlp.obj_grad!(view(f,1:nlp.n),view(x,1:nlp.n))
+    f.*=ipp.obj_scale[]
+    cnt.obj_grad_cnt+=1
+    cnt.obj_grad_cnt==1 && (is_valid(f)  || throw(InvalidNumberException()))
+    return f
+end
+
+function eval_cons_wrapper!(ipp::Solver, c::Vector{Float64},x::Vector{Float64})
+    nlp = ipp.nlp
+    cnt = ipp.cnt
+    @trace(ipp.logger, "Evaluating constraints.")
+    cnt.eval_function_time += @elapsed nlp.con!(view(c,1:nlp.m),view(x,1:nlp.n))
+    view(c,ipp.ind_ineq).-=view(x,nlp.n+1:ipp.n)
+    c.-=ipp.rhs
+    c.*=ipp.con_scale
+    cnt.con_cnt+=1
+    cnt.con_cnt==2 && (is_valid(c) || throw(InvalidNumberException()))
+    return c
+end
+
+function eval_jac_wrapper!(ipp::Solver, kkt::AbstractKKTSystem, x::Vector{Float64})
+    nlp = ipp.nlp
+    cnt = ipp.cnt
+    n_jac = length(kkt.jac)
+    ns = length(ipp.ind_ineq)
+    @trace(ipp.logger, "Evaluating constraint Jacobian.")
+    cnt.eval_function_time += @elapsed nlp.con_jac!(kkt.jac,view(x,1:nlp.n))
+    cnt.con_jac_cnt+=1
+    cnt.con_jac_cnt==1 && (is_valid(kkt.jac) || throw(InvalidNumberException()))
+    compress_jacobian!(kkt)
+    @trace(ipp.logger,"Constraint jacobian evaluation started.")
+    return kkt.jac
+end
+
+function eval_lag_hess_wrapper!(ipp::Solver, kkt::AbstractKKTSystem, x::Vector{Float64},l::Vector{Float64};is_resto=false)
+    nlp = ipp.nlp
+    cnt = ipp.cnt
+    @trace(ipp.logger,"Evaluating Lagrangian Hessian.")
+    ipp._w1l .= l.*ipp.con_scale
+    cnt.eval_function_time += @elapsed nlp.lag_hess!(
+        kkt.hess, view(x,1:nlp.n), ipp._w1l, is_resto ? 0.0 : ipp.obj_scale[])
+    compress_hessian!(kkt)
+    cnt.lag_hess_cnt+=1
+    cnt.lag_hess_cnt==1 && (is_valid(kkt.hess) || throw(InvalidNumberException()))
+    return kkt.hess
+end
 
 function Solver(nlp::NonlinearProgram;
                 option_dict::Dict{Symbol,Any}=Dict{Symbol,Any}(),
@@ -333,6 +319,8 @@ function Solver(nlp::NonlinearProgram;
     cnt = Counters(start_time=time())
     opt = Options(linear_solver=default_linear_solver())
     set_options!(opt,option_dict,kwargs)
+    check_option_sanity(opt)
+
     logger = Logger(print_level=opt.print_level,file_print_level=opt.file_print_level,
                     file = opt.output_file == "" ? nothing : open(opt.output_file,"w+"))
     @trace(logger,"Logger is initialized.")
@@ -405,19 +393,41 @@ function Solver(nlp::NonlinearProgram;
     x_trial_lr = view(x_trial,ind_lb)
     x_trial_ur = view(x_trial,ind_ub)
 
-    aug_vec_length = opt.reduced_system ? n+m : n+m+nlb+nub
+    #=
+        Build KKT System
+    =#
+    kkt = if opt.kkt_system == SPARSE_KKT_SYSTEM
+        MT = (opt.linear_solver.INPUT_MATRIX_TYPE == :csc) ? SparseMatrixCSC{Float64, Int32} : Matrix{Float64}
+        SparseKKTSystem{Float64, MT}(
+            n, m, nlb, nub, ind_ineq, ind_fixed,
+            hess_sparsity_I, hess_sparsity_J, jac_sparsity_I, jac_sparsity_J,
+        )
+    elseif opt.kkt_system == SPARSE_UNREDUCED_KKT_SYSTEM
+        MT = (opt.linear_solver.INPUT_MATRIX_TYPE == :csc) ? SparseMatrixCSC{Float64, Int32} : Matrix{Float64}
+        SparseUnreducedKKTSystem{Float64, MT}(
+            n, m, nlb, nub, ind_ineq, ind_fixed,
+            hess_sparsity_I, hess_sparsity_J, jac_sparsity_I, jac_sparsity_J,
+            ind_lb, ind_ub,
+        )
+    elseif opt.kkt_system == DENSE_KKT_SYSTEM
+        MT = Matrix{Float64}
+        VT = Vector{Float64}
+        DenseKKTSystem{Float64, VT, MT}(nlp.n, ns, m, ind_ineq)
+    end
+
+    aug_vec_length = is_reduced(kkt) ? n+m : n+m+nlb+nub
 
     _w1 = Vector{Float64}(undef,aug_vec_length)
     _w1x= view(_w1,1:n)
     _w1l= view(_w1,n+1:n+m)
-    _w1zl = opt.reduced_system ? nothing : view(_w1,n+m+1:n+m+nlb)
-    _w1zu = opt.reduced_system ? nothing : view(_w1,n+m+nlb+1:n+m+nlb+nub)
+    _w1zl = is_reduced(kkt) ? nothing : view(_w1,n+m+1:n+m+nlb)
+    _w1zu = is_reduced(kkt) ? nothing : view(_w1,n+m+nlb+1:n+m+nlb+nub)
 
     _w2 = Vector{Float64}(undef,aug_vec_length)
     _w2x= view(_w2,1:n)
     _w2l= view(_w2,n+1:n+m)
-    _w2zl = opt.reduced_system ? nothing : view(_w2,n+m+1:n+m+nlb)
-    _w2zu = opt.reduced_system ? nothing : view(_w2,n+m+nlb+1:n+m+nlb+nub)
+    _w2zl = is_reduced(kkt) ? nothing : view(_w2,n+m+1:n+m+nlb)
+    _w2zu = is_reduced(kkt) ? nothing : view(_w2,n+m+nlb+1:n+m+nlb+nub)
 
     _w3 = Vector{Float64}(undef,aug_vec_length)
     _w3x= view(_w3,1:n)
@@ -431,179 +441,57 @@ function Solver(nlp::NonlinearProgram;
     d = Vector{Float64}(undef,aug_vec_length)
     dx= view(d,1:n)
     dl= view(d,n+1:n+m)
-    dzl= opt.reduced_system ? Vector{Float64}(undef,nlb) : view(d,n+m+1:n+m+nlb)
-    dzu= opt.reduced_system ? Vector{Float64}(undef,nub) : view(d,n+m+nlb+1:n+m+nlb+nub)
+    dzl= is_reduced(kkt) ? Vector{Float64}(undef,nlb) : view(d,n+m+1:n+m+nlb)
+    dzu= is_reduced(kkt) ? Vector{Float64}(undef,nub) : view(d,n+m+nlb+1:n+m+nlb+nub)
     dx_lr = view(dx,ind_lb)
     dx_ur = view(dx,ind_ub)
 
     p = Vector{Float64}(undef,aug_vec_length)
     px= view(p,1:n)
     pl= view(p,n+1:n+m)
-    pzl= opt.reduced_system ? Vector{Float64}(undef,nlb) : view(p,n+m+1:n+m+nlb)
-    pzu= opt.reduced_system ? Vector{Float64}(undef,nub) : view(p,n+m+nlb+1:n+m+nlb+nub)
+    pzl= is_reduced(kkt) ? Vector{Float64}(undef,nlb) : view(p,n+m+1:n+m+nlb)
+    pzu= is_reduced(kkt) ? Vector{Float64}(undef,nub) : view(p,n+m+nlb+1:n+m+nlb+nub)
 
     obj_scale = [1.0]
     con_scale = ones(m)
     con_jac_scale = ones(n_jac)
 
-    aug_mat_length = opt.reduced_system ? n+m+n_hess+n_jac : n+m+n_hess+n_jac+2nlb+2nub
-
-    I = Vector{Int32}(undef,aug_mat_length)
-    J = Vector{Int32}(undef,aug_mat_length)
-    V = Vector{Float64}(undef,aug_mat_length)
-
-    offset = n+n_jac+n_hess+m
-
-    I[1:n] .= 1:n
-    I[n+1:n+n_hess] = hess_sparsity_I
-    I[n+n_hess+1:n+n_hess+n_jac].=(jac_sparsity_I.+n)
-    I[n+n_hess+n_jac+1:offset].=(n+1:n+m)
-
-    J[1:n] .= 1:n
-    J[n+1:n+n_hess] = hess_sparsity_J
-    J[n+n_hess+1:n+n_hess+n_jac].=jac_sparsity_J
-    J[n+n_hess+n_jac+1:offset].=(n+1:n+m)
-
-    if !opt.reduced_system
-        I[offset+1:offset+nlb] .= (1:nlb).+(n+m)
-        I[offset+nlb+1:offset+2nlb] .= (1:nlb).+(n+m)
-        I[offset+2nlb+1:offset+2nlb+nub] .= (1:nub).+(n+m+nlb)
-        I[offset+2nlb+nub+1:offset+2nlb+2nub] .= (1:nub).+(n+m+nlb)
-        J[offset+1:offset+nlb] .= (1:nlb).+(n+m)
-        J[offset+nlb+1:offset+2nlb] .= ind_lb
-        J[offset+2nlb+1:offset+2nlb+nub] .= (1:nub).+(n+m+nlb)
-        J[offset+2nlb+nub+1:offset+2nlb+2nub] .= ind_ub
-    end
-
-    pr_diag = view(V,1:n)
-    du_diag = view(V,n_jac+n_hess+n+1:n_jac+n_hess+n+m)
-
-    l_diag = opt.reduced_system ? nothing : view(V,offset+1:offset+nlb)
-    l_lower= opt.reduced_system ? nothing : view(V,offset+nlb+1:offset+2nlb)
-    u_diag = opt.reduced_system ? nothing : view(V,offset+2nlb+1:offset+2nlb+nub)
-    u_lower= opt.reduced_system ? nothing : view(V,offset+2nlb+nub+1:offset+2nlb+2nub)
-
-    hess = view(V,n+1:n+n_hess)
-    jac = view(V,n_hess+n+1:n_hess+n+n_jac)
-
-    aug_raw = SparseMatrixCOO(aug_vec_length,aug_vec_length,I,J,V)
-    jac_raw = SparseMatrixCOO(m,n,jac_sparsity_I,jac_sparsity_J,jac)
-
-    get_coo_to_com = get_get_coo_to_com(opt.linear_solver.INPUT_MATRIX_TYPE)
-    aug_com,aug_compress = get_coo_to_com(aug_raw)
-    jac_com,jac_compress = get_coo_to_com(jac_raw)
 
     @trace(logger,"Initializing linear solver.")
     cnt.linear_solver_time =
-        @elapsed linear_solver = opt.linear_solver.Solver(aug_com;option_dict=option_dict,logger=logger)
-    
+        @elapsed linear_solver = opt.linear_solver.Solver(get_kkt(kkt) ; option_dict=option_dict,logger=logger)
+
     @trace(logger,"Initializing iterative solver.")
     iterator = opt.iterator.Solver(
         Vector{Float64}(undef,m+n),
-        (b,x)->mul!(b,Symmetric(aug_com,:L),x),(x)->solve!(linear_solver,x);option_dict=option_dict)
+        (b,x)->mul!(b,kkt,x),(x)->solve!(linear_solver,x);option_dict=option_dict)
 
     @trace(logger,"Initializing fixed variable treatment scheme.")
-    fixed_variable_treatment_aug = get_fixed_variable_treatment_aug(aug_com,ind_fixed)
 
     if opt.inertia_correction_method == INERTIA_AUTO
         opt.inertia_correction_method = is_inertia(linear_solver) ? INERTIA_BASED : INERTIA_FREE
     end
 
-    function factorize_wrapper!()
-        @trace(logger,"Factorization started.")
-        aug_compress()
-        fixed_variable_treatment_aug()
-        cnt.linear_solver_time += @elapsed factorize!(linear_solver)
-    end
-
-    function solve_refine_wrapper!(x,b)
-        @trace(logger,"Iterative solution started.")
-        fixed_variable_treatment_vec!(b,ind_fixed)
-
-        cnt.linear_solver_time += @elapsed (result = solve_refine!(x,iterator,b))
-        if result == :Solved
-            solve_status =  true
-        else
-            if improve!(linear_solver)
-                cnt.linear_solver_time += @elapsed begin
-                    factorize!(linear_solver)
-                    solve_status = (solve_refine!(x,iterator,b) == :Solved ? true : false)
-                end
-            else
-                solve_status = false
-            end
-        end
-        fixed_variable_treatment_vec!(x,ind_fixed)
-        return solve_status
-    end
-    function obj(x::Vector{Float64})
-        @trace(logger,"Evaluating objective.")
-        cnt.eval_function_time += @elapsed obj_val = nlp.obj(view(x,1:nlp.n))
-        cnt.obj_cnt+=1
-        cnt.obj_cnt==1 && (is_valid(obj_val) || throw(InvalidNumberException()))
-        return obj_val*obj_scale[]
-    end
-    function obj_grad!(f::Vector{Float64},x::Vector{Float64})
-        @trace(logger,"Evaluating objective gradient.")
-        cnt.eval_function_time += @elapsed nlp.obj_grad!(f,view(x,1:nlp.n))
-        f.*=obj_scale[]
-        cnt.obj_grad_cnt+=1
-        cnt.obj_grad_cnt==1 && (is_valid(f)  || throw(InvalidNumberException()))
-        return f
-    end
-    function con!(c::Vector{Float64},x::Vector{Float64})
-        @trace(logger,"Evaluating constraints.")
-        cnt.eval_function_time += @elapsed nlp.con!(c,view(x,1:nlp.n))
-        view(c,ind_ineq).-=view(x,nlp.n+1:n)
-        c.-=rhs
-        c.*=con_scale
-        cnt.con_cnt+=1
-        cnt.con_cnt==2 && (is_valid(c) || throw(InvalidNumberException()))
-        return c
-    end
-    function con_jac!(x::Vector{Float64})
-        @trace(logger,"Evaluating constraint Jacobian.")
-        cnt.eval_function_time += @elapsed nlp.con_jac!(jac,view(x,1:nlp.n))
-        jac[n_jac-ns+1:n_jac].=-1.
-        jac.*=con_jac_scale
-        cnt.con_jac_cnt+=1
-        cnt.con_jac_cnt==1 && (is_valid(jac) || throw(InvalidNumberException()))
-        jac_compress()
-        @trace(logger,"Constraint jacobian evaluation started.")
-        return jac
-    end
-    function lag_hess!(x::Vector{Float64},l::Vector{Float64};is_resto=false)
-        @trace(logger,"Evaluating Lagrangian Hessian.")
-        _w1l .= l.*con_scale
-        cnt.eval_function_time += @elapsed  nlp.lag_hess!(
-            hess,view(x,1:nlp.n),_w1l,is_resto ? 0. : obj_scale[])
-        cnt.lag_hess_cnt+=1
-        cnt.lag_hess_cnt==1 && (is_valid(hess) || throw(InvalidNumberException()))
-        return hess
-    end
-
     !isempty(option_dict) && print_ignored_options(logger,option_dict)
 
-    return Solver(nlp,opt,cnt,logger,
+    return Solver{typeof(kkt)}(nlp,kkt,opt,cnt,logger,
                   n,m,nlb,nub,x,l,zl,zu,xl,xu,0.,f,c,
-                  hess,jac,pr_diag,du_diag,l_diag,u_diag,l_lower,u_lower,
-                  aug_raw,aug_com,aug_compress,jac_raw,jac_com,jac_compress,jacl,
+                  jacl,
                   d,dx,dl,dzl,dzu,p,px,pl,pzl,pzu,
                   _w1,_w1x,_w1l,_w1zl,_w1zu,_w2,_w2x,_w2l,_w2zl,_w2zu,_w3,_w3x,_w3l,_w4,_w4x,_w4l,
-                  x_trial,c_trial,0.,x_slk,c_slk,rhs,ind_fixed,ind_llb,ind_uub,
+                  x_trial,c_trial,0.,x_slk,c_slk,rhs,ind_ineq,ind_fixed,ind_llb,ind_uub,
                   x_lr,x_ur,xl_r,xu_r,zl_r,zu_r,dx_lr,dx_ur,x_trial_lr,x_trial_ur,
-                  factorize_wrapper!,solve_refine_wrapper!,
                   linear_solver,iterator,
                   obj_scale,con_scale,con_jac_scale,
-                  obj,obj_grad!,con!,con_jac!,lag_hess!,
                   0.,0.,0.,0.,0.,0.,0.,0.,0.," ",0.,0.,0.,
                   Vector{Float64}[],nothing,INITIAL,Dict())
 end
 
-function initialize!(ips::Solver)
+function initialize!(ips::AbstractInteriorPointSolver)
+    ips.cnt.start_time = time()
     # initializing slack variables
     @trace(ips.logger,"Initializing slack variables.")
-    ips.nlp.con!(ips.c,ips.nlp.x)
+    ips.nlp.con!(view(ips.c,1:ips.nlp.m),ips.nlp.x)
     ips.cnt.con_cnt += 1
     ips.x_slk.=ips.c_slk
 
@@ -617,16 +505,17 @@ function initialize!(ips::Solver)
 
     # Automatic scaling (constraints)
     @trace(ips.logger,"Computing constraint scaling.")
-    ips.con_jac!(ips.x)
+    eval_jac_wrapper!(ips, ips.kkt, ips.x)
+    compress_jacobian!(ips.kkt)
     if ips.opt.nlp_scaling
-        set_con_scale!(ips.con_scale,ips.con_jac_scale,ips.jac,ips.jac_raw.I,ips.opt.nlp_scaling_max_gradient)
+        set_con_scale!(ips.con_scale,ips.con_jac_scale,ips.kkt.jac,ips.kkt.jac_raw.I,ips.opt.nlp_scaling_max_gradient)
+        set_jacobian_scaling!(ips.kkt, ips.con_scale)
         ips.l./=ips.con_scale
-        ips.jac.*=ips.con_jac_scale
     end
-    ips.jac_compress()
+    compress_jacobian!(ips.kkt)
 
     # Automatic scaling (objective)
-    ips.obj_grad!(ips.f,ips.x)
+    eval_grad_f_wrapper!(ips, ips.f,ips.x)
     @trace(ips.logger,"Computing objective scaling.")
     if ips.opt.nlp_scaling
         ips.obj_scale[] = min(1,ips.opt.nlp_scaling_max_gradient/norm(ips.f,Inf))
@@ -636,23 +525,17 @@ function initialize!(ips::Solver)
     # Initialize dual variables
     @trace(ips.logger,"Initializing constraint duals.")
     if !ips.opt.dual_initialized
-        if ips.opt.reduced_system
-            set_initial_aug_reduced!(ips.pr_diag,ips.du_diag,ips.hess)
-            set_initial_rhs_reduced!(ips.px,ips.pl,ips.f,ips.zl,ips.zu)
-        else
-            set_initial_aug_unreduced!(
-                ips.pr_diag,ips.du_diag,ips.hess,ips.l_lower,ips.u_lower,ips.l_diag,ips.u_diag)
-            set_initial_rhs_unreduced!(ips.px,ips.pl,ips.pzl,ips.pzu,ips.f,ips.zl,ips.zu)
-        end
-        ips.factorize!()
-        ips.solve_refine!(ips.d,ips.p)
+        set_initial_rhs!(ips, ips.kkt)
+        initialize!(ips.kkt)
+        factorize_wrapper!(ips)
+        solve_refine_wrapper!(ips,ips.d,ips.p)
         norm(ips.dl,Inf)>ips.opt.constr_mult_init_max ? (ips.l.= 0.) : (ips.l.= ips.dl)
     end
 
     # Initializing
-    ips.obj_val = ips.obj(ips.x)
-    ips.con!(ips.c,ips.x)
-    ips.lag_hess!(ips.x,ips.l)
+    ips.obj_val = eval_f_wrapper(ips, ips.x)
+    eval_cons_wrapper!(ips, ips.c, ips.x)
+    eval_lag_hess_wrapper!(ips, ips.kkt, ips.x, ips.l)
 
     theta = get_theta(ips.c)
     ips.theta_max=1e4*max(1,theta)
@@ -665,17 +548,17 @@ function initialize!(ips::Solver)
 end
 
 
-function reinitialize!(ips::Solver)
+function reinitialize!(ips::AbstractInteriorPointSolver)
     ips.obj_val = ips.nlp.obj_val*ips.obj_scale[]
     view(ips.x,1:ips.nlp.n) .= ips.nlp.x
-    view(ips.zl,1:ips.nlp.n) .= ips.nlp.zl 
+    view(ips.zl,1:ips.nlp.n) .= ips.nlp.zl
     view(ips.zu,1:ips.nlp.n) .= ips.nlp.zu
 
-    ips.obj_val = ips.obj(ips.x)
-    ips.obj_grad!(ips.f,ips.x)
-    ips.con!(ips.c,ips.x)
-    ips.con_jac!(ips.x)
-    ips.lag_hess!(ips.x,ips.l)
+    ips.obj_val = eval_f_wrapper(ips, ips.x)
+    eval_grad_f_wrapper!(ips, ips.f, ips.x)
+    eval_cons_wrapper!(ips, ips.c, ips.x)
+    eval_jac_wrapper!(ips, ips.kkt, ips.x)
+    eval_lag_hess_wrapper!(ips, ips.kkt, ips.x, ips.l)
 
     theta = get_theta(ips.c)
     ips.theta_max=1e4*max(1,theta)
@@ -688,7 +571,7 @@ function reinitialize!(ips::Solver)
 end
 
 # major loops ---------------------------------------------------------
-function optimize!(ips::Solver)
+function optimize!(ips::AbstractInteriorPointSolver)
     try
         if ips.status == INITIAL
             @notice(ips.logger,"This is $(introduce()), running with $(introduce(ips.linear_solver))\n")
@@ -728,7 +611,7 @@ function optimize!(ips::Solver)
     end
 end
 
-function terminate!(ips::Solver)
+function terminate!(ips::AbstractInteriorPointSolver)
     @trace(ips.logger,"Writing the result to NonlinearProgram.")
     ips.nlp.obj_val = ips.obj_val/ips.obj_scale[]
     ips.nlp.x .=  view(ips.x,1:ips.nlp.n)
@@ -740,10 +623,12 @@ function terminate!(ips::Solver)
     ips.nlp.status = ips.status
 end
 
-function regular!(ips::Solver)
+function regular!(ips::AbstractInteriorPointSolver)
     while true
-        (ips.cnt.k!=0 && !ips.opt.jacobian_constant) && ips.con_jac!(ips.x)
-        mul!(ips.jacl,ips.jac_com',ips.l)
+        if (ips.cnt.k!=0 && !ips.opt.jacobian_constant)
+            eval_jac_wrapper!(ips, ips.kkt, ips.x)
+        end
+        jtprod!(ips.jacl, ips.kkt, ips.l)
         fixed_variable_treatment_vec!(ips.jacl,ips.ind_fixed)
         fixed_variable_treatment_z!(ips.zl,ips.zu,ips.f,ips.jacl,ips.ind_fixed)
 
@@ -762,7 +647,7 @@ function regular!(ips::Solver)
         max(ips.inf_pr,ips.inf_du,ips.inf_compl) <= ips.opt.tol && return SOLVE_SUCCEEDED
         max(ips.inf_pr,ips.inf_du,ips.inf_compl) <= ips.opt.acceptable_tol ?
             (ips.cnt.acceptable_cnt < ips.opt.acceptable_iter ?
-             ips.cnt.acceptable_cnt+=1 : return SOLVED_TO_ACCEPTABLE_LEVEL) : (ips.cnt.acceptable_cnt = 0)
+            ips.cnt.acceptable_cnt+=1 : return SOLVED_TO_ACCEPTABLE_LEVEL) : (ips.cnt.acceptable_cnt = 0)
         max(ips.inf_pr,ips.inf_du,ips.inf_compl) >= ips.opt.diverging_iterates_tol && return DIVERGING_ITERATES
         ips.cnt.k>=ips.opt.max_iter && return MAXIMUM_ITERATIONS_EXCEEDED
         time()-ips.cnt.start_time>=ips.opt.max_wall_time && return MAXIMUM_WALLTIME_EXCEEDED
@@ -784,19 +669,14 @@ function regular!(ips::Solver)
 
         # compute the newton step
         @trace(ips.logger,"Computing the newton step.")
-        (ips.cnt.k!=0 && !ips.opt.hessian_constant) && ips.lag_hess!(ips.x,ips.l)
+        if (ips.cnt.k!=0 && !ips.opt.hessian_constant)
+            eval_lag_hess_wrapper!(ips, ips.kkt, ips.x, ips.l)
+        end
 
-        if ips.opt.reduced_system
-            set_aug_reduced!(ips.pr_diag,ips.du_diag,ips.x,ips.xl,ips.xu,ips.zl,ips.zu)
-            set_aug_rhs_reduced!(ips.x,ips.xl,ips.xu,ips.f,ips.c,ips.jacl,ips.px,ips.pl,ips.mu)
-            ips.opt.inertia_correction_method == INERTIA_FREE && set_aug_rhs_ifr_reduced!(ips.c,ips._w1x,ips._w1l)
-        else
-            set_aug_unreduced!(ips.pr_diag,ips.du_diag,ips.l_lower,ips.u_lower,ips.l_diag,ips.u_diag,
-                               ips.zl_r,ips.zu_r,ips.x_lr,ips.xl_r,ips.xu_r,ips.x_ur)
-            set_aug_rhs_unreduced!(ips.px,ips.pl,ips.pzl,ips.pzu,ips.f,ips.c,ips.jacl,ips.l_lower,ips.u_lower,
-                                   ips.x_lr,ips.xl_r,ips.xu_r,ips.x_ur,ips.zl,ips.zu,ips.mu)
-            ips.opt.inertia_correction_method == INERTIA_FREE &&
-                set_aug_rhs_ifr_unreduced!(ips.c,ips._w1x,ips._w1l,ips._w1zl,ips._w1zu)
+        set_aug_diagonal!(ips.kkt,ips)
+        set_aug_rhs!(ips, ips.kkt, ips.c)
+        if ips.opt.inertia_correction_method == INERTIA_FREE
+            set_aug_rhs_ifr!(ips, ips.kkt)
         end
         dual_inf_perturbation!(ips.px,ips.ind_llb,ips.ind_uub,ips.mu,ips.opt.kappa_d)
 
@@ -808,13 +688,7 @@ function regular!(ips::Solver)
             inertia_based_reg(ips) || return ROBUST
         end
 
-        if ips.opt.reduced_system
-            finish_aug_solve_reduced!(
-                ips.x_lr,ips.xl_r,ips.zl_r,ips.dx_lr,ips.dzl,ips.x_ur,ips.xu_r,ips.zu_r,ips.dx_ur,ips.dzu,ips.mu)
-        else
-            finish_aug_solve_unreduced!(ips.dzl,ips.dzu,ips.l_lower,ips.u_lower)
-        end
-
+        finish_aug_solve!(ips, ips.kkt, ips.mu)
 
         # filter start
         @trace(ips.logger,"Backtracking line search initiated.")
@@ -822,22 +696,23 @@ function regular!(ips::Solver)
         varphi= get_varphi(ips.obj_val,ips.x_lr,ips.xl_r,ips.xu_r,ips.x_ur,ips.mu)
         varphi_d = get_varphi_d(ips.f,ips.x,ips.xl,ips.xu,ips.dx,ips.mu)
 
+        
         alpha_max = get_alpha_max(ips.x,ips.xl,ips.xu,ips.dx,ips.tau)
         ips.alpha_z = get_alpha_z(ips.zl_r,ips.zu_r,ips.dzl,ips.dzu,ips.tau)
         alpha_min = get_alpha_min(theta,varphi_d,ips.theta_min,ips.opt.gamma_theta,ips.opt.gamma_phi,
                                   ips.opt.alpha_min_frac,ips.opt.delta,ips.opt.s_theta,ips.opt.s_phi)
-
         ips.cnt.l = 1
         ips.alpha = alpha_max
         varphi_trial= 0.
-        theta_trial = 0.
-        small_search_norm = get_rel_search_norm(ips.x,ips.dx) < 10*eps(Float64)
+            theta_trial = 0.
+            small_search_norm = get_rel_search_norm(ips.x,ips.dx) < 10*eps(Float64)
         switching_condition = is_switching(varphi_d,ips.alpha,ips.opt.s_phi,ips.opt.delta,2.,ips.opt.s_theta)
         armijo_condition = false
         while true
             ips.x_trial .= ips.x .+ ips.alpha.*ips.dx
-            ips.obj_val_trial = ips.obj(ips.x_trial)
-            ips.con!(ips.c_trial,ips.x_trial)
+            ips.obj_val_trial = eval_f_wrapper(ips, ips.x_trial)
+            # ips.con!(ips.c_trial,ips.x_trial)
+            eval_cons_wrapper!(ips, ips.c_trial, ips.x_trial)
 
             theta_trial = get_theta(ips.c_trial)
             varphi_trial= get_varphi(ips.obj_val_trial,ips.x_trial_lr,ips.xl_r,ips.xu_r,ips.x_trial_ur,ips.mu)
@@ -881,7 +756,7 @@ function regular!(ips::Solver)
         ips.zu_r.+=ips.alpha_z.*ips.dzu
         reset_bound_dual!(ips.zl,ips.x,ips.xl,ips.mu,ips.opt.kappa_sigma)
         reset_bound_dual!(ips.zu,ips.xu,ips.x,ips.mu,ips.opt.kappa_sigma)
-        ips.obj_grad!(ips.f,ips.x)
+        eval_grad_f_wrapper!(ips, ips.f,ips.x)
 
         if !switching_condition || !armijo_condition
             @trace(ips.logger,"Augmenting filter.")
@@ -897,11 +772,12 @@ function robust!(ips::Solver)
     initialize_robust_restorer!(ips)
     RR = ips.RR
     while true
-        !ips.opt.jacobian_constant && ips.con_jac!(ips.x)
-        mul!(ips.jacl,ips.jac_com',ips.l)
+        if !ips.opt.jacobian_constant
+            eval_jac_wrapper!(ips, ips.kkt, ips.x)
+        end
+        jtprod!(ips.jacl, ips.kkt, ips.l)
         fixed_variable_treatment_vec!(ips.jacl,ips.ind_fixed)
         fixed_variable_treatment_z!(ips.zl,ips.zu,ips.f,ips.jacl,ips.ind_fixed)
-        # end
 
         # evaluate termination criteria
         @trace(ips.logger,"Evaluating restoration phase termination criteria.")
@@ -945,35 +821,18 @@ function robust!(ips::Solver)
         end
 
         # compute the newton step
-        !ips.opt.hessian_constant && ips.lag_hess!(ips.x,ips.l;is_resto=true)
-        if ips.opt.reduced_system
-            set_aug_RR_reduced!(
-                ips.pr_diag,ips.du_diag,ips.x,ips.xl,ips.xu,ips.zl,ips.zu,RR.pp,RR.nn,RR.zp,RR.zn,RR.zeta,RR.D_R)
-            set_aug_rhs_RR_reduced!(
-                ips.px,ips.pl,ips.x,ips.l,RR.pp,RR.nn,RR.zp,RR.zn,
-                ips.xl,ips.xu,ips.c,ips.jacl,RR.f_R,RR.mu_R,ips.opt.rho)
-        else
-            set_aug_RR_unreduced!(
-                ips.pr_diag,ips.du_diag,ips.l_lower,ips.u_lower,ips.l_diag,ips.u_diag,ips.x,
-                ips.xl,ips.xu,ips.zl,ips.zu,ips.xl_r,ips.x_lr,ips.x_ur,ips.xu_r,ips.zl_r,ips.zu_r,
-                RR.pp,RR.nn,RR.zp,RR.zn,RR.zeta,RR.D_R)
-            set_aug_rhs_RR_unreduced!(
-                ips.px,ips.pl,ips.pzl,ips.pzu,ips.x,ips.l,ips.zl,ips.zu,RR.pp,RR.nn,RR.zp,RR.zn,
-                ips.xl_r,ips.x_lr,ips.xu_r,ips.x_ur,ips.l_lower,ips.u_lower,
-                ips.xl,ips.xu,ips.c,ips.jacl,RR.f_R,RR.mu_R,ips.opt.rho)
+        if !ips.opt.hessian_constant
+            eval_lag_hess_wrapper!(ips, ips.kkt, ips.x, ips.l; is_resto=true)
         end
+        set_aug_RR!(ips.kkt, ips, RR)
+        set_aug_rhs_RR!(ips, ips.kkt, RR, ips.opt.rho)
 
         # without inertia correction,
         @trace(ips.logger,"Solving restoration phase primal-dual system.")
-        ips.factorize!()
-        ips.solve_refine!(ips.d,ips.p)
+        factorize_wrapper!(ips)
+        solve_refine_wrapper!(ips,ips.d,ips.p)
 
-        if ips.opt.reduced_system
-            finish_aug_solve_reduced!(
-                ips.x_lr,ips.xl_r,ips.zl_r,ips.dx_lr,ips.dzl,ips.x_ur,ips.xu_r,ips.zu_r,ips.dx_ur,ips.dzu,RR.mu_R)
-        else
-            finish_aug_solve_unreduced!(ips.dzl,ips.dzu,ips.l_lower,ips.u_lower)
-        end
+        finish_aug_solve!(ips, ips.kkt, RR.mu_R)
         finish_aug_solve_RR!(RR.dpp,RR.dnn,RR.dzp,RR.dzn,ips.l,ips.dl,RR.pp,RR.nn,RR.zp,RR.zn,RR.mu_R,ips.opt.rho)
 
 
@@ -1004,7 +863,7 @@ function robust!(ips::Solver)
             RR.nn_trial.= RR.nn.+ ips.alpha.*RR.dnn
             RR.obj_val_R_trial = get_obj_val_R(
                 RR.pp_trial,RR.nn_trial,RR.D_R,ips.x_trial,RR.x_ref,ips.opt.rho,RR.zeta)
-            ips.con!(ips.c_trial,ips.x_trial)
+            eval_cons_wrapper!(ips, ips.c_trial, ips.x_trial)
             theta_R_trial  = get_theta_R(ips.c_trial,RR.pp_trial,RR.nn_trial)
             varphi_R_trial = get_varphi_R(
                 RR.obj_val_R_trial,ips.x_trial_lr,ips.xl_r,ips.xu_r,ips.x_trial_ur,RR.pp_trial,RR.nn_trial,RR.mu_R)
@@ -1055,8 +914,8 @@ function robust!(ips::Solver)
 
         # check if going back to regular phase
         @trace(ips.logger,"Checking if going back to regular phase.")
-        ips.obj_val = ips.obj(ips.x)
-        ips.obj_grad!(ips.f,ips.x)
+        ips.obj_val = eval_f_wrapper(ips, ips.x)
+        eval_grad_f_wrapper!(ips, ips.f, ips.x)
         theta = get_theta(ips.c)
         varphi= get_varphi(ips.obj_val,ips.x_lr,ips.xl_r,ips.xu_r,ips.x_ur,ips.mu)
 
@@ -1064,21 +923,15 @@ function robust!(ips::Solver)
         if !is_filter_acceptable(ips.RR.filter,theta,varphi) &&
             theta <= ips.opt.required_infeasibility_reduction * RR.theta_ref
 
-            @trace(ips.logger,"Going back to the regular pahse.")
+            @trace(ips.logger,"Going back to the regular phase.")
             ips.zl_r.=1
             ips.zu_r.=1
 
-            if ips.opt.reduced_system
-                set_initial_aug_reduced!(ips.pr_diag,ips.du_diag,ips.hess)
-                set_initial_rhs_reduced!(ips.px,ips.pl,ips.f,ips.zl,ips.zu)
-            else
-                set_initial_aug_unreduced!(
-                    ips.pr_diag,ips.du_diag,ips.hess,ips.l_lower,ips.u_lower,ips.l_diag,ips.u_diag)
-                set_initial_rhs_unreduced!(ips.px,ips.pl,ips.pzl,ips.pzu,ips.f,ips.zl,ips.zu)
-            end
+            set_initial_rhs!(ips, ips.kkt)
+            initialize!(ips.kkt)
 
-            ips.factorize!()
-            ips.solve_refine!(ips.d,ips.p)
+            factorize_wrapper!(ips)
+            solve_refine_wrapper!(ips,ips.d,ips.p)
             norm(ips.dl,Inf)>ips.opt.constr_mult_init_max ? (ips.l.= 0) : (ips.l.= ips.dl)
             ips.cnt.k+=1
 
@@ -1094,19 +947,19 @@ function robust!(ips::Solver)
     end
 end
 
-function inertia_based_reg(ips::Solver)
+function inertia_based_reg(ips::AbstractInteriorPointSolver)
     @trace(ips.logger,"Inertia-based regularization started.")
 
-    ips.factorize!()
+    factorize_wrapper!(ips)
     num_pos,num_zero,num_neg = inertia(ips.linear_solver)
-    solve_status = num_zero!= 0 ? false : ips.solve_refine!(ips.d,ips.p)
+    solve_status = num_zero!= 0 ? false : solve_refine_wrapper!(ips,ips.d,ips.p)
 
     n_trial = 0
-    ips.del_w = del_w_prev = 0.
+    ips.del_w = del_w_prev = 0.0
     while num_zero!= 0 || num_pos != ips.n || !solve_status
         @debug(ips.logger,"Primal-dual perturbed.")
         if n_trial > 0
-            if ips.del_w == 0.
+            if ips.del_w == 0.0
                 ips.del_w = ips.del_w_last==0. ? ips.opt.first_hessian_perturbation :
                     max(ips.opt.min_hessian_perturbation,ips.opt.perturb_dec_fact*ips.del_w_last)
             else
@@ -1119,13 +972,12 @@ function inertia_based_reg(ips::Solver)
         end
         ips.del_c = (num_zero == 0 || !solve_status) ?
             ips.opt.jacobian_regularization_value * ips.mu^(ips.opt.jacobian_regularization_exponent) : 0.
-        ips.pr_diag.+=ips.del_w-del_w_prev
-        ips.du_diag.=-ips.del_c
+        regularize_diagonal!(ips.kkt, ips.del_w - del_w_prev, ips.del_c)
         del_w_prev = ips.del_w
 
-        ips.factorize!()
+        factorize_wrapper!(ips)
         num_pos,num_zero,num_neg = inertia(ips.linear_solver)
-        solve_status = num_zero!= 0 ? false : ips.solve_refine!(ips.d,ips.p)
+        solve_status = num_zero!= 0 ? false : solve_refine_wrapper!(ips,ips.d,ips.p)
         n_trial += 1
     end
     ips.del_w != 0 && (ips.del_w_last = ips.del_w)
@@ -1152,10 +1004,10 @@ function inertia_free_reg(ips::Solver)
     fixed_variable_treatment_vec!(g,ips.ind_fixed)
     # end
 
-    ips.factorize!()
-    solve_status = (ips.solve_refine!(d0,p0) && ips.solve_refine!(ips.d,ips.p))
+    factorize_wrapper!(ips)
+    solve_status = (solve_refine_wrapper!(ips,d0,p0) && solve_refine_wrapper!(ips,ips.d,ips.p))
     t .= ips.dx.-n
-    mul!(ips._w4,Symmetric(ips.aug_com,:L),ips._w3) # prepartation for curv_test
+    mul!(ips._w4, ips.kkt, ips._w3) # prepartation for curv_test
     n_trial = 0
     ips.del_w = del_w_prev = 0.
 
@@ -1173,14 +1025,13 @@ function inertia_free_reg(ips::Solver)
         end
         ips.del_c = !solve_status ?
             ips.opt.jacobian_regularization_value * ips.mu^(ips.opt.jacobian_regularization_exponent) : 0.
-        ips.pr_diag.+=ips.del_w-del_w_prev
-        ips.du_diag.=-ips.del_c
+        regularize_diagonal!(ips.kkt, ips.del_w - del_w_prev, ips.del_c)
         del_w_prev = ips.del_w
 
-        ips.factorize!()
-        solve_status = (ips.solve_refine!(d0,p0) && ips.solve_refine!(ips.d,ips.p))
+        factorize_wrapper!(ips)
+        solve_status = (solve_refine_wrapper!(ips,d0,p0) && solve_refine_wrapper!(ips,ips.d,ips.p))
         t .= ips.dx.-n
-        mul!(ips._w4,Symmetric(ips.aug_com,:L),ips._w3) # prepartation for curv_test
+        mul!(ips._w4, ips.kkt, ips._w3) # prepartation for curv_test
         n_trial += 1
     end
 
@@ -1190,7 +1041,7 @@ end
 
 curv_test(t,n,g,wx,inertia_free_tol) = dot(wx,t) + max(dot(wx,n)-dot(g,n),0) - inertia_free_tol*dot(t,t) >=0
 
-function second_order_correction(ips::Solver,alpha_max::Float64,theta::Float64,varphi::Float64,
+function second_order_correction(ips::AbstractInteriorPointSolver,alpha_max::Float64,theta::Float64,varphi::Float64,
                                  theta_trial::Float64,varphi_d::Float64,switching_condition::Bool)
     @trace(ips.logger,"Second-order correction started.")
 
@@ -1198,21 +1049,14 @@ function second_order_correction(ips::Solver,alpha_max::Float64,theta::Float64,v
     theta_soc_old = theta_trial
     for p=1:ips.opt.max_soc
         # compute second order correction
-        if ips.opt.reduced_system
-            set_aug_rhs_reduced!(
-                ips.x,ips.xl,ips.xu,ips.f,ips._w1l,ips.jacl,ips.px,ips.pl,ips.mu)
-        else
-            set_aug_rhs_unreduced!(
-                ips.px,ips.pl,ips.pzl,ips.pzu,ips.f,ips._w1l,ips.jacl,ips.l_lower,ips.u_lower,
-                ips.x_lr,ips.xl_r,ips.xu_r,ips.x_ur,ips.zl,ips.zu,ips.mu)
-        end
+        set_aug_rhs!(ips, ips.kkt, ips._w1l)
         dual_inf_perturbation!(ips.px,ips.ind_llb,ips.ind_uub,ips.mu,ips.opt.kappa_d)
-        ips.solve_refine!(ips._w1,ips.p)
+        solve_refine_wrapper!(ips,ips._w1,ips.p)
         alpha_soc = get_alpha_max(ips.x,ips.xl,ips.xu,ips._w1x,ips.tau)
 
         ips.x_trial .= ips.x.+alpha_soc.*ips._w1x
-        ips.con!(ips.c_trial,ips.x_trial)
-        ips.obj_val_trial = ips.obj(ips.x_trial)
+        eval_cons_wrapper!(ips, ips.c_trial,ips.x_trial)
+        ips.obj_val_trial = eval_f_wrapper(ips, ips.x_trial)
 
         theta_soc = get_theta(ips.c_trial)
         varphi_soc= get_varphi(ips.obj_val_trial,ips.x_trial_lr,ips.xl_r,ips.xu_r,ips.x_trial_ur,ips.mu)
@@ -1243,6 +1087,129 @@ function second_order_correction(ips::Solver,alpha_max::Float64,theta::Float64,v
     @trace(ips.logger,"Second-order correction terminated.")
 
     return false
+end
+
+
+
+# KKT system updates -------------------------------------------------------
+# Set diagonal
+# TODO: Temporary solution --> create auxiliary functions to force specialization
+function _set_aug_diagonal_reduced!(pr_diag, du_diag, x, xl, xu, zl, zu)
+    pr_diag .= zl./(x.-xl) .+ zu./(xu.-x)
+    fill!(du_diag, 0.0)
+end
+function _set_aug_diagonal_unreduced!(pr_diag, du_diag, l_lower, u_lower, l_diag, u_diag, zl_r, zu_r, xl_r, xu_r, x_lr, x_ur)
+    pr_diag .= 0.0
+    du_diag .= 0.0
+    l_lower .= .-sqrt.(zl_r)
+    u_lower .= .-sqrt.(zu_r)
+    l_diag  .= xl_r .- x_lr
+    u_diag  .= x_ur .- xu_r
+end
+function set_aug_diagonal!(kkt::AbstractKKTSystem, ips::Solver)
+    _set_aug_diagonal_reduced!(kkt.pr_diag, kkt.du_diag, ips.x, ips.xl, ips.xu, ips.zl, ips.zu)
+end
+function set_aug_diagonal!(kkt::SparseUnreducedKKTSystem, ips::Solver)
+    _set_aug_diagonal_unreduced!(kkt.pr_diag, kkt.du_diag, kkt.l_lower, kkt.u_lower, kkt.l_diag, kkt.u_diag,
+        ips.zl_r, ips.zu_r, ips.xl_r, ips.xu_r, ips.x_lr, ips.x_ur,
+    )
+end
+
+# Robust restoration
+function set_aug_RR!(kkt::AbstractKKTSystem, ips::Solver, RR::RobustRestorer)
+    kkt.pr_diag .= ips.zl./(ips.x.-ips.xl) .+ ips.zu./(ips.xu.-ips.x) .+ RR.zeta.*RR.D_R.^2
+    kkt.du_diag .= .-RR.pp./RR.zp .- RR.nn./RR.zn
+end
+function set_aug_RR!(kkt::SparseUnreducedKKTSystem, ips::Solver, RR::RobustRestorer)
+    kkt.pr_diag.= RR.zeta.*RR.D_R.^2
+    kkt.du_diag.= .-RR.pp./RR.zp.-RR.nn./RR.zn
+    kkt.l_lower.=.-sqrt.(ips.zl_r)
+    kkt.u_lower.=.-sqrt.(ips.zu_r)
+    kkt.l_diag .= ips.xl_r .- ips.x_lr
+    kkt.u_diag .= ips.x_ur .- ips.xu_r
+end
+
+# Set RHS
+# TODO: Temporary solution --> create auxiliary functions to force specialization
+function _set_aug_rhs_reduced!(px, pl, x, xl, xu, c, f, jacl, mu)
+    px.=.-f.+mu./(x.-xl).-mu./(xu.-x).-jacl
+    pl.=.-c
+end
+function _set_aug_rhs_unreduced!(px, pl, pzl, pzu, c, f, zl, zu, jacl, xl_r, xu_r, x_lr, x_ur, l_lower, u_lower, mu)
+    px.=.-f.+zl.-zu.-jacl
+    pl.=.-c
+    pzl.=(xl_r-x_lr).*l_lower .+ mu./l_lower
+    pzu.=(xu_r-x_ur).*u_lower .- mu./u_lower
+end
+function set_aug_rhs!(ips::Solver, kkt::AbstractKKTSystem, c)
+    _set_aug_rhs_reduced!(ips.px, ips.pl, ips.x, ips.xl, ips.xu, c, ips.f, ips.jacl, ips.mu)
+end
+function set_aug_rhs!(ips::Solver, kkt::SparseUnreducedKKTSystem, c)
+    _set_aug_rhs_unreduced!(ips.px, ips.pl, ips.pzl, ips.pzu, c, ips.f, ips.zl, ips.zu,
+                            ips.jacl, ips.xl_r, ips.xu_r, ips.x_lr, ips.x_ur,
+                            kkt.l_lower, kkt.u_lower, ips.mu)
+end
+
+# Set RHS RR
+function set_aug_rhs_RR!(
+    ips::Solver, kkt::AbstractKKTSystem, RR::RobustRestorer, rho,
+)
+    ips.px.=.-RR.f_R.-ips.jacl.+RR.mu_R./(ips.x.-ips.xl).-RR.mu_R./(ips.xu.-ips.x)
+    ips.pl.=.-ips.c.+RR.pp.-RR.nn.+(RR.mu_R.-(rho.-ips.l).*RR.pp)./RR.zp.-(RR.mu_R.-(rho.+ips.l).*RR.nn)./RR.zn
+end
+function set_aug_rhs_RR!(
+    ips::Solver, kkt::SparseUnreducedKKTSystem, RR::RobustRestorer, rho,
+)
+    ips.px.=.-RR.f_R.+ips.zl.-ips.zu.-ips.jacl
+    ips.pl.=.-ips.c.+RR.pp.-RR.nn.+(RR.mu_R.-rho.*RR.pp)./RR.zp.+ips.l.*RR.pp./RR.zp.-(RR.mu_R.-rho.*RR.nn)./RR.zn.+ips.l.*RR.nn./RR.zn
+    ips.pzl.=(ips.xl_r-ips.x_lr).*kkt.l_lower.+RR.mu_R./kkt.l_lower
+    ips.pzu.=(ips.xu_r-ips.x_ur).*kkt.u_lower.-RR.mu_R./kkt.u_lower
+end
+
+# Finish
+function _finish_aug_solve_reduced!(dzl, dzu, zl_r, zu_r, dx_lr, dx_ur, x_lr, x_ur, xl_r, xu_r, mu)
+    dzl.= (mu.-zl_r.*dx_lr)./(x_lr.-xl_r).-zl_r
+    dzu.= (mu.+zu_r.*dx_ur)./(xu_r.-x_ur).-zu_r
+end
+function finish_aug_solve!(ips::Solver, kkt::AbstractKKTSystem, mu)
+    _finish_aug_solve_reduced!(ips.dzl, ips.dzu, ips.zl_r, ips.zu_r, ips.dx_lr, ips.dx_ur, ips.x_lr, ips.x_ur, ips.xl_r, ips.xu_r, mu)
+end
+# Note: No need to force specialization here.
+function finish_aug_solve!(ips::Solver, kkt::SparseUnreducedKKTSystem, mu)
+    ips.dzl.*=.-kkt.l_lower
+    ips.dzu.*=kkt.u_lower
+end
+
+# Initial
+function set_initial_rhs!(ips::Solver, kkt::AbstractKKTSystem)
+    ips.px .= .-ips.f.+ips.zl.-ips.zu
+    ips.pl .= 0.0
+end
+function set_initial_rhs!(ips::Solver, kkt::SparseUnreducedKKTSystem)
+    ips.px .= .-ips.f.+ips.zl.-ips.zu
+    ips.pl .= 0.0
+    ips.pzl.= 0.0
+    ips.pzu.= 0.0
+end
+
+# Set ifr
+function set_aug_rhs_ifr!(ips::Solver, kkt::AbstractKKTSystem)
+    ips._w1x .= 0.0
+    ips._w1l .= .-ips.c
+end
+function set_aug_rhs_ifr!(ips::Solver, kkt::SparseUnreducedKKTSystem)
+    ips._w1x .= 0.
+    ips._w1l .= .-ips.c
+    ips._w1zl.= 0.
+    ips._w1zu.= 0.
+end
+
+# Finish RR
+function finish_aug_solve_RR!(dpp,dnn,dzp,dzn,l,dl,pp,nn,zp,zn,mu_R,rho)
+    dpp .= (mu_R.+pp.*dl.-(rho.-l).*pp)./zp
+    dnn .= (mu_R.-nn.*dl.-(rho.+l).*nn)./zn
+    dzp .= (mu_R.-zp.*dpp)./pp.-zp
+    dzn .= (mu_R.-zn.*dnn)./nn.-zn
 end
 
 # Kernel functions ---------------------------------------------------------
@@ -1306,7 +1273,7 @@ function get_alpha_z(zl_r,zu_r,dzl,dzu,tau)
     alpha_z = 1.
     for i=1:length(zl_r)
         @inbounds dzl[i]<0 && (alpha_z=min(alpha_z,-zl_r[i]/dzl[i]))
-    end
+     end
     for i=1:length(zu_r)
         @inbounds dzu[i]<0 && (alpha_z=min(alpha_z,-zu_r[i]/dzu[i]))
     end
@@ -1532,24 +1499,14 @@ function get_ftype(filter,theta,theta_trial,varphi,varphi_trial,switching_condit
 end
 
 # fixed variable treatment ----------------------------------------------------
-function get_fixed_variable_treatment_aug(aug::SparseMatrixCSC,ind_fixed)
-    fixed_aug_diag = view(aug.nzval,aug.colptr[ind_fixed])
+function _get_fixed_variable_index(mat::SparseMatrixCSC{Tv,Ti1}, ind_fixed::Vector{Ti2}) where {Tv,Ti1,Ti2}
     fixed_aug_index = Int[]
     for i in ind_fixed
         append!(fixed_aug_index,
-                append!(collect(aug.colptr[i]+1:aug.colptr[i+1]-1),
-                        setdiff!(findall(aug.rowval.==i),aug.colptr[i])))
+                append!(collect(mat.colptr[i]+1:mat.colptr[i+1]-1),
+                        setdiff!(findall(mat.rowval.==i),mat.colptr[i])))
     end
-    fixed_aug = view(aug.nzval,fixed_aug_index)
-    return ()->(fixed_aug.=0;fixed_aug_diag.=1)
-end
-get_fixed_variable_treatment_aug(aug::Matrix,ind_fixed) = ()->fixed_variable_treatment_aug(aug,ind_fixed)
-function fixed_variable_treatment_aug(aug::Matrix,ind_fixed)
-    for i in ind_fixed
-        aug[i,:].=0.
-        aug[:,i].=0.
-        aug[i,i] =1.
-    end
+    return fixed_aug_index
 end
 fixed_variable_treatment_vec!(vec,ind_fixed) = (vec[ind_fixed] .= 0.)
 function fixed_variable_treatment_z!(zl,zu,f,jacl,ind_fixed)
@@ -1559,104 +1516,7 @@ function fixed_variable_treatment_z!(zl,zu,f,jacl,ind_fixed)
     end
 end
 
-# reduced linear algebra -----------------------------------------------------
-function finish_aug_solve_reduced!(x_lr,xl_r,zl_r,dx_lr,dzl,x_ur,xu_r,zu_r,dx_ur,dzu,mu)
-    dzl.= (mu.-zl_r.*dx_lr)./(x_lr.-xl_r).-zl_r
-    dzu.= (mu.+zu_r.*dx_ur)./(xu_r.-x_ur).-zu_r
-end
-function finish_aug_solve_RR!(dpp,dnn,dzp,dzn,l,dl,pp,nn,zp,zn,mu_R,rho)
-    dpp .= (mu_R.+pp.*dl.-(rho.-l).*pp)./zp
-    dnn .= (mu_R.-nn.*dl.-(rho.+l).*nn)./zn
-    dzp .= (mu_R.-zp.*dpp)./pp.-zp
-    dzn .= (mu_R.-zn.*dnn)./nn.-zn
-end
-function set_aug_rhs_reduced!(x,xl,xu,f,c,jacl,px,pl,mu)
-    px.=.-f.+mu./(x.-xl).-mu./(xu.-x).-jacl
-    pl.=.-c
-end
-function set_aug_rhs_ifr_reduced!(c,p0x,p0l)
-    p0x.=0.
-    p0l.=.-c
-end
-function set_aug_reduced!(pr_diag,du_diag,x,xl,xu,zl,zu)
-    pr_diag.=  zl./(x.-xl).+zu./(xu.-x)
-    du_diag.= 0
-end
-function set_initial_aug_reduced!(pr_diag,du_diag,hess)
-    pr_diag.=1
-    du_diag.=0
-    hess.=0
-end
-function set_initial_rhs_reduced!(px,pl,f,zl,zu)
-    px .= .-f.+zl.-zu
-    pl .= 0.
-end
-function set_aug_RR_reduced!(pr_diag,du_diag,x,xl,xu,zl,zu,pp,nn,zp,zn,zeta,D_R)
-    pr_diag.= zl./(x.-xl).+zu./(xu.-x).+zeta.*D_R.^2
-    du_diag.= .-pp./zp.-nn./zn
-end
-function set_aug_rhs_RR_reduced!(px,pl,x,l,pp,nn,zp,zn,xl,xu,c,jacl,f_R,mu_R,rho)
-    px.=.-f_R.-jacl.+mu_R./(x.-xl).-mu_R./(xu.-x)
-    pl.=.-c.+pp.-nn.+(mu_R.-(rho.-l).*pp)./zp.-(mu_R.-(rho.+l).*nn)./zn
-end
 
-# unreduced linear algebra --------------------------------------------------
-function set_aug_unreduced!(pr_diag,du_diag,l_lower,u_lower,l_diag,u_diag,zl_r,zu_r,x_lr,xl_r,xu_r,x_ur)
-    pr_diag.=0
-    du_diag.=0
-    l_lower.=.-sqrt.(zl_r)
-    u_lower.=.-sqrt.(zu_r)
-    l_diag .= xl_r-x_lr
-    u_diag .= x_ur-xu_r
-end
-function set_aug_rhs_unreduced!(px,pl,pzl,pzu,f,c,jacl,l_lower,u_lower,x_lr,xl_r,xu_r,x_ur,zl,zu,mu)
-    px.=.-f.+zl.-zu.-jacl
-    pl.=.-c
-    pzl.=(xl_r-x_lr).*l_lower.+mu./l_lower
-    pzu.=(xu_r-x_ur).*u_lower.-mu./u_lower
-end
-function finish_aug_solve_unreduced!(dzl,dzu,l_lower,u_lower)
-    dzl.*=.-l_lower
-    dzu.*=u_lower
-end
-function set_initial_aug_unreduced!(pr_diag,du_diag,hess,l_lower,u_lower,l_diag,u_diag)
-    pr_diag.=1
-    du_diag.=0
-    hess.=0
-    l_lower.=0
-    u_lower.=0
-    l_diag.=1
-    u_diag.=1
-end
-function set_initial_rhs_unreduced!(px,pl,pzl,pzu,f,zl,zu)
-    px .= .-f.+zl.-zu
-    pl .= 0.
-    pzl.= 0.
-    pzu.= 0.
-end
-function set_aug_rhs_ifr_unreduced!(c,px,pl,pzl,pzu)
-    px .= 0.
-    pl .= .-c
-    pzl.= 0.
-    pzu.= 0.
-end
-function set_aug_RR_unreduced!(pr_diag,du_diag,l_lower,u_lower,l_diag,u_diag,x,xl,xu,zl,zu,
-                               xl_r,x_lr,x_ur,xu_r,zl_r,zu_r,pp,nn,zp,zn,zeta,D_R)
-    pr_diag.= zeta.*D_R.^2
-    du_diag.= .-pp./zp.-nn./zn
-    l_lower.=.-sqrt.(zl_r)
-    u_lower.=.-sqrt.(zu_r)
-    l_diag .= xl_r-x_lr
-    u_diag .= x_ur-xu_r
-end
-function set_aug_rhs_RR_unreduced!(
-    px,pl,pzl,pzu,x,l,zl,zu,pp,nn,zp,zn,xl_r,x_lr,xu_r,x_ur,l_lower,u_lower,xl,xu,c,jacl,f_R,mu_R,rho)
-
-    px.=.-f_R.+zl.-zu.-jacl
-    pl.=.-c.+pp.-nn.+(mu_R.-rho.*pp)./zp.+l.*pp./zp.-(mu_R.-rho.*nn)./zn.+l.*nn./zn
-    pzl.=(xl_r-x_lr).*l_lower.+mu_R./l_lower
-    pzu.=(xu_r-x_ur).*u_lower.-mu_R./u_lower
-end
 function dual_inf_perturbation!(px,ind_llb,ind_uub,mu,kappa_d)
     for i in ind_llb
         @inbounds px[i] -= mu*kappa_d
@@ -1668,7 +1528,7 @@ end
 
 
 # Print functions -----------------------------------------------------------
-function print_init(ips::Solver)
+function print_init(ips::AbstractInteriorPointSolver)
     @notice(ips.logger,@sprintf("Number of nonzeros in constraint Jacobian............: %8i",ips.nlp.nnz_jac))
     @notice(ips.logger,@sprintf("Number of nonzeros in Lagrangian Hessian.............: %8i\n",ips.nlp.nnz_hess))
 
@@ -1696,7 +1556,7 @@ function print_init(ips::Solver)
     return
 end
 
-function print_iter(ips::Solver;is_resto=false)
+function print_iter(ips::AbstractInteriorPointSolver;is_resto=false)
     mod(ips.cnt.k,10)==0&& @info(ips.logger,@sprintf(
         "iter    objective    inf_pr   inf_du lg(mu)  ||d||  lg(rg) alpha_du alpha_pr  ls"))
     @info(ips.logger,@sprintf(
@@ -1711,7 +1571,7 @@ function print_iter(ips::Solver;is_resto=false)
     return
 end
 
-function print_summary_1(ips::Solver)
+function print_summary_1(ips::AbstractInteriorPointSolver)
     @notice(ips.logger,"")
     @notice(ips.logger,"Number of Iterations....: $(ips.cnt.k)\n")
     @notice(ips.logger,"                                   (scaled)                 (unscaled)")
@@ -1726,7 +1586,7 @@ function print_summary_1(ips::Solver)
     return
 end
 
-function print_summary_2(ips::Solver)
+function print_summary_2(ips::AbstractInteriorPointSolver)
     ips.cnt.solver_time = ips.cnt.total_time-ips.cnt.linear_solver_time-ips.cnt.eval_function_time
     @notice(ips.logger,"Number of objective function evaluations             = $(ips.cnt.obj_cnt)")
     @notice(ips.logger,"Number of objective gradient evaluations             = $(ips.cnt.obj_grad_cnt)")
@@ -1749,7 +1609,7 @@ function print_ignored_options(logger,option_dict)
         @warn(logger," - "*string(key))
     end
 end
-function string(ips::Solver)
+function string(ips::AbstractInteriorPointSolver)
     """
             Interior point solver
 
@@ -1760,6 +1620,6 @@ function string(ips::Solver)
             status...................................: $(ips.nlp.status)
             """
 end
-print(io::IO,ips::Solver) = print(io, string(ips))
-show(io::IO,ips::Solver) = print(io,ips)
+print(io::IO,ips::AbstractInteriorPointSolver) = print(io, string(ips))
+show(io::IO,ips::AbstractInteriorPointSolver) = print(io,ips)
 
