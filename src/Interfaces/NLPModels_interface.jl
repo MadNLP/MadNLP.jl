@@ -32,7 +32,7 @@ function _nlp_model_to_nonlinear_program_buffered(model)
     # buffers
     xb = Vector{Float64}(undef,model.meta.nvar)
     fb = Vector{Float64}(undef,model.meta.nvar)
-    cb = Vector{Float64}(undef,model.meta.nvar)
+    cb = Vector{Float64}(undef,model.meta.ncon)
     lb = cb
     jacb= Vector{Float64}(undef,model.meta.nnzj)
     hessb = Vector{Float64}(undef,model.meta.nnzh)
