@@ -1131,13 +1131,13 @@ function NonlinearProgram(model::Optimizer)
     set_g!(model,l,gl,gu)
 
     obj_scale = get_obj_scale(model.sense)
-    obj(x::AbstractArray{Float64,1}) = obj_scale*eval_objective(model,x)
-    obj_grad!(f::AbstractArray{Float64,1},x::AbstractArray{Float64,1}) =
+    obj(x::StrideOneVector{Float64}) = obj_scale*eval_objective(model,x)
+    obj_grad!(f::StrideOneVector{Float64},x::StrideOneVector{Float64}) =
         (eval_objective_gradient(model,f,x); obj_scale!=1. && (f.*=obj_scale))
-    con!(c::Array{Float64,1},x::AbstractArray{Float64,1}) = eval_constraint(model,c,x)
-    con_jac!(jac::AbstractArray{Float64,1},
-             x::AbstractArray{Float64,1})=eval_constraint_jacobian(model,jac,x)
-    lag_hess!(hess::AbstractArray{Float64,1},x::AbstractArray{Float64,1},l::AbstractArray{Float64,1},
+    con!(c::StrideOneVector{Float64},x::StrideOneVector{Float64}) = eval_constraint(model,c,x)
+    con_jac!(jac::StrideOneVector{Float64},
+             x::StrideOneVector{Float64})=eval_constraint_jacobian(model,jac,x)
+    lag_hess!(hess::StrideOneVector{Float64},x::StrideOneVector{Float64},l::StrideOneVector{Float64},
               sig::Float64) = eval_hessian_lagrangian(model,hess,x,obj_scale*sig,l)
     hess_sparsity!(I,J)= hessian_lagrangian_structure(model,I,J)
     jac_sparsity!(I,J) = jacobian_structure(model,I,J)

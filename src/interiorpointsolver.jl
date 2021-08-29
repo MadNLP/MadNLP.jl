@@ -266,7 +266,7 @@ function eval_grad_f_wrapper!(ipp::Solver, f::Vector{Float64},x::Vector{Float64}
     cnt = ipp.cnt
     @trace(ipp.logger,"Evaluating objective gradient.")
     cnt.eval_function_time += @elapsed nlp.obj_grad!(view(f,1:nlp.n),view(x,1:nlp.n))
-    f[1:nlp.n].*=ipp.obj_scale[]
+    f.*=ipp.obj_scale[]
     cnt.obj_grad_cnt+=1
     cnt.obj_grad_cnt==1 && (is_valid(f)  || throw(InvalidNumberException()))
     return f
@@ -276,7 +276,7 @@ function eval_cons_wrapper!(ipp::Solver, c::Vector{Float64},x::Vector{Float64})
     nlp = ipp.nlp
     cnt = ipp.cnt
     @trace(ipp.logger, "Evaluating constraints.")
-    cnt.eval_function_time += @elapsed nlp.con!(c,view(x,1:nlp.n))
+    cnt.eval_function_time += @elapsed nlp.con!(view(c,1:nlp.m),view(x,1:nlp.n))
     view(c,ipp.ind_ineq).-=view(x,nlp.n+1:ipp.n)
     c.-=ipp.rhs
     c.*=ipp.con_scale
@@ -491,7 +491,7 @@ function initialize!(ips::AbstractInteriorPointSolver)
     ips.cnt.start_time = time()
     # initializing slack variables
     @trace(ips.logger,"Initializing slack variables.")
-    ips.nlp.con!(ips.c,ips.nlp.x)
+    ips.nlp.con!(view(ips.c,1:ips.nlp.m),ips.nlp.x)
     ips.cnt.con_cnt += 1
     ips.x_slk.=ips.c_slk
 
