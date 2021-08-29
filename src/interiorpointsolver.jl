@@ -120,7 +120,7 @@ mutable struct Solver{KKTSystem} <: AbstractInteriorPointSolver
     obj_val_trial::Float64
 
     x_slk::StrideOneVector{Float64}
-    c_slk::SubArray{Float64, 1, Vector{Float64}, Tuple{Vector{Int64}}, false}
+    c_slk::SubVector{Float64}
     rhs::Vector{Float64}
 
     ind_ineq::Vector{Int}
@@ -128,17 +128,17 @@ mutable struct Solver{KKTSystem} <: AbstractInteriorPointSolver
     ind_llb::Vector{Int}
     ind_uub::Vector{Int}
 
-    x_lr::SubArray{Float64, 1, Vector{Float64}, Tuple{Vector{Int64}}, false}
-    x_ur::SubArray{Float64, 1, Vector{Float64}, Tuple{Vector{Int64}}, false}
-    xl_r::SubArray{Float64, 1, Vector{Float64}, Tuple{Vector{Int64}}, false}
-    xu_r::SubArray{Float64, 1, Vector{Float64}, Tuple{Vector{Int64}}, false}
-    zl_r::SubArray{Float64, 1, Vector{Float64}, Tuple{Vector{Int64}}, false}
-    zu_r::SubArray{Float64, 1, Vector{Float64}, Tuple{Vector{Int64}}, false}
+    x_lr::SubVector{Float64}
+    x_ur::SubVector{Float64}
+    xl_r::SubVector{Float64}
+    xu_r::SubVector{Float64}
+    zl_r::SubVector{Float64}
+    zu_r::SubVector{Float64}
 
-    dx_lr::SubArray{Float64, 1, Vector{Float64}, Tuple{Vector{Int64}}, false}
-    dx_ur::SubArray{Float64, 1, Vector{Float64}, Tuple{Vector{Int64}}, false}
-    x_trial_lr::SubArray{Float64, 1, Vector{Float64}, Tuple{Vector{Int64}}, false}
-    x_trial_ur::SubArray{Float64, 1, Vector{Float64}, Tuple{Vector{Int64}}, false}
+    dx_lr::SubVector{Float64}
+    dx_ur::SubVector{Float64}
+    x_trial_lr::SubVector{Float64}
+    x_trial_ur::SubVector{Float64}
 
     linear_solver::AbstractLinearSolver
     iterator::AbstractIterator
@@ -265,8 +265,8 @@ function eval_grad_f_wrapper!(ipp::Solver, f::Vector{Float64},x::Vector{Float64}
     nlp = ipp.nlp
     cnt = ipp.cnt
     @trace(ipp.logger,"Evaluating objective gradient.")
-    cnt.eval_function_time += @elapsed nlp.obj_grad!(f,view(x,1:nlp.n))
-    f.*=ipp.obj_scale[]
+    cnt.eval_function_time += @elapsed nlp.obj_grad!(view(f,1:nlp.n),view(x,1:nlp.n))
+    f[1:nlp.n].*=ipp.obj_scale[]
     cnt.obj_grad_cnt+=1
     cnt.obj_grad_cnt==1 && (is_valid(f)  || throw(InvalidNumberException()))
     return f

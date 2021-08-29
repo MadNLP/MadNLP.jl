@@ -6,7 +6,7 @@ module MadNLPMa77
 import ..MadNLPHSL:
     @kwdef, Logger, @debug, @warn, @error, libhsl,
     SparseMatrixCSC, SparseMatrixCSC, SubVector, StrideOneVector,
-    get_tril_to_full, transform!,
+    get_tril_to_full, transfer!,
     AbstractOptions, AbstractLinearSolver, set_options!,
     SymbolicException,FactorizationException,SolveException,InertiaException,
     introduce, factorize!, solve!, improve!, is_inertia, inertia
