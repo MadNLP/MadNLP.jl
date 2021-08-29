@@ -33,7 +33,7 @@ mutable struct Solver <: AbstractLinearSolver
     info::Vector{Int32}
 
     a::Vector{Float64}
-    a_view::SubVector{Float64}
+    a_view::StrideOneVector{Float64}
     la::Int32
     ikeep::Vector{Int32}
 
