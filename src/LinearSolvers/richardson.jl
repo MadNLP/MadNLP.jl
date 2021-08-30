@@ -32,14 +32,14 @@ end
 
 function solve_refine!(x::StrideOneVector{Float64},
                        IS::Solver,
-                       b::AbstractVector{Float64})
+                       b::StrideOneVector{Float64})
+
     @debug(IS.logger,"Iterative solver initiated")
     norm_b = norm(b,Inf)
-    # x.=b
-    # IS.div!(x)
-    # IS.mul!(IS.res,x)
+
     x.=0
-    IS.res=.-b
+    IS.res.=.-b
+
     norm_res = norm(IS.res,Inf)
     residual_ratio = norm_res/(1+norm_b)
 
