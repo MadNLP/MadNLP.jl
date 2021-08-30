@@ -337,7 +337,6 @@ function eval_lag_hess_wrapper!(ipp::InteriorPointSolver, kkt::AbstractKKTSystem
     return hess
 end
 
-
 function eval_jac_wrapper!(ipp::InteriorPointSolver, kkt::DenseKKTSystem, x::Vector{Float64})
     nlp = ipp.nlp
     cnt = ipp.cnt
@@ -367,9 +366,10 @@ function eval_lag_hess_wrapper!(ipp::InteriorPointSolver, kkt::DenseKKTSystem, x
     return hess
 end
 
-function InteriorPointSolver(nlp::AbstractNLPModel;
-                option_dict::Dict{Symbol,Any}=Dict{Symbol,Any}(),
-                kwargs...)
+function InteriorPointSolver(nlp::AbstractNLPModel; kkt=nothing;
+    option_dict::Dict{Symbol,Any}=Dict{Symbol,Any}(),
+    kwargs...
+)
 
     cnt = Counters(start_time=time())
     opt = Options(linear_solver=default_linear_solver())
@@ -393,16 +393,18 @@ function InteriorPointSolver(nlp::AbstractNLPModel;
     m = get_ncon(nlp)
 
     # Initialize KKT
-    kkt = if opt.kkt_system == SPARSE_KKT_SYSTEM
-        MT = (opt.linear_solver.INPUT_MATRIX_TYPE == :csc) ? SparseMatrixCSC{Float64, Int32} : Matrix{Float64}
-        SparseKKTSystem{Float64, MT}(nlp, ind_cons)
-    elseif opt.kkt_system == SPARSE_UNREDUCED_KKT_SYSTEM
-        MT = (opt.linear_solver.INPUT_MATRIX_TYPE == :csc) ? SparseMatrixCSC{Float64, Int32} : Matrix{Float64}
-        SparseUnreducedKKTSystem{Float64, MT}(nlp, ind_cons)
-    elseif opt.kkt_system == DENSE_KKT_SYSTEM
-        MT = Matrix{Float64}
-        VT = Vector{Float64}
-        DenseKKTSystem{Float64, VT, MT}(nlp, ind_cons)
+    if !isa(kkt, AbstractKKTSystem)
+        kkt = if opt.kkt_system == SPARSE_KKT_SYSTEM
+            MT = (opt.linear_solver.INPUT_MATRIX_TYPE == :csc) ? SparseMatrixCSC{Float64, Int32} : Matrix{Float64}
+            SparseKKTSystem{Float64, MT}(nlp, ind_cons)
+        elseif opt.kkt_system == SPARSE_UNREDUCED_KKT_SYSTEM
+            MT = (opt.linear_solver.INPUT_MATRIX_TYPE == :csc) ? SparseMatrixCSC{Float64, Int32} : Matrix{Float64}
+            SparseUnreducedKKTSystem{Float64, MT}(nlp, ind_cons)
+        elseif opt.kkt_system == DENSE_KKT_SYSTEM
+            MT = Matrix{Float64}
+            VT = Vector{Float64}
+            DenseKKTSystem{Float64, VT, MT}(nlp, ind_cons)
+        end
     end
 
     xl = [get_lvar(nlp);view(get_lcon(nlp),ind_cons.ind_ineq)]
@@ -528,7 +530,7 @@ function initialize!(ips::AbstractInteriorPointSolver)
     @trace(ips.logger,"Computing constraint scaling.")
     eval_jac_wrapper!(ips, ips.kkt, ips.x)
     compress_jacobian!(ips.kkt)
-    if ips.opt.nlp_scaling
+    if (ips.m > 0) && ips.opt.nlp_scaling
         jac = get_raw_jacobian(ips.kkt)
         set_con_scale!(ips.con_scale, jac, ips.opt.nlp_scaling_max_gradient)
         set_jacobian_scaling!(ips.kkt, ips.con_scale)
@@ -1285,7 +1287,7 @@ end
 
 # Kernel functions ---------------------------------------------------------
 is_valid(val::Real) = !(isnan(val) || isinf(val))
-function is_valid(vec)
+function is_valid(vec::AbstractArray)
     @inbounds for i=1:length(vec)
         is_valid(vec[i]) || return false
     end

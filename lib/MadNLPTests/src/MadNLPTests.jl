@@ -1,9 +1,14 @@
 module MadNLPTests
 
-import LinearAlgebra: norm
+import MadNLP
+import LinearAlgebra: norm, I, mul!, dot
+using NLPModels
 import JuMP: Model, @variable, @constraint, @objective, @NLconstraint , @NLobjective, optimize!,
     MOI, termination_status, LowerBoundRef, UpperBoundRef, value, dual
 import Test: @test, @testset
+using Random
+
+export test_madnlp, solcmp
 
 function solcmp(x,sol;atol=1e-4,rtol=1e-4)
     aerr = norm(x-sol,Inf)
@@ -57,7 +62,7 @@ function lootsma(optimizer_constructor::Function)
         @test solcmp(dual.(l),[2.000024518601535,2.0000305441119535])
         @test solcmp(dual.(LowerBoundRef.(x)),[0.,0.,0.])
         @test solcmp(dual.(UpperBoundRef.(x)),[0.,0.,0.])
-        
+
         @test termination_status(m) == MOI.LOCALLY_SOLVED
     end
 end
@@ -190,6 +195,119 @@ function eigmina(optimizer_constructor::Function)
     end
 end
 
-export test_madnlp, solcmp
+
+struct DenseDummyQP <: AbstractNLPModel{Float64,Vector{Float64}}
+    meta::NLPModels.NLPModelMeta{Float64, Vector{Float64}}
+    P::Matrix{Float64} # primal hessian
+    A::Matrix{Float64} # constraint jacobian
+    q::Vector{Float64}
+    hrows::Vector{Int}
+    hcols::Vector{Int}
+    jrows::Vector{Int}
+    jcols::Vector{Int}
+    counters::Counters
+end
+
+function NLPModels.jac_structure!(qp::DenseDummyQP,I, J)
+    copyto!(I, qp.jrows)
+    copyto!(J, qp.jcols)
+end
+function NLPModels.hess_structure!(qp::DenseDummyQP,I, J)
+    copyto!(I, qp.hrows)
+    copyto!(J, qp.hcols)
+end
+
+function NLPModels.obj(qp::DenseDummyQP,x)
+    return 0.5 * dot(x, qp.P, x) + dot(qp.q, x)
+end
+function NLPModels.grad!(qp::DenseDummyQP,x,g)
+    mul!(g, qp.P, x)
+    g .+= qp.q
+    return
+end
+function NLPModels.cons!(qp::DenseDummyQP,x,c)
+    mul!(c, qp.A, x)
+end
+# Jacobian: sparse callback
+function NLPModels.jac_coord!(qp::DenseDummyQP, x, J::AbstractVector)
+    index = 1
+    for (i, j) in zip(qp.jrows, qp.jcols)
+        J[index] =  qp.A[i, j]
+        index += 1
+    end
+end
+# Jacobian: dense callback
+MadNLP.jac_dense!(qp::DenseDummyQP, x, J::AbstractMatrix) = copyto!(J, qp.A)
+# Hessian: sparse callback
+function NLPModels.hess_coord!(qp::DenseDummyQP,x, l, hess::AbstractVector; obj_weight=1.)
+    index = 1
+    for i in 1:get_nvar(qp) , j in 1:i
+        hess[index] = obj_weight * qp.P[j, i]
+        index += 1
+    end
+end
+# Hessian: dense callback
+function MadNLP.hess_dense!(qp::DenseDummyQP, x, l,hess::AbstractMatrix; obj_weight=1.)
+    hess .= obj_weight .* qp.P
+end
+
+function DenseDummyQP(; n=100, m=10, fixed_variables=Int[])
+    if m >= n
+        error("The number of constraints `m` should be less than the number of variable `n`.")
+    end
+
+    Random.seed!(1)
+
+    # Build QP problem 0.5 * x' * P * x + q' * x
+    P = randn(n , n)
+    P += P' # P is symmetric
+    P += 100.0 * I
+
+    q = randn(n)
+
+    # Build constraints gl <= Ax <= gu
+    A = zeros(m, n)
+    for j in 1:m
+        A[j, j]  = 1.0
+        A[j, j+1]  = -1.0
+    end
+
+    x0 = zeros(n)
+    y0 = zeros(m)
+
+    # Bound constraints
+    xu =   ones(n)
+    xl = - ones(n)
+    gl = -ones(m)
+    gu = ones(m)
+
+    xl[fixed_variables] .= xu[fixed_variables]
+
+    hrows = [i for i in 1:n for j in 1:i]
+    hcols = [j for i in 1:n for j in 1:i]
+    nnzh = div(n * (n + 1), 2)
+
+    jrows = [j for i in 1:n for j in 1:m]
+    jcols = [i for i in 1:n for j in 1:m]
+    nnzj = n * m
+
+    return DenseDummyQP(
+        NLPModels.NLPModelMeta(
+            n,
+            ncon = m,
+            nnzj = nnzj,
+            nnzh = nnzh,
+            x0 = x0,
+            y0 = y0,
+            lvar = xl,
+            uvar = xu,
+            lcon = gl,
+            ucon = gu,
+            minimize = true
+        ),
+        P,A,q,hrows,hcols,jrows,jcols,
+        Counters()
+    )
+end
 
 end # module

@@ -23,8 +23,8 @@ const INPUT_MATRIX_TYPE = :dense
     lapackgpu_algorithm::Algorithms = BUNCHKAUFMAN
 end
 
-mutable struct Solver <: AbstractLinearSolver
-    dense::Matrix{Float64}
+mutable struct Solver{MT} <: AbstractLinearSolver
+    dense::MT
     fact::CuMatrix{Float64}
     rhs::CuVector{Float64}
     work::CuVector{Float64}
@@ -37,10 +37,10 @@ mutable struct Solver <: AbstractLinearSolver
     logger::Logger
 end
 
-function Solver(dense::Matrix{Float64};
+function Solver(dense::MT;
                 option_dict::Dict{Symbol,Any}=Dict{Symbol,Any}(),
                 opt=Options(),logger=Logger(),
-                kwargs...)
+                kwargs...) where {MT <: AbstractMatrix}
 
     set_options!(opt,option_dict,kwargs...)
     fact = CuMatrix{Float64}(undef,size(dense))
@@ -88,10 +88,10 @@ introduce(M::Solver) = "Lapack-GPU ($(M.opt.lapackgpu_algorithm))"
 if toolkit_version() >= v"11.3.1"
 
     is_inertia(M::Solver) = M.opt.lapackgpu_algorithm == CHOLESKY  # TODO: implement inertia(M::Solver) for BUNCHKAUFMAN
-    
+
     function factorize_bunchkaufman!(M::Solver)
-        haskey(M.etc,:ipiv) || (M.etc[:ipiv] = CuVector{Int32}(undef,size(M.dense,1)))    
-        haskey(M.etc,:ipiv64) || (M.etc[:ipiv64] = CuVector{Int64}(undef,length(M.etc[:ipiv]))) 
+        haskey(M.etc,:ipiv) || (M.etc[:ipiv] = CuVector{Int32}(undef,size(M.dense,1)))
+        haskey(M.etc,:ipiv64) || (M.etc[:ipiv64] = CuVector{Int64}(undef,length(M.etc[:ipiv])))
 
         copyto!(M.fact,M.dense)
         cusolverDnDsytrf_bufferSize(
@@ -105,7 +105,7 @@ if toolkit_version() >= v"11.3.1"
     end
 
     function solve_bunchkaufman!(M::Solver,x)
-        
+
         copyto!(M.etc[:ipiv64],M.etc[:ipiv])
         copyto!(M.rhs,x)
         ccall((:cusolverDnXsytrs_bufferSize, libcusolver()), cusolverStatus_t,
@@ -126,12 +126,12 @@ if toolkit_version() >= v"11.3.1"
               size(M.fact,1),1,R_64F,M.fact,size(M.fact,2),
               M.etc[:ipiv64],R_64F,M.rhs,length(M.rhs),M.work,M.lwork[],M.work_host,M.lwork_host[],M.info)
         copyto!(x,M.rhs)
-        
+
         return x
     end
 else
     is_inertia(M::Solver) =
-        M.opt.lapackgpu_algorithm == CHOLESKY || M.opt.lapackgpu_algorithm == CHOLESKY 
+        M.opt.lapackgpu_algorithm == CHOLESKY || M.opt.lapackgpu_algorithm == CHOLESKY
 
     function factorize_bunchkaufman!(M::Solver)
         haskey(M.etc,:ipiv) || (M.etc[:ipiv] = CuVector{Int32}(undef,size(M.dense,1)))
@@ -162,7 +162,7 @@ else
             Cvoid,
             (Ref{Cchar},Ref{Int},Ref{Int},Ptr{Cdouble},Ref{Int},Ptr{Int},Ptr{Cdouble},Ref{Int},Ptr{Int}),
             'L',size(M.fact,1),1,M.etc[:fact_cpu],size(M.fact,2),M.etc[:ipiv_cpu],x,length(x),[1])
-        
+
         return x
     end
 end
@@ -242,7 +242,7 @@ function inertia(M::Solver)
     if M.opt.lapackgpu_algorithm == BUNCHKAUFMAN
         inertia(M.etc[:fact_cpu],M.etc[:ipiv_cpu],M.etc[:info_cpu][])
     elseif M.opt.lapackgpu_algorithm == CHOLESKY
-        sum(M.info) == 0 ? (size(M.fact,1),0,0) : (0,size(M.fact,1),0) 
+        sum(M.info) == 0 ? (size(M.fact,1),0,0) : (0,size(M.fact,1),0)
     else
         error(LOGGER,"Invalid lapackcpu_algorithm")
     end

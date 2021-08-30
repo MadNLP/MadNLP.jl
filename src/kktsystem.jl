@@ -240,7 +240,7 @@ function SparseKKTSystem{T, MT}(nlp::AbstractNLPModel, ind_cons=get_index_constr
     jac_I = Vector{Int32}(undef, get_nnzj(nlp))
     jac_J = Vector{Int32}(undef, get_nnzj(nlp))
     jac_structure!(nlp,jac_I, jac_J)
-    
+
     hess_I = Vector{Int32}(undef, get_nnzh(nlp))
     hess_J = Vector{Int32}(undef, get_nnzh(nlp))
     hess_structure!(nlp,hess_I,hess_J)
@@ -411,19 +411,25 @@ struct DenseKKTSystem{T, VT, MT} <: AbstractKKTSystem{T, MT}
     diag_hess::VT
     # KKT system
     aug_com::MT
+    # Buffers
+    _w1::VT
+    _w2::VT
     # Info
     ind_ineq::Vector{Int}
     ind_fixed::Vector{Int}
     jacobian_scaling::VT
 end
 
-function DenseKKTSystem{T, VT, MT}(n, m, ind_ineq, ind_fixed) where {T, VT, MT}
+function DenseKKTSystem{T, VT, MT}(n, m, ind_ineq, ind_fixed; buffer_size=0) where {T, VT, MT}
     ns = length(ind_ineq)
     hess = MT(undef, n, n)
     jac = MT(undef, m, n+ns)
     pr_diag = VT(undef, n+ns)
     du_diag = VT(undef, m)
     diag_hess = VT(undef, n)
+    # Buffers (used mostly when DenseKKTSystem is deported on the GPU)
+    _w1 = VT(undef, buffer_size)
+    _w2 = VT(undef, buffer_size)
 
     # If the the problem is unconstrained, then KKT system is directly equal
     # to the Hessian (+ some regularization terms)
@@ -445,13 +451,13 @@ function DenseKKTSystem{T, VT, MT}(n, m, ind_ineq, ind_fixed) where {T, VT, MT}
     fill!(jacobian_scaling, one(T))
 
     return DenseKKTSystem{T, VT, MT}(
-        hess, jac, pr_diag, du_diag, diag_hess, aug_com, ind_ineq, ind_fixed, jacobian_scaling,
+        hess, jac, pr_diag, du_diag, diag_hess, aug_com, _w1, _w2, ind_ineq, ind_fixed, jacobian_scaling,
     )
 end
 
-function DenseKKTSystem{T, VT, MT}(nlp::AbstractNLPModel, info_constraints=get_index_constraints(nlp)) where {T, VT, MT}
+function DenseKKTSystem{T, VT, MT}(nlp::AbstractNLPModel, info_constraints=get_index_constraints(nlp); options...) where {T, VT, MT}
     return DenseKKTSystem{T, VT, MT}(
-        get_nvar(nlp), get_ncon(nlp), info_constraints.ind_ineq, info_constraints.ind_fixed,
+        get_nvar(nlp), get_ncon(nlp), info_constraints.ind_ineq, info_constraints.ind_fixed; options...
     )
 end
 
@@ -468,9 +474,9 @@ get_raw_jacobian(kkt::DenseKKTSystem) = kkt.jac
 nnz_jacobian(kkt::DenseKKTSystem) = length(kkt.jac)
 nnz_kkt(kkt::DenseKKTSystem) = length(kkt.aug_com)
 
-function _update_diagonal!(dest::AbstractMatrix, d1::AbstractVector, d2::AbstractVector)
+function diag_add!(dest::AbstractMatrix, d1::AbstractVector, d2::AbstractVector)
     n = length(d1)
-    for i in 1:n
+    @inbounds for i in 1:n
         dest[i, i] = d1[i] + d2[i]
     end
 end
@@ -505,7 +511,7 @@ function build_kkt!(kkt::DenseKKTSystem{T, VT, MT}) where {T, VT, MT}
     m = size(kkt.jac, 1)
     ns = length(kkt.ind_ineq)
     if m == 0 # If problem is unconstrained, just need to update the diagonal
-        _update_diagonal!(kkt.aug_com, kkt.diag_hess, kkt.pr_diag)
+        diag_add!(kkt.aug_com, kkt.diag_hess, kkt.pr_diag)
     else # otherwise, we update the full matrix
         _build_dense_kkt_system!(kkt.aug_com, kkt.hess, kkt.jac, kkt.pr_diag, kkt.du_diag, kkt.diag_hess, n, m, ns)
     end
