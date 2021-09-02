@@ -39,6 +39,23 @@ testset = [
         true
     ],
     [
+        "Option: AUGMENTED KKT SYSTEM",
+        ()->MadNLP.Optimizer(
+            reduced_system=false,
+            kkt_system=MadNLP.SPARSE_UNREDUCED_KKT_SYSTEM,
+            print_level=MadNLP.ERROR),
+        ["infeasible","eigmina"] # numerical errors
+    ],
+    [
+        "Option: INERTIA_FREE & AUGMENTED KKT SYSTEM",
+        ()->MadNLP.Optimizer(
+            inertia_correction_method=MadNLP.INERTIA_FREE,
+            kkt_system=MadNLP.SPARSE_UNREDUCED_KKT_SYSTEM,
+            reduced_system=false,
+            print_level=MadNLP.ERROR),
+        ["infeasible","eigmina"] # numerical errors
+    ],
+    [
         "Option: INERTIA_FREE",
         ()->MadNLP.Optimizer(
             inertia_correction_method=MadNLP.INERTIA_FREE,
