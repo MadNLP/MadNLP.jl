@@ -93,14 +93,21 @@ mutable struct Solver{KKTSystem} <: AbstractInteriorPointSolver
     px::StrideOneVector{Float64}
     pl::StrideOneVector{Float64}
 
+    pzl::Union{Nothing,StrideOneVector{Float64}}
+    pzu::Union{Nothing,StrideOneVector{Float64}}
+
     _w1::Vector{Float64}
     _w1x::StrideOneVector{Float64}
     _w1l::StrideOneVector{Float64}
+    _w1zl::Union{Nothing,StrideOneVector{Float64}}
+    _w1zu::Union{Nothing,StrideOneVector{Float64}}
 
     _w2::Vector{Float64}
     _w2x::StrideOneVector{Float64}
     _w2l::StrideOneVector{Float64}
-
+    _w2zl::Union{Nothing,StrideOneVector{Float64}}
+    _w2zu::Union{Nothing,StrideOneVector{Float64}}
+    
     _w3::Vector{Float64}
     _w3x::StrideOneVector{Float64}
     _w3l::StrideOneVector{Float64}
@@ -396,6 +403,13 @@ function Solver(nlp::NonlinearProgram;
             n, m, nlb, nub, ind_ineq, ind_fixed,
             hess_sparsity_I, hess_sparsity_J, jac_sparsity_I, jac_sparsity_J,
         )
+    elseif opt.kkt_system == SPARSE_UNREDUCED_KKT_SYSTEM
+        MT = (opt.linear_solver.INPUT_MATRIX_TYPE == :csc) ? SparseMatrixCSC{Float64, Int32} : Matrix{Float64}
+        SparseUnreducedKKTSystem{Float64, MT}(
+            n, m, nlb, nub, ind_ineq, ind_fixed,
+            hess_sparsity_I, hess_sparsity_J, jac_sparsity_I, jac_sparsity_J,
+            ind_lb, ind_ub,
+        )        
     elseif opt.kkt_system == DENSE_KKT_SYSTEM
         MT = Matrix{Float64}
         VT = Vector{Float64}
@@ -407,11 +421,16 @@ function Solver(nlp::NonlinearProgram;
     _w1 = Vector{Float64}(undef,aug_vec_length)
     _w1x= view(_w1,1:n)
     _w1l= view(_w1,n+1:n+m)
+    _w1zl = is_reduced(kkt) ? nothing : view(_w1,n+m+1:n+m+nlb)
+    _w1zu = is_reduced(kkt) ? nothing : view(_w1,n+m+nlb+1:n+m+nlb+nub)
+
 
     _w2 = Vector{Float64}(undef,aug_vec_length)
     _w2x= view(_w2,1:n)
     _w2l= view(_w2,n+1:n+m)
-
+    _w2zl = is_reduced(kkt) ? nothing : view(_w2,n+m+1:n+m+nlb)
+    _w2zu = is_reduced(kkt) ? nothing : view(_w2,n+m+nlb+1:n+m+nlb+nub)
+    
     _w3 = Vector{Float64}(undef,aug_vec_length)
     _w3x= view(_w3,1:n)
     _w3l= view(_w3,n+1:n+m)
@@ -432,6 +451,8 @@ function Solver(nlp::NonlinearProgram;
     p = Vector{Float64}(undef,aug_vec_length)
     px= view(p,1:n)
     pl= view(p,n+1:n+m)
+    pzl= is_reduced(kkt) ? Vector{Float64}(undef,nlb) : view(p,n+m+1:n+m+nlb)
+    pzu= is_reduced(kkt) ? Vector{Float64}(undef,nub) : view(p,n+m+nlb+1:n+m+nlb+nub)
 
     obj_scale = [1.0]
     con_scale = ones(m)
@@ -444,7 +465,7 @@ function Solver(nlp::NonlinearProgram;
 
     @trace(logger,"Initializing iterative solver.")
     iterator = opt.iterator.Solver(
-        Vector{Float64}(undef,m+n),
+        similar(d),
         (b,x)->mul!(b,kkt,x),(x)->solve!(linear_solver,x);option_dict=option_dict)
 
     @trace(logger,"Initializing fixed variable treatment scheme.")
@@ -458,8 +479,8 @@ function Solver(nlp::NonlinearProgram;
     return Solver{typeof(kkt)}(nlp,kkt,opt,cnt,logger,
                   n,m,nlb,nub,x,l,zl,zu,xl,xu,0.,f,c,
                   jacl,
-                  d,dx,dl,dzl,dzu,p,px,pl,
-                  _w1,_w1x,_w1l,_w2,_w2x,_w2l,_w3,_w3x,_w3l,_w4,_w4x,_w4l,
+                  d,dx,dl,dzl,dzu,p,px,pl,pzl,pzu,
+                  _w1,_w1x,_w1l,_w1zl,_w1zu,_w2,_w2x,_w2l,_w2zl,_w2zu,_w3,_w3x,_w3l,_w4,_w4x,_w4l,
                   x_trial,c_trial,0.,x_slk,c_slk,rhs,ind_ineq,ind_fixed,ind_llb,ind_uub,
                   x_lr,x_ur,xl_r,xu_r,zl_r,zu_r,dx_lr,dx_ur,x_trial_lr,x_trial_ur,
                   linear_solver,iterator,
@@ -690,7 +711,9 @@ function regular!(ips::AbstractInteriorPointSolver)
         switching_condition = is_switching(varphi_d,ips.alpha,ips.opt.s_phi,ips.opt.delta,2.,ips.opt.s_theta)
         armijo_condition = false
         while true
-            apply_step!(ips.x_trial,ips.x,ips.dx,ips.alpha)
+            copyto!(ips.x_trial,ips.x)
+            axpy!(ips.alpha,ips.dx,ips.x_trial)
+            
             ips.obj_val_trial = eval_f_wrapper(ips, ips.x_trial)
             eval_cons_wrapper!(ips, ips.c_trial, ips.x_trial)
 
@@ -731,9 +754,9 @@ function regular!(ips::AbstractInteriorPointSolver)
         adjusted > 0 &&
             @warn(ips.logger,"In iteration $(ips.cnt.k), $adjusted Slack too small, adjusting variable bound")
 
-        apply_step!(ips.l,ips.l,ips.dl,ips.alpha)
-        apply_step!(ips.zl_r,ips.zl_r,ips.dzl,ips.alpha_z)
-        apply_step!(ips.zu_r,ips.zu_r,ips.dzu,ips.alpha_z)
+        axpy!(ips.alpha,ips.dl,ips.l)
+        axpy!(ips.alpha_z,ips.dzl,ips.zl_r)
+        axpy!(ips.alpha_z,ips.dzu,ips.zu_r)
         reset_bound_dual!(ips.zl,ips.x,ips.xl,ips.mu,ips.opt.kappa_sigma)
         reset_bound_dual!(ips.zu,ips.xu,ips.x,ips.mu,ips.opt.kappa_sigma)
         eval_grad_f_wrapper!(ips, ips.f,ips.x)
@@ -838,9 +861,12 @@ function robust!(ips::Solver)
         armijo_condition = false
 
         while true
-            apply_step!(ips.x_trial , ips.x ,ips.dx, ips.alpha)
-            apply_step!(RR.pp_trial, RR.pp,RR.dpp, ips.alpha)
-            apply_step!(RR.nn_trial, RR.nn,RR.dnn, ips.alpha)
+            copyto!(ips.x_trial,ips.x)
+            copyto!(RR.pp_trial,RR.pp)
+            copyto!(RR.nn_trial,RR.nn)
+            axpy!(ips.alpha,ips.dx,ips.x_trial)
+            axpy!(ips.alpha,RR.dpp,RR.pp_trial)
+            axpy!(ips.alpha,RR.dnn,RR.nn_trial)
 
             RR.obj_val_R_trial = get_obj_val_R(
                 RR.pp_trial,RR.nn_trial,RR.D_R,ips.x_trial,RR.x_ref,ips.opt.rho,RR.zeta)
@@ -877,11 +903,11 @@ function robust!(ips::Solver)
         RR.obj_val_R=RR.obj_val_R_trial
         RR.f_R .= RR.zeta.*RR.D_R.^2 .*(ips.x.-RR.x_ref)
 
-        apply_step!(ips.l ,ips.l , ips.dl,ips.alpha)
-        apply_step!(ips.zl_r,ips.zl_r, ips.dzl,ips.alpha_z)
-        apply_step!(ips.zu_r,ips.zu_r, ips.dzu,ips.alpha_z)
-        apply_step!(RR.zp,RR.zp, RR.dzp,ips.alpha_z)
-        apply_step!(RR.zn,RR.zn, RR.dzn,ips.alpha_z)
+        axpy!(ips.alpha, ips.dl,ips.l )
+        axpy!(ips.alpha_z, ips.dzl,ips.zl_r)
+        axpy!(ips.alpha_z, ips.dzu,ips.zu_r)
+        axpy!(ips.alpha_z, RR.dzp,RR.zp)
+        axpy!(ips.alpha_z, RR.dzn,RR.zn)
 
         reset_bound_dual!(ips.zl,ips.x,ips.xl,RR.mu_R,ips.opt.kappa_sigma)
         reset_bound_dual!(ips.zu,ips.xu,ips.x,RR.mu_R,ips.opt.kappa_sigma)
@@ -1068,11 +1094,6 @@ function second_order_correction(ips::AbstractInteriorPointSolver,alpha_max::Flo
     return false
 end
 
-function apply_step!(x_new,x,dx,alpha)
-    x_new .= x .+ alpha.*dx
-    return
-end
-
 
 # KKT system updates -------------------------------------------------------
 # Set diagonal
@@ -1080,17 +1101,47 @@ function set_aug_diagonal!(kkt::AbstractKKTSystem, ips::Solver)
     kkt.pr_diag .= ips.zl./(ips.x.-ips.xl) .+ ips.zu./(ips.xu.-ips.x)
     fill!(kkt.du_diag, 0.0)
 end
+function set_aug_diagonal!(kkt::SparseUnreducedKKTSystem, ips::Solver)
+    kkt.pr_diag .= 0.0
+    kkt.du_diag .= 0.0
+    kkt.l_lower .= .-sqrt.(ips.zl_r)
+    kkt.u_lower .= .-sqrt.(ips.zu_r)
+    kkt.l_diag  .= ips.xl_r .- ips.x_lr
+    kkt.u_diag  .= ips.x_ur .- ips.xu_r
+end
 
 # Robust restoration
 function set_aug_RR!(kkt::AbstractKKTSystem, ips::Solver, RR::RobustRestorer)
     kkt.pr_diag .= ips.zl./(ips.x.-ips.xl) .+ ips.zu./(ips.xu.-ips.x) .+ RR.zeta.*RR.D_R.^2
     kkt.du_diag .= .-RR.pp./RR.zp .- RR.nn./RR.zn
 end
+function set_aug_RR!(kkt::SparseUnreducedKKTSystem, ips::Solver, RR::RobustRestorer)
+    kkt.pr_diag.= RR.zeta.*RR.D_R.^2
+    kkt.du_diag.= .-RR.pp./RR.zp.-RR.nn./RR.zn
+    kkt.l_lower.=.-sqrt.(ips.zl_r)
+    kkt.u_lower.=.-sqrt.(ips.zu_r)
+    kkt.l_diag .= ips.xl_r .- ips.x_lr
+    kkt.u_diag .= ips.x_ur .- ips.xu_r
+end
 
 # Set RHS
 function set_aug_rhs!(ips::Solver, kkt::AbstractKKTSystem, c)
     ips.px.=.-ips.f.+ips.mu./(ips.x.-ips.xl).-ips.mu./(ips.xu.-ips.x).-ips.jacl
     ips.pl.=.-c
+end
+
+function set_aug_rhs!(ips::Solver, kkt::SparseUnreducedKKTSystem, c)
+    ips.px.=.-ips.f.+ips.zl.-ips.zu.-ips.jacl
+    ips.pl.=.-c
+    ips.pzl.=(ips.xl_r-ips.x_lr).*kkt.l_lower .+ ips.mu./kkt.l_lower
+    ips.pzu.=(ips.xu_r-ips.x_ur).*kkt.u_lower .- ips.mu./kkt.u_lower
+end
+
+function set_aug_rhs_ifr!(ips::Solver, kkt::SparseUnreducedKKTSystem,c)
+    ips._w1x .= 0.
+    ips._w1l .= .-c
+    ips._w1zl.= 0.
+    ips._w1zu.= 0.
 end
 
 # Set RHS RR
@@ -1107,10 +1158,23 @@ function finish_aug_solve!(ips::Solver, kkt::AbstractKKTSystem, mu)
     ips.dzu.= (mu.+ips.zu_r.*ips.dx_ur)./(ips.xu_r.-ips.x_ur).-ips.zu_r
 end
 
+function finish_aug_solve!(ips::Solver, kkt::SparseUnreducedKKTSystem, mu)
+    ips.dzl.*=.-kkt.l_lower
+    ips.dzu.*=kkt.u_lower
+    ips.dzl.= (mu.-ips.zl_r.*ips.dx_lr)./(ips.x_lr.-ips.xl_r).-ips.zl_r
+    ips.dzu.= (mu.+ips.zu_r.*ips.dx_ur)./(ips.xu_r.-ips.x_ur).-ips.zu_r
+end
+
 # Initial
 function set_initial_rhs!(ips::Solver, kkt::AbstractKKTSystem)
     ips.px .= .-ips.f.+ips.zl.-ips.zu
     ips.pl .= 0.0
+end
+function set_initial_rhs!(ips::Solver, kkt::SparseUnreducedKKTSystem)
+    ips.px .= .-ips.f.+ips.zl.-ips.zu
+    ips.pl .= 0.0
+    ips.pzl.= 0.0
+    ips.pzu.= 0.0
 end
 
 # Set ifr
