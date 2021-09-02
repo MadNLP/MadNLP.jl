@@ -92,6 +92,7 @@ mutable struct Solver{KKTSystem} <: AbstractInteriorPointSolver
     p::Vector{Float64}
     px::StrideOneVector{Float64}
     pl::StrideOneVector{Float64}
+
     pzl::Union{Nothing,StrideOneVector{Float64}}
     pzu::Union{Nothing,StrideOneVector{Float64}}
 
@@ -106,7 +107,7 @@ mutable struct Solver{KKTSystem} <: AbstractInteriorPointSolver
     _w2l::StrideOneVector{Float64}
     _w2zl::Union{Nothing,StrideOneVector{Float64}}
     _w2zu::Union{Nothing,StrideOneVector{Float64}}
-
+    
     _w3::Vector{Float64}
     _w3x::StrideOneVector{Float64}
     _w3l::StrideOneVector{Float64}
@@ -223,89 +224,89 @@ function initialize_robust_restorer!(ips::AbstractInteriorPointSolver)
     ips.del_w = 0
 end
 
-function factorize_wrapper!(ipp::Solver)
-    @trace(ipp.logger,"Factorization started.")
-    build_kkt!(ipp.kkt)
-    ipp.cnt.linear_solver_time += @elapsed factorize!(ipp.linear_solver)
+function factorize_wrapper!(ips::Solver)
+    @trace(ips.logger,"Factorization started.")
+    build_kkt!(ips.kkt)
+    ips.cnt.linear_solver_time += @elapsed factorize!(ips.linear_solver)
 end
 
-function solve_refine_wrapper!(ipp::Solver, x,b)
-    cnt = ipp.cnt
-    @trace(ipp.logger,"Iterative solution started.")
-    fixed_variable_treatment_vec!(b, ipp.ind_fixed)
+function solve_refine_wrapper!(ips::Solver, x,b)
+    cnt = ips.cnt
+    @trace(ips.logger,"Iterative solution started.")
+    fixed_variable_treatment_vec!(b, ips.ind_fixed)
 
-    cnt.linear_solver_time += @elapsed (result = solve_refine!(x, ipp.iterator, b))
+    cnt.linear_solver_time += @elapsed (result = solve_refine!(x, ips.iterator, b))
     if result == :Solved
         solve_status =  true
     else
-        if improve!(ipp.linear_solver)
+        if improve!(ips.linear_solver)
             cnt.linear_solver_time += @elapsed begin
-                factorize!(ipp.linear_solver)
-                solve_status = (solve_refine!(x, ipp.iterator, b) == :Solved ? true : false)
+                factorize!(ips.linear_solver)
+                solve_status = (solve_refine!(x, ips.iterator, b) == :Solved ? true : false)
             end
         else
             solve_status = false
         end
     end
-    fixed_variable_treatment_vec!(x, ipp.ind_fixed)
+    fixed_variable_treatment_vec!(x, ips.ind_fixed)
     return solve_status
 end
 
-function eval_f_wrapper(ipp::Solver, x::Vector{Float64})
-    nlp = ipp.nlp
-    cnt = ipp.cnt
-    @trace(ipp.logger,"Evaluating objective.")
+function eval_f_wrapper(ips::Solver, x::Vector{Float64})
+    nlp = ips.nlp
+    cnt = ips.cnt
+    @trace(ips.logger,"Evaluating objective.")
     cnt.eval_function_time += @elapsed obj_val = nlp.obj(view(x,1:nlp.n))::Float64
     cnt.obj_cnt+=1
     cnt.obj_cnt==1 && (is_valid(obj_val) || throw(InvalidNumberException()))
-    return obj_val*ipp.obj_scale[]
+    return obj_val*ips.obj_scale[]
 end
 
-function eval_grad_f_wrapper!(ipp::Solver, f::Vector{Float64},x::Vector{Float64})
-    nlp = ipp.nlp
-    cnt = ipp.cnt
-    @trace(ipp.logger,"Evaluating objective gradient.")
+function eval_grad_f_wrapper!(ips::Solver, f::Vector{Float64},x::Vector{Float64})
+    nlp = ips.nlp
+    cnt = ips.cnt
+    @trace(ips.logger,"Evaluating objective gradient.")
     cnt.eval_function_time += @elapsed nlp.obj_grad!(view(f,1:nlp.n),view(x,1:nlp.n))
-    f.*=ipp.obj_scale[]
+    f.*=ips.obj_scale[]
     cnt.obj_grad_cnt+=1
     cnt.obj_grad_cnt==1 && (is_valid(f)  || throw(InvalidNumberException()))
     return f
 end
 
-function eval_cons_wrapper!(ipp::Solver, c::Vector{Float64},x::Vector{Float64})
-    nlp = ipp.nlp
-    cnt = ipp.cnt
-    @trace(ipp.logger, "Evaluating constraints.")
+function eval_cons_wrapper!(ips::Solver, c::Vector{Float64},x::Vector{Float64})
+    nlp = ips.nlp
+    cnt = ips.cnt
+    @trace(ips.logger, "Evaluating constraints.")
     cnt.eval_function_time += @elapsed nlp.con!(view(c,1:nlp.m),view(x,1:nlp.n))
-    view(c,ipp.ind_ineq).-=view(x,nlp.n+1:ipp.n)
-    c.-=ipp.rhs
-    c.*=ipp.con_scale
+    view(c,ips.ind_ineq).-=view(x,nlp.n+1:ips.n)
+    c.-=ips.rhs
+    c.*=ips.con_scale
     cnt.con_cnt+=1
     cnt.con_cnt==2 && (is_valid(c) || throw(InvalidNumberException()))
     return c
 end
 
-function eval_jac_wrapper!(ipp::Solver, kkt::AbstractKKTSystem, x::Vector{Float64})
-    nlp = ipp.nlp
-    cnt = ipp.cnt
+function eval_jac_wrapper!(ips::Solver, kkt::AbstractKKTSystem, x::Vector{Float64})
+    nlp = ips.nlp
+    cnt = ips.cnt
     n_jac = length(kkt.jac)
-    ns = length(ipp.ind_ineq)
-    @trace(ipp.logger, "Evaluating constraint Jacobian.")
+    ns = length(ips.ind_ineq)
+    @trace(ips.logger, "Evaluating constraint Jacobian.")
     cnt.eval_function_time += @elapsed nlp.con_jac!(kkt.jac,view(x,1:nlp.n))
     cnt.con_jac_cnt+=1
     cnt.con_jac_cnt==1 && (is_valid(kkt.jac) || throw(InvalidNumberException()))
     compress_jacobian!(kkt)
-    @trace(ipp.logger,"Constraint jacobian evaluation started.")
+    @trace(ips.logger,"Constraint jacobian evaluation started.")
     return kkt.jac
 end
 
-function eval_lag_hess_wrapper!(ipp::Solver, kkt::AbstractKKTSystem, x::Vector{Float64},l::Vector{Float64};is_resto=false)
-    nlp = ipp.nlp
-    cnt = ipp.cnt
-    @trace(ipp.logger,"Evaluating Lagrangian Hessian.")
-    ipp._w1l .= l.*ipp.con_scale
+function eval_lag_hess_wrapper!(ips::Solver, kkt::AbstractKKTSystem, x::Vector{Float64},l::Vector{Float64};is_resto=false)
+    nlp = ips.nlp
+    cnt = ips.cnt
+    @trace(ips.logger,"Evaluating Lagrangian Hessian.")
+    ips._w1l .= l.*ips.con_scale
     cnt.eval_function_time += @elapsed nlp.lag_hess!(
-        kkt.hess, view(x,1:nlp.n), ipp._w1l, is_resto ? 0.0 : ipp.obj_scale[])
+        kkt.hess, view(x,1:nlp.n), ips._w1l, is_resto ? 0.0 : ips.obj_scale[])
     compress_hessian!(kkt)
     cnt.lag_hess_cnt+=1
     cnt.lag_hess_cnt==1 && (is_valid(kkt.hess) || throw(InvalidNumberException()))
@@ -408,7 +409,7 @@ function Solver(nlp::NonlinearProgram;
             n, m, nlb, nub, ind_ineq, ind_fixed,
             hess_sparsity_I, hess_sparsity_J, jac_sparsity_I, jac_sparsity_J,
             ind_lb, ind_ub,
-        )
+        )        
     elseif opt.kkt_system == DENSE_KKT_SYSTEM
         MT = Matrix{Float64}
         VT = Vector{Float64}
@@ -423,12 +424,13 @@ function Solver(nlp::NonlinearProgram;
     _w1zl = is_reduced(kkt) ? nothing : view(_w1,n+m+1:n+m+nlb)
     _w1zu = is_reduced(kkt) ? nothing : view(_w1,n+m+nlb+1:n+m+nlb+nub)
 
+
     _w2 = Vector{Float64}(undef,aug_vec_length)
     _w2x= view(_w2,1:n)
     _w2l= view(_w2,n+1:n+m)
     _w2zl = is_reduced(kkt) ? nothing : view(_w2,n+m+1:n+m+nlb)
     _w2zu = is_reduced(kkt) ? nothing : view(_w2,n+m+nlb+1:n+m+nlb+nub)
-
+    
     _w3 = Vector{Float64}(undef,aug_vec_length)
     _w3x= view(_w3,1:n)
     _w3l= view(_w3,n+1:n+m)
@@ -463,7 +465,7 @@ function Solver(nlp::NonlinearProgram;
 
     @trace(logger,"Initializing iterative solver.")
     iterator = opt.iterator.Solver(
-        Vector{Float64}(undef,m+n),
+        similar(d),
         (b,x)->mul!(b,kkt,x),(x)->solve!(linear_solver,x);option_dict=option_dict)
 
     @trace(logger,"Initializing fixed variable treatment scheme.")
@@ -709,9 +711,10 @@ function regular!(ips::AbstractInteriorPointSolver)
         switching_condition = is_switching(varphi_d,ips.alpha,ips.opt.s_phi,ips.opt.delta,2.,ips.opt.s_theta)
         armijo_condition = false
         while true
-            ips.x_trial .= ips.x .+ ips.alpha.*ips.dx
+            copyto!(ips.x_trial,ips.x)
+            axpy!(ips.alpha,ips.dx,ips.x_trial)
+            
             ips.obj_val_trial = eval_f_wrapper(ips, ips.x_trial)
-            # ips.con!(ips.c_trial,ips.x_trial)
             eval_cons_wrapper!(ips, ips.c_trial, ips.x_trial)
 
             theta_trial = get_theta(ips.c_trial)
@@ -751,9 +754,9 @@ function regular!(ips::AbstractInteriorPointSolver)
         adjusted > 0 &&
             @warn(ips.logger,"In iteration $(ips.cnt.k), $adjusted Slack too small, adjusting variable bound")
 
-        ips.l.+=ips.alpha.*ips.dl
-        ips.zl_r.+=ips.alpha_z.*ips.dzl
-        ips.zu_r.+=ips.alpha_z.*ips.dzu
+        axpy!(ips.alpha,ips.dl,ips.l)
+        axpy!(ips.alpha_z,ips.dzl,ips.zl_r)
+        axpy!(ips.alpha_z,ips.dzu,ips.zu_r)
         reset_bound_dual!(ips.zl,ips.x,ips.xl,ips.mu,ips.opt.kappa_sigma)
         reset_bound_dual!(ips.zu,ips.xu,ips.x,ips.mu,ips.opt.kappa_sigma)
         eval_grad_f_wrapper!(ips, ips.f,ips.x)
@@ -858,9 +861,13 @@ function robust!(ips::Solver)
         armijo_condition = false
 
         while true
-            ips.x_trial .= ips.x .+ ips.alpha.*ips.dx
-            RR.pp_trial.= RR.pp.+ ips.alpha.*RR.dpp
-            RR.nn_trial.= RR.nn.+ ips.alpha.*RR.dnn
+            copyto!(ips.x_trial,ips.x)
+            copyto!(RR.pp_trial,RR.pp)
+            copyto!(RR.nn_trial,RR.nn)
+            axpy!(ips.alpha,ips.dx,ips.x_trial)
+            axpy!(ips.alpha,RR.dpp,RR.pp_trial)
+            axpy!(ips.alpha,RR.dnn,RR.nn_trial)
+
             RR.obj_val_R_trial = get_obj_val_R(
                 RR.pp_trial,RR.nn_trial,RR.D_R,ips.x_trial,RR.x_ref,ips.opt.rho,RR.zeta)
             eval_cons_wrapper!(ips, ips.c_trial, ips.x_trial)
@@ -896,11 +903,11 @@ function robust!(ips::Solver)
         RR.obj_val_R=RR.obj_val_R_trial
         RR.f_R .= RR.zeta.*RR.D_R.^2 .*(ips.x.-RR.x_ref)
 
-        ips.l .+= ips.alpha.*ips.dl
-        ips.zl_r.+= ips.alpha_z.*ips.dzl
-        ips.zu_r.+= ips.alpha_z.*ips.dzu
-        RR.zp.+= ips.alpha_z.*RR.dzp
-        RR.zn.+= ips.alpha_z.*RR.dzn
+        axpy!(ips.alpha, ips.dl,ips.l )
+        axpy!(ips.alpha_z, ips.dzl,ips.zl_r)
+        axpy!(ips.alpha_z, ips.dzu,ips.zu_r)
+        axpy!(ips.alpha_z, RR.dzp,RR.zp)
+        axpy!(ips.alpha_z, RR.dzn,RR.zn)
 
         reset_bound_dual!(ips.zl,ips.x,ips.xl,RR.mu_R,ips.opt.kappa_sigma)
         reset_bound_dual!(ips.zu,ips.xu,ips.x,RR.mu_R,ips.opt.kappa_sigma)
@@ -958,16 +965,14 @@ function inertia_based_reg(ips::AbstractInteriorPointSolver)
     ips.del_w = del_w_prev = 0.0
     while num_zero!= 0 || num_pos != ips.n || !solve_status
         @debug(ips.logger,"Primal-dual perturbed.")
-        if n_trial > 0
-            if ips.del_w == 0.0
-                ips.del_w = ips.del_w_last==0. ? ips.opt.first_hessian_perturbation :
-                    max(ips.opt.min_hessian_perturbation,ips.opt.perturb_dec_fact*ips.del_w_last)
-            else
-                ips.del_w*= ips.del_w_last==0. ? ips.opt.perturb_inc_fact_first : ips.opt.perturb_inc_fact
-                if ips.del_w>ips.opt.max_hessian_perturbation ips.cnt.k+=1
-                    @debug(ips.logger,"Primal regularization is too big. Switching to restoration phase.")
-                    return false
-                end
+        if ips.del_w == 0.0
+            ips.del_w = ips.del_w_last==0. ? ips.opt.first_hessian_perturbation :
+                max(ips.opt.min_hessian_perturbation,ips.opt.perturb_dec_fact*ips.del_w_last)
+        else
+            ips.del_w*= ips.del_w_last==0. ? ips.opt.perturb_inc_fact_first : ips.opt.perturb_inc_fact
+            if ips.del_w>ips.opt.max_hessian_perturbation ips.cnt.k+=1
+                @debug(ips.logger,"Primal regularization is too big. Switching to restoration phase.")
+                return false
             end
         end
         ips.del_c = (num_zero == 0 || !solve_status) ?
@@ -1090,29 +1095,19 @@ function second_order_correction(ips::AbstractInteriorPointSolver,alpha_max::Flo
 end
 
 
-
 # KKT system updates -------------------------------------------------------
 # Set diagonal
-# TODO: Temporary solution --> create auxiliary functions to force specialization
-function _set_aug_diagonal_reduced!(pr_diag, du_diag, x, xl, xu, zl, zu)
-    pr_diag .= zl./(x.-xl) .+ zu./(xu.-x)
-    fill!(du_diag, 0.0)
-end
-function _set_aug_diagonal_unreduced!(pr_diag, du_diag, l_lower, u_lower, l_diag, u_diag, zl_r, zu_r, xl_r, xu_r, x_lr, x_ur)
-    pr_diag .= 0.0
-    du_diag .= 0.0
-    l_lower .= .-sqrt.(zl_r)
-    u_lower .= .-sqrt.(zu_r)
-    l_diag  .= xl_r .- x_lr
-    u_diag  .= x_ur .- xu_r
-end
 function set_aug_diagonal!(kkt::AbstractKKTSystem, ips::Solver)
-    _set_aug_diagonal_reduced!(kkt.pr_diag, kkt.du_diag, ips.x, ips.xl, ips.xu, ips.zl, ips.zu)
+    kkt.pr_diag .= ips.zl./(ips.x.-ips.xl) .+ ips.zu./(ips.xu.-ips.x)
+    fill!(kkt.du_diag, 0.0)
 end
 function set_aug_diagonal!(kkt::SparseUnreducedKKTSystem, ips::Solver)
-    _set_aug_diagonal_unreduced!(kkt.pr_diag, kkt.du_diag, kkt.l_lower, kkt.u_lower, kkt.l_diag, kkt.u_diag,
-        ips.zl_r, ips.zu_r, ips.xl_r, ips.xu_r, ips.x_lr, ips.x_ur,
-    )
+    kkt.pr_diag .= 0.0
+    kkt.du_diag .= 0.0
+    kkt.l_lower .= .-sqrt.(ips.zl_r)
+    kkt.u_lower .= .-sqrt.(ips.zu_r)
+    kkt.l_diag  .= ips.xl_r .- ips.x_lr
+    kkt.u_diag  .= ips.x_ur .- ips.xu_r
 end
 
 # Robust restoration
@@ -1130,24 +1125,23 @@ function set_aug_RR!(kkt::SparseUnreducedKKTSystem, ips::Solver, RR::RobustResto
 end
 
 # Set RHS
-# TODO: Temporary solution --> create auxiliary functions to force specialization
-function _set_aug_rhs_reduced!(px, pl, x, xl, xu, c, f, jacl, mu)
-    px.=.-f.+mu./(x.-xl).-mu./(xu.-x).-jacl
-    pl.=.-c
-end
-function _set_aug_rhs_unreduced!(px, pl, pzl, pzu, c, f, zl, zu, jacl, xl_r, xu_r, x_lr, x_ur, l_lower, u_lower, mu)
-    px.=.-f.+zl.-zu.-jacl
-    pl.=.-c
-    pzl.=(xl_r-x_lr).*l_lower .+ mu./l_lower
-    pzu.=(xu_r-x_ur).*u_lower .- mu./u_lower
-end
 function set_aug_rhs!(ips::Solver, kkt::AbstractKKTSystem, c)
-    _set_aug_rhs_reduced!(ips.px, ips.pl, ips.x, ips.xl, ips.xu, c, ips.f, ips.jacl, ips.mu)
+    ips.px.=.-ips.f.+ips.mu./(ips.x.-ips.xl).-ips.mu./(ips.xu.-ips.x).-ips.jacl
+    ips.pl.=.-c
 end
+
 function set_aug_rhs!(ips::Solver, kkt::SparseUnreducedKKTSystem, c)
-    _set_aug_rhs_unreduced!(ips.px, ips.pl, ips.pzl, ips.pzu, c, ips.f, ips.zl, ips.zu,
-                            ips.jacl, ips.xl_r, ips.xu_r, ips.x_lr, ips.x_ur,
-                            kkt.l_lower, kkt.u_lower, ips.mu)
+    ips.px.=.-ips.f.+ips.zl.-ips.zu.-ips.jacl
+    ips.pl.=.-c
+    ips.pzl.=(ips.xl_r-ips.x_lr).*kkt.l_lower .+ ips.mu./kkt.l_lower
+    ips.pzu.=(ips.xu_r-ips.x_ur).*kkt.u_lower .- ips.mu./kkt.u_lower
+end
+
+function set_aug_rhs_ifr!(ips::Solver, kkt::SparseUnreducedKKTSystem,c)
+    ips._w1x .= 0.
+    ips._w1l .= .-c
+    ips._w1zl.= 0.
+    ips._w1zu.= 0.
 end
 
 # Set RHS RR
@@ -1157,27 +1151,18 @@ function set_aug_rhs_RR!(
     ips.px.=.-RR.f_R.-ips.jacl.+RR.mu_R./(ips.x.-ips.xl).-RR.mu_R./(ips.xu.-ips.x)
     ips.pl.=.-ips.c.+RR.pp.-RR.nn.+(RR.mu_R.-(rho.-ips.l).*RR.pp)./RR.zp.-(RR.mu_R.-(rho.+ips.l).*RR.nn)./RR.zn
 end
-function set_aug_rhs_RR!(
-    ips::Solver, kkt::SparseUnreducedKKTSystem, RR::RobustRestorer, rho,
-)
-    ips.px.=.-RR.f_R.+ips.zl.-ips.zu.-ips.jacl
-    ips.pl.=.-ips.c.+RR.pp.-RR.nn.+(RR.mu_R.-rho.*RR.pp)./RR.zp.+ips.l.*RR.pp./RR.zp.-(RR.mu_R.-rho.*RR.nn)./RR.zn.+ips.l.*RR.nn./RR.zn
-    ips.pzl.=(ips.xl_r-ips.x_lr).*kkt.l_lower.+RR.mu_R./kkt.l_lower
-    ips.pzu.=(ips.xu_r-ips.x_ur).*kkt.u_lower.-RR.mu_R./kkt.u_lower
-end
 
 # Finish
-function _finish_aug_solve_reduced!(dzl, dzu, zl_r, zu_r, dx_lr, dx_ur, x_lr, x_ur, xl_r, xu_r, mu)
-    dzl.= (mu.-zl_r.*dx_lr)./(x_lr.-xl_r).-zl_r
-    dzu.= (mu.+zu_r.*dx_ur)./(xu_r.-x_ur).-zu_r
-end
 function finish_aug_solve!(ips::Solver, kkt::AbstractKKTSystem, mu)
-    _finish_aug_solve_reduced!(ips.dzl, ips.dzu, ips.zl_r, ips.zu_r, ips.dx_lr, ips.dx_ur, ips.x_lr, ips.x_ur, ips.xl_r, ips.xu_r, mu)
+    ips.dzl.= (mu.-ips.zl_r.*ips.dx_lr)./(ips.x_lr.-ips.xl_r).-ips.zl_r
+    ips.dzu.= (mu.+ips.zu_r.*ips.dx_ur)./(ips.xu_r.-ips.x_ur).-ips.zu_r
 end
-# Note: No need to force specialization here.
+
 function finish_aug_solve!(ips::Solver, kkt::SparseUnreducedKKTSystem, mu)
     ips.dzl.*=.-kkt.l_lower
     ips.dzu.*=kkt.u_lower
+    ips.dzl.= (mu.-ips.zl_r.*ips.dx_lr)./(ips.x_lr.-ips.xl_r).-ips.zl_r
+    ips.dzu.= (mu.+ips.zu_r.*ips.dx_ur)./(ips.xu_r.-ips.x_ur).-ips.zu_r
 end
 
 # Initial
@@ -1196,12 +1181,6 @@ end
 function set_aug_rhs_ifr!(ips::Solver, kkt::AbstractKKTSystem)
     ips._w1x .= 0.0
     ips._w1l .= .-ips.c
-end
-function set_aug_rhs_ifr!(ips::Solver, kkt::SparseUnreducedKKTSystem)
-    ips._w1x .= 0.
-    ips._w1l .= .-ips.c
-    ips._w1zl.= 0.
-    ips._w1zu.= 0.
 end
 
 # Finish RR
@@ -1224,64 +1203,64 @@ is_valid(args...) = all(is_valid(arg) for arg in args)
 
 function get_varphi(obj_val,x_lr,xl_r,xu_r,x_ur,mu)
     varphi = obj_val
-    for i=1:length(x_lr)
-        xll = x_lr[i]-xl_r[i]
-        @inbounds xll < 0 && return Inf
-        @inbounds varphi -= mu*log(xll)
+    @simd for i=1:length(x_lr)
+        @inbounds xll = x_lr[i]-xl_r[i]
+        xll < 0 && return Inf
+        varphi -= mu*log(xll)
     end
-    for i=1:length(x_ur)
-        xuu = xu_r[i]-x_ur[i]
-        @inbounds xuu < 0 && return Inf
-        @inbounds varphi -= mu*log(xuu)
+    @simd for i=1:length(x_ur)
+        @inbounds xuu = xu_r[i]-x_ur[i]
+        xuu < 0 && return Inf
+        varphi -= mu*log(xuu)
     end
     return varphi
 end
 get_inf_pr(c) = norm(c,Inf)
 function get_inf_du(f,zl,zu,jacl,sd)
     inf_du = 0.
-    for i=1:length(f)
+    @simd for i=1:length(f)
         @inbounds inf_du = max(inf_du,abs(f[i]-zl[i]+zu[i]+jacl[i]))
     end
     return inf_du/sd
 end
 function get_inf_compl(x_lr,xl_r,zl_r,xu_r,x_ur,zu_r,mu,sc)
     inf_compl = 0.
-    for i=1:length(x_lr)
+    @simd for i=1:length(x_lr)
         @inbounds inf_compl = max(inf_compl,abs((x_lr[i]-xl_r[i])*zl_r[i]-mu))
     end
-    for i=1:length(x_ur)
+    @simd for i=1:length(x_ur)
         @inbounds inf_compl = max(inf_compl,abs((xu_r[i]-x_ur[i])*zu_r[i]-mu))
     end
     return inf_compl/sc
 end
 function get_varphi_d(f,x,xl,xu,dx,mu)
     varphi_d = 0.
-    for i=1:length(f)
+    @simd for i=1:length(f)
         @inbounds varphi_d += (f[i] - mu/(x[i]-xl[i]) + mu/(xu[i]-x[i])) *dx[i]
     end
     return varphi_d
 end
 function get_alpha_max(x,xl,xu,dx,tau)
     alpha_max = 1.
-    for i=1:length(x)
-        @inbounds dx[i]<0 && (alpha_max=min(alpha_max,(-x[i]+xl[i])/dx[i]))
-        @inbounds dx[i]>0 && (alpha_max=min(alpha_max,(-x[i]+xu[i])/dx[i]))
+    @simd for i=1:length(x)
+        @inbounds dx[i]<0 && (alpha_max=min(alpha_max,(-x[i]+xl[i])*tau/dx[i]))
+        @inbounds dx[i]>0 && (alpha_max=min(alpha_max,(-x[i]+xu[i])*tau/dx[i]))
     end
-    return alpha_max*tau
+    return alpha_max
 end
 function get_alpha_z(zl_r,zu_r,dzl,dzu,tau)
     alpha_z = 1.
-    for i=1:length(zl_r)
-        @inbounds dzl[i]<0 && (alpha_z=min(alpha_z,-zl_r[i]/dzl[i]))
+    @simd for i=1:length(zl_r)
+        @inbounds dzl[i]<0 && (alpha_z=min(alpha_z,-zl_r[i]*tau/dzl[i]))
      end
-    for i=1:length(zu_r)
-        @inbounds dzu[i]<0 && (alpha_z=min(alpha_z,-zu_r[i]/dzu[i]))
+    @simd for i=1:length(zu_r)
+        @inbounds dzu[i]<0 && (alpha_z=min(alpha_z,-zu_r[i]*tau/dzu[i]))
     end
-    return alpha_z*tau
+    return alpha_z
 end
 function get_obj_val_R(p,n,D_R,x,x_ref,rho,zeta)
     obj_val_R = 0.
-    for i=1:length(p)
+    @simd for i=1:length(p)
         @inbounds obj_val_R += rho*(p[i]+n[i]) .+ zeta/2*D_R[i]^2*(x[i]-x_ref[i])^2
     end
     return obj_val_R
@@ -1289,94 +1268,94 @@ end
 get_theta(c) = norm(c,1)
 function get_theta_R(c,p,n)
     theta_R = 0.
-    for i=1:length(c)
+    @simd for i=1:length(c)
         @inbounds theta_R += abs(c[i]-p[i]+n[i])
     end
     return theta_R
 end
 function get_inf_pr_R(c,p,n)
     inf_pr_R = 0.
-    for i=1:length(c)
+    @simd for i=1:length(c)
         @inbounds inf_pr_R = max(inf_pr_R,abs(c[i]-p[i]+n[i]))
     end
     return inf_pr_R
 end
 function get_inf_du_R(f_R,l,zl,zu,jacl,zp,zn,rho,sd)
     inf_du_R = 0.
-    for i=1:length(zl)
+    @simd for i=1:length(zl)
         @inbounds inf_du_R = max(inf_du_R,abs(f_R[i]-zl[i]+zu[i]+jacl[i]))
     end
-    for i=1:length(zp)
+    @simd for i=1:length(zp)
         @inbounds inf_du_R = max(inf_du_R,abs(rho-l[i]-zp[i]))
     end
-    for i=1:length(zn)
+    @simd for i=1:length(zn)
         @inbounds inf_du_R = max(inf_du_R,abs(rho+l[i]-zn[i]))
     end
     return inf_du_R/sd
 end
 function get_inf_compl_R(x_lr,xl_r,zl_r,xu_r,x_ur,zu_r,pp,zp,nn,zn,mu_R,sc)
     inf_compl_R = 0.
-    for i=1:length(x_lr)
+    @simd for i=1:length(x_lr)
         @inbounds inf_compl_R = max(inf_compl_R,abs((x_lr[i]-xl_r[i])*zl_r[i]-mu_R))
     end
-    for i=1:length(xu_r)
+    @simd for i=1:length(xu_r)
         @inbounds inf_compl_R = max(inf_compl_R,abs((xu_r[i]-x_ur[i])*zu_r[i]-mu_R))
     end
-    for i=1:length(pp)
+    @simd for i=1:length(pp)
         @inbounds inf_compl_R = max(inf_compl_R,abs(pp[i]*zp[i]-mu_R))
     end
-    for i=1:length(nn)
+    @simd for i=1:length(nn)
         @inbounds inf_compl_R = max(inf_compl_R,abs(nn[i]*zn[i]-mu_R))
     end
     return inf_compl_R/sc
 end
 function get_alpha_max_R(x,xl,xu,dx,pp,dpp,nn,dnn,tau_R)
     alpha_max_R = 1.
-    for i=1:length(x)
-        @inbounds dx[i]<0 && (alpha_max_R=min(alpha_max_R,(-x[i]+xl[i])/dx[i]))
-        @inbounds dx[i]>0 && (alpha_max_R=min(alpha_max_R,(-x[i]+xu[i])/dx[i]))
+    @simd for i=1:length(x)
+        @inbounds dx[i]<0 && (alpha_max_R=min(alpha_max_R,(-x[i]+xl[i])*tau_R/dx[i]))
+        @inbounds dx[i]>0 && (alpha_max_R=min(alpha_max_R,(-x[i]+xu[i])*tau_R/dx[i]))
     end
-    for i=1:length(pp)
-        @inbounds dpp[i]<0 && (alpha_max_R=min(alpha_max_R,-pp[i]/dpp[i]))
+    @simd for i=1:length(pp)
+        @inbounds dpp[i]<0 && (alpha_max_R=min(alpha_max_R,-pp[i]*tau_R/dpp[i]))
     end
-    for i=1:length(nn)
-        @inbounds dnn[i]<0 && (alpha_max_R=min(alpha_max_R,-nn[i]/dnn[i]))
+    @simd for i=1:length(nn)
+        @inbounds dnn[i]<0 && (alpha_max_R=min(alpha_max_R,-nn[i]*tau_R/dnn[i]))
     end
-    return alpha_max_R*tau_R
+    return alpha_max_R
 end
 function get_alpha_z_R(zl_r,zu_r,dzl,dzu,zp,dzp,zn,dzn,tau_R)
     alpha_z_R = 1.
-    for i=1:length(zl_r)
-        @inbounds dzl[i]<0 && (alpha_z_R=min(alpha_z_R,-zl_r[i]/dzl[i]))
+    @simd for i=1:length(zl_r)
+        @inbounds dzl[i]<0 && (alpha_z_R=min(alpha_z_R,-zl_r[i]*tau_R/dzl[i]))
     end
-    for i=1:length(zu_r)
-        @inbounds dzu[i]<0 && (alpha_z_R=min(alpha_z_R,-zu_r[i]/dzu[i]))
+    @simd for i=1:length(zu_r)
+        @inbounds dzu[i]<0 && (alpha_z_R=min(alpha_z_R,-zu_r[i]*tau_R/dzu[i]))
     end
-    for i=1:length(zp)
-        @inbounds dzp[i]<0 && (alpha_z_R=min(alpha_z_R,-zp[i]/dzp[i]))
+    @simd for i=1:length(zp)
+        @inbounds dzp[i]<0 && (alpha_z_R=min(alpha_z_R,-zp[i]*tau_R/dzp[i]))
     end
-    for i=1:length(zn)
-        @inbounds dzn[i]<0 && (alpha_z_R=min(alpha_z_R,-zn[i]/dzn[i]))
+    @simd for i=1:length(zn)
+        @inbounds dzn[i]<0 && (alpha_z_R=min(alpha_z_R,-zn[i]*tau_R/dzn[i]))
     end
-    return alpha_z_R*tau_R
+    return alpha_z_R
 end
 function get_varphi_R(obj_val,x_lr,xl_r,xu_r,x_ur,pp,nn,mu_R)
     varphi_R = obj_val
-    for i=1:length(x_lr)
-        xll = x_lr[i]-xl_r[i]
-        @inbounds xll < 0 && return Inf
-        @inbounds varphi_R -= mu_R*log(xll)
+    @simd for i=1:length(x_lr)
+        @inbounds xll = x_lr[i]-xl_r[i]
+        xll < 0 && return Inf
+        varphi_R -= mu_R*log(xll)
     end
-    for i=1:length(x_ur)
-        xuu = xu_r[i]-x_ur[i]
-        @inbounds xuu < 0 && return Inf
-        @inbounds varphi_R -= mu_R*log(xuu)
+    @simd for i=1:length(x_ur)
+        @inbounds xuu = xu_r[i]-x_ur[i]
+        xuu < 0 && return Inf
+        varphi_R -= mu_R*log(xuu)
     end
-    for i=1:length(pp)
+    @simd for i=1:length(pp)
         @inbounds pp[i] < 0 && return Inf
         @inbounds varphi_R -= mu_R*log(pp[i])
     end
-    for i=1:length(pp)
+    @simd for i=1:length(pp)
         @inbounds nn[i] < 0 && return Inf
         @inbounds varphi_R -= mu_R*log(nn[i])
     end
@@ -1384,19 +1363,19 @@ function get_varphi_R(obj_val,x_lr,xl_r,xu_r,x_ur,pp,nn,mu_R)
 end
 function get_varphi_d_R(f_R,x,xl,xu,dx,pp,nn,dpp,dnn,mu_R,rho)
     varphi_d = 0.
-    for i=1:length(x)
+    @simd for i=1:length(x)
         @inbounds varphi_d += (f_R[i] - mu_R/(x[i]-xl[i]) + mu_R/(xu[i]-x[i])) *dx[i]
     end
-    for i=1:length(pp)
+    @simd for i=1:length(pp)
         @inbounds varphi_d += (rho - mu_R/pp[i]) *dpp[i]
     end
-    for i=1:length(nn)
+    @simd for i=1:length(nn)
         @inbounds varphi_d += (rho - mu_R/nn[i]) *dnn[i]
     end
     return varphi_d
 end
 function initialize_variables!(x,xl,xu,bound_push,bound_fac)
-    @inbounds for i=1:length(x)
+    @inbounds @simd for i=1:length(x)
         if xl[i]!=-Inf && xu[i]!=Inf
             x[i]=min(xu[i]-min(bound_push*max(1,abs(xu[i])),bound_fac*(xu[i]-xl[i])),
                      max(xl[i]+min(bound_push*max(1,abs(xl[i])),bound_fac*(xu[i]-xl[i])),x[i]))
@@ -1408,11 +1387,11 @@ function initialize_variables!(x,xl,xu,bound_push,bound_fac)
     end
 end
 function set_con_scale!(con_scale,con_jac_scale,jac,jac_sparsity_I,nlp_scaling_max_gradient)
-    for i=1:length(jac)
+    @simd for i=1:length(jac)
         @inbounds con_scale[jac_sparsity_I[i]]=max(con_scale[jac_sparsity_I[i]],abs(jac[i]))
     end
     con_scale.=min.(1,nlp_scaling_max_gradient./con_scale)
-    for i=1:length(jac_sparsity_I)
+    @simd for i=1:length(jac_sparsity_I)
         @inbounds con_jac_scale[i]=con_scale[jac_sparsity_I[i]]
     end
 end
@@ -1420,23 +1399,23 @@ function adjust_boundary!(x_lr,xl_r,x_ur,xu_r,mu)
     adjusted = 0
     c1 = eps(Float64)*mu
     c2= eps(Float64)^(3/4)
-    for i=1:length(xl_r)
+    @simd for i=1:length(xl_r)
         @inbounds x_lr[i]-xl_r[i] < c1 && (xl_r[i] -= c2*max(1,x_lr[i]);adjusted+=1)
     end
-    for i=1:length(xu_r)
+    @simd for i=1:length(xu_r)
         @inbounds xu_r[i]-x_ur[i] < c1 && (xu_r[i] += c2*max(1,x_ur[i]);adjusted+=1)
     end
     return adjusted
 end
 function get_rel_search_norm(x,dx)
     rel_search_norm = 0.
-    for i=1:length(x)
+    @simd for i=1:length(x)
         @inbounds rel_search_norm = max(rel_search_norm,abs(dx[i])/(1. +abs(x[i])))
     end
     return rel_search_norm
 end
 function force_lower_triangular!(I,J)
-    for i=1:length(I)
+    @simd for i=1:length(I)
         @inbounds if J[i] > I[i]
             tmp=J[i]
             J[i]=I[i]
@@ -1510,7 +1489,7 @@ function _get_fixed_variable_index(mat::SparseMatrixCSC{Tv,Ti1}, ind_fixed::Vect
 end
 fixed_variable_treatment_vec!(vec,ind_fixed) = (vec[ind_fixed] .= 0.)
 function fixed_variable_treatment_z!(zl,zu,f,jacl,ind_fixed)
-    for i in ind_fixed
+    @simd for i in ind_fixed
         z = f[i]+jacl[i]
         z >=0 ? (zl[i] = z; zu[i] = 0.) : (zl[i] = 0.; zu[i] = -z)
     end
@@ -1518,10 +1497,10 @@ end
 
 
 function dual_inf_perturbation!(px,ind_llb,ind_uub,mu,kappa_d)
-    for i in ind_llb
+    @simd for i in ind_llb
         @inbounds px[i] -= mu*kappa_d
     end
-    for i in ind_uub
+    @simd for i in ind_uub
         @inbounds px[i] += mu*kappa_d
     end
 end

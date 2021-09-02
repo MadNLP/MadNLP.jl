@@ -247,7 +247,7 @@ function SparseUnreducedKKTSystem{T, MT}(
 
     I = Vector{Int32}(undef, aug_mat_length)
     J = Vector{Int32}(undef, aug_mat_length)
-    V = Vector{Float64}(undef, aug_mat_length)
+    V = zeros(aug_mat_length)
 
     offset = n+n_jac+n_hess+m
 
