@@ -61,6 +61,16 @@ function get_index_constraints(nlp::NonlinearProgram; fixed_variable_treatment=M
     )
 end
 
+function has_dense_hessian_callback(nlp::NonlinearProgram)
+    func = nlp.lag_hess!
+    return hasmethod(func, Tuple{AbstractMatrix{T} where T, Any, Any, Any})
+end
+
+function has_dense_jacobian_callback(nlp::NonlinearProgram)
+    func = nlp.con_jac!
+    return hasmethod(func, Tuple{AbstractMatrix{T} where T, Any})
+end
+
 function string(nlp::NonlinearProgram)
     """
     Nonlinear program

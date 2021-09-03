@@ -323,6 +323,17 @@ function Solver(nlp::NonlinearProgram;
     set_options!(opt,option_dict,kwargs)
     check_option_sanity(opt)
 
+    # If we are using DenseKKTSystem, ensure that dense callbacks are available
+    if opt.kkt_system == DENSE_KKT_SYSTEM
+        if !has_dense_hessian_callback(nlp)
+            error("MadNLP is unable to find a dense callback for Hessian in `nlp`.\n" *
+                  "Please add a new method with signature `lag_hess!(<:AbstractMatrix{T}, Any, Any, Any)`.")
+        end
+        if ((nlp.m > 0) && !has_dense_jacobian_callback(nlp))
+            error("MadNLP is unable to find a dense callback for Jacobian in `nlp`.\n" *
+                  "Please add a new method with signature `con_jac!(<:AbstractMatrix{T}, Any)`.")
+        end
+    end
     logger = Logger(print_level=opt.print_level,file_print_level=opt.file_print_level,
                     file = opt.output_file == "" ? nothing : open(opt.output_file,"w+"))
     @trace(logger,"Logger is initialized.")
