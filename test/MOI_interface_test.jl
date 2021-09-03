@@ -15,8 +15,7 @@ const config_no_duals = MOIT.Config(atol=1e-4, rtol=1e-4, duals=false,
         @test MOI.get(optimizer, MOI.SolverName()) == "MadNLP"
     end
     @testset "supports_default_copy_to" begin
-        @test MOI.supports_incremental_interface(optimizer, false)
-        @test !MOI.supports_incremental_interface(optimizer, true)
+        @test MOI.supports_incremental_interface(optimizer)
     end
     @testset "MOI.Silent" begin
         @test MOI.supports(optimizer, MOI.Silent())

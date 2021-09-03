@@ -28,7 +28,7 @@ mutable struct Optimizer <: MOI.AbstractOptimizer
     nlp_data::MOI.NLPBlockData
     sense::MOI.OptimizationSense
     objective::Union{
-        MOI.SingleVariable,MOI.ScalarAffineFunction{Float64},MOI.ScalarQuadraticFunction{Float64},Nothing}
+        MOI.VariableIndex,MOI.ScalarAffineFunction{Float64},MOI.ScalarQuadraticFunction{Float64},Nothing}
 
     linear_le_constraints::Vector{ConstraintInfo{MOI.ScalarAffineFunction{Float64},MOI.LessThan{Float64}}}
     linear_ge_constraints::Vector{ConstraintInfo{MOI.ScalarAffineFunction{Float64},MOI.GreaterThan{Float64}}}
@@ -69,15 +69,15 @@ empty_nlp_data() = MOI.NLPBlockData([], EmptyNLPEvaluator(), false)
 
 # for throw_if_valid
 MOI.is_valid(model::Optimizer, vi::MOI.VariableIndex) = vi.value in eachindex(model.variable_info)
-function MOI.is_valid(model::Optimizer, ci::MOI.ConstraintIndex{MOI.SingleVariable, MOI.LessThan{Float64}})
+function MOI.is_valid(model::Optimizer, ci::MOI.ConstraintIndex{MOI.VariableIndex, MOI.LessThan{Float64}})
     vi = MOI.VariableIndex(ci.value)
     return MOI.is_valid(model, vi) && has_upper_bound(model, vi)
 end
-function MOI.is_valid(model::Optimizer, ci::MOI.ConstraintIndex{MOI.SingleVariable, MOI.GreaterThan{Float64}})
+function MOI.is_valid(model::Optimizer, ci::MOI.ConstraintIndex{MOI.VariableIndex, MOI.GreaterThan{Float64}})
     vi = MOI.VariableIndex(ci.value)
     return MOI.is_valid(model, vi) && has_lower_bound(model, vi)
 end
-function MOI.is_valid(model::Optimizer, ci::MOI.ConstraintIndex{MOI.SingleVariable, MOI.EqualTo{Float64}})
+function MOI.is_valid(model::Optimizer, ci::MOI.ConstraintIndex{MOI.VariableIndex, MOI.EqualTo{Float64}})
     vi = MOI.VariableIndex(ci.value)
     return MOI.is_valid(model, vi) && is_fixed(model, vi)
 end
@@ -85,13 +85,13 @@ end
 
 # supported obj/var/cons
 MOI.supports(::Optimizer, ::MOI.NLPBlock) = true
-MOI.supports(::Optimizer,::MOI.ObjectiveFunction{MOI.SingleVariable}) = true
+MOI.supports(::Optimizer,::MOI.ObjectiveFunction{MOI.VariableIndex}) = true
 MOI.supports(::Optimizer,::MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}) = true
 MOI.supports(::Optimizer,::MOI.ObjectiveFunction{MOI.ScalarQuadraticFunction{Float64}}) = true
 MOI.supports(::Optimizer, ::MOI.VariablePrimalStart,::Type{MOI.VariableIndex}) = true
-MOI.supports_constraint(::Optimizer,::Type{MOI.SingleVariable},::Type{MOI.LessThan{Float64}})=true
-MOI.supports_constraint(::Optimizer,::Type{MOI.SingleVariable},::Type{MOI.GreaterThan{Float64}})=true
-MOI.supports_constraint(::Optimizer,::Type{MOI.SingleVariable},::Type{MOI.EqualTo{Float64}})=true
+MOI.supports_constraint(::Optimizer,::Type{MOI.VariableIndex},::Type{MOI.LessThan{Float64}})=true
+MOI.supports_constraint(::Optimizer,::Type{MOI.VariableIndex},::Type{MOI.GreaterThan{Float64}})=true
+MOI.supports_constraint(::Optimizer,::Type{MOI.VariableIndex},::Type{MOI.EqualTo{Float64}})=true
 MOI.supports_constraint(::Optimizer,::Type{MOI.ScalarAffineFunction{Float64}},::Type{MOI.LessThan{Float64}})=true
 MOI.supports_constraint(::Optimizer,::Type{MOI.ScalarAffineFunction{Float64}},::Type{MOI.GreaterThan{Float64}})=true
 MOI.supports_constraint(::Optimizer,::Type{MOI.ScalarAffineFunction{Float64}},::Type{MOI.EqualTo{Float64}})=true
@@ -109,9 +109,9 @@ MOI.get(model::Optimizer,::MOI.NumberOfVariables)=length(model.variable_info)
 MOI.get(model::Optimizer,::MOI.NumberOfConstraints{MOI.ScalarAffineFunction{Float64},MOI.LessThan{Float64}})=length(model.linear_le_constraints)
 MOI.get(model::Optimizer,::MOI.NumberOfConstraints{MOI.ScalarAffineFunction{Float64},MOI.EqualTo{Float64}})=length(model.linear_eq_constraints)
 MOI.get(model::Optimizer,::MOI.NumberOfConstraints{MOI.ScalarAffineFunction{Float64},MOI.GreaterThan{Float64}})=length(model.linear_ge_constraints)
-MOI.get(model::Optimizer,::MOI.NumberOfConstraints{MOI.SingleVariable,MOI.LessThan{Float64}})=count(e->e.has_upper_bound,model.variable_info)
-MOI.get(model::Optimizer,::MOI.NumberOfConstraints{MOI.SingleVariable,MOI.EqualTo{Float64}})=count(e->e.is_fixed,model.variable_info)
-MOI.get(model::Optimizer,::MOI.NumberOfConstraints{MOI.SingleVariable,MOI.GreaterThan{Float64}})=count(e->e.has_lower_bound,model.variable_info)
+MOI.get(model::Optimizer,::MOI.NumberOfConstraints{MOI.VariableIndex,MOI.LessThan{Float64}})=count(e->e.has_upper_bound,model.variable_info)
+MOI.get(model::Optimizer,::MOI.NumberOfConstraints{MOI.VariableIndex,MOI.EqualTo{Float64}})=count(e->e.is_fixed,model.variable_info)
+MOI.get(model::Optimizer,::MOI.NumberOfConstraints{MOI.VariableIndex,MOI.GreaterThan{Float64}})=count(e->e.has_lower_bound,model.variable_info)
 MOI.get(model::Optimizer,::MOI.ObjectiveFunction) = model.objective
 MOI.get(model::Optimizer,::MOI.ListOfVariableIndices) = [MOI.VariableIndex(i) for i in 1:length(model.variable_info)]
 MOI.get(model::Optimizer,::MOI.BarrierIterations) = model.ips.cnt.k
@@ -139,30 +139,30 @@ end
 
 
 function MOI.get(model::Optimizer,::MOI.ConstraintSet,
-                 c::MOI.ConstraintIndex{MOI.SingleVariable, MOI.LessThan{Float64}})
+                 c::MOI.ConstraintIndex{MOI.VariableIndex, MOI.LessThan{Float64}})
     return MOI.LessThan{Float64}(model.variable_info[c.value].upper_bound)
 end
 
 function MOI.get(model::Optimizer,::MOI.ConstraintSet,
-                 c::MOI.ConstraintIndex{MOI.SingleVariable, MOI.EqualTo{Float64}})
+                 c::MOI.ConstraintIndex{MOI.VariableIndex, MOI.EqualTo{Float64}})
     return MOI.EqualTo{Float64}(model.variable_info[c.value].lower_bound)
 end
 
 function MOI.get(model::Optimizer,::MOI.ConstraintSet,
-                 c::MOI.ConstraintIndex{MOI.SingleVariable, MOI.GreaterThan{Float64}})
+                 c::MOI.ConstraintIndex{MOI.VariableIndex, MOI.GreaterThan{Float64}})
     return MOI.GreaterThan{Float64}(model.variable_info[c.value].lower_bound)
 end
 function MOI.get(model::Optimizer,::MOI.ConstraintFunction,
-                 c::MOI.ConstraintIndex{MOI.SingleVariable, MOI.LessThan{Float64}})
+                 c::MOI.ConstraintIndex{MOI.VariableIndex, MOI.LessThan{Float64}})
     return MOI.SingleVariable(MOI.VariableIndex(c.value))
 end
 function MOI.get(model::Optimizer,::MOI.ConstraintFunction,
-                 c::MOI.ConstraintIndex{MOI.SingleVariable, MOI.EqualTo{Float64}})
+                 c::MOI.ConstraintIndex{MOI.VariableIndex, MOI.EqualTo{Float64}})
     return MOI.SingleVariable(MOI.VariableIndex(c.value))
 end
 function MOI.get(
     model::Optimizer,::MOI.ConstraintFunction,
-    c::MOI.ConstraintIndex{MOI.SingleVariable, MOI.GreaterThan{Float64}})
+    c::MOI.ConstraintIndex{MOI.VariableIndex, MOI.GreaterThan{Float64}})
     return MOI.SingleVariable(MOI.VariableIndex(c.value))
 end
 
@@ -172,9 +172,9 @@ function MOI.get(model::Optimizer, ::MOI.ListOfConstraintTypesPresent)
     constraints = Set{Tuple{DataType, DataType}}()
 
     for info in model.variable_info
-        info.has_lower_bound && push!(constraints, (MOI.SingleVariable, MOI.LessThan{Float64}))
-        info.has_upper_bound && push!(constraints, (MOI.SingleVariable, MOI.GreaterThan{Float64}))
-        info.is_fixed && push!(constraints, (MOI.SingleVariable, MOI.EqualTo{Float64}))
+        info.has_lower_bound && push!(constraints, (MOI.VariableIndex, MOI.LessThan{Float64}))
+        info.has_upper_bound && push!(constraints, (MOI.VariableIndex, MOI.GreaterThan{Float64}))
+        info.is_fixed && push!(constraints, (MOI.VariableIndex, MOI.EqualTo{Float64}))
     end
 
     isempty(model.linear_le_constraints) ||
@@ -210,25 +210,25 @@ function MOI.get(
 )
     return MOI.ConstraintIndex{MOI.ScalarAffineFunction{Float64}, MOI.GreaterThan{Float64}}.(eachindex(model.linear_ge_constraints))
 end
-function MOI.get(model::Optimizer, ::MOI.ListOfConstraintIndices{MOI.SingleVariable, MOI.LessThan{Float64}})
+function MOI.get(model::Optimizer, ::MOI.ListOfConstraintIndices{MOI.VariableIndex, MOI.LessThan{Float64}})
     dict = Dict(model.variable_info[i] => i for i in 1:length(model.variable_info))
     filter!(info -> info.first.has_upper_bound, dict)
-    return MOI.ConstraintIndex{MOI.SingleVariable, MOI.LessThan{Float64}}.(values(dict))
+    return MOI.ConstraintIndex{MOI.VariableIndex, MOI.LessThan{Float64}}.(values(dict))
 end
-function MOI.get(model::Optimizer, ::MOI.ListOfConstraintIndices{MOI.SingleVariable, MOI.EqualTo{Float64}})
+function MOI.get(model::Optimizer, ::MOI.ListOfConstraintIndices{MOI.VariableIndex, MOI.EqualTo{Float64}})
     dict = Dict(model.variable_info[i] => i for i in 1:length(model.variable_info))
     filter!(info -> info.first.is_fixed, dict)
-    return MOI.ConstraintIndex{MOI.SingleVariable, MOI.EqualTo{Float64}}.(values(dict))
+    return MOI.ConstraintIndex{MOI.VariableIndex, MOI.EqualTo{Float64}}.(values(dict))
 end
-function MOI.get(model::Optimizer, ::MOI.ListOfConstraintIndices{MOI.SingleVariable, MOI.GreaterThan{Float64}})
+function MOI.get(model::Optimizer, ::MOI.ListOfConstraintIndices{MOI.VariableIndex, MOI.GreaterThan{Float64}})
     dict = Dict(model.variable_info[i] => i for i in 1:length(model.variable_info))
     filter!(info -> info.first.has_lower_bound, dict)
-    return MOI.ConstraintIndex{MOI.SingleVariable, MOI.GreaterThan{Float64}}.(values(dict))
+    return MOI.ConstraintIndex{MOI.VariableIndex, MOI.GreaterThan{Float64}}.(values(dict))
 end
 
 
 function MOI.set(model::Optimizer, ::MOI.ConstraintSet,
-                 ci::MOI.ConstraintIndex{MOI.SingleVariable, MOI.LessThan{Float64}},
+                 ci::MOI.ConstraintIndex{MOI.VariableIndex, MOI.LessThan{Float64}},
                  set::MOI.LessThan{Float64})
     MOI.throw_if_not_valid(model, ci)
     model.variable_info[ci.value].upper_bound = set.upper
@@ -236,7 +236,7 @@ function MOI.set(model::Optimizer, ::MOI.ConstraintSet,
 end
 
 function MOI.set(model::Optimizer, ::MOI.ConstraintSet,
-                 ci::MOI.ConstraintIndex{MOI.SingleVariable, MOI.GreaterThan{Float64}},
+                 ci::MOI.ConstraintIndex{MOI.VariableIndex, MOI.GreaterThan{Float64}},
                  set::MOI.GreaterThan{Float64})
     MOI.throw_if_not_valid(model, ci)
     model.variable_info[ci.value].lower_bound = set.lower
@@ -244,7 +244,7 @@ function MOI.set(model::Optimizer, ::MOI.ConstraintSet,
 end
 
 function MOI.set(model::Optimizer, ::MOI.ConstraintSet,
-                 ci::MOI.ConstraintIndex{MOI.SingleVariable, MOI.EqualTo{Float64}},
+                 ci::MOI.ConstraintIndex{MOI.VariableIndex, MOI.EqualTo{Float64}},
                  set::MOI.EqualTo{Float64})
     MOI.throw_if_not_valid(model, ci)
     model.variable_info[ci.value].lower_bound = set.value
@@ -253,8 +253,8 @@ function MOI.set(model::Optimizer, ::MOI.ConstraintSet,
 end
 
 # default_copy_to
-MOI.supports_incremental_interface(model::Optimizer, copy_names::Bool) = !copy_names
-MOI.copy_to(model::Optimizer, src::MOI.ModelLike; copy_names = false) = MOIU.default_copy_to(model, src, copy_names)
+MOI.supports_incremental_interface(model::Optimizer) = true
+MOI.copy_to(model::Optimizer, src::MOI.ModelLike) = MOIU.default_copy_to(model, src)
 
 # objective sense
 MOI.supports(::Optimizer,::MOI.ObjectiveSense) = true
@@ -328,7 +328,6 @@ function check_inbounds(model::Optimizer, vi::MOI.VariableIndex)
         error("Invalid variable index $vi. ($num_variables variables in the model.)")
     end
 end
-check_inbounds(model::Optimizer, var::MOI.SingleVariable) = check_inbounds(model, var.variable)
 function check_inbounds(model::Optimizer, aff::MOI.ScalarAffineFunction)
     for term in aff.terms
         check_inbounds(model, term.variable)
@@ -348,21 +347,21 @@ has_upper_bound(model::Optimizer, vi::MOI.VariableIndex) = model.variable_info[v
 has_lower_bound(model::Optimizer, vi::MOI.VariableIndex) = model.variable_info[vi.value].has_lower_bound
 is_fixed(model::Optimizer, vi::MOI.VariableIndex) = model.variable_info[vi.value].is_fixed
 
-function MOI.delete(model::Optimizer, ci::MOI.ConstraintIndex{MOI.SingleVariable, MOI.LessThan{Float64}})
+function MOI.delete(model::Optimizer, ci::MOI.ConstraintIndex{MOI.VariableIndex, MOI.LessThan{Float64}})
     MOI.throw_if_not_valid(model, ci)
     model.variable_info[ci.value].upper_bound = Inf
     model.variable_info[ci.value].has_upper_bound = false
     return
 end
 
-function MOI.delete(model::Optimizer, ci::MOI.ConstraintIndex{MOI.SingleVariable, MOI.GreaterThan{Float64}})
+function MOI.delete(model::Optimizer, ci::MOI.ConstraintIndex{MOI.VariableIndex, MOI.GreaterThan{Float64}})
     MOI.throw_if_not_valid(model, ci)
     model.variable_info[ci.value].lower_bound = -Inf
     model.variable_info[ci.value].has_lower_bound = false
     return
 end
 
-function MOI.delete(model::Optimizer, ci::MOI.ConstraintIndex{MOI.SingleVariable, MOI.EqualTo{Float64}})
+function MOI.delete(model::Optimizer, ci::MOI.ConstraintIndex{MOI.VariableIndex, MOI.EqualTo{Float64}})
     MOI.throw_if_not_valid(model, ci)
     model.variable_info[ci.value].lower_bound = -Inf
     model.variable_info[ci.value].upper_bound = Inf
@@ -371,8 +370,7 @@ function MOI.delete(model::Optimizer, ci::MOI.ConstraintIndex{MOI.SingleVariable
 end
 
 
-function MOI.add_constraint(model::Optimizer, v::MOI.SingleVariable, lt::MOI.LessThan{Float64})
-    vi = v.variable
+function MOI.add_constraint(model::Optimizer, vi::MOI.VariableIndex, lt::MOI.LessThan{Float64})
     check_inbounds(model, vi)
     if isnan(lt.upper)
         error("Invalid upper bound value $(lt.upper).")
@@ -385,11 +383,10 @@ function MOI.add_constraint(model::Optimizer, v::MOI.SingleVariable, lt::MOI.Les
     end
     model.variable_info[vi.value].upper_bound = lt.upper
     model.variable_info[vi.value].has_upper_bound = true
-    return MOI.ConstraintIndex{MOI.SingleVariable, MOI.LessThan{Float64}}(vi.value)
+    return MOI.ConstraintIndex{MOI.VariableIndex, MOI.LessThan{Float64}}(vi.value)
 end
 
-function MOI.add_constraint(model::Optimizer, v::MOI.SingleVariable, gt::MOI.GreaterThan{Float64})
-    vi = v.variable
+function MOI.add_constraint(model::Optimizer, vi::MOI.VariableIndex, gt::MOI.GreaterThan{Float64})
     check_inbounds(model, vi)
     if isnan(gt.lower)
         error("Invalid lower bound value $(gt.lower).")
@@ -402,11 +399,10 @@ function MOI.add_constraint(model::Optimizer, v::MOI.SingleVariable, gt::MOI.Gre
     end
     model.variable_info[vi.value].lower_bound = gt.lower
     model.variable_info[vi.value].has_lower_bound = true
-    return MOI.ConstraintIndex{MOI.SingleVariable, MOI.GreaterThan{Float64}}(vi.value)
+    return MOI.ConstraintIndex{MOI.VariableIndex, MOI.GreaterThan{Float64}}(vi.value)
 end
 
-function MOI.add_constraint(model::Optimizer, v::MOI.SingleVariable, eq::MOI.EqualTo{Float64})
-    vi = v.variable
+function MOI.add_constraint(model::Optimizer, vi::MOI.VariableIndex, eq::MOI.EqualTo{Float64})
     check_inbounds(model, vi)
     if isnan(eq.value)
         error("Invalid fixed value $(gt.lower).")
@@ -423,7 +419,7 @@ function MOI.add_constraint(model::Optimizer, v::MOI.SingleVariable, eq::MOI.Equ
     model.variable_info[vi.value].lower_bound = eq.value
     model.variable_info[vi.value].upper_bound = eq.value
     model.variable_info[vi.value].is_fixed = true
-    return MOI.ConstraintIndex{MOI.SingleVariable, MOI.EqualTo{Float64}}(vi.value)
+    return MOI.ConstraintIndex{MOI.VariableIndex, MOI.EqualTo{Float64}}(vi.value)
 end
 
 macro define_add_constraint(function_type, set_type, prefix)
@@ -452,12 +448,12 @@ function MOI.set(model::Optimizer, ::MOI.VariablePrimalStart,
 end
 
 function MOI.supports(model::Optimizer, ::MOI.ConstraintDualStart,
-                      ci::MOI.ConstraintIndex{MOI.SingleVariable, MOI.GreaterThan{Float64}},
+                      ci::MOI.ConstraintIndex{MOI.VariableIndex, MOI.GreaterThan{Float64}},
                       value::Union{Real, Nothing})
     return true
 end
 function MOI.set(model::Optimizer, ::MOI.ConstraintDualStart,
-                 ci::MOI.ConstraintIndex{MOI.SingleVariable, MOI.GreaterThan{Float64}},
+                 ci::MOI.ConstraintIndex{MOI.VariableIndex, MOI.GreaterThan{Float64}},
                  value::Union{Real, Nothing})
     vi = MOI.VariableIndex(ci.value)
     check_inbounds(model, vi)
@@ -465,12 +461,12 @@ function MOI.set(model::Optimizer, ::MOI.ConstraintDualStart,
     return
 end
 function MOI.supports(model::Optimizer, ::MOI.ConstraintDualStart,
-                      ci::MOI.ConstraintIndex{MOI.SingleVariable, MOI.LessThan{Float64}},
+                      ci::MOI.ConstraintIndex{MOI.VariableIndex, MOI.LessThan{Float64}},
                       value::Union{Real, Nothing})
     return true
 end
 function MOI.set(model::Optimizer, ::MOI.ConstraintDualStart,
-                 ci::MOI.ConstraintIndex{MOI.SingleVariable, MOI.LessThan{Float64}},
+                 ci::MOI.ConstraintIndex{MOI.VariableIndex, MOI.LessThan{Float64}},
                  value::Union{Real, Nothing})
     vi = MOI.VariableIndex(ci.value)
     check_inbounds(model, vi)
@@ -478,12 +474,12 @@ function MOI.set(model::Optimizer, ::MOI.ConstraintDualStart,
     return
 end
 function MOI.supports(model::Optimizer, ::MOI.ConstraintDualStart,
-                      ci::MOI.ConstraintIndex{MOI.SingleVariable, MOI.EqualTo{Float64}},
+                      ci::MOI.ConstraintIndex{MOI.VariableIndex, MOI.EqualTo{Float64}},
                       value::Union{Real, Nothing})
     return true
 end
 function MOI.set(model::Optimizer, ::MOI.ConstraintDualStart,
-                 ci::MOI.ConstraintIndex{MOI.SingleVariable, MOI.EqualTo{Float64}},
+                 ci::MOI.ConstraintIndex{MOI.VariableIndex, MOI.EqualTo{Float64}},
                  value::Union{Real, Nothing})
     vi = MOI.VariableIndex(ci.value)
     check_inbounds(model, vi)
@@ -498,7 +494,7 @@ MOI.set(model::Optimizer, ::MOI.NLPBlockDualStart, values) = (model.nlp_dual_sta
 MOI.set(model::Optimizer, ::MOI.NLPBlock, nlp_data::MOI.NLPBlockData) = (model.nlp_data = nlp_data)
 
 function MOI.set(model::Optimizer, ::MOI.ObjectiveFunction,
-                 func::Union{MOI.SingleVariable, MOI.ScalarAffineFunction,MOI.ScalarQuadraticFunction})
+                 func::Union{MOI.VariableIndex, MOI.ScalarAffineFunction,MOI.ScalarQuadraticFunction})
     check_inbounds(model, func)
     model.objective = func
     return
@@ -583,7 +579,7 @@ function jacobian_structure(model::Optimizer,I,J)
     return I,J
 end
 
-append_to_hessian_sparsity!(I,J,::Union{MOI.SingleVariable,MOI.ScalarAffineFunction},offset) = 0
+append_to_hessian_sparsity!(I,J,::Union{MOI.VariableIndex,MOI.ScalarAffineFunction},offset) = 0
 
 function append_to_hessian_sparsity!(I,J,quad::MOI.ScalarQuadraticFunction,offset)
     cnt = 0
@@ -641,8 +637,8 @@ get_nnz_jac_nonlinear(model::Optimizer) =
     (isempty(model.nlp_data.constraint_bounds) ? 0 : length(MOI.jacobian_structure(model.nlp_data.evaluator)))
 
 
-function eval_function(var::MOI.SingleVariable, x)
-    return x[var.variable.value]
+function eval_function(var::MOI.VariableIndex, x)
+    return x[var.value]
 end
 
 function eval_function(aff::MOI.ScalarAffineFunction, x)
@@ -684,9 +680,9 @@ function eval_objective(model::Optimizer, x)
     end
 end
 
-function fill_gradient!(grad, x, var::MOI.SingleVariable)
+function fill_gradient!(grad, x, var::MOI.VariableIndex)
     fill!(grad, 0.0)
-    grad[var.variable.value] = 1.0
+    grad[var.value] = 1.0
 end
 
 function fill_gradient!(grad, x, aff::MOI.ScalarAffineFunction{Float64})
@@ -806,7 +802,7 @@ function eval_constraint_jacobian(model::Optimizer, values, x)
 end
 
 function fill_hessian_lagrangian!(values, start_offset, scale_factor,
-                                  ::Union{MOI.SingleVariable,
+                                  ::Union{MOI.VariableIndex,
                                           MOI.ScalarAffineFunction,Nothing})
     return 0
 end
