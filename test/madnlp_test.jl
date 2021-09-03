@@ -41,7 +41,6 @@ testset = [
     [
         "Option: AUGMENTED KKT SYSTEM",
         ()->MadNLP.Optimizer(
-            reduced_system=false,
             kkt_system=MadNLP.SPARSE_UNREDUCED_KKT_SYSTEM,
             print_level=MadNLP.ERROR),
         ["infeasible","eigmina"] # numerical errors
@@ -51,7 +50,6 @@ testset = [
         ()->MadNLP.Optimizer(
             inertia_correction_method=MadNLP.INERTIA_FREE,
             kkt_system=MadNLP.SPARSE_UNREDUCED_KKT_SYSTEM,
-            reduced_system=false,
             print_level=MadNLP.ERROR),
         ["infeasible","eigmina"] # numerical errors
     ],
