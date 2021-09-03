@@ -435,6 +435,7 @@ function DenseKKTSystem{T, VT, MT}(n, m, ind_ineq, ind_fixed) where {T, VT, MT}
     fill!(jac,     zero(T))
     fill!(pr_diag, zero(T))
     fill!(du_diag, zero(T))
+    fill!(diag_hess, zero(T))
     fill!(jacobian_scaling, one(T))
 
     return DenseKKTSystem{T, VT, MT}(

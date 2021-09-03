@@ -333,26 +333,26 @@ function Solver(nlp::NonlinearProgram;
     set_blas_num_threads(opt.blas_num_threads; permanent=true)
 
     @trace(logger,"Initializing variables.")
-    info_constraints = get_index_constraints(nlp; fixed_variable_treatment=opt.fixed_variable_treatment)
-    ns = length(info_constraints.ind_ineq)
+    ind_cons = get_index_constraints(nlp; fixed_variable_treatment=opt.fixed_variable_treatment)
+    ns = length(ind_cons.ind_ineq)
     n = nlp.n+ns
     m = nlp.m
 
     # Initialize KKT
     kkt = if opt.kkt_system == SPARSE_KKT_SYSTEM
         MT = (opt.linear_solver.INPUT_MATRIX_TYPE == :csc) ? SparseMatrixCSC{Float64, Int32} : Matrix{Float64}
-        SparseKKTSystem{Float64, MT}(nlp, info_constraints)
+        SparseKKTSystem{Float64, MT}(nlp, ind_cons)
     elseif opt.kkt_system == SPARSE_UNREDUCED_KKT_SYSTEM
         MT = (opt.linear_solver.INPUT_MATRIX_TYPE == :csc) ? SparseMatrixCSC{Float64, Int32} : Matrix{Float64}
-        SparseUnreducedKKTSystem{Float64, MT}(nlp, info_constraints)
+        SparseUnreducedKKTSystem{Float64, MT}(nlp, ind_cons)
     elseif opt.kkt_system == DENSE_KKT_SYSTEM
         MT = Matrix{Float64}
         VT = Vector{Float64}
-        DenseKKTSystem{Float64, VT, MT}(nlp, info_constraints)
+        DenseKKTSystem{Float64, VT, MT}(nlp, ind_cons)
     end
 
-    xl = [nlp.xl;view(nlp.gl,info_constraints.ind_ineq)]
-    xu = [nlp.xu;view(nlp.gu,info_constraints.ind_ineq)]
+    xl = [nlp.xl;view(nlp.gl,ind_cons.ind_ineq)]
+    xu = [nlp.xu;view(nlp.gu,ind_cons.ind_ineq)]
     x = [nlp.x;zeros(ns)]
     l = nlp.l
     zl= [nlp.zl;zeros(ns)]
@@ -363,24 +363,24 @@ function Solver(nlp::NonlinearProgram;
 
     n_jac = nnz_jacobian(kkt)
 
-    nlb = length(info_constraints.ind_lb)
-    nub = length(info_constraints.ind_ub)
+    nlb = length(ind_cons.ind_lb)
+    nub = length(ind_cons.ind_ub)
 
     x_trial=Vector{Float64}(undef,n)
     c_trial=Vector{Float64}(undef,m)
 
     x_slk= view(x,nlp.n+1:n)
-    c_slk= view(c,info_constraints.ind_ineq)
+    c_slk= view(c,ind_cons.ind_ineq)
     rhs = (nlp.gl.==nlp.gu).*nlp.gl
 
-    x_lr = view(x, info_constraints.ind_lb)
-    x_ur = view(x, info_constraints.ind_ub)
-    xl_r = view(xl, info_constraints.ind_lb)
-    xu_r = view(xu, info_constraints.ind_ub)
-    zl_r = view(zl, info_constraints.ind_lb)
-    zu_r = view(zu, info_constraints.ind_ub)
-    x_trial_lr = view(x_trial, info_constraints.ind_lb)
-    x_trial_ur = view(x_trial, info_constraints.ind_ub)
+    x_lr = view(x, ind_cons.ind_lb)
+    x_ur = view(x, ind_cons.ind_ub)
+    xl_r = view(xl, ind_cons.ind_lb)
+    xu_r = view(xu, ind_cons.ind_ub)
+    zl_r = view(zl, ind_cons.ind_lb)
+    zu_r = view(zu, ind_cons.ind_ub)
+    x_trial_lr = view(x_trial, ind_cons.ind_lb)
+    x_trial_ur = view(x_trial, ind_cons.ind_ub)
 
     aug_vec_length = is_reduced(kkt) ? n+m : n+m+nlb+nub
 
@@ -411,8 +411,8 @@ function Solver(nlp::NonlinearProgram;
     dl= view(d,n+1:n+m)
     dzl= is_reduced(kkt) ? Vector{Float64}(undef,nlb) : view(d,n+m+1:n+m+nlb)
     dzu= is_reduced(kkt) ? Vector{Float64}(undef,nub) : view(d,n+m+nlb+1:n+m+nlb+nub)
-    dx_lr = view(dx,info_constraints.ind_lb)
-    dx_ur = view(dx,info_constraints.ind_ub)
+    dx_lr = view(dx,ind_cons.ind_lb)
+    dx_ur = view(dx,ind_cons.ind_ub)
 
     p = Vector{Float64}(undef,aug_vec_length)
     px= view(p,1:n)
@@ -447,7 +447,7 @@ function Solver(nlp::NonlinearProgram;
                   d,dx,dl,dzl,dzu,p,px,pl,pzl,pzu,
                   _w1,_w1x,_w1l,_w1zl,_w1zu,_w2,_w2x,_w2l,_w2zl,_w2zu,_w3,_w3x,_w3l,_w4,_w4x,_w4l,
                   x_trial,c_trial,0.,x_slk,c_slk,rhs,
-                  info_constraints.ind_ineq,info_constraints.ind_fixed,info_constraints.ind_llb,info_constraints.ind_uub,
+                  ind_cons.ind_ineq,ind_cons.ind_fixed,ind_cons.ind_llb,ind_cons.ind_uub,
                   x_lr,x_ur,xl_r,xu_r,zl_r,zu_r,dx_lr,dx_ur,x_trial_lr,x_trial_ur,
                   linear_solver,iterator,
                   obj_scale,con_scale,con_jac_scale,
@@ -1355,7 +1355,7 @@ end
 
 function set_con_scale!(con_scale::AbstractVector, jac::SparseMatrixCOO, nlp_scaling_max_gradient)
     @simd for i in 1:nnz(jac)
-        row = jac.I[i]
+        row = @inbounds jac.I[i]
         @inbounds con_scale[row] = max(con_scale[row], abs(jac.V[i]))
     end
     con_scale .= min.(1.0, nlp_scaling_max_gradient ./ con_scale)
