@@ -13,7 +13,8 @@ import SparseArrays: AbstractSparseMatrix, SparseMatrixCSC, sparse, getcolptr, r
 import Logging: @debug, @info,  @warn, @error
 import Base: string, show, print, size, getindex, copyto!, @kwdef
 import SuiteSparse: UMFPACK
-import NLPModels: finalize, AbstractNLPModel, obj, grad!, cons!, jac_coord!, hess_coord!, hess_structure!, jac_structure!
+import NLPModels: finalize, AbstractNLPModel, obj, grad!, cons!, jac_coord!, hess_coord!, hess_structure!, jac_structure!, NLPModelMeta, get_nvar, get_ncon, get_minimize, get_x0, get_y0, get_nnzj, get_nnzh, get_lvar, get_uvar, get_lcon, get_ucon, Counters as NLPModelsCounters # get_zl,get_zu
+
 import SolverCore: GenericExecutionStats
 
 const MOI = MathOptInterface
@@ -29,7 +30,6 @@ introduce() = "MadNLP version v$(version())"
 include("enums.jl")
 include("utils.jl")
 include("options.jl")
-include("nonlinearprogram.jl")
 include("matrixtools.jl")
 include(joinpath("LinearSolvers","linearsolvers.jl"))
 include("kktsystem.jl")

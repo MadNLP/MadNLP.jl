@@ -1,4 +1,5 @@
 include("config.jl")
+Pkg.add(PackageSpec(name="CUTEst",rev="main")) # will be removed once the new CUTEst version is released
 
 function get_status(code::Symbol)
     if code == :first_order

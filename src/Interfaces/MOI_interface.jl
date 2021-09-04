@@ -20,7 +20,6 @@ end
 ConstraintInfo(func, set) = ConstraintInfo(func, set, nothing)
 
 mutable struct Optimizer <: MOI.AbstractOptimizer
-    nlp::Union{NonlinearProgram,Nothing}
     ips::Union{Solver,Nothing}
 
     # Problem data.
@@ -50,7 +49,7 @@ function Optimizer(;kwargs...)
     for (name, value) in kwargs
         option_dict[name] = value
     end
-    return Optimizer(nothing,nothing,[],empty_nlp_data(),MOI.FEASIBILITY_SENSE,
+    return Optimizer(nothing,[],empty_nlp_data(),MOI.FEASIBILITY_SENSE,
                      nothing,[],[],[],[],[],[],nothing,option_dict,NaN)
 end
 
@@ -299,7 +298,6 @@ function MOI.empty!(model::Optimizer)
     empty!(model.quadratic_ge_constraints)
     empty!(model.quadratic_eq_constraints)
     model.nlp_dual_start = nothing
-    model.nlp = nothing
     model.ips = nothing
 end
 
@@ -841,10 +839,10 @@ end
 
 
 
-MOI.get(model::Optimizer, ::MOI.TerminationStatus) = model.nlp === nothing ?
-    MOI.OPTIMIZE_NOT_CALLED : termination_status(model.nlp)
-MOI.get(model::Optimizer, ::MOI.RawStatusString) = string(model.nlp.status)
-MOI.get(model::Optimizer, ::MOI.ResultCount) = (model.nlp !== nothing) ? 1 : 0
+MOI.get(model::Optimizer, ::MOI.TerminationStatus) = model.ips === nothing ?
+    MOI.OPTIMIZE_NOT_CALLED : termination_status(model.ips)
+MOI.get(model::Optimizer, ::MOI.RawStatusString) = string(model.ips.status)
+MOI.get(model::Optimizer, ::MOI.ResultCount) = (model.ips !== nothing) ? 1 : 0
 MOI.get(model::Optimizer, attr::MOI.PrimalStatus) = !(1 <= attr.N <= MOI.get(model, MOI.ResultCount())) ?
     MOI.NO_SOLUTION : primal_status(model.ips)
 MOI.get(model::Optimizer, attr::MOI.DualStatus) = !(1 <= attr.N <= MOI.get(model, MOI.ResultCount())) ?
@@ -874,25 +872,23 @@ const status_dual_dict = Dict(
     SOLVED_TO_ACCEPTABLE_LEVEL => MOI.NEARLY_FEASIBLE_POINT,
     INFEASIBLE_PROBLEM_DETECTED => MOI.INFEASIBLE_POINT)
 
-termination_status(nlp::NonlinearProgram) = haskey(status_moi_dict,nlp.status) ?
-    status_moi_dict[nlp.status] : MOI.UNKNOWN_RESULT_STATUS
-termination_status(ips::Solver) = termination_status(ips.nlp)
-primal_status(ips::Solver) = haskey(status_primal_dict,ips.nlp.status) ?
-    status_primal_dict[ips.nlp.status] : MOI.UNKNOWN_RESULT_STATUS
-dual_status(ips::Solver) = haskey(status_dual_dict,ips.nlp.status) ?
-    status_dual_dict[ips.nlp.status] : MOI.UNKNOWN_RESULT_STATUS
+termination_status(ips::Solver) = haskey(status_moi_dict,ips.status) ? status_moi_dict[ips.status] : MOI.UNKNOWN_RESULT_STATUS
+primal_status(ips::Solver) = haskey(status_primal_dict,ips.status) ?
+    status_primal_dict[ips.status] : MOI.UNKNOWN_RESULT_STATUS
+dual_status(ips::Solver) = haskey(status_dual_dict,ips.status) ?
+    status_dual_dict[ips.status] : MOI.UNKNOWN_RESULT_STATUS
 
 
 function MOI.get(model::Optimizer, attr::MOI.ObjectiveValue)
     MOI.check_result_index_bounds(model, attr)
     scale = (model.sense == MOI.MAX_SENSE) ? -1 : 1
-    return scale * model.nlp.obj_val
+    return scale * model.ips.obj_val
 end
 
 function MOI.get(model::Optimizer, attr::MOI.VariablePrimal, vi::MOI.VariableIndex)
     MOI.check_result_index_bounds(model, attr)
     check_inbounds(model, vi)
-    return model.nlp.x[vi.value]
+    return model.ips.x[vi.value]
 end
 
 macro define_constraint_primal(function_type, set_type, prefix)
@@ -917,18 +913,6 @@ end
 @define_constraint_primal(MOI.ScalarQuadraticFunction{Float64},MOI.GreaterThan{Float64}, quadratic_ge)
 @define_constraint_primal(MOI.ScalarQuadraticFunction{Float64},MOI.EqualTo{Float64}, quadratic_eq)
 
-# function MOI.get(model::Optimizer, attr::MOI.ConstraintPrimal,
-#                  ci::MOI.ConstraintIndex{MOI.SingleVariable,
-#                                          MOI.LessThan{Float64}})
-#     MOI.check_result_index_bounds(model, attr)
-#     vi = MOI.VariableIndex(ci.value)
-#     check_inbounds(model, vi)
-#     if !has_upper_bound(model, vi)
-#         error("Variable $vi has no upper bound -- ConstraintPrimal not defined.")
-#     end
-#     return model.nlp.x[vi.value]
-# end
-
 function MOI.get(model::Optimizer, attr::MOI.ConstraintPrimal,
                  ci::MOI.ConstraintIndex{MOI.SingleVariable,
                                          MOI.GreaterThan{Float64}})
@@ -938,7 +922,7 @@ function MOI.get(model::Optimizer, attr::MOI.ConstraintPrimal,
     if !has_lower_bound(model, vi)
         error("Variable $vi has no lower bound -- ConstraintPrimal not defined.")
     end
-    return model.nlp.x[vi.value]
+    return model.ips.x[vi.value]
 end
 
 function MOI.get(model::Optimizer, attr::MOI.ConstraintPrimal,
@@ -950,7 +934,7 @@ function MOI.get(model::Optimizer, attr::MOI.ConstraintPrimal,
     if !is_fixed(model, vi)
         error("Variable $vi is not fixed -- ConstraintPrimal not defined.")
     end
-    return model.nlp.x[vi.value]
+    return model.ips.x[vi.value]
 end
 
 macro define_constraint_dual(function_type, set_type, prefix)
@@ -963,7 +947,7 @@ macro define_constraint_dual(function_type, set_type, prefix)
             if !(1 <= ci.value <= length(model.$(constraint_array)))
                 error("Invalid constraint index ", ci.value)
             end
-            return -1 * model.nlp.l[ci.value + $offset_function(model)]
+            return -1 * model.ips.l[ci.value + $offset_function(model)]
         end
     end
 end
@@ -980,7 +964,7 @@ function MOI.get(model::Optimizer, attr::MOI.ConstraintDual,
     vi = MOI.VariableIndex(ci.value)
     check_inbounds(model, vi)
     has_upper_bound(model, vi) || error("Variable $vi has no upper bound -- ConstraintDual not defined.")
-    return -1 * model.nlp.zu[vi.value] # MOI convention is for feasible LessThan duals to be nonpositive.
+    return -1 * model.ips.zu[vi.value] # MOI convention is for feasible LessThan duals to be nonpositive.
 end
 
 function MOI.get(model::Optimizer, attr::MOI.ConstraintDual,
@@ -990,7 +974,7 @@ function MOI.get(model::Optimizer, attr::MOI.ConstraintDual,
     vi = MOI.VariableIndex(ci.value)
     check_inbounds(model, vi)
     has_lower_bound(model, vi) || error("Variable $vi has no lower bound -- ConstraintDual not defined.")
-    return model.nlp.zl[vi.value]
+    return model.ips.zl[vi.value]
 end
 
 function MOI.get(model::Optimizer, attr::MOI.ConstraintDual,
@@ -1002,12 +986,12 @@ function MOI.get(model::Optimizer, attr::MOI.ConstraintDual,
     if !is_fixed(model, vi)
         error("Variable $vi is not fixed -- ConstraintDual not defined.")
     end
-    return model.nlp.zl[vi.value] - model.nlp.zu[vi.value]
+    return model.ips.zl[vi.value] - model.ips.zu[vi.value]
 end
 
 function MOI.get(model::Optimizer, attr::MOI.NLPBlockDual)
     MOI.check_result_index_bounds(model, attr)
-    return -1 * model.nlp.l[(1 + nlp_constraint_offset(model)):end]
+    return -1 * model.ips.l[(1 + nlp_constraint_offset(model)):end]
 end
 
 function num_constraints(model::Optimizer)
@@ -1031,15 +1015,13 @@ end
 
 zero_if_nothing(x) = x == nothing ? 0. : x
 
-function set_x!(model,x,xl,xu,zl,zu)
+function set_x!(model,x,xl,xu)
 
     for i=1:length(model.variable_info)
         info = model.variable_info[i]
         x[i]  = info.start == nothing ? 0. : info.start
         xl[i] = info.lower_bound
         xu[i] = info.upper_bound
-        zl[i] = zero_if_nothing(info.lower_bound_dual_start)
-        zu[i] = zero_if_nothing(info.upper_bound_dual_start)
         i += 1
     end
 end
@@ -1101,58 +1083,75 @@ end
 
 num_variables(model::Optimizer) = length(model.variable_info)
 
-function get_obj_scale(sense)
-    sense == MOI.MIN_SENSE && return 1.
-    sense == MOI.MAX_SENSE && return -1.
-    return 0.
+struct MadNLPModel <: AbstractNLPModel{Float64,Vector{Float64}}
+    meta::NLPModelMeta{Float64, Vector{Float64}}
+    model::Optimizer
+    counters::NLPModelsCounters
 end
 
-function NonlinearProgram(model::Optimizer)
+obj(nlp::MadNLPModel,x::StrideOneVector{Float64}) = eval_objective(nlp.model,x)
+grad!(nlp::MadNLPModel,x::StrideOneVector{Float64},f::StrideOneVector{Float64}) =
+    eval_objective_gradient(nlp.model,f,x)
+cons!(nlp::MadNLPModel,x::StrideOneVector{Float64},c::StrideOneVector{Float64}) =
+    eval_constraint(nlp.model,c,x)
+jac_coord!(nlp::MadNLPModel,x::StrideOneVector{Float64},jac::StrideOneVector{Float64})=
+    eval_constraint_jacobian(nlp.model,jac,x)
+hess_coord!(nlp::MadNLPModel,x::StrideOneVector{Float64},l::StrideOneVector{Float64},hess::StrideOneVector{Float64};
+            obj_weight::Float64=1.) = eval_hessian_lagrangian(nlp.model,hess,x,obj_weight,l)
+hess_structure!(nlp::MadNLPModel,I,J)= hessian_lagrangian_structure(nlp.model,I,J)
+jac_structure!(nlp::MadNLPModel,I,J) = jacobian_structure(nlp.model,I,J)
+
+function MadNLPModel(model::Optimizer)
     :Hess in MOI.features_available(model.nlp_data.evaluator) || error("Hessian information is needed.")
     MOI.initialize(model.nlp_data.evaluator, [:Grad,:Hess,:Jac])
 
-    n = num_variables(model)
-    m = num_constraints(model)
-    nnz_hess = get_nnz_hess(model)
-    nnz_jac = get_nnz_jac(model)
+    nvar = num_variables(model)
+    ncon = num_constraints(model)
+    nnzh = get_nnz_hess(model)
+    nnzj = get_nnz_jac(model)
 
-    x  = Vector{Float64}(undef,n)
-    g  = Vector{Float64}(undef,m)
-    xl = Vector{Float64}(undef,n)
-    xu = Vector{Float64}(undef,n)
-    zl = Vector{Float64}(undef,n)
-    zu = Vector{Float64}(undef,n)
+    x0  = Vector{Float64}(undef,nvar)
+    xl = Vector{Float64}(undef,nvar)
+    xu = Vector{Float64}(undef,nvar)
 
-    l = Vector{Float64}(undef,m)
-    gl = Vector{Float64}(undef,m)
-    gu = Vector{Float64}(undef,m)
+    y0 = Vector{Float64}(undef,ncon)
+    gl = Vector{Float64}(undef,ncon)
+    gu = Vector{Float64}(undef,ncon)
 
-    set_x!(model,x,xl,xu,zl,zu)
-    set_g!(model,l,gl,gu)
-
-    obj_scale = get_obj_scale(model.sense)
-    obj(x::StrideOneVector{Float64}) = obj_scale*eval_objective(model,x)
-    obj_grad!(f::StrideOneVector{Float64},x::StrideOneVector{Float64}) =
-        (eval_objective_gradient(model,f,x); obj_scale!=1. && (f.*=obj_scale))
-    con!(c::StrideOneVector{Float64},x::StrideOneVector{Float64}) = eval_constraint(model,c,x)
-    con_jac!(jac::StrideOneVector{Float64},
-             x::StrideOneVector{Float64})=eval_constraint_jacobian(model,jac,x)
-    lag_hess!(hess::StrideOneVector{Float64},x::StrideOneVector{Float64},l::StrideOneVector{Float64},
-              sig::Float64) = eval_hessian_lagrangian(model,hess,x,obj_scale*sig,l)
-    hess_sparsity!(I,J)= hessian_lagrangian_structure(model,I,J)
-    jac_sparsity!(I,J) = jacobian_structure(model,I,J)
+    set_x!(model,x0,xl,xu)
+    set_g!(model,y0,gl,gu)
 
     model.option_dict[:jacobian_constant], model.option_dict[:hessian_constant] = is_jac_hess_constant(model)
-    model.option_dict[:dual_initialized] = !iszero(l)
+    model.option_dict[:dual_initialized] = !iszero(y0)
 
-    return NonlinearProgram(n,m,nnz_hess,nnz_jac,0.,x,g,l,zl,zu,xl,xu,gl,gu,obj,obj_grad!,con!,con_jac!,
-                            lag_hess!,hess_sparsity!,jac_sparsity!,INITIAL,Dict{Symbol,Any}())
+    meta = NLPModelMeta(
+        nvar,
+        x0 = x0,
+        lvar = xl,
+        uvar = xu,
+        ncon = ncon,
+        y0 = y0,
+        lcon = gl,
+        ucon = gu,
+        nnzj = nnzj,
+        nnzh = nnzh,
+        minimize = model.sense == MOI.MIN_SENSE
+    )
+
+    return MadNLPModel(meta,model,NLPModelsCounters())
 end
 
 function MOI.optimize!(model::Optimizer)
-    model.nlp = NonlinearProgram(model)
-    model.ips = Solver(model.nlp;option_dict=copy(model.option_dict))
-    optimize!(model.ips)
+    nlp = MadNLPModel(model)
+    ips = Solver(nlp;option_dict=copy(model.option_dict))
+    model.ips = ips
+    optimize!(ips)
+
+    ips.obj_val = ips.obj_val/ips.obj_scale[]
+    ips.c ./= ips.con_scale
+    ips.c .-= ips.rhs
+    ips.c_slk .+= ips.x_slk
+    
     model.solve_time = model.ips.cnt.total_time
     return
 end

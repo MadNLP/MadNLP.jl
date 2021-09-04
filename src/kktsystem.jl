@@ -224,25 +224,25 @@ function SparseKKTSystem{T, MT}(
     )
 end
 
-# Build KKT system directly from NonlinearProgram
-function SparseKKTSystem{T, MT}(nlp::NonlinearProgram, ind_cons=get_index_constraints(nlp)) where {T, MT}
+# Build KKT system directly from AbstractNLPModel
+function SparseKKTSystem{T, MT}(nlp::AbstractNLPModel, ind_cons=get_index_constraints(nlp)) where {T, MT}
     n_slack = length(ind_cons.ind_ineq)
     # Deduce KKT size.
-    n = nlp.n + n_slack
-    m = nlp.m
+    n = get_nvar(nlp) + n_slack
+    m = get_ncon(nlp)
     # Evaluate sparsity pattern
-    jac_I = Vector{Int32}(undef, nlp.nnz_jac)
-    jac_J = Vector{Int32}(undef, nlp.nnz_jac)
-    nlp.jac_sparsity!(jac_I, jac_J)
-
-    hess_I = Vector{Int32}(undef, nlp.nnz_hess)
-    hess_J = Vector{Int32}(undef, nlp.nnz_hess)
-    nlp.hess_sparsity!(hess_I,hess_J)
+    jac_I = Vector{Int32}(undef, get_nnzj(nlp))
+    jac_J = Vector{Int32}(undef, get_nnzj(nlp))
+    jac_structure!(nlp,jac_I, jac_J)
+    
+    hess_I = Vector{Int32}(undef, get_nnzh(nlp))
+    hess_J = Vector{Int32}(undef, get_nnzh(nlp))
+    hess_structure!(nlp,hess_I,hess_J)
 
     force_lower_triangular!(hess_I,hess_J)
     # Incorporate slack's sparsity pattern
     append!(jac_I, ind_cons.ind_ineq)
-    append!(jac_J, nlp.n+1:nlp.n+n_slack)
+    append!(jac_J, get_nvar(nlp)+1:get_nvar(nlp)+n_slack)
 
     return SparseKKTSystem{T, MT}(
         n, m, ind_cons.ind_ineq, ind_cons.ind_fixed,
@@ -354,26 +354,26 @@ function SparseUnreducedKKTSystem{T, MT}(
     )
 end
 
-function SparseUnreducedKKTSystem{T, MT}(nlp::NonlinearProgram, ind_cons=get_index_constraints(nlp)) where {T, MT}
+function SparseUnreducedKKTSystem{T, MT}(nlp::AbstractNLPModel, ind_cons=get_index_constraints(nlp)) where {T, MT}
     n_slack = length(ind_cons.ind_ineq)
     nlb = length(ind_cons.ind_lb)
     nub = length(ind_cons.ind_ub)
     # Deduce KKT size.
-    n = nlp.n + n_slack
-    m = nlp.m
+    n = get_nvar(nlp) + n_slack
+    m = get_ncon(nlp)
     # Evaluate sparsity pattern
-    jac_I = Vector{Int32}(undef, nlp.nnz_jac)
-    jac_J = Vector{Int32}(undef, nlp.nnz_jac)
-    nlp.jac_sparsity!(jac_I, jac_J)
+    jac_I = Vector{Int32}(undef, get_nnzj(nlp))
+    jac_J = Vector{Int32}(undef, get_nnzj(nlp))
+    jac_structure!(nlp,jac_I, jac_J)
 
-    hess_I = Vector{Int32}(undef, nlp.nnz_hess)
-    hess_J = Vector{Int32}(undef, nlp.nnz_hess)
-    nlp.hess_sparsity!(hess_I,hess_J)
+    hess_I = Vector{Int32}(undef, get_nnzh(nlp))
+    hess_J = Vector{Int32}(undef, get_nnzh(nlp))
+    hess_structure!(nlp,hess_I,hess_J)
 
     force_lower_triangular!(hess_I,hess_J)
     # Incorporate slack's sparsity pattern
     append!(jac_I, ind_cons.ind_ineq)
-    append!(jac_J, nlp.n+1:nlp.n+n_slack)
+    append!(jac_J, get_nvar(nlp)+1:get_nvar(nlp)+n_slack)
 
     return SparseUnreducedKKTSystem{T, MT}(
         n, m, nlb, nub, ind_cons.ind_ineq, ind_cons.ind_fixed,
@@ -443,9 +443,9 @@ function DenseKKTSystem{T, VT, MT}(n, m, ind_ineq, ind_fixed) where {T, VT, MT}
     )
 end
 
-function DenseKKTSystem{T, VT, MT}(nlp::NonlinearProgram, info_constraints=get_index_constraints(nlp)) where {T, VT, MT}
+function DenseKKTSystem{T, VT, MT}(nlp::AbstractNLPModel, info_constraints=get_index_constraints(nlp)) where {T, VT, MT}
     return DenseKKTSystem{T, VT, MT}(
-        nlp.n, nlp.m, info_constraints.ind_ineq, info_constraints.ind_fixed,
+        get_nvar(nlp), get_ncon(nlp), info_constraints.ind_ineq, info_constraints.ind_fixed,
     )
 end
 

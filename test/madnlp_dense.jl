@@ -1,7 +1,65 @@
 using Test
+import MadNLP: jac_structure!, hess_structure!, obj, grad!, cons!, jac_coord!, hess_coord!, jac_dense!, hess_dense!
+using NLPModels
 using LinearAlgebra
 using SparseArrays
 using Random
+
+struct DenseQP <: AbstractNLPModel{Float64,Vector{Float64}}
+    meta::NLPModels.NLPModelMeta{Float64, Vector{Float64}}
+    P::Matrix{Float64} # primal hessi
+    A::Matrix{Float64} # constratin jacobian
+    q::Vector{Float64}
+    hrows::Vector{Int}
+    hcols::Vector{Int}
+    jrows::Vector{Int}
+    jcols::Vector{Int}
+    counters::Counters
+end
+
+
+function jac_structure!(qp::DenseQP,I, J)
+    copyto!(I, qp.jrows)
+    copyto!(J, qp.jcols)
+end
+function hess_structure!(qp::DenseQP,I, J)
+    copyto!(I, qp.hrows)
+    copyto!(J, qp.hcols)
+end
+
+function obj(qp::DenseQP,x)
+    return 0.5 * dot(x, qp.P, x) + dot(qp.q, x)
+end
+function grad!(qp::DenseQP,x,g)
+    mul!(g, qp.P, x)
+    g .+= qp.q
+    return
+end
+function cons!(qp::DenseQP,x,c)
+    mul!(c, qp.A, x)
+end
+# Jacobian: sparse callback
+function jac_coord!(qp::DenseQP, x, J::AbstractVector)
+    index = 1
+    for (i, j) in zip(qp.jrows, qp.jcols)
+        J[index] =  qp.A[i, j]
+        index += 1
+    end
+end
+# Jacobian: dense callback
+jac_dense!(qp::DenseQP, x, J::AbstractMatrix) = copyto!(J, qp.A)
+# Hessian: sparse callback
+function hess_coord!(qp::DenseQP,x, l, hess::AbstractVector; obj_weight=1.)
+    index = 1
+    for i in 1:get_nvar(qp) , j in 1:i
+        hess[index] = obj_weight * qp.P[j, i]
+        index += 1
+    end
+end
+# Hessian: dense callback
+function hess_dense!(qp::DenseQP, x, l,hess::AbstractMatrix; obj_weight=1.)
+    hess .= obj_weight .* qp.P
+end
 
 
 function build_qp_test(; n=100, m=10, fixed_variables=Int[])
@@ -10,10 +68,12 @@ function build_qp_test(; n=100, m=10, fixed_variables=Int[])
     end
 
     Random.seed!(1)
+    
     # Build QP problem 0.5 * x' * P * x + q' * x
     P = randn(n , n)
     P += P' # P is symmetric
-    P += 2.0 * I
+    P += 100.0 * I
+    
     q = randn(n)
 
     # Build constraints gl <= Ax <= gu
@@ -24,6 +84,8 @@ function build_qp_test(; n=100, m=10, fixed_variables=Int[])
     end
 
     x0 = zeros(n)
+    y0 = zeros(m)
+    
     # Bound constraints
     xu =   ones(n)
     xl = - ones(n)
@@ -31,93 +93,32 @@ function build_qp_test(; n=100, m=10, fixed_variables=Int[])
     gu = ones(m)
 
     xl[fixed_variables] .= xu[fixed_variables]
-
-    rows = [i for i in 1:n for j in 1:i]
-    cols = [j for i in 1:n for j in 1:i]
+    
+    hrows = [i for i in 1:n for j in 1:i]
+    hcols = [j for i in 1:n for j in 1:i]
     nnzh = div(n * (n + 1), 2)
 
     jrows = [j for i in 1:n for j in 1:m]
     jcols = [i for i in 1:n for j in 1:m]
     nnzj = n * m
-    function jac_struct(I, J)
-        copyto!(I, jrows)
-        copyto!(J, jcols)
-    end
-    function hess_struct(I, J)
-        copy!(I, rows)
-        copy!(J, cols)
-    end
-
-    function eval_f(x)
-        return 0.5 * dot(x, P, x) + dot(q, x)
-    end
-    function eval_g(g, x)
-        mul!(g, P, x)
-        g .+= q
-        return
-    end
-    eval_cons(c, x) = mul!(c, A, x)
-    # Jacobian: sparse callback
-    function eval_jac(J::AbstractVector, x)
-        index = 1
-        for (i, j) in zip(jrows, jcols)
-            J[index] =  A[i, j]
-            index += 1
-        end
-    end
-    # Jacobian: dense callback
-    eval_jac(J::AbstractMatrix, x) = copyto!(J, A)
-    # Hessian: sparse callback
-    function eval_hess(hess::AbstractVector, x, l, sig)
-        index = 1
-        for i in 1:n , j in 1:i
-            hess[index] = sig * P[j, i]
-            index += 1
-        end
-    end
-    # Hessian: dense callback
-    function eval_hess(hess::AbstractMatrix, x, l, sig)
-        copyto!(hess, sig .* P)
-    end
-
-    return MadNLP.NonlinearProgram(
-        n, m, nnzh, nnzj,
-        0.0, x0,
-        zeros(m), zeros(m),
-        zeros(n), zeros(n),
-        xl, xu, gl, gu,
-        eval_f,
-        eval_g,
-        eval_cons,
-        eval_jac,
-        eval_hess,
-        hess_struct,
-        jac_struct,
-        MadNLP.INITIAL,
-        Dict{Symbol,Any}(),
+    
+    return DenseQP(
+        NLPModels.NLPModelMeta(
+            n,
+            ncon = m,
+            nnzj = nnzj,
+            nnzh = nnzh,
+            x0 = x0,
+            y0 = y0,
+            lvar = xl,
+            uvar = xu,
+            lcon = gl,
+            ucon = gu,
+            minimize = true
+        ),
+        P,A,q,hrows,hcols,jrows,jcols,
+        Counters()
     )
-end
-
-function reset_nlp!(nlp::MadNLP.NonlinearProgram, x0, l0)
-    copyto!(nlp.x, x0)
-    copyto!(nlp.l, l0)
-end
-
-function test_qp(; n=10, m=0, fixed_variables=Int[],
-    linear_solver=MadNLPLapackCPU,
-    kkt_system=MadNLP.SPARSE_KKT_SYSTEM,
-    maxit=100,
-)
-    madnlp_options = Dict{Symbol, Any}(
-        :max_iter=>maxit,
-        :kkt_system=>kkt_system,
-        :linear_solver=>linear_solver,
-        :print_level=>MadNLP.DEBUG,
-    )
-    nlp = build_qp_test(; n=n, m=m, fixed_variables=fixed_variables)
-    ipp = MadNLP.Solver(nlp; option_dict=madnlp_options)
-    MadNLP.optimize!(ipp)
-    return ipp
 end
 
 @testset "MadNLP: dense API" begin
@@ -181,12 +182,10 @@ function _compare_dense_with_sparse(n, m, ind_fixed)
     )
 
     nlp = build_qp_test(; n=n, m=m, fixed_variables=ind_fixed)
-    x, l = copy(nlp.x), copy(nlp.l)
-
     ips = MadNLP.Solver(nlp, option_dict=sparse_options)
     MadNLP.optimize!(ips)
 
-    # Reinit NonlinearProgram to avoid side effect
+    # Reinit DenseQP to avoid side effect
     nlp = build_qp_test(; n=n, m=m, fixed_variables=ind_fixed)
     ipd = MadNLP.Solver(nlp, option_dict=dense_options)
     MadNLP.optimize!(ipd)
