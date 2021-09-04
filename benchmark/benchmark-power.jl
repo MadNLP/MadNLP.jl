@@ -1,22 +1,24 @@
-if haskey(ENV, "PGLIB_PATH")
-    const PGLIB_PATH = ENV["PGLIB_PATH"]
-else
-    error("Unable to find path to PGLIB benchmark.\n"*
-          "Please set environment variable `PGLIB_PATH` to run benchmark with PowerModels.jl")
-end
-
 include("config.jl")
 
 @everywhere begin
+    if haskey(ENV, "PGLIB_PATH")
+        const PGLIB_PATH = ENV["PGLIB_PATH"]
+    else
+        error("Unable to find path to PGLIB benchmark.\n"*
+            "Please set environment variable `PGLIB_PATH` to run benchmark with PowerModels.jl")
+    end
+
     using PowerModels, MathOptInterface, JuMP
     const MOI = MathOptInterface
     
     PowerModels.silence()
 
     function evalmodel(prob,solver;gcoff=false)
-        println("Solving $(get_name(prob))")
+        case,type = prob
+        pm = instantiate_model(joinpath(PGLIB_PATH,case),type,PowerModels.build_opf)
+        println("Solving $(get_name(pm))")
         gcoff && GC.enable(false);
-        return solver(prob)
+        return solver(pm)
     end
 
     function get_status(code::MOI.TerminationStatusCode)
@@ -82,8 +84,11 @@ end
 
 function benchmark(solver,probs;warm_up_probs = [])
     println("Warming up (forcing JIT compile)")
-    println(get_name.(warm_up_probs))
-    rs = [remotecall.(solver,i,warm_up_probs) for i in procs() if i!= 1]
+    warm_up_pms = [
+        instantiate_model(joinpath(PGLIB_PATH,case),type,PowerModels.build_opf)
+        for (case,type) in warm_up_probs]
+    println(get_name.(warm_up_pms))
+    rs = [remotecall.(solver,i,warm_up_pms) for i in procs() if i!= 1]
     ws = [wait.(r) for r in rs]
     fs= [fetch.(r) for r in rs]
 
@@ -108,11 +113,11 @@ else
              DCPLLPowerModel,LPACCPowerModel, SOCWRPowerModel,
              QCRMPowerModel,QCLSPowerModel]
 end
-probs = [instantiate_model(joinpath(PGLIB_PATH,case),type,PowerModels.build_opf) for case in cases for type in types]
+probs = [(case,type) for case in cases for type in types]
 name =  ["$case-$type" for case in cases for type in types]
 
 status,time,mem,iter = benchmark(solver,probs;warm_up_probs = [
-    instantiate_model(joinpath(PGLIB_PATH,"pglib_opf_case1888_rte.m"), ACPPowerModel,PowerModels.build_opf)
+    ("pglib_opf_case1888_rte.m",ACPPowerModel)
 ])
 
 writedlm("name-power.csv",name,',')
