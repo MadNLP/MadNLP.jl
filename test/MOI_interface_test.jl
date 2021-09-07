@@ -35,10 +35,12 @@ const config_no_duals = MOIT.Config(atol=1e-4, rtol=1e-4, duals=false,
     end
 end
 
-@testset "Testing getters" begin
-    MOIT.copytest(MOI.instantiate(()->MadNLP.Optimizer(print_level=MadNLP.ERROR),
-                                  with_bridge_type=Float64), MOIU.Model{Float64}())
-end
+# Currently broken on MOI 0.10
+# See: https://github.com/jump-dev/MathOptInterface.jl/pull/1591
+# @testset "Testing getters" begin
+#     MOIT.copytest(MOI.instantiate(()->MadNLP.Optimizer(print_level=MadNLP.ERROR),
+#                                   with_bridge_type=Float64), MOIU.Model{Float64}())
+# end
 
 @testset "Bounds set twice" begin
     optimizer = MadNLP.Optimizer(print_level=MadNLP.ERROR)
