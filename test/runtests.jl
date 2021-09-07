@@ -16,11 +16,12 @@ import SparseArrays: sparse
         include("nlpmodels_test.jl")
     end
 
-    @testset "MadNLP test" begin 
+    @testset "MadNLP test" begin
         include("madnlp_test.jl")
+        include("madnlp_dense.jl")
     end
 
-    @testset "MINLP test" begin 
+    @testset "MINLP test" begin
         include("minlp_test.jl")
     end
 end # @testset

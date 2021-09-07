@@ -8,7 +8,7 @@ import MathOptInterface
 import Libdl: dlopen, dlext, RTLD_DEEPBIND, RTLD_GLOBAL
 import Printf: @sprintf
 import LinearAlgebra: BLAS, Adjoint, Symmetric, mul!, ldiv!, norm, dot
-import LinearAlgebra.BLAS: libblas, liblapack, BlasInt, @blasfunc
+import LinearAlgebra.BLAS: axpy!, libblas, liblapack, BlasInt, @blasfunc
 import SparseArrays: AbstractSparseMatrix, SparseMatrixCSC, sparse, getcolptr, rowvals, nnz
 import Logging: @debug, @info,  @warn, @error
 import Base: string, show, print, size, getindex, copyto!, @kwdef
