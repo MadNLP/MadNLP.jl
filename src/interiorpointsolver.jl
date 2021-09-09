@@ -58,7 +58,7 @@ end
 abstract type AbstractInteriorPointSolver end
 
 mutable struct Solver{KKTSystem} <: AbstractInteriorPointSolver
-    nlp::NonlinearProgram
+    nlp::AbstractNLPModel
     kkt::KKTSystem
 
     opt::Options
@@ -171,8 +171,30 @@ mutable struct Solver{KKTSystem} <: AbstractInteriorPointSolver
     output::Dict
 end
 
+struct MadNLPExecutionStats{T} <: AbstractExecutionStats
+    status::Status
+    solution::StrideOneVector{T} 
+    objective::T 
+    constraints::StrideOneVector{T}
+    dual_feas::T 
+    primal_feas::T 
+    multipliers::StrideOneVector{T} 
+    multipliers_L::StrideOneVector{T} 
+    multipliers_U::StrideOneVector{T} 
+    iter::Int
+    counters::NLPModelsCounters
+    elapsed_time::Real
+end
+
 struct InvalidNumberException <: Exception end
 struct NotEnoughDegreesOfFreedomException <: Exception end
+
+MadNLPExecutionStats(ips::Solver) =MadNLPExecutionStats(
+    ips.status,view(ips.x,1:get_nvar(ips.nlp)),ips.obj_val,ips.c,
+    ips.inf_du, ips.inf_pr, 
+    ips.l,view(ips.zl,1:get_nvar(ips.nlp)),view(ips.zu,1:get_nvar(ips.nlp)),
+    ips.cnt.k, ips.nlp.counters,ips.cnt.total_time)
+getStatus(result::MadNLPExecutionStats) = STATUS_OUTPUT_DICT[result.status]
 
 function RobustRestorer(ips::AbstractInteriorPointSolver)
 
@@ -256,7 +278,7 @@ function eval_f_wrapper(ips::Solver, x::Vector{Float64})
     nlp = ips.nlp
     cnt = ips.cnt
     @trace(ips.logger,"Evaluating objective.")
-    cnt.eval_function_time += @elapsed obj_val = nlp.obj(view(x,1:nlp.n))::Float64
+    cnt.eval_function_time += @elapsed obj_val = (get_minimize(nlp) ? 1. : -1.) * obj(nlp,view(x,1:get_nvar(nlp)))
     cnt.obj_cnt+=1
     cnt.obj_cnt==1 && (is_valid(obj_val) || throw(InvalidNumberException()))
     return obj_val*ips.obj_scale[]
@@ -266,8 +288,8 @@ function eval_grad_f_wrapper!(ips::Solver, f::Vector{Float64},x::Vector{Float64}
     nlp = ips.nlp
     cnt = ips.cnt
     @trace(ips.logger,"Evaluating objective gradient.")
-    cnt.eval_function_time += @elapsed nlp.obj_grad!(view(f,1:nlp.n),view(x,1:nlp.n))
-    f.*=ips.obj_scale[]
+    cnt.eval_function_time += @elapsed grad!(nlp,view(x,1:get_nvar(nlp)),view(f,1:get_nvar(nlp)))
+    f.*=ips.obj_scale[] * (get_minimize(nlp) ? 1. : -1.)
     cnt.obj_grad_cnt+=1
     cnt.obj_grad_cnt==1 && (is_valid(f)  || throw(InvalidNumberException()))
     return f
@@ -277,8 +299,8 @@ function eval_cons_wrapper!(ips::Solver, c::Vector{Float64},x::Vector{Float64})
     nlp = ips.nlp
     cnt = ips.cnt
     @trace(ips.logger, "Evaluating constraints.")
-    cnt.eval_function_time += @elapsed nlp.con!(view(c,1:nlp.m),view(x,1:nlp.n))
-    view(c,ips.ind_ineq).-=view(x,nlp.n+1:ips.n)
+    cnt.eval_function_time += @elapsed cons!(nlp,view(x,1:get_nvar(nlp)),view(c,1:get_ncon(nlp)))
+    view(c,ips.ind_ineq).-=view(x,get_nvar(nlp)+1:ips.n)
     c.-=ips.rhs
     c.*=ips.con_scale
     cnt.con_cnt+=1
@@ -292,7 +314,7 @@ function eval_jac_wrapper!(ipp::Solver, kkt::AbstractKKTSystem, x::Vector{Float6
     ns = length(ipp.ind_ineq)
     @trace(ipp.logger, "Evaluating constraint Jacobian.")
     jac = get_jacobian(kkt)
-    cnt.eval_function_time += @elapsed nlp.con_jac!(jac, view(x,1:nlp.n))
+    cnt.eval_function_time += @elapsed jac_coord!(nlp,view(x,1:get_nvar(nlp)),jac)
     compress_jacobian!(kkt)
     cnt.con_jac_cnt+=1
     cnt.con_jac_cnt==1 && (is_valid(jac) || throw(InvalidNumberException()))
@@ -306,15 +328,46 @@ function eval_lag_hess_wrapper!(ipp::Solver, kkt::AbstractKKTSystem, x::Vector{F
     @trace(ipp.logger,"Evaluating Lagrangian Hessian.")
     ipp._w1l .= l.*ipp.con_scale
     hess = get_hessian(kkt)
-    cnt.eval_function_time += @elapsed nlp.lag_hess!(
-        hess, view(x,1:nlp.n), ipp._w1l, is_resto ? 0.0 : ipp.obj_scale[])
+    cnt.eval_function_time += @elapsed hess_coord!(
+        nlp, view(x,1:get_nvar(nlp)), ipp._w1l, hess;
+        obj_weight = (get_minimize(nlp) ? 1. : -1.) * (is_resto ? 0.0 : ipp.obj_scale[]))
     compress_hessian!(kkt)
     cnt.lag_hess_cnt+=1
     cnt.lag_hess_cnt==1 && (is_valid(hess) || throw(InvalidNumberException()))
     return hess
 end
 
-function Solver(nlp::NonlinearProgram;
+
+function eval_jac_wrapper!(ipp::Solver, kkt::DenseKKTSystem, x::Vector{Float64})
+    nlp = ipp.nlp
+    cnt = ipp.cnt
+    ns = length(ipp.ind_ineq)
+    @trace(ipp.logger, "Evaluating constraint Jacobian.")
+    jac = get_jacobian(kkt)
+    cnt.eval_function_time += @elapsed jac_dense!(nlp,view(x,1:get_nvar(nlp)),jac)
+    compress_jacobian!(kkt)
+    cnt.con_jac_cnt+=1
+    cnt.con_jac_cnt==1 && (is_valid(jac) || throw(InvalidNumberException()))
+    @trace(ipp.logger,"Constraint jacobian evaluation started.")
+    return jac
+end
+
+function eval_lag_hess_wrapper!(ipp::Solver, kkt::DenseKKTSystem, x::Vector{Float64},l::Vector{Float64};is_resto=false)
+    nlp = ipp.nlp
+    cnt = ipp.cnt
+    @trace(ipp.logger,"Evaluating Lagrangian Hessian.")
+    ipp._w1l .= l.*ipp.con_scale
+    hess = get_hessian(kkt)
+    cnt.eval_function_time += @elapsed hess_dense!(
+        nlp, view(x,1:get_nvar(nlp)), ipp._w1l, hess;
+        obj_weight = (get_minimize(nlp) ? 1. : -1.) * (is_resto ? 0.0 : ipp.obj_scale[]))
+    compress_hessian!(kkt)
+    cnt.lag_hess_cnt+=1
+    cnt.lag_hess_cnt==1 && (is_valid(hess) || throw(InvalidNumberException()))
+    return hess
+end
+
+function Solver(nlp::AbstractNLPModel;
                 option_dict::Dict{Symbol,Any}=Dict{Symbol,Any}(),
                 kwargs...)
 
@@ -324,16 +377,6 @@ function Solver(nlp::NonlinearProgram;
     check_option_sanity(opt)
 
     # If we are using DenseKKTSystem, ensure that dense callbacks are available
-    if opt.kkt_system == DENSE_KKT_SYSTEM
-        if !has_dense_hessian_callback(nlp)
-            error("MadNLP is unable to find a dense callback for Hessian in `nlp`.\n" *
-                  "Please add a new method with signature `lag_hess!(<:AbstractMatrix{T}, Any, Any, Any)`.")
-        end
-        if ((nlp.m > 0) && !has_dense_jacobian_callback(nlp))
-            error("MadNLP is unable to find a dense callback for Jacobian in `nlp`.\n" *
-                  "Please add a new method with signature `con_jac!(<:AbstractMatrix{T}, Any)`.")
-        end
-    end
     logger = Logger(print_level=opt.print_level,file_print_level=opt.file_print_level,
                     file = opt.output_file == "" ? nothing : open(opt.output_file,"w+"))
     @trace(logger,"Logger is initialized.")
@@ -346,8 +389,8 @@ function Solver(nlp::NonlinearProgram;
     @trace(logger,"Initializing variables.")
     ind_cons = get_index_constraints(nlp; fixed_variable_treatment=opt.fixed_variable_treatment)
     ns = length(ind_cons.ind_ineq)
-    n = nlp.n+ns
-    m = nlp.m
+    n = get_nvar(nlp)+ns
+    m = get_ncon(nlp)
 
     # Initialize KKT
     kkt = if opt.kkt_system == SPARSE_KKT_SYSTEM
@@ -362,15 +405,15 @@ function Solver(nlp::NonlinearProgram;
         DenseKKTSystem{Float64, VT, MT}(nlp, ind_cons)
     end
 
-    xl = [nlp.xl;view(nlp.gl,ind_cons.ind_ineq)]
-    xu = [nlp.xu;view(nlp.gu,ind_cons.ind_ineq)]
-    x = [nlp.x;zeros(ns)]
-    l = nlp.l
-    zl= [nlp.zl;zeros(ns)]
-    zu= [nlp.zu;zeros(ns)]
+    xl = [get_lvar(nlp);view(get_lcon(nlp),ind_cons.ind_ineq)]
+    xu = [get_uvar(nlp);view(get_ucon(nlp),ind_cons.ind_ineq)]
+    x = [get_x0(nlp);zeros(ns)]
+    l = copy(get_y0(nlp))
+    zl= zeros(get_nvar(nlp)+ns)
+    zu= zeros(get_nvar(nlp)+ns)
 
     f = zeros(n) # not sure why, but seems necessary to initialize to 0 when used with Plasmo interface
-    c = nlp.g
+    c = zeros(m)
 
     n_jac = nnz_jacobian(kkt)
 
@@ -380,9 +423,9 @@ function Solver(nlp::NonlinearProgram;
     x_trial=Vector{Float64}(undef,n)
     c_trial=Vector{Float64}(undef,m)
 
-    x_slk= view(x,nlp.n+1:n)
+    x_slk= view(x,get_nvar(nlp)+1:n)
     c_slk= view(c,ind_cons.ind_ineq)
-    rhs = (nlp.gl.==nlp.gu).*nlp.gl
+    rhs = (get_lcon(nlp).==get_ucon(nlp)).*get_lcon(nlp)
 
     x_lr = view(x, ind_cons.ind_lb)
     x_ur = view(x, ind_cons.ind_ub)
@@ -470,7 +513,7 @@ function initialize!(ips::AbstractInteriorPointSolver)
     ips.cnt.start_time = time()
     # initializing slack variables
     @trace(ips.logger,"Initializing slack variables.")
-    ips.nlp.con!(view(ips.c,1:ips.nlp.m),ips.nlp.x)
+    cons!(ips.nlp,get_x0(ips.nlp),view(ips.c,1:get_ncon(ips.nlp)))
     ips.cnt.con_cnt += 1
     ips.x_slk.=ips.c_slk
 
@@ -500,6 +543,8 @@ function initialize!(ips::AbstractInteriorPointSolver)
     if ips.opt.nlp_scaling
         ips.obj_scale[] = min(1,ips.opt.nlp_scaling_max_gradient/norm(ips.f,Inf))
         ips.f.*=ips.obj_scale[]
+        ips.zl.*=ips.obj_scale[]
+        ips.zu.*=ips.obj_scale[]
     end
 
     # Initialize dual variables
@@ -529,10 +574,9 @@ end
 
 
 function reinitialize!(ips::AbstractInteriorPointSolver)
-    ips.obj_val = ips.nlp.obj_val*ips.obj_scale[]
-    view(ips.x,1:ips.nlp.n) .= ips.nlp.x
-    view(ips.zl,1:ips.nlp.n) .= ips.nlp.zl
-    view(ips.zu,1:ips.nlp.n) .= ips.nlp.zu
+    view(ips.x,1:get_nvar(ips.nlp)) .= get_x0(ips.nlp)
+    view(ips.zl,1:get_nvar(ips.nlp)) .= get_zl(ips.nlp)
+    view(ips.zu,1:get_nvar(ips.nlp)) .= get_zu(ips.nlp)
 
     ips.obj_val = eval_f_wrapper(ips, ips.x)
     eval_grad_f_wrapper!(ips, ips.f, ips.x)
@@ -581,26 +625,22 @@ function optimize!(ips::AbstractInteriorPointSolver)
             ips.opt.rethrow_error && rethrow(e)
         end
     finally
+        unscale!(ips)
         ips.cnt.total_time = time() - ips.cnt.start_time
         !(ips.status < SOLVE_SUCCEEDED) && (print_summary_1(ips);print_summary_2(ips))
-        @notice(ips.logger,"EXIT: $(status_output_dict[ips.status])")
-        terminate!(ips)
+        @notice(ips.logger,"EXIT: $(STATUS_OUTPUT_DICT[ips.status])")
         ips.opt.disable_garbage_collector &&
             (GC.enable(true); @warn(ips.logger,"Julia garbage collector is turned back on"))
         finalize(ips.logger)
+        return MadNLPExecutionStats(ips)
     end
 end
 
-function terminate!(ips::AbstractInteriorPointSolver)
-    @trace(ips.logger,"Writing the result to NonlinearProgram.")
-    ips.nlp.obj_val = ips.obj_val/ips.obj_scale[]
-    ips.nlp.x .=  view(ips.x,1:ips.nlp.n)
+function unscale!(ips::AbstractInteriorPointSolver)
+    ips.obj_val/=ips.obj_scale[]
     ips.c ./= ips.con_scale
     ips.c .-= ips.rhs
     ips.c_slk .+= ips.x_slk
-    ips.nlp.zl.=  view(ips.zl,1:ips.nlp.n)
-    ips.nlp.zu.=  view(ips.zu,1:ips.nlp.n)
-    ips.nlp.status = ips.status
 end
 
 function regular!(ips::AbstractInteriorPointSolver)
@@ -1492,20 +1532,20 @@ end
 
 # Print functions -----------------------------------------------------------
 function print_init(ips::AbstractInteriorPointSolver)
-    @notice(ips.logger,@sprintf("Number of nonzeros in constraint Jacobian............: %8i",ips.nlp.nnz_jac))
-    @notice(ips.logger,@sprintf("Number of nonzeros in Lagrangian Hessian.............: %8i\n",ips.nlp.nnz_hess))
+    @notice(ips.logger,@sprintf("Number of nonzeros in constraint Jacobian............: %8i",get_nnzj(ips.nlp)))
+    @notice(ips.logger,@sprintf("Number of nonzeros in Lagrangian Hessian.............: %8i\n",get_nnzh(ips.nlp)))
 
     num_fixed = length(ips.ind_fixed)
-    num_var = ips.nlp.n - num_fixed
+    num_var = get_nvar(ips.nlp) - num_fixed
     num_llb_vars = length(ips.ind_llb)
-    num_lu_vars = sum((ips.nlp.xl.!=-Inf).*(ips.nlp.xu.!=Inf)) - num_fixed
+    num_lu_vars = sum((get_lvar(ips.nlp).!=-Inf).*(get_uvar(ips.nlp).!=Inf)) - num_fixed
     num_uub_vars = length(ips.ind_uub)
-    num_eq_cons = sum(ips.nlp.gl.==ips.nlp.gu)
-    num_ineq_cons = sum(ips.nlp.gl.!=ips.nlp.gu)
-    num_ue_cons = sum((ips.nlp.gl.!=ips.nlp.gu).*(ips.nlp.gl.==-Inf).*(ips.nlp.gu.!=Inf))
-    num_le_cons = sum((ips.nlp.gl.!=ips.nlp.gu).*(ips.nlp.gl.!=-Inf).*(ips.nlp.gu.==Inf))
-    num_lu_cons = sum((ips.nlp.gl.!=ips.nlp.gu).*(ips.nlp.gl.!=-Inf).*(ips.nlp.gu.!=Inf))
-    ips.nlp.n < num_eq_cons && throw(NotEnoughDegreesOfFreedomException())
+    num_eq_cons = sum(get_lcon(ips.nlp).==get_ucon(ips.nlp))
+    num_ineq_cons = sum(get_lcon(ips.nlp).!=get_ucon(ips.nlp))
+    num_ue_cons = sum((get_lcon(ips.nlp).!=get_ucon(ips.nlp)).*(get_lcon(ips.nlp).==-Inf).*(get_ucon(ips.nlp).!=Inf))
+    num_le_cons = sum((get_lcon(ips.nlp).!=get_ucon(ips.nlp)).*(get_lcon(ips.nlp).!=-Inf).*(get_ucon(ips.nlp).==Inf))
+    num_lu_cons = sum((get_lcon(ips.nlp).!=get_ucon(ips.nlp)).*(get_lcon(ips.nlp).!=-Inf).*(get_ucon(ips.nlp).!=Inf))
+    get_nvar(ips.nlp) < num_eq_cons && throw(NotEnoughDegreesOfFreedomException())
 
     @notice(ips.logger,@sprintf("Total number of variables............................: %8i",num_var))
     @notice(ips.logger,@sprintf("                     variables with only lower bounds: %8i",num_llb_vars))
@@ -1574,15 +1614,49 @@ function print_ignored_options(logger,option_dict)
 end
 function string(ips::AbstractInteriorPointSolver)
     """
-            Interior point solver
+                Interior point solver
 
-            number of variables......................: $(ips.nlp.n)
-            number of constraints....................: $(ips.nlp.m)
-            number of nonzeros in lagrangian hessian.: $(ips.nlp.nnz_hess)
-            number of nonzeros in constraint jacobian: $(ips.nlp.nnz_jac)
-            status...................................: $(ips.nlp.status)
-            """
+                number of variables......................: $(get_nvar(ips.nlp))
+                number of constraints....................: $(get_ncon(ips.nlp))
+                number of nonzeros in lagrangian hessian.: $(get_nnzh(ips.nlp))
+                number of nonzeros in constraint jacobian: $(get_nnzj(ips.nlp))
+                status...................................: $(ips.status)
+                """
 end
 print(io::IO,ips::AbstractInteriorPointSolver) = print(io, string(ips))
 show(io::IO,ips::AbstractInteriorPointSolver) = print(io,ips)
+
+function get_index_constraints(nlp::AbstractNLPModel; fixed_variable_treatment=MAKE_PARAMETER)
+    ind_ineq = findall(get_lcon(nlp) .!= get_ucon(nlp))
+    xl = [get_lvar(nlp);view(get_lcon(nlp),ind_ineq)]
+    xu = [get_uvar(nlp);view(get_ucon(nlp),ind_ineq)]
+    if fixed_variable_treatment == MAKE_PARAMETER
+        ind_fixed = findall(xl .== xu)
+        ind_lb = findall((xl .!= -Inf) .* (xl .!= xu))
+        ind_ub = findall((xu .!=  Inf) .* (xl .!= xu))
+    else
+        ind_fixed = Int[]
+        ind_lb = findall(xl .!=-Inf)
+        ind_ub = findall(xu .!= Inf)
+    end
+
+    ind_llb = findall((get_lvar(nlp) .== -Inf).*(get_uvar(nlp) .!= Inf))
+    ind_uub = findall((get_lvar(nlp) .!= -Inf).*(get_uvar(nlp) .== Inf))
+
+    # Return named tuple
+    return (
+        ind_ineq=ind_ineq,
+        ind_fixed=ind_fixed,
+        ind_lb=ind_lb,
+        ind_ub=ind_ub,
+        ind_llb=ind_llb,
+        ind_uub=ind_uub,
+    )
+end
+
+function madnlp(model::AbstractNLPModel;buffered=true, kwargs...)
+    ips = Solver(model;kwargs...)
+    initialize!(ips.kkt)
+    return optimize!(ips)
+end
 

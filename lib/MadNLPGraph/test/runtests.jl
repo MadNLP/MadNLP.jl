@@ -35,27 +35,10 @@ using Test, Plasmo, MadNLP, MadNLPTests, MadNLPGraph
         @testset "plasmo-$name" begin
             MadNLP.optimize!(graph;kwargs...);
             @test MadNLP.termination_status(graph.optimizer) == MOI.LOCALLY_SOLVED
+            @test solcmp([0.0,0.03137979101284875,0.0627286139604959,0.09401553133948139,0.12520966673966746,0.15628023531552773,0.18719657416707308,0.21792817260043182,0.24844470223822107,0.2787160469499936], value.(getnode(graph,1)[:x][1:10]))
+            @test solcmp([-0.0627595821831224,-0.06269764605256355,-0.06257383491492904,-0.06238827095686386,-0.06214113730759117,-0.06183267785818605,-0.06146319702088434,-0.06103305942866446,-0.06054268957539879,-0.05999257139692946], dual.(getnode(graph,1)[:dynamics][1:10]))
+            @test solcmp([-1.574246826343827e-10,-1.5726901766520537e-10,-1.5695784406668639e-10,-1.5649147434189076e-10,-1.5587037679839438e-10,-1.5509517501550025e-10,-1.541666471342132e-10,-1.5308572497187857e-10,-1.5185349296508524e-10,-1.504711869423148e-10], dual.(UpperBoundRef.(getnode(graph,1)[:u][1:10])))
+            @test solcmp([0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0], dual.(LowerBoundRef.(getnode(graph,1)[:u][1:10])))
         end
     end
-
-    # maybe not necessary for MadNLPGraph
-    # optimizer_constructors = [
-    #     ("default",()->MadNLP.Optimizer(print_level=MadNLP.ERROR)),
-    #     ("schur",()->MadNLP.Optimizer(linear_solver=MadNLPSchur,schur_num_parts=2,print_level=MadNLP.ERROR)),
-    #     ("schwarz-single",()->MadNLP.Optimizer(linear_solver=MadNLPSchwarz,schwarz_num_parts=2,print_level=MadNLP.ERROR)),
-    #     ("schwarz-double",()->MadNLP.Optimizer(linear_solver=MadNLPSchwarz,schwarz_num_parts_upper=2,schwarz_num_parts=10,
-    #                                            print_level=MadNLP.ERROR))
-    # ]
-
-    # for (name,optimizer_constructor) in optimizer_constructors
-    #     @testset "jump-$name" begin
-    #         node,~=combine(graph)
-    #         m = node.model
-    #         set_optimizer(m,optimizer_constructor)
-    #         optimize!(m);
-    #         @test solcmp([0.0,0.03137979101284875,0.0627286139604959,0.09401553133948139,0.12520966673966746,0.15628023531552773,0.18719657416707308,0.21792817260043182,0.24844470223822107,0.2787160469499936], value.(getnode(graph,1)[:x][1:10]))
-    #         @test termination_status(m) == MOI.LOCALLY_SOLVED
-    #     end
-    # end
-    
 end
