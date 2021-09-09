@@ -42,7 +42,7 @@
       USER_REQUESTED_STOP = -5,
       INTERNAL_ERROR = -6)
 
-const status_output_dict = Dict(
+const STATUS_OUTPUT_DICT = Dict(
     SOLVE_SUCCEEDED => "Optimal Solution Found.",
     SOLVED_TO_ACCEPTABLE_LEVEL => "Solved To Acceptable Level.",
     SEARCH_DIRECTION_BECOMES_TOO_SMALL => "Search Direction is becoming Too Small.",

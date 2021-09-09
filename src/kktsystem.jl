@@ -46,6 +46,12 @@ function nnz_jacobian end
 "Nonzero in Hessian"
 function nnz_kkt end
 
+"Dense Jacobian callback"
+function jac_dense! end
+
+"Dense Hessian callback"
+function hess_dense! end
+
 #=
     Generic functions
 =#

@@ -5,10 +5,10 @@ using LinearAlgebra
 using SparseArrays
 using Random
 
-struct DenseQP <: AbstractNLPModel{Float64,Vector{Float64}}
+struct DenseDummyQP <: AbstractNLPModel{Float64,Vector{Float64}}
     meta::NLPModels.NLPModelMeta{Float64, Vector{Float64}}
-    P::Matrix{Float64} # primal hessi
-    A::Matrix{Float64} # constratin jacobian
+    P::Matrix{Float64} # primal hessian
+    A::Matrix{Float64} # constraint jacobian
     q::Vector{Float64}
     hrows::Vector{Int}
     hcols::Vector{Int}
@@ -18,28 +18,28 @@ struct DenseQP <: AbstractNLPModel{Float64,Vector{Float64}}
 end
 
 
-function jac_structure!(qp::DenseQP,I, J)
+function jac_structure!(qp::DenseDummyQP,I, J)
     copyto!(I, qp.jrows)
     copyto!(J, qp.jcols)
 end
-function hess_structure!(qp::DenseQP,I, J)
+function hess_structure!(qp::DenseDummyQP,I, J)
     copyto!(I, qp.hrows)
     copyto!(J, qp.hcols)
 end
 
-function obj(qp::DenseQP,x)
+function obj(qp::DenseDummyQP,x)
     return 0.5 * dot(x, qp.P, x) + dot(qp.q, x)
 end
-function grad!(qp::DenseQP,x,g)
+function grad!(qp::DenseDummyQP,x,g)
     mul!(g, qp.P, x)
     g .+= qp.q
     return
 end
-function cons!(qp::DenseQP,x,c)
+function cons!(qp::DenseDummyQP,x,c)
     mul!(c, qp.A, x)
 end
 # Jacobian: sparse callback
-function jac_coord!(qp::DenseQP, x, J::AbstractVector)
+function jac_coord!(qp::DenseDummyQP, x, J::AbstractVector)
     index = 1
     for (i, j) in zip(qp.jrows, qp.jcols)
         J[index] =  qp.A[i, j]
@@ -47,9 +47,9 @@ function jac_coord!(qp::DenseQP, x, J::AbstractVector)
     end
 end
 # Jacobian: dense callback
-jac_dense!(qp::DenseQP, x, J::AbstractMatrix) = copyto!(J, qp.A)
+jac_dense!(qp::DenseDummyQP, x, J::AbstractMatrix) = copyto!(J, qp.A)
 # Hessian: sparse callback
-function hess_coord!(qp::DenseQP,x, l, hess::AbstractVector; obj_weight=1.)
+function hess_coord!(qp::DenseDummyQP,x, l, hess::AbstractVector; obj_weight=1.)
     index = 1
     for i in 1:get_nvar(qp) , j in 1:i
         hess[index] = obj_weight * qp.P[j, i]
@@ -57,12 +57,12 @@ function hess_coord!(qp::DenseQP,x, l, hess::AbstractVector; obj_weight=1.)
     end
 end
 # Hessian: dense callback
-function hess_dense!(qp::DenseQP, x, l,hess::AbstractMatrix; obj_weight=1.)
+function hess_dense!(qp::DenseDummyQP, x, l,hess::AbstractMatrix; obj_weight=1.)
     hess .= obj_weight .* qp.P
 end
 
 
-function build_qp_test(; n=100, m=10, fixed_variables=Int[])
+function DenseDummyQP(; n=100, m=10, fixed_variables=Int[])
     if m >= n
         error("The number of constraints `m` should be less than the number of variable `n`.")
     end
@@ -102,7 +102,7 @@ function build_qp_test(; n=100, m=10, fixed_variables=Int[])
     jcols = [i for i in 1:n for j in 1:m]
     nnzj = n * m
     
-    return DenseQP(
+    return DenseDummyQP(
         NLPModels.NLPModelMeta(
             n,
             ncon = m,
@@ -129,7 +129,7 @@ end
             :linear_solver=>MadNLPLapackCPU,
         )
         m = 0
-        nlp = build_qp_test(; n=n, m=m)
+        nlp = DenseDummyQP(; n=n, m=m)
         ipd = MadNLP.Solver(nlp, option_dict=dense_options)
 
         kkt = ipd.kkt
@@ -154,7 +154,7 @@ end
             :linear_solver=>MadNLPLapackCPU,
         )
         m = 5
-        nlp = build_qp_test(; n=n, m=m)
+        nlp = DenseDummyQP(; n=n, m=m)
         ipd = MadNLP.Solver(nlp, option_dict=dense_options)
         ns = length(ipd.ind_ineq)
 
@@ -181,13 +181,12 @@ function _compare_dense_with_sparse(n, m, ind_fixed)
         :print_level=>MadNLP.ERROR,
     )
 
-    nlp = build_qp_test(; n=n, m=m, fixed_variables=ind_fixed)
+    nlp = DenseDummyQP(; n=n, m=m, fixed_variables=ind_fixed)
+    
     ips = MadNLP.Solver(nlp, option_dict=sparse_options)
-    MadNLP.optimize!(ips)
-
-    # Reinit DenseQP to avoid side effect
-    nlp = build_qp_test(; n=n, m=m, fixed_variables=ind_fixed)
     ipd = MadNLP.Solver(nlp, option_dict=dense_options)
+    
+    MadNLP.optimize!(ips)
     MadNLP.optimize!(ipd)
 
     # Check that dense formulation matches exactly sparse formulation

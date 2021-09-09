@@ -171,8 +171,30 @@ mutable struct Solver{KKTSystem} <: AbstractInteriorPointSolver
     output::Dict
 end
 
+struct MadNLPExecutionStats{T} <: AbstractExecutionStats
+    status::Status
+    solution::StrideOneVector{T} 
+    objective::T 
+    constraints::StrideOneVector{T}
+    dual_feas::T 
+    primal_feas::T 
+    multipliers::StrideOneVector{T} 
+    multipliers_L::StrideOneVector{T} 
+    multipliers_U::StrideOneVector{T} 
+    iter::Int
+    counters::NLPModelsCounters
+    elapsed_time::Real
+end
+
 struct InvalidNumberException <: Exception end
 struct NotEnoughDegreesOfFreedomException <: Exception end
+
+MadNLPExecutionStats(ips::Solver) =MadNLPExecutionStats(
+    ips.status,view(ips.x,1:get_nvar(ips.nlp)),ips.obj_val,ips.c,
+    ips.inf_du, ips.inf_pr, 
+    ips.l,view(ips.zl,1:get_nvar(ips.nlp)),view(ips.zu,1:get_nvar(ips.nlp)),
+    ips.cnt.k, ips.nlp.counters,ips.cnt.total_time)
+getStatus(result::MadNLPExecutionStats) = STATUS_OUTPUT_DICT[result.status]
 
 function RobustRestorer(ips::AbstractInteriorPointSolver)
 
@@ -603,15 +625,23 @@ function optimize!(ips::AbstractInteriorPointSolver)
             ips.opt.rethrow_error && rethrow(e)
         end
     finally
+        unscale!(ips)
         ips.cnt.total_time = time() - ips.cnt.start_time
         !(ips.status < SOLVE_SUCCEEDED) && (print_summary_1(ips);print_summary_2(ips))
-        @notice(ips.logger,"EXIT: $(status_output_dict[ips.status])")
+        @notice(ips.logger,"EXIT: $(STATUS_OUTPUT_DICT[ips.status])")
         ips.opt.disable_garbage_collector &&
             (GC.enable(true); @warn(ips.logger,"Julia garbage collector is turned back on"))
         finalize(ips.logger)
+        return MadNLPExecutionStats(ips)
     end
 end
 
+function unscale!(ips::AbstractInteriorPointSolver)
+    ips.obj_val/=ips.obj_scale[]
+    ips.c ./= ips.con_scale
+    ips.c .-= ips.rhs
+    ips.c_slk .+= ips.x_slk
+end
 
 function regular!(ips::AbstractInteriorPointSolver)
     while true
@@ -1623,3 +1653,10 @@ function get_index_constraints(nlp::AbstractNLPModel; fixed_variable_treatment=M
         ind_uub=ind_uub,
     )
 end
+
+function madnlp(model::AbstractNLPModel;buffered=true, kwargs...)
+    ips = Solver(model;kwargs...)
+    initialize!(ips.kkt)
+    return optimize!(ips)
+end
+

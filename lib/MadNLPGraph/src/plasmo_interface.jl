@@ -1,6 +1,3 @@
-# MadNLP.jl
-# Created by Sungho Shin (sungho.shin@wisc.edu)
-
 const dummy_function = ()->nothing
 
 num_linkconstraints(modeledge::OptiEdge) = length(modeledge.linkconstraints)
@@ -166,7 +163,42 @@ get_nnz_link_jac(linkedge::OptiEdge) = sum(
     length(linkcon.func.terms) for (ind,linkcon) in linkedge.linkconstraints)
 
 
-function NonlinearProgram(graph::OptiGraph)
+struct GraphModel{T} <: AbstractNLPModel{T,Vector{T}}
+    ninds::Vector{UnitRange{Int}}
+    minds::Vector{UnitRange{Int}}
+    pinds::Vector{UnitRange{Int}}
+    nnzs_jac_inds::Vector{UnitRange{Int}}
+    nnzs_hess_inds::Vector{UnitRange{Int}}
+    nnzs_link_jac_inds::Vector{UnitRange{Int}}
+    
+    x_index_map::Dict #
+    g_index_map::Dict #
+    
+    modelnodes::Vector{OptiNode}
+    linkedges::Vector{OptiEdge}
+    
+    meta::NLPModelMeta{T, Vector{T}}
+    graph::OptiGraph
+    counters::NLPModelsCounters
+    ext::Dict{Symbol,Any}
+end
+
+obj(nlp::GraphModel,x) =  eval_objective(nlp.graph,x,nlp.ninds,nlp.x_index_map,nlp.modelnodes)
+grad!(nlp::GraphModel,x,f) =eval_objective_gradient(nlp.graph,f,x,nlp.ninds,nlp.modelnodes)
+cons!(nlp::GraphModel,x,c) = eval_constraint(
+    nlp.graph,c,x,nlp.ninds,nlp.minds,nlp.pinds,nlp.x_index_map,nlp.modelnodes,nlp.linkedges)
+hess_coord!(nlp::GraphModel,x,l,hess;obj_weight=1.) =eval_hessian_lagrangian(
+    nlp.graph,hess,x,obj_weight,l,nlp.ninds,nlp.minds,nlp.nnzs_hess_inds,nlp.modelnodes)
+jac_coord!(nlp::GraphModel,x,jac)=eval_constraint_jacobian(
+    nlp.graph,jac,x,nlp.ninds,nlp.minds,nlp.nnzs_jac_inds,nlp.nnzs_link_jac_inds,
+    nlp.modelnodes,nlp.linkedges)
+hess_structure!(nlp::GraphModel,I,J)=hessian_lagrangian_structure(
+    nlp.graph,I,J,nlp.ninds,nlp.nnzs_hess_inds,nlp.modelnodes)
+jac_structure!(nlp::GraphModel,I,J) =jacobian_structure(
+    nlp.graph,I,J,nlp.ninds,nlp.minds,nlp.pinds,nlp.nnzs_jac_inds,nlp.nnzs_link_jac_inds,
+    nlp.x_index_map,nlp.g_index_map,nlp.modelnodes,nlp.linkedges)
+
+function GraphModel(graph::OptiGraph)
     modelnodes = all_nodes(graph)
     linkedges = all_edges(graph)
 
@@ -219,20 +251,15 @@ function NonlinearProgram(graph::OptiGraph)
         [(i==1 ? nnz_jac : nnz_jac+nnzs_link_jac_cumsum[i-1])+1: nnz_jac + nnzs_link_jac_cumsum[i] for i=1:Q]
     
     x =Vector{Float64}(undef,n)
-    g =Vector{Float64}(undef,m+p)
-
     xl=Vector{Float64}(undef,n)
     xu=Vector{Float64}(undef,n)
-    zl=Vector{Float64}(undef,n)
-    zu=Vector{Float64}(undef,n)
 
     l =Vector{Float64}(undef,m+p)
     gl=Vector{Float64}(undef,m+p)
     gu=Vector{Float64}(undef,m+p)
 
     @blas_safe_threads for k=1:K
-        set_x!(moi_optimizer(modelnodes[k]),view(x,ninds[k]),view(xl,ninds[k]),
-               view(xu,ninds[k]),view(zl,ninds[k]),view(zu,ninds[k]))
+        set_x!(moi_optimizer(modelnodes[k]),view(x,ninds[k]),view(xl,ninds[k]),view(xu,ninds[k]))
         set_g!(moi_optimizer(modelnodes[k]),view(l,minds[k]),view(gl,minds[k]),view(gu,minds[k]))
     end
 
@@ -248,26 +275,6 @@ function NonlinearProgram(graph::OptiGraph)
     cnt = 0
     g_index_map = Dict(con=> m + (cnt+=1) for linkedge in linkedges for (ind,con) in linkedge.linkconstraints)
 
-    obj(x) =  eval_objective(graph,x,ninds,x_index_map,modelnodes)
-    obj_grad!(f,x) =eval_objective_gradient(graph,f,x,ninds,modelnodes)
-    con!(c,x) = eval_constraint(graph,c,x,ninds,minds,pinds,x_index_map,modelnodes,linkedges)
-    lag_hess!(hess,x,l,sig::Float64) =eval_hessian_lagrangian(
-        graph,hess,x,sig,l,ninds,minds,nnzs_hess_inds,modelnodes)
-    con_jac!(jac,x)=eval_constraint_jacobian(
-        graph,jac,x,ninds,minds,nnzs_jac_inds,nnzs_link_jac_inds,modelnodes,linkedges)
-    hess_sparsity!(I,J)=hessian_lagrangian_structure(graph,I,J,ninds,nnzs_hess_inds,modelnodes)
-    jac_sparsity!(I,J) =jacobian_structure(
-        graph,I,J,ninds,minds,pinds,nnzs_jac_inds,nnzs_link_jac_inds,x_index_map,g_index_map,modelnodes,linkedges)
-
-    # some of outputs should be set automatically with this
-    @blas_safe_threads for k=1:K
-        moi_optimizer(modelnodes[k]).nlp = NonlinearProgram(
-            0,0,0,0,0.,view(x,ninds[k]),Float64[],view(l,minds[k]),view(zl,ninds[k]),view(zu,ninds[k]),
-            Float64[],Float64[],Float64[],Float64[],
-            dummy_function,dummy_function,dummy_function,dummy_function,dummy_function,
-            dummy_function,dummy_function,INITIAL, Dict{Symbol,Any}())
-    end
-
     jac_constant = true
     hess_constant = true
     for node in modelnodes
@@ -279,20 +286,38 @@ function NonlinearProgram(graph::OptiGraph)
     ext = Dict{Symbol,Any}(:n=>n,:m=>m,:p=>p,:ninds=>ninds,:minds=>minds,:pinds=>pinds,
                            :linkedges=>linkedges,:jac_constant=>jac_constant,:hess_constant=>hess_constant)
     
-    return NonlinearProgram(n,m+p,nnz_hess,nnz_jac+nnz_link_jac,0.,x,g,l,zl,zu,xl,xu,gl,gu,obj,obj_grad!,
-                            con!,con_jac!,lag_hess!,hess_sparsity!,jac_sparsity!, INITIAL , ext)
+    return GraphModel(
+        ninds,minds,pinds,nnzs_jac_inds,nnzs_hess_inds,nnzs_link_jac_inds,
+        x_index_map,g_index_map,modelnodes,linkedges,
+        NLPModelMeta(
+            n,
+            ncon = m+p,
+            x0 = x,
+            lvar = xl,
+            uvar = xu,
+            y0 = l,
+            lcon = gl,
+            ucon = gu,
+            nnzj = nnz_jac + nnz_link_jac,
+            nnzh = nnz_hess,
+            minimize = true # graph.objective_sense == MOI.MIN_SENSE
+        ),
+        graph,NLPModelsCounters(),
+        ext
+    )
+
 end
 
-function get_part(graph,nlp::NonlinearProgram)
+function get_part(graph::OptiGraph,nlp::GraphModel)
     n = nlp.ext[:n]
     m = nlp.ext[:m]
     p = nlp.ext[:p]
     
-    ninds = nlp.ext[:ninds]
-    minds = nlp.ext[:minds]
-    pinds = nlp.ext[:pinds]
+    ninds = nlp.ninds
+    minds = nlp.minds
+    pinds = nlp.pinds
     
-    ind_ineq = findall(nlp.gl.!=nlp.gu)
+    ind_ineq = findall(get_lcon(nlp).!=get_ucon(nlp))
     l = length(ind_ineq)
 
     part = Vector{Int}(undef,n+m+l+p)
@@ -324,9 +349,10 @@ function get_part(graph,nlp::NonlinearProgram)
 end
 
 function optimize!(graph::OptiGraph; option_dict = Dict{Symbol,Any}(), kwargs...)
-    nlp = NonlinearProgram(graph)
+    graph.objective_function.constant = 0.
+    nlp = GraphModel(graph)    
     
-    
+    K = num_all_nodes(graph) 
     if (haskey(kwargs,:schwarz_custom_partition) && kwargs[:schwarz_custom_partition]) ||
         (haskey(option_dict,:schwarz_custom_partition) && option_dict[:schwarz_custom_partition])
         
@@ -338,7 +364,6 @@ function optimize!(graph::OptiGraph; option_dict = Dict{Symbol,Any}(), kwargs...
         (haskey(option_dict,:schur_custom_partition) && option_dict[:schur_custom_partition])
 
         part= get_part(graph,nlp)
-        K = num_all_nodes(graph) 
         part[part.>K].=0
         option_dict[:schur_part] = part
         option_dict[:schur_num_parts] = K
@@ -346,14 +371,21 @@ function optimize!(graph::OptiGraph; option_dict = Dict{Symbol,Any}(), kwargs...
     
     option_dict[:jacobian_constant] = nlp.ext[:jac_constant]
     option_dict[:hessian_constant] = nlp.ext[:hess_constant]
-    graph.optimizer = Solver(nlp;option_dict=option_dict,kwargs...)
-        
-    optimize!(graph.optimizer)
+    ips = Solver(nlp;option_dict=option_dict,kwargs...)
+    result = optimize!(ips)
 
+    graph.optimizer = ips
     graph.objective_function.constant = graph.optimizer.obj_val
-    
-    @blas_safe_threads for modelnode in all_nodes(graph) # set outputs
-        moi_optimizer(modelnode).nlp.status = graph.optimizer.status
-        moi_optimizer(modelnode).nlp.obj_val= graph.optimizer.obj_val
+
+    @blas_safe_threads for k=1:K
+        moi_optimizer(nlp.modelnodes[k]).result = MadNLPExecutionStats(
+            ips.status,view(result.solution,nlp.ninds[k]),
+            ips.obj_val,
+            view(result.constraints,nlp.minds[k]),
+            ips.inf_du, ips.inf_pr, 
+            view(result.multipliers,nlp.minds[k]),
+            view(result.multipliers_L,nlp.ninds[k]),
+            view(result.multipliers_U,nlp.ninds[k]),
+            ips.cnt.k, ips.nlp.counters,ips.cnt.total_time)
     end
 end
