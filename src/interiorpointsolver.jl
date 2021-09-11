@@ -631,8 +631,8 @@ function optimize!(ips::AbstractInteriorPointSolver)
         ips.opt.disable_garbage_collector &&
             (GC.enable(true); @warn(ips.logger,"Julia garbage collector is turned back on"))
         finalize(ips.logger)
-        return MadNLPExecutionStats(ips)
     end
+    return MadNLPExecutionStats(ips)
 end
 
 function unscale!(ips::AbstractInteriorPointSolver)
@@ -1509,6 +1509,8 @@ function _get_fixed_variable_index(mat::SparseMatrixCSC{Tv,Ti1}, ind_fixed::Vect
                 append!(collect(mat.colptr[i]+1:mat.colptr[i+1]-1),
                         setdiff!(findall(mat.rowval.==i),mat.colptr[i])))
     end
+
+    
     return fixed_aug_index
 end
 fixed_variable_treatment_vec!(vec,ind_fixed) = (vec[ind_fixed] .= 0.)
