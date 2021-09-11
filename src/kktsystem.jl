@@ -77,13 +77,9 @@ get_raw_jacobian(kkt::AbstractKKTSystem) = kkt.jac_raw
 
 # Fix variable treatment
 function treat_fixed_variable!(kkt::AbstractKKTSystem{T, MT}) where {T, MT<:SparseMatrixCSC{T, Int32}}
-    length(kkt.ind_fixed) == 0 && return
-    aug = kkt.aug_com
-
-    fixed_aug_diag = view(aug.nzval, aug.colptr[kkt.ind_fixed])
-    fixed_aug_diag .= 1.0
-    fixed_aug = view(aug.nzval, kkt.ind_aug_fixed)
-    fixed_aug .= 0.0
+    length(kkt.ind_fixed) == 0 && return    
+    kkt.fixed_aug_diag .= 1.0
+    kkt.fixed_aug .= 0.0
     return
 end
 function treat_fixed_variable!(kkt::AbstractKKTSystem{T, MT}) where {T, MT<:Matrix{T}}
@@ -168,7 +164,8 @@ struct SparseKKTSystem{T, MT} <: AbstractSparseKKTSystem{T, MT}
     # Info
     ind_ineq::Vector{Int}
     ind_fixed::Vector{Int}
-    ind_aug_fixed::Vector{Int}
+    fixed_aug_diag::SubVector{T}
+    fixed_aug::SubVector{T}
     jacobian_scaling::Vector{T}
 end
 
@@ -215,18 +212,22 @@ function SparseKKTSystem{T, MT}(
     aug_csc_map = get_mapping(aug_com, aug_raw)
     jac_csc_map = get_mapping(jac_com, jac_raw)
 
+
     ind_aug_fixed = if isa(aug_com, SparseMatrixCSC)
         _get_fixed_variable_index(aug_com, ind_fixed)
     else
         zeros(Int, 0)
     end
+    fixed_aug_diag = view(aug_com.nzval, aug_com.colptr[ind_fixed])
+    fixed_aug = view(aug_com.nzval, ind_aug_fixed)
+
     jac_scaling = ones(T, n_jac)
 
     return SparseKKTSystem{T, MT}(
         hess, jac, pr_diag, du_diag,
         aug_raw, aug_com, aug_csc_map,
         jac_raw, jac_com, jac_csc_map,
-        ind_ineq, ind_fixed, ind_aug_fixed, jac_scaling,
+        ind_ineq, ind_fixed, fixed_aug_diag, fixed_aug, jac_scaling,
     )
 end
 
@@ -282,7 +283,6 @@ struct SparseUnreducedKKTSystem{T, MT} <: AbstractSparseKKTSystem{T, MT}
     jac_csc_map::Union{Nothing, Vector{Int}}
     ind_ineq::Vector{Int}
     ind_fixed::Vector{Int}
-    ind_aug_fixed::Vector{Int}
     jacobian_scaling::Vector{T}
 end
 
@@ -356,7 +356,7 @@ function SparseUnreducedKKTSystem{T, MT}(
         l_diag, u_diag, l_lower, u_lower,
         aug_raw, aug_com, aug_csc_map,
         jac_raw, jac_com, jac_csc_map,
-        ind_ineq, ind_fixed, ind_aug_fixed, jac_scaling,
+        ind_ineq, jac_scaling,
     )
 end
 

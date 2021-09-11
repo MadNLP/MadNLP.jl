@@ -164,6 +164,8 @@ mutable struct Solver{KKTSystem} <: AbstractInteriorPointSolver
     del_c::Float64
     del_w_last::Float64
 
+    has_inequality::Bool
+
     filter::Vector{Tuple{Float64,Float64}}
 
     RR::Union{Nothing,RobustRestorer}
@@ -184,6 +186,7 @@ struct MadNLPExecutionStats{T} <: AbstractExecutionStats
     iter::Int
     counters::NLPModelsCounters
     elapsed_time::Real
+    ips::AbstractInteriorPointSolver
 end
 
 struct InvalidNumberException <: Exception end
@@ -193,7 +196,8 @@ MadNLPExecutionStats(ips::Solver) =MadNLPExecutionStats(
     ips.status,view(ips.x,1:get_nvar(ips.nlp)),ips.obj_val,ips.c,
     ips.inf_du, ips.inf_pr, 
     ips.l,view(ips.zl,1:get_nvar(ips.nlp)),view(ips.zu,1:get_nvar(ips.nlp)),
-    ips.cnt.k, ips.nlp.counters,ips.cnt.total_time)
+    ips.cnt.k, ips.nlp.counters,ips.cnt.total_time,
+    ips)
 getStatus(result::MadNLPExecutionStats) = STATUS_OUTPUT_DICT[result.status]
 
 function RobustRestorer(ips::AbstractInteriorPointSolver)
@@ -296,6 +300,7 @@ function eval_grad_f_wrapper!(ips::Solver, f::Vector{Float64},x::Vector{Float64}
 end
 
 function eval_cons_wrapper!(ips::Solver, c::Vector{Float64},x::Vector{Float64})
+    !has_constraint(ips) && return c
     nlp = ips.nlp
     cnt = ips.cnt
     @trace(ips.logger, "Evaluating constraints.")
@@ -309,6 +314,7 @@ function eval_cons_wrapper!(ips::Solver, c::Vector{Float64},x::Vector{Float64})
 end
 
 function eval_jac_wrapper!(ipp::Solver, kkt::AbstractKKTSystem, x::Vector{Float64})
+    !has_constraint(ipp) && return kkt.jac
     nlp = ipp.nlp
     cnt = ipp.cnt
     ns = length(ipp.ind_ineq)
@@ -506,15 +512,18 @@ function Solver(nlp::AbstractNLPModel;
                   linear_solver,iterator,
                   obj_scale,con_scale,con_jac_scale,
                   0.,0.,0.,0.,0.,0.,0.,0.,0.," ",0.,0.,0.,
+                  ind_cons.has_inequality,
                   Vector{Float64}[],nothing,INITIAL,Dict())
 end
 
 function initialize!(ips::AbstractInteriorPointSolver)
     # initializing slack variables
-    @trace(ips.logger,"Initializing slack variables.")
-    cons!(ips.nlp,get_x0(ips.nlp),view(ips.c,1:get_ncon(ips.nlp)))
-    ips.cnt.con_cnt += 1
-    ips.x_slk.=ips.c_slk
+    if has_constraint(ips)
+        @trace(ips.logger,"Initializing slack variables.")
+        cons!(ips.nlp,get_x0(ips.nlp),view(ips.c,1:get_ncon(ips.nlp)))
+        ips.cnt.con_cnt += 1
+        ips.x_slk.=ips.c_slk
+    end
 
     # Initialization
     @trace(ips.logger,"Initializing primal and bound duals.")
@@ -525,16 +534,18 @@ function initialize!(ips::AbstractInteriorPointSolver)
     initialize_variables!(ips.x,ips.xl,ips.xu,ips.opt.bound_push,ips.opt.bound_fac)
 
     # Automatic scaling (constraints)
-    @trace(ips.logger,"Computing constraint scaling.")
-    eval_jac_wrapper!(ips, ips.kkt, ips.x)
-    compress_jacobian!(ips.kkt)
-    if ips.opt.nlp_scaling
-        jac = get_raw_jacobian(ips.kkt)
-        set_con_scale!(ips.con_scale, jac, ips.opt.nlp_scaling_max_gradient)
-        set_jacobian_scaling!(ips.kkt, ips.con_scale)
-        ips.l./=ips.con_scale
+    if has_constraint(ips)
+        @trace(ips.logger,"Computing constraint scaling.")
+        eval_jac_wrapper!(ips, ips.kkt, ips.x)
+        compress_jacobian!(ips.kkt)
+        if ips.opt.nlp_scaling
+            jac = get_raw_jacobian(ips.kkt)
+            set_con_scale!(ips.con_scale, jac, ips.opt.nlp_scaling_max_gradient)
+            set_jacobian_scaling!(ips.kkt, ips.con_scale)
+            ips.l./=ips.con_scale
+        end
+        compress_jacobian!(ips.kkt)
     end
-    compress_jacobian!(ips.kkt)
 
     # Automatic scaling (objective)
     eval_grad_f_wrapper!(ips, ips.f,ips.x)
@@ -542,8 +553,8 @@ function initialize!(ips::AbstractInteriorPointSolver)
     if ips.opt.nlp_scaling
         ips.obj_scale[] = min(1,ips.opt.nlp_scaling_max_gradient/norm(ips.f,Inf))
         ips.f.*=ips.obj_scale[]
-        ips.zl.*=ips.obj_scale[]
-        ips.zu.*=ips.obj_scale[]
+        # ips.zl.*=ips.obj_scale[]
+        # ips.zu.*=ips.obj_scale[]
     end
 
     # Initialize dual variables
@@ -564,7 +575,7 @@ function initialize!(ips::AbstractInteriorPointSolver)
     theta = get_theta(ips.c)
     ips.theta_max=1e4*max(1,theta)
     ips.theta_min=1e-4*max(1,theta)
-    ips.mu=ips.opt.mu_init
+    has_inequality(ips) && (ips.mu=ips.opt.mu_init)
     ips.tau=max(ips.opt.tau_min,1-ips.opt.mu_init)
     ips.filter = [(ips.theta_max,-Inf)]
 
@@ -586,7 +597,7 @@ function reinitialize!(ips::AbstractInteriorPointSolver)
     theta = get_theta(ips.c)
     ips.theta_max=1e4*max(1,theta)
     ips.theta_min=1e-4*max(1,theta)
-    ips.mu=ips.opt.mu_init
+    has_inequality(ips) && (ips.mu=ips.opt.mu_init)
     ips.tau=max(ips.opt.tau_min,1-ips.opt.mu_init)
     ips.filter = [(ips.theta_max,-Inf)]
 
@@ -672,18 +683,20 @@ function regular!(ips::AbstractInteriorPointSolver)
         time()-ips.cnt.start_time>=ips.opt.max_wall_time && return MAXIMUM_WALLTIME_EXCEEDED
 
         # update the barrier parameter
-        @trace(ips.logger,"Updating the barrier parameter.")
-        while ips.mu != max(ips.opt.mu_min,ips.opt.tol/10) &&
-            max(ips.inf_pr,ips.inf_du,inf_compl_mu) <= ips.opt.barrier_tol_factor*ips.mu
-            mu_new = get_mu(ips.mu,ips.opt.mu_min,
-                            ips.opt.mu_linear_decrease_factor,ips.opt.mu_superlinear_decrease_power,ips.opt.tol)
-            inf_compl_mu = get_inf_compl(ips.x_lr,ips.xl_r,ips.zl_r,ips.xu_r,ips.x_ur,ips.zu_r,ips.mu,sc)
-            ips.tau= get_tau(ips.mu,ips.opt.tau_min)
-            ips.zl_r./=sqrt(mu_new/ips.mu)
-            ips.zu_r./=sqrt(mu_new/ips.mu)
-            ips.mu = mu_new
-            empty!(ips.filter)
-            push!(ips.filter,(ips.theta_max,-Inf))
+        if has_inequality(ips)
+            @trace(ips.logger,"Updating the barrier parameter.")
+            if ips.mu != max(ips.opt.mu_min,ips.opt.tol/10) &&
+                max(ips.inf_pr,ips.inf_du,inf_compl_mu) <= ips.opt.barrier_tol_factor*ips.mu
+                mu_new = get_mu(ips.mu,ips.opt.mu_min,
+                                ips.opt.mu_linear_decrease_factor,ips.opt.mu_superlinear_decrease_power,ips.opt.tol)
+                inf_compl_mu = get_inf_compl(ips.x_lr,ips.xl_r,ips.zl_r,ips.xu_r,ips.x_ur,ips.zu_r,ips.mu,sc)
+                ips.tau= get_tau(ips.mu,ips.opt.tau_min)
+                # ips.zl_r./=sqrt(mu_new/ips.mu)
+                # ips.zu_r./=sqrt(mu_new/ips.mu)
+                ips.mu = mu_new
+                empty!(ips.filter)
+                push!(ips.filter,(ips.theta_max,-Inf))
+            end
         end
 
         # compute the newton step
@@ -757,8 +770,10 @@ function regular!(ips::AbstractInteriorPointSolver)
                 return ROBUST
             else
                 @trace(ips.logger,"Step rejected; proceed with the next trial step.")
-                ips.alpha < eps(Float64)*10 && return ips.cnt.acceptable_cnt >0 ?
+                if ips.alpha < eps(Float64)*10 && ips.alpha*norm(ips.dx,Inf) < eps(Float64)*10
+                    return ips.cnt.acceptable_cnt >0 ?
                     SOLVED_TO_ACCEPTABLE_LEVEL : SEARCH_DIRECTION_BECOMES_TOO_SMALL
+                end
             end
         end
 
@@ -823,23 +838,25 @@ function robust!(ips::Solver)
 
 
         # update the barrier parameter
-        @trace(ips.logger,"Updating restoration phase barrier parameter.")
-        while RR.mu_R != ips.opt.mu_min*100 &&
-            max(RR.inf_pr_R,RR.inf_du_R,inf_compl_mu_R) <= ips.opt.barrier_tol_factor*RR.mu_R
-            mu_new = get_mu(RR.mu_R,ips.opt.mu_min,
-                            ips.opt.mu_linear_decrease_factor,ips.opt.mu_superlinear_decrease_power,ips.opt.tol)
-            inf_compl_mu_R = get_inf_compl_R(
-                ips.x_lr,ips.xl_r,ips.zl_r,ips.xu_r,ips.x_ur,ips.zu_r,RR.pp,RR.zp,RR.nn,RR.zn,RR.mu_R,sc)
-            RR.tau_R= max(ips.opt.tau_min,1-RR.mu_R)
-            RR.zeta = sqrt(RR.mu_R)
-            ips.zl_r./=sqrt(mu_new/RR.mu_R)
-            ips.zu_r./=sqrt(mu_new/RR.mu_R)
-            RR.mu_R = mu_new
+        if has_inequality(ips)
+            @trace(ips.logger,"Updating restoration phase barrier parameter.")
+            if RR.mu_R != ips.opt.mu_min*100 &&
+                max(RR.inf_pr_R,RR.inf_du_R,inf_compl_mu_R) <= ips.opt.barrier_tol_factor*RR.mu_R
+                mu_new = get_mu(RR.mu_R,ips.opt.mu_min,
+                                ips.opt.mu_linear_decrease_factor,ips.opt.mu_superlinear_decrease_power,ips.opt.tol)
+                inf_compl_mu_R = get_inf_compl_R(
+                    ips.x_lr,ips.xl_r,ips.zl_r,ips.xu_r,ips.x_ur,ips.zu_r,RR.pp,RR.zp,RR.nn,RR.zn,RR.mu_R,sc)
+                RR.tau_R= max(ips.opt.tau_min,1-RR.mu_R)
+                RR.zeta = sqrt(RR.mu_R)
+                # ips.zl_r./=sqrt(mu_new/RR.mu_R)
+                # ips.zu_r./=sqrt(mu_new/RR.mu_R)
+                RR.mu_R = mu_new
 
-            empty!(RR.filter)
-            push!(RR.filter,(ips.theta_max,-Inf))
+                empty!(RR.filter)
+                push!(RR.filter,(ips.theta_max,-Inf))
+            end
         end
-
+        
         # compute the newton step
         if !ips.opt.hessian_constant
             eval_lag_hess_wrapper!(ips, ips.kkt, ips.x, ips.l; is_resto=true)
@@ -1502,15 +1519,15 @@ function get_ftype(filter,theta,theta_trial,varphi,varphi_trial,switching_condit
 end
 
 # fixed variable treatment ----------------------------------------------------
-function _get_fixed_variable_index(mat::SparseMatrixCSC{Tv,Ti1}, ind_fixed::Vector{Ti2}) where {Tv,Ti1,Ti2}
+function _get_fixed_variable_index(
+    mat::SparseMatrixCSC{Tv,Ti1}, ind_fixed::Vector{Ti2}) where {Tv,Ti1,Ti2}
+
     fixed_aug_index = Int[]
     for i in ind_fixed
-        append!(fixed_aug_index,
-                append!(collect(mat.colptr[i]+1:mat.colptr[i+1]-1),
-                        setdiff!(findall(mat.rowval.==i),mat.colptr[i])))
+        append!(fixed_aug_index,append!(collect(mat.colptr[i]+1:mat.colptr[i+1]-1)))
     end
+    append!(fixed_aug_index,setdiff!(Base._findin(mat.rowval,ind_fixed),mat.colptr))
 
-    
     return fixed_aug_index
 end
 fixed_variable_treatment_vec!(vec,ind_fixed) = (vec[ind_fixed] .= 0.)
@@ -1564,11 +1581,13 @@ function print_iter(ips::AbstractInteriorPointSolver;is_resto=false)
     mod(ips.cnt.k,10)==0&& @info(ips.logger,@sprintf(
         "iter    objective    inf_pr   inf_du lg(mu)  ||d||  lg(rg) alpha_du alpha_pr  ls"))
     @info(ips.logger,@sprintf(
-        "%4i%s% 10.7e %6.2e %6.2e %5.1f %6.2e %s %6.2e %6.2e%s  %i",
+        "%4i%s% 10.7e %6.2e %6.2e %s %6.2e %s %6.2e %6.2e%s  %i",
         ips.cnt.k,is_resto ? "r" : " ",ips.obj_val/ips.obj_scale[],
         is_resto ? ips.RR.inf_pr_R : ips.inf_pr,
         is_resto ? ips.RR.inf_du_R : ips.inf_du,
-        is_resto ? log(10,ips.RR.mu_R) : log(10,ips.mu),
+        is_resto ?
+            (ips.RR.mu_R == 0 ? "   - " : @sprintf("%5.1f",log(10,ips.RR.mu_R))) :
+            (ips.mu == 0 ? "   - " : @sprintf("%5.1f",log(10,ips.mu))),
         ips.cnt.k == 0 ? 0. : norm(ips.dx,Inf),
         ips.del_w == 0 ? "   - " : @sprintf("%5.1f",log(10,ips.del_w)),
         ips.alpha_z,ips.alpha,ips.ftype,ips.cnt.l))
@@ -1644,6 +1663,8 @@ function get_index_constraints(nlp::AbstractNLPModel; fixed_variable_treatment=M
     ind_llb = findall((get_lvar(nlp) .== -Inf).*(get_uvar(nlp) .!= Inf))
     ind_uub = findall((get_lvar(nlp) .!= -Inf).*(get_uvar(nlp) .== Inf))
 
+    has_inequality = !isempty(ind_ineq) || !isempty(ind_lb) || !isempty(ind_ub)
+
     # Return named tuple
     return (
         ind_ineq=ind_ineq,
@@ -1652,6 +1673,7 @@ function get_index_constraints(nlp::AbstractNLPModel; fixed_variable_treatment=M
         ind_ub=ind_ub,
         ind_llb=ind_llb,
         ind_uub=ind_uub,
+        has_inequality=has_inequality
     )
 end
 
@@ -1661,3 +1683,5 @@ function madnlp(model::AbstractNLPModel;buffered=true, kwargs...)
     return optimize!(ips)
 end
 
+has_inequality(ips::Solver) = ips.has_inequality
+has_constraint(ips::Solver) = ips.m != 0

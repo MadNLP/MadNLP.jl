@@ -19,7 +19,7 @@ end
 
 @kwdef mutable struct Options <: AbstractOptions
     # General options
-    rethrow_error::Bool = true
+    rethrow_error::Bool = false
     disable_garbage_collector::Bool = false
     blas_num_threads::Int = 1
     linear_solver::Module
