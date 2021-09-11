@@ -510,7 +510,6 @@ function Solver(nlp::AbstractNLPModel;
 end
 
 function initialize!(ips::AbstractInteriorPointSolver)
-    ips.cnt.start_time = time()
     # initializing slack variables
     @trace(ips.logger,"Initializing slack variables.")
     cons!(ips.nlp,get_x0(ips.nlp),view(ips.c,1:get_ncon(ips.nlp)))
