@@ -1,12 +1,15 @@
 module MadNLPTests
 
-import MadNLP
+# Standard packages
 import LinearAlgebra: norm, I, mul!, dot
-using NLPModels
+import Random
+import Test: @test, @testset
+
+# Optimization packages
+import MadNLP
+import NLPModels
 import JuMP: Model, @variable, @constraint, @objective, @NLconstraint , @NLobjective, optimize!,
     MOI, termination_status, LowerBoundRef, UpperBoundRef, value, dual
-import Test: @test, @testset
-using Random
 
 export test_madnlp, solcmp
 
@@ -196,7 +199,7 @@ function eigmina(optimizer_constructor::Function)
 end
 
 
-struct DenseDummyQP <: AbstractNLPModel{Float64,Vector{Float64}}
+struct DenseDummyQP <: NLPModels.AbstractNLPModel{Float64,Vector{Float64}}
     meta::NLPModels.NLPModelMeta{Float64, Vector{Float64}}
     P::Matrix{Float64} # primal hessian
     A::Matrix{Float64} # constraint jacobian
@@ -205,7 +208,7 @@ struct DenseDummyQP <: AbstractNLPModel{Float64,Vector{Float64}}
     hcols::Vector{Int}
     jrows::Vector{Int}
     jcols::Vector{Int}
-    counters::Counters
+    counters::NLPModels.Counters
 end
 
 function NLPModels.jac_structure!(qp::DenseDummyQP,I, J)
@@ -232,22 +235,22 @@ end
 function NLPModels.jac_coord!(qp::DenseDummyQP, x, J::AbstractVector)
     index = 1
     for (i, j) in zip(qp.jrows, qp.jcols)
-        J[index] =  qp.A[i, j]
+        J[index] = qp.A[i, j]
         index += 1
     end
 end
 # Jacobian: dense callback
 MadNLP.jac_dense!(qp::DenseDummyQP, x, J::AbstractMatrix) = copyto!(J, qp.A)
 # Hessian: sparse callback
-function NLPModels.hess_coord!(qp::DenseDummyQP,x, l, hess::AbstractVector; obj_weight=1.)
+function NLPModels.hess_coord!(qp::DenseDummyQP,x, l, hess::AbstractVector; obj_weight=1.0)
     index = 1
-    for i in 1:get_nvar(qp) , j in 1:i
+    for i in 1:NLPModels.get_nvar(qp) , j in 1:i
         hess[index] = obj_weight * qp.P[j, i]
         index += 1
     end
 end
 # Hessian: dense callback
-function MadNLP.hess_dense!(qp::DenseDummyQP, x, l,hess::AbstractMatrix; obj_weight=1.)
+function MadNLP.hess_dense!(qp::DenseDummyQP, x, l,hess::AbstractMatrix; obj_weight=1.0)
     hess .= obj_weight .* qp.P
 end
 
@@ -306,7 +309,7 @@ function DenseDummyQP(; n=100, m=10, fixed_variables=Int[])
             minimize = true
         ),
         P,A,q,hrows,hcols,jrows,jcols,
-        Counters()
+        NLPModels.Counters()
     )
 end
 

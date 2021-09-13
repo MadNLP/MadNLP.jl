@@ -411,25 +411,21 @@ struct DenseKKTSystem{T, VT, MT} <: AbstractKKTSystem{T, MT}
     diag_hess::VT
     # KKT system
     aug_com::MT
-    # Buffers
-    _w1::VT
-    _w2::VT
     # Info
     ind_ineq::Vector{Int}
     ind_fixed::Vector{Int}
     jacobian_scaling::VT
+    # Buffers
+    etc::Dict{Symbol, Any}
 end
 
-function DenseKKTSystem{T, VT, MT}(n, m, ind_ineq, ind_fixed; buffer_size=0) where {T, VT, MT}
+function DenseKKTSystem{T, VT, MT}(n, m, ind_ineq, ind_fixed) where {T, VT, MT}
     ns = length(ind_ineq)
     hess = MT(undef, n, n)
     jac = MT(undef, m, n+ns)
     pr_diag = VT(undef, n+ns)
     du_diag = VT(undef, m)
     diag_hess = VT(undef, n)
-    # Buffers (used mostly when DenseKKTSystem is deported on the GPU)
-    _w1 = VT(undef, buffer_size)
-    _w2 = VT(undef, buffer_size)
 
     # If the the problem is unconstrained, then KKT system is directly equal
     # to the Hessian (+ some regularization terms)
@@ -451,7 +447,8 @@ function DenseKKTSystem{T, VT, MT}(n, m, ind_ineq, ind_fixed; buffer_size=0) whe
     fill!(jacobian_scaling, one(T))
 
     return DenseKKTSystem{T, VT, MT}(
-        hess, jac, pr_diag, du_diag, diag_hess, aug_com, _w1, _w2, ind_ineq, ind_fixed, jacobian_scaling,
+        hess, jac, pr_diag, du_diag, diag_hess, aug_com,
+        ind_ineq, ind_fixed, jacobian_scaling, Dict{Symbol, Any}(),
     )
 end
 

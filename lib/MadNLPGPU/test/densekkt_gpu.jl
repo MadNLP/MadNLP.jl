@@ -9,7 +9,7 @@ function _compare_gpu_with_cpu(n, m, ind_fixed)
         :print_level=>MadNLP.ERROR,
     )
 
-    nlp = build_qp_test(; n=n, m=m, fixed_variables=ind_fixed)
+    nlp = MadNLPTests.build_qp_test(; n=n, m=m, fixed_variables=ind_fixed)
     x, l = copy(nlp.x), copy(nlp.l)
 
     h_ips = MadNLP.Solver(nlp; option_dict=copy(madnlp_options))
@@ -22,7 +22,7 @@ function _compare_gpu_with_cpu(n, m, ind_fixed)
 
     # Init KKT on the GPU
     kkt = MadNLP.DenseKKTSystem{Float64, CuVector{Float64}, CuMatrix{Float64}}(
-        nlp, ind_cons; buffer_size=(nlp.n+nlp.m+ns),
+        nlp, ind_cons,
     )
     # Instantiate Solver with KKT on the GPU
     d_ips = MadNLP.Solver(nlp, kkt; option_dict=copy(madnlp_options))

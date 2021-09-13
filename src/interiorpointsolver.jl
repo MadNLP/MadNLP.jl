@@ -366,9 +366,8 @@ function eval_lag_hess_wrapper!(ipp::InteriorPointSolver, kkt::DenseKKTSystem, x
     return hess
 end
 
-function InteriorPointSolver(nlp::AbstractNLPModel; kkt=nothing;
-    option_dict::Dict{Symbol,Any}=Dict{Symbol,Any}(),
-    kwargs...
+function InteriorPointSolver(nlp::AbstractNLPModel;
+    kkt=nothing, option_dict::Dict{Symbol,Any}=Dict{Symbol,Any}(), kwargs...
 )
 
     cnt = Counters(start_time=time())

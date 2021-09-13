@@ -62,32 +62,45 @@ end
 #=
     DenseKKTSystem kernels
 =#
-
 function MadNLP.mul!(y::AbstractVector, kkt::MadNLP.DenseKKTSystem{T, VT, MT}, x::AbstractVector) where {T, VT<:CuVector{T}, MT<:CuMatrix{T}}
-    @assert length(kkt._w2) == length(x)
+    # Load buffers
+    haskey(kkt.etc, :hess_w1) || (kkt.etc[:hess_w1] = CuVector{T}(undef, size(kkt.aug_com, 1)))
+    haskey(kkt.etc, :hess_w2) || (kkt.etc[:hess_w2] = CuVector{T}(undef, size(kkt.aug_com, 1)))
+
+    d_x = kkt.etc[:hess_w1]::VT
+    d_y = kkt.etc[:hess_w2]::VT
+
     # x and y can be host arrays. Copy them on the device to avoid side effect.
-    copyto!(kkt._w2, x)
-    mul!(kkt._w1, kkt.aug_com, kkt._w2)
-    copyto!(y, kkt._w1)
+    copyto!(d_x, x)
+    LinearAlgebra.mul!(d_y, kkt.aug_com, d_x)
+    copyto!(y, d_y)
 end
 
 function MadNLP.jtprod!(y::AbstractVector, kkt::MadNLP.DenseKKTSystem{T, VT, MT}, x::AbstractVector) where {T, VT<:CuVector{T}, MT<:CuMatrix{T}}
+    # Load buffers
+    haskey(kkt.etc, :jac_w1) || (kkt.etc[:jac_w1] = CuVector{T}(undef, size(kkt.jac, 1)))
+    haskey(kkt.etc, :jac_w2) || (kkt.etc[:jac_w2] = CuVector{T}(undef, size(kkt.jac, 2)))
+
+    d_x = kkt.etc[:jac_w1]::VT
+    d_y = kkt.etc[:jac_w2]::VT
+
     # x and y can be host arrays. Copy them on the device to avoid side effect.
-    #
-    d_x = x |> CuArray
-    d_y = y |> CuArray
-    mul!(d_y, kkt.jac', d_x)
+    copyto!(d_x, x)
+    LinearAlgebra.mul!(d_y, kkt.jac', d_x)
     copyto!(y, d_y)
 end
 
 function MadNLP.set_aug_diagonal!(kkt::MadNLP.DenseKKTSystem{T, VT, MT}, ips::MadNLP.Solver) where {T, VT<:CuVector{T}, MT<:CuMatrix{T}}
+    haskey(kkt.etc, :pr_diag_host) || (kkt.etc[:pr_diag_host] = Vector{T}(undef, length(kkt.pr_diag)))
+    pr_diag_h = kkt.etc[:pr_diag_host]::Vector{T}
     # Broadcast is not working as MadNLP array are allocated on the CPU,
     # whereas pr_diag is allocated on the GPU
-    copyto!(kkt.pr_diag, ips.zl./(ips.x.-ips.xl) .+ ips.zu./(ips.xu.-ips.x))
+    pr_diag_h .= ips.zl./(ips.x.-ips.xl) .+ ips.zu./(ips.xu.-ips.x))
+    copyto!(kkt.pr_diag, pr_diag_h)
     fill!(kkt.du_diag, 0.0)
 end
 
-@kernel function _build_dense_kkt_system_kerneq!(
+@kernel function _build_dense_kkt_system_kernel!(
     dest, hess, jac, pr_diag, du_diag, diag_hess, n, m, ns
 )
     i, j = @index(Global, NTuple)
@@ -117,7 +130,7 @@ function MadNLP._build_dense_kkt_system!(
     pr_diag::CuVector, du_diag::CuVector, diag_hess::CuVector, n, m, ns
 )
     ndrange = (n+m+ns, n+ns)
-    ev = _build_dense_kkt_system_kerneq!(CUDADevice())(dest, hess, jac, pr_diag, du_diag, diag_hess, n, m, ns, ndrange=ndrange)
+    ev = _build_dense_kkt_system_kernel!(CUDADevice())(dest, hess, jac, pr_diag, du_diag, diag_hess, n, m, ns, ndrange=ndrange)
     wait(ev)
 end
 
