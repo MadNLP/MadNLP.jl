@@ -679,8 +679,6 @@ function regular!(ips::AbstractInteriorPointSolver)
                             ips.opt.mu_linear_decrease_factor,ips.opt.mu_superlinear_decrease_power,ips.opt.tol)
             inf_compl_mu = get_inf_compl(ips.x_lr,ips.xl_r,ips.zl_r,ips.xu_r,ips.x_ur,ips.zu_r,ips.mu,sc)
             ips.tau= get_tau(ips.mu,ips.opt.tau_min)
-            ips.zl_r./=sqrt(mu_new/ips.mu)
-            ips.zu_r./=sqrt(mu_new/ips.mu)
             ips.mu = mu_new
             empty!(ips.filter)
             push!(ips.filter,(ips.theta_max,-Inf))
@@ -832,8 +830,6 @@ function robust!(ips::Solver)
                 ips.x_lr,ips.xl_r,ips.zl_r,ips.xu_r,ips.x_ur,ips.zu_r,RR.pp,RR.zp,RR.nn,RR.zn,RR.mu_R,sc)
             RR.tau_R= max(ips.opt.tau_min,1-RR.mu_R)
             RR.zeta = sqrt(RR.mu_R)
-            ips.zl_r./=sqrt(mu_new/RR.mu_R)
-            ips.zu_r./=sqrt(mu_new/RR.mu_R)
             RR.mu_R = mu_new
 
             empty!(RR.filter)
