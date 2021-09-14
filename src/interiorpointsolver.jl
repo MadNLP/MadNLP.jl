@@ -1485,6 +1485,8 @@ reset_bound_dual!(z,x,mu,kappa_sigma) = (z.=max.(min.(z,kappa_sigma.*mu./x),mu/k
 reset_bound_dual!(z,x1,x2,mu,kappa_sigma) = (z.=max.(min.(z,(kappa_sigma*mu)./(x1.-x2)),(mu/kappa_sigma)./(x1.-x2)))
 function get_ftype(filter,theta,theta_trial,varphi,varphi_trial,switching_condition,armijo_condition,
                    theta_min,obj_max_inc,gamma_theta,gamma_phi)
+    !isnan(varphi_trial) || return " "
+    !isnan(theta_trial) || return " "
     !is_filter_acceptable(filter,theta_trial,varphi_trial) || return " "
     !is_barr_obj_rapid_increase(varphi,varphi_trial,obj_max_inc) || return " "
 
