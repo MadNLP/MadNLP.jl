@@ -80,12 +80,17 @@ function benchmark(solver,probs;warm_up_probs = [])
 end
 
 exclude = [
-    "PFIT1","PFIT2","PFIT4","DENSCHNE","SPECANNE","DJTL", "EG3","OET7",
-    "PRIMAL3","TAX213322","TAXR213322","TAX53322","TAXR53322","HIMMELP2","MOSARQP2","LUKVLE11",
-    "CYCLOOCT","CYCLOOCF","LIPPERT1","GAUSSELM","A2NSSSSL",
-    "YATP1LS","YATP2LS","YATP1CLS","YATP2CLS","BA-L52LS","BA-L73LS","BA-L21LS","CRESC132"
+    # MadNLP running into error
+    # Ipopt running into error
+    "EG3", # lfact blows up
+    # Problems that are hopelessly large
+    "TAX213322","TAXR213322","TAX53322","TAXR53322",
+    "YATP1LS","YATP2LS","YATP1CLS","YATP2CLS",
+    "CYCLOOCT","CYCLOOCF",
+    "LIPPERT1",
+    "GAUSSELM",
+    "BA-L52LS","BA-L73LS","BA-L21LS"
 ]
-
 
 if QUICK
     probs = readdlm("cutest-quick-names.csv")[:]
