@@ -606,6 +606,7 @@ function optimize!(ips::AbstractInteriorPointSolver)
 
         while ips.status >= REGULAR
             ips.status == REGULAR && (ips.status = regular!(ips))
+            ips.status == RESTORE && (ips.status = restore!(ips))
             ips.status == ROBUST && (ips.status = robust!(ips))
         end
     catch e
@@ -752,7 +753,7 @@ function regular!(ips::AbstractInteriorPointSolver)
                 @debug(ips.logger,
                        "Cannot find an acceptable step at iteration $(ips.cnt.k). Switching to restoration phase.")
                 ips.cnt.k+=1
-                return ROBUST
+                return RESTORE
             else
                 @trace(ips.logger,"Step rejected; proceed with the next trial step.")
                 ips.alpha < eps(Float64)*10 && return ips.cnt.acceptable_cnt >0 ?
@@ -768,7 +769,7 @@ function regular!(ips::AbstractInteriorPointSolver)
         adjusted = adjust_boundary!(ips.x_lr,ips.xl_r,ips.x_ur,ips.xu_r,ips.mu)
         adjusted > 0 &&
             @warn(ips.logger,"In iteration $(ips.cnt.k), $adjusted Slack too small, adjusting variable bound")
-
+        
         axpy!(ips.alpha,ips.dl,ips.l)
         axpy!(ips.alpha_z,ips.dzl,ips.zl_r)
         axpy!(ips.alpha_z,ips.dzu,ips.zu_r)
@@ -783,6 +784,81 @@ function regular!(ips::AbstractInteriorPointSolver)
 
         ips.cnt.k+=1
         @trace(ips.logger,"Proceeding to the next interior point iteration.")
+    end
+end
+
+function restore!(ips::AbstractInteriorPointSolver)
+    ips.del_w=0
+    ips._w1x .= ips.x # backup the previous primal iterate
+    ips._w1l .= ips.l # backup the previous primal iterate
+    ips._w2l .= ips.c # backup the previous primal iterate
+
+    F = get_F(ips.c,ips.f,ips.zl,ips.zu,ips.jacl,ips.x_lr,ips.xl_r,ips.zl_r,ips.xu_r,ips.x_ur,ips.zu_r,ips.mu)
+    ips.cnt.t = 0
+    ips.alpha_z = 0.
+    ips.ftype = "R"
+    
+    while true
+        ips.alpha = min(get_alpha_max(ips.x,ips.xl,ips.xu,ips.dx,ips.tau),
+                        get_alpha_z(ips.zl_r,ips.zu_r,ips.dzl,ips.dzu,ips.tau))
+
+        ips.x .+= ips.alpha.*ips.dx
+        ips.l .+= ips.alpha.*ips.dl
+        ips.zl_r.+=ips.alpha.*ips.dzl
+        ips.zu_r.+=ips.alpha.*ips.dzu
+        
+        eval_cons_wrapper!(ips,ips.c,ips.x)
+        eval_grad_f_wrapper!(ips,ips.f,ips.x)
+        ips.obj_val = eval_f_wrapper(ips,ips.x)
+
+        !ips.opt.jacobian_constant && eval_jac_wrapper!(ips,ips.kkt,ips.x)
+        jtprod!(ips.jacl,ips.kkt,ips.l)
+
+        F_trial = get_F(
+            ips.c,ips.f,ips.zl,ips.zu,ips.jacl,ips.x_lr,ips.xl_r,ips.zl_r,ips.xu_r,ips.x_ur,ips.zu_r,ips.mu)  
+        if F_trial > ips.opt.soft_resto_pderror_reduction_factor*F
+            ips.x.=ips._w1x
+            ips.l.=ips._w1l
+            ips.c.=ips._w2l # backup the previous primal iterate
+            return ROBUST
+        end
+
+        adjusted = adjust_boundary!(ips.x_lr,ips.xl_r,ips.x_ur,ips.xu_r,ips.mu)
+        adjusted > 0 &&
+            @warn(ips.logger,"In iteration $(ips.cnt.k), $adjusted Slack too small, adjusting variable bound")
+
+
+        F = F_trial
+        
+        theta = get_theta(ips.c)
+        varphi= get_varphi(ips.obj_val,ips.x_lr,ips.xl_r,ips.xu_r,ips.x_ur,ips.mu)
+        
+        ips.cnt.k+=1
+        
+        is_filter_acceptable(ips.filter,theta,varphi) ? (ips.cnt.t+=1) : return REGULAR
+        ips.cnt.k>=ips.opt.max_iter && return MAXIMUM_ITERATIONS_EXCEEDED
+        time()-ips.cnt.start_time>=ips.opt.max_wall_time && return MAXIMUM_WALLTIME_EXCEEDED
+
+
+        sd = get_sd(ips.l,ips.zl_r,ips.zu_r,ips.opt.s_max)
+        sc = get_sc(ips.zl_r,ips.zu_r,ips.opt.s_max)
+        ips.inf_pr = get_inf_pr(ips.c)
+        ips.inf_du = get_inf_du(ips.f,ips.zl,ips.zu,ips.jacl,sd)
+
+        ips.inf_compl = get_inf_compl(ips.x_lr,ips.xl_r,ips.zl_r,ips.xu_r,ips.x_ur,ips.zu_r,0.,sc)
+        inf_compl_mu = get_inf_compl(ips.x_lr,ips.xl_r,ips.zl_r,ips.xu_r,ips.x_ur,ips.zu_r,ips.mu,sc)
+        print_iter(ips)
+        
+        !ips.opt.hessian_constant && eval_lag_hess_wrapper!(ips,ips.kkt,ips.x,ips.l)
+        set_aug_diagonal!(ips.kkt,ips)
+        set_aug_rhs!(ips, ips.kkt, ips.c)
+
+        dual_inf_perturbation!(ips.px,ips.ind_llb,ips.ind_uub,ips.mu,ips.opt.kappa_d)
+        factorize_wrapper!(ips)
+        solve_refine_wrapper!(ips,ips.d,ips.p)
+        finish_aug_solve!(ips, ips.kkt, ips.mu)
+        
+        ips.ftype = "f"
     end
 end
 
@@ -845,7 +921,7 @@ function robust!(ips::Solver)
 
         # without inertia correction,
         @trace(ips.logger,"Solving restoration phase primal-dual system.")
-        factorize_wrapper!(ips)
+        factorize_wrapper!(ips)        
         solve_refine_wrapper!(ips,ips.d,ips.p)
 
         finish_aug_solve!(ips, ips.kkt, RR.mu_R)
@@ -925,6 +1001,10 @@ function robust!(ips::Solver)
         reset_bound_dual!(ips.zu,ips.xu,ips.x,RR.mu_R,ips.opt.kappa_sigma)
         reset_bound_dual!(RR.zp,RR.pp,RR.mu_R,ips.opt.kappa_sigma)
         reset_bound_dual!(RR.zn,RR.nn,RR.mu_R,ips.opt.kappa_sigma)
+
+        adjusted = adjust_boundary!(ips.x_lr,ips.xl_r,ips.x_ur,ips.xu_r,ips.mu)
+        adjusted > 0 &&
+            @warn(ips.logger,"In iteration $(ips.cnt.k), $adjusted Slack too small, adjusting variable bound")
 
         if !switching_condition || !armijo_condition
             @trace(ips.logger,"Augmenting restoration phase filter.")
@@ -1373,6 +1453,26 @@ function get_varphi_R(obj_val,x_lr,xl_r,xu_r,x_ur,pp,nn,mu_R)
     end
     return varphi_R
 end
+function get_F(c,f,zl,zu,jacl,x_lr,xl_r,zl_r,xu_r,x_ur,zu_r,mu)
+    F = 0.
+    for i=1:length(c)
+        @inbounds F = max(F,c[i])
+    end
+    for i=1:length(f)
+        @inbounds F = max(F,f[i]-zl[i]+zu[i]+jacl[i])
+    end
+    for i=1:length(x_lr)
+        x_lr[i] >= xl_r[i] || return Inf
+        zl_r[i] >= 0       || return Inf
+        @inbounds F = max(F,(x_lr[i]-xl_r[i])*zl_r[i]-mu)
+    end
+    for i=1:length(x_ur)
+        xu_r[i] >= x_ur[i] || return Inf
+        zu_r[i] >= 0       || return Inf
+        @inbounds F = max(F,(xu_r[i]-xu_r[i])*zu_r[i]-mu)
+    end
+    return F
+end
 function get_varphi_d_R(f_R,x,xl,xu,dx,pp,nn,dpp,dnn,mu_R,rho)
     varphi_d = 0.
     @simd for i=1:length(x)
@@ -1420,10 +1520,10 @@ function adjust_boundary!(x_lr,xl_r,x_ur,xu_r,mu)
     c1 = eps(Float64)*mu
     c2= eps(Float64)^(3/4)
     @simd for i=1:length(xl_r)
-        @inbounds x_lr[i]-xl_r[i] < c1 && (xl_r[i] -= c2*max(1,x_lr[i]);adjusted+=1)
+        @inbounds x_lr[i]-xl_r[i] < c1 && (xl_r[i] -= c2*max(1,abs(x_lr[i]));adjusted+=1)
     end
     @simd for i=1:length(xu_r)
-        @inbounds xu_r[i]-x_ur[i] < c1 && (xu_r[i] += c2*max(1,x_ur[i]);adjusted+=1)
+        @inbounds xu_r[i]-x_ur[i] < c1 && (xu_r[i] += c2*max(1,abs(x_ur[i]));adjusted+=1)
     end
     return adjusted
 end
@@ -1475,7 +1575,7 @@ augment_filter!(filter,theta,varphi,gamma_theta) = push!(filter,((1-gamma_theta)
 function is_filter_acceptable(filter,theta,varphi)
     is_filter_acceptable_bool = true
     for (theta_F,varphi_F) in filter
-        is_filter_acceptable_bool = (is_filter_acceptable_bool && !(theta>=theta_F && varphi>=varphi_F))
+        is_filter_acceptable_bool = (is_filter_acceptable_bool && !(theta>theta_F && varphi>varphi_F))
     end
     return !is_filter_acceptable_bool
 end
