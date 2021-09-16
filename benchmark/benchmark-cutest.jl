@@ -6,7 +6,7 @@ Pkg.add(PackageSpec(name="CUTEst",rev="main")) # will be removed once the new CU
 if SOLVER == "master" || SOLVER == "current"
     @everywhere begin
         using MadNLP, MadNLPHSL
-        solver = nlp -> madnlp(nlp,linear_solver=MadNLPMa57,max_wall_time=900.,tol=1e-6, print_level=PRINT_LEVEL)
+        solver = nlp -> madnlp(nlp,linear_solver=MadNLPMa57,max_wall_time=900., print_level=PRINT_LEVEL)
         function get_status(code::MadNLP.Status)
             if code == MadNLP.SOLVE_SUCCEEDED
                 return 1
@@ -19,7 +19,7 @@ if SOLVER == "master" || SOLVER == "current"
     end
 elseif SOLVER == "ipopt"
     @everywhere begin
-        solver = nlp -> ipopt(nlp,linear_solver="ma57",max_cpu_time=900.,tol=1e-6, print_level=PRINT_LEVEL)
+        solver = nlp -> ipopt(nlp,linear_solver="ma57",max_cpu_time=900., print_level=PRINT_LEVEL)
         using NLPModelsIpopt
         function get_status(code::Symbol)
             if code == :first_order
