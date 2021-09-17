@@ -28,6 +28,15 @@ testset = [
         [],
         @isdefined(MadNLPLapackGPU)
     ],
+    [
+        "LapackGPU-CHOLESKY",
+        ()->MadNLP.Optimizer(
+            linear_solver=MadNLPLapackGPU,
+            lapackgpu_algorithm=MadNLPLapackGPU.CHOLESKY,
+            print_level=MadNLP.ERROR),
+        ["infeasible", "lootsma", "eigmina"],
+        @isdefined(MadNLPLapackGPU)
+    ],
 ]
 
 @testset "MadNLPGPU test" begin
