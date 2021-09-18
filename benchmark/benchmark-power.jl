@@ -18,7 +18,9 @@ include("config.jl")
         pm = instantiate_model(joinpath(PGLIB_PATH,case),type,PowerModels.build_opf)
         println("Solving $(get_name(pm))")
         gcoff && GC.enable(false);
-        return solver(pm)
+        retval = solver(pm)
+        gcoff && GC.enable(true);
+        return retval
     end
 
     function get_status(code::MOI.TerminationStatusCode)

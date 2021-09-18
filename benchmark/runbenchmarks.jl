@@ -28,6 +28,9 @@ function parse_commandline()
         "--quick", "-q"
             help = "run tests with reduced number of instances"
             action = :store_true
+        "--decode", "-d"
+            help = "decode the cutest instances"
+            action = :store_true
         "testsets"
             help = "testsets for benchmark (separated by comma). possible values: cutest, power"
             required = true
@@ -60,7 +63,7 @@ function main()
     for class in CLASSES
         for solver in SOLVERS
             launch_script = joinpath(PROJECT_PATH, "benchmark-$class.jl")
-            run(`julia --project=$PROJECT_PATH $launch_script $(pargs["nprocs"]) $solver $(pargs["verbose"]) $(pargs["quick"]) $(pargs["gcoff"])`)
+            run(`julia --project=$PROJECT_PATH $launch_script $(pargs["nprocs"]) $solver $(pargs["verbose"]) $(pargs["quick"]) $(pargs["gcoff"]) $(pargs["decode"])`)
         end
     end
 
