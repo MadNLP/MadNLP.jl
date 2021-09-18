@@ -900,9 +900,8 @@ function robust!(ips::Solver)
         @trace(ips.logger,"Updating restoration phase barrier parameter.")
         while RR.mu_R != ips.opt.mu_min*100 &&
             max(RR.inf_pr_R,RR.inf_du_R,inf_compl_mu_R) <= ips.opt.barrier_tol_factor*RR.mu_R
-            mu_new = get_mu(RR.mu_R,ips.opt.mu_min,
+            RR.mu_R = get_mu(RR.mu_R,ips.opt.mu_min,
                             ips.opt.mu_linear_decrease_factor,ips.opt.mu_superlinear_decrease_power,ips.opt.tol)
-            RR.mu_R = mu_new
             inf_compl_mu_R = get_inf_compl_R(
                 ips.x_lr,ips.xl_r,ips.zl_r,ips.xu_r,ips.x_ur,ips.zu_r,RR.pp,RR.zp,RR.nn,RR.zn,RR.mu_R,sc)
             RR.tau_R= max(ips.opt.tau_min,1-RR.mu_R)
@@ -1020,8 +1019,7 @@ function robust!(ips::Solver)
         theta = get_theta(ips.c)
         varphi= get_varphi(ips.obj_val,ips.x_lr,ips.xl_r,ips.xu_r,ips.x_ur,ips.mu)
 
-
-        if !is_filter_acceptable(ips.RR.filter,theta,varphi) &&
+        if !is_filter_acceptable(ips.filter,theta,varphi) &&
             theta <= ips.opt.required_infeasibility_reduction * RR.theta_ref
 
             @trace(ips.logger,"Going back to the regular phase.")
