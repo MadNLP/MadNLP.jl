@@ -542,8 +542,6 @@ function initialize!(ips::AbstractInteriorPointSolver)
     if ips.opt.nlp_scaling
         ips.obj_scale[] = min(1,ips.opt.nlp_scaling_max_gradient/norm(ips.f,Inf))
         ips.f.*=ips.obj_scale[]
-        ips.zl.*=ips.obj_scale[]
-        ips.zu.*=ips.obj_scale[]
     end
 
     # Initialize dual variables
