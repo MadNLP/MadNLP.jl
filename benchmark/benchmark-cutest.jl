@@ -62,16 +62,17 @@ end
     end
 end
 
-function benchmark(solver,probs;warm_up_probs = [])
+function benchmark(solver,probs;warm_up_probs = [], decode = false)
     println("Warming up (forcing JIT compile)")
-    broadcast(decodemodel,warm_up_probs)
-    [remotecall_fetch.(prob->evalmodel(prob,solver;gcoff=GCOFF),i,warm_up_probs) for i in procs() if i!= 1]
+    decode && broadcast(decodemodel,warm_up_probs)
+    r = [remotecall.(prob->evalmodel(prob,solver;gcoff=GCOFF),i,warm_up_probs) for i in procs() if i!= 1]
+    fetch.(r)
 
     println("Decoding problems")
-    broadcast(decodemodel,probs)
+    decode && broadcast(decodemodel,probs)
 
     println("Solving problems")
-    retvals = pmap(prob->evalmodel(prob,solver),probs)
+    retvals = pmap(prob->evalmodel(prob,solver;gcoff=GCOFF),probs)
     status = [retval.status for retval in retvals]
     time   = [retval.time for retval in retvals]
     mem    = [retval.mem for retval in retvals]
@@ -100,10 +101,11 @@ end
 
 filter!(e->!(e in exclude),probs)
 
-status,time,mem,iter = benchmark(solver,probs;warm_up_probs = ["EIGMINA"])
+status,time,mem,iter = benchmark(solver,probs;warm_up_probs = ["EIGMINA"], decode = DECODE)
 
-writedlm("name-cutest.csv",probs,',')
-writedlm("status-cutest-$(SOLVER).csv",status),','
-writedlm("time-cutest-$(SOLVER).csv",time,',')
-writedlm("mem-cutest-$(SOLVER).csv",mem,',')
-writedlm("iter-cutest-$(SOLVER).csv",iter,',')
+f = !QUICK ? "" : "-quick"
+writedlm("name-cutest$f.csv",probs,',')
+writedlm("status-cutest-$(SOLVER)$f.csv",status,',')
+writedlm("time-cutest-$(SOLVER)$f.csv",time,',')
+writedlm("mem-cutest-$(SOLVER)$f.csv",mem,',')
+writedlm("iter-cutest-$(SOLVER)$f.csv",iter,',')

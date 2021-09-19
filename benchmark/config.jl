@@ -5,6 +5,7 @@ const SOLVER = ARGS[2]
 const VERBOSE = ARGS[3] == "true"
 const QUICK = ARGS[4] == "true"
 const GCOFF = ARGS[5] == "true"
+const DECODE = ARGS[6] == "true"
 
 addprocs(parse(Int,NP),exeflags="--project=.")
 Pkg.instantiate()
