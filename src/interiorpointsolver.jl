@@ -740,7 +740,7 @@ function regular!(ips::AbstractInteriorPointSolver)
             ips.ftype = get_ftype(
                 ips.filter,theta,theta_trial,varphi,varphi_trial,switching_condition,armijo_condition,
                 ips.theta_min,ips.opt.obj_max_inc,ips.opt.gamma_theta,ips.opt.gamma_phi,
-                ips.m != 0)
+                has_constraints(ips))
             ips.ftype in ["f","h"] && (@trace(ips.logger,"Step accepted with type $(ips.ftype)"); break)
 
             ips.cnt.l==1 && theta_trial>=theta && second_order_correction(
@@ -969,7 +969,7 @@ function robust!(ips::Solver)
                 RR.filter,theta_R,theta_R_trial,varphi_R,varphi_R_trial,
                 switching_condition,armijo_condition,
                 ips.theta_min,ips.opt.obj_max_inc,ips.opt.gamma_theta,ips.opt.gamma_phi,
-                ips.m != 0)
+                has_constraints(ips))
             ips.ftype in ["f","h"] && (@trace(ips.logger,"Step accepted with type $(ips.ftype)"); break)
 
             ips.alpha /= 2
@@ -1172,7 +1172,7 @@ function second_order_correction(ips::AbstractInteriorPointSolver,alpha_max::Flo
             end
         else
             # Case II
-            if is_sufficient_progress(theta_soc,theta,ips.opt.gamma_theta,varphi_soc,varphi,ips.opt.gamma_phi,ips.m != 0)
+            if is_sufficient_progress(theta_soc,theta,ips.opt.gamma_theta,varphi_soc,varphi,ips.opt.gamma_phi,has_constraints(ips))
                 @trace(ips.logger,"Step in second order correction accepted by sufficient progress.")
                 ips.ftype = "H"
                 ips.alpha=alpha_soc
@@ -1631,7 +1631,6 @@ function dual_inf_perturbation!(px,ind_llb,ind_uub,mu,kappa_d)
     end
 end
 
-
 # Print functions -----------------------------------------------------------
 function print_init(ips::AbstractInteriorPointSolver)
     @notice(ips.logger,@sprintf("Number of nonzeros in constraint Jacobian............: %8i",get_nnzj(ips.nlp)))
@@ -1761,4 +1760,7 @@ function madnlp(model::AbstractNLPModel;buffered=true, kwargs...)
     initialize!(ips.kkt)
     return optimize!(ips)
 end
+
+# Utilities
+has_constraints(ips) = ips.m != 0
 
