@@ -739,7 +739,8 @@ function regular!(ips::AbstractInteriorPointSolver)
 
             ips.ftype = get_ftype(
                 ips.filter,theta,theta_trial,varphi,varphi_trial,switching_condition,armijo_condition,
-                ips.theta_min,ips.opt.obj_max_inc,ips.opt.gamma_theta,ips.opt.gamma_phi)
+                ips.theta_min,ips.opt.obj_max_inc,ips.opt.gamma_theta,ips.opt.gamma_phi,
+                has_constraints(ips))
             ips.ftype in ["f","h"] && (@trace(ips.logger,"Step accepted with type $(ips.ftype)"); break)
 
             ips.cnt.l==1 && theta_trial>=theta && second_order_correction(
@@ -754,7 +755,8 @@ function regular!(ips::AbstractInteriorPointSolver)
                 return RESTORE
             else
                 @trace(ips.logger,"Step rejected; proceed with the next trial step.")
-                ips.alpha < eps(Float64)*10 && return ips.cnt.acceptable_cnt >0 ?
+                ips.alpha * norm(ips.dx) < eps(Float64)*10 &&
+                    return ips.cnt.acceptable_cnt >0 ?
                     SOLVED_TO_ACCEPTABLE_LEVEL : SEARCH_DIRECTION_BECOMES_TOO_SMALL
             end
         end
@@ -898,13 +900,12 @@ function robust!(ips::Solver)
         @trace(ips.logger,"Updating restoration phase barrier parameter.")
         while RR.mu_R != ips.opt.mu_min*100 &&
             max(RR.inf_pr_R,RR.inf_du_R,inf_compl_mu_R) <= ips.opt.barrier_tol_factor*RR.mu_R
-            mu_new = get_mu(RR.mu_R,ips.opt.mu_min,
+            RR.mu_R = get_mu(RR.mu_R,ips.opt.mu_min,
                             ips.opt.mu_linear_decrease_factor,ips.opt.mu_superlinear_decrease_power,ips.opt.tol)
             inf_compl_mu_R = get_inf_compl_R(
                 ips.x_lr,ips.xl_r,ips.zl_r,ips.xu_r,ips.x_ur,ips.zu_r,RR.pp,RR.zp,RR.nn,RR.zn,RR.mu_R,sc)
             RR.tau_R= max(ips.opt.tau_min,1-RR.mu_R)
             RR.zeta = sqrt(RR.mu_R)
-            RR.mu_R = mu_new
 
             empty!(RR.filter)
             push!(RR.filter,(ips.theta_max,-Inf))
@@ -964,8 +965,10 @@ function robust!(ips::Solver)
 
             small_search_norm && break
             ips.ftype = get_ftype(
-                RR.filter,theta_R,theta_R_trial,varphi_R,varphi_R_trial,switching_condition,armijo_condition,
-                ips.theta_min,ips.opt.obj_max_inc,ips.opt.gamma_theta,ips.opt.gamma_phi)
+                RR.filter,theta_R,theta_R_trial,varphi_R,varphi_R_trial,
+                switching_condition,armijo_condition,
+                ips.theta_min,ips.opt.obj_max_inc,ips.opt.gamma_theta,ips.opt.gamma_phi,
+                has_constraints(ips))
             ips.ftype in ["f","h"] && (@trace(ips.logger,"Step accepted with type $(ips.ftype)"); break)
 
             ips.alpha /= 2
@@ -1016,8 +1019,7 @@ function robust!(ips::Solver)
         theta = get_theta(ips.c)
         varphi= get_varphi(ips.obj_val,ips.x_lr,ips.xl_r,ips.xu_r,ips.x_ur,ips.mu)
 
-
-        if !is_filter_acceptable(ips.RR.filter,theta,varphi) &&
+        if !is_filter_acceptable(ips.filter,theta,varphi) &&
             theta <= ips.opt.required_infeasibility_reduction * RR.theta_ref
 
             @trace(ips.logger,"Going back to the regular phase.")
@@ -1168,7 +1170,7 @@ function second_order_correction(ips::AbstractInteriorPointSolver,alpha_max::Flo
             end
         else
             # Case II
-            if is_sufficient_progress(theta_soc,theta,ips.opt.gamma_theta,varphi_soc,varphi,ips.opt.gamma_phi)
+            if is_sufficient_progress(theta_soc,theta,ips.opt.gamma_theta,varphi_soc,varphi,ips.opt.gamma_phi,has_constraints(ips))
                 @trace(ips.logger,"Step in second order correction accepted by sufficient progress.")
                 ips.ftype = "H"
                 ips.alpha=alpha_soc
@@ -1566,9 +1568,9 @@ function get_alpha_min(theta,varphi_d,theta_min,gamma_theta,gamma_phi,alpha_min_
 end
 is_switching(varphi_d,alpha,s_phi,del,theta,s_theta) = varphi_d < 0 && alpha*(-varphi_d)^s_phi > del*theta^s_theta
 is_armijo(varphi_trial,varphi,eta_phi,alpha,varphi_d) = varphi_trial <= varphi + eta_phi*alpha*varphi_d
-is_sufficient_progress(theta_trial,theta,gamma_theta,varphi_trial,varphi,gamma_phi) =
-    (((theta_trial<=(1-gamma_theta)*theta+10*eps(Float64)*abs(theta))) ||
-     ((varphi_trial<=varphi-gamma_phi*theta +10*eps(Float64)*abs(varphi))))
+is_sufficient_progress(theta_trial,theta,gamma_theta,varphi_trial,varphi,gamma_phi,has_constraints) =
+    (has_constraints && ((theta_trial<=(1-gamma_theta)*theta+10*eps(Float64)*abs(theta))) ||
+    ((varphi_trial<=varphi-gamma_phi*theta +10*eps(Float64)*abs(varphi))))
 augment_filter!(filter,theta,varphi,gamma_theta) = push!(filter,((1-gamma_theta)*theta,varphi-gamma_theta*theta))
 function is_filter_acceptable(filter,theta,varphi)
     is_filter_acceptable_bool = true
@@ -1582,7 +1584,7 @@ is_barr_obj_rapid_increase(varphi,varphi_trial,obj_max_inc) =
 reset_bound_dual!(z,x,mu,kappa_sigma) = (z.=max.(min.(z,kappa_sigma.*mu./x),mu/kappa_sigma./x))
 reset_bound_dual!(z,x1,x2,mu,kappa_sigma) = (z.=max.(min.(z,(kappa_sigma*mu)./(x1.-x2)),(mu/kappa_sigma)./(x1.-x2)))
 function get_ftype(filter,theta,theta_trial,varphi,varphi_trial,switching_condition,armijo_condition,
-                   theta_min,obj_max_inc,gamma_theta,gamma_phi)
+                   theta_min,obj_max_inc,gamma_theta,gamma_phi,has_constraints)
     !isnan(varphi_trial) || return " "
     !isnan(theta_trial) || return " "
     !is_filter_acceptable(filter,theta_trial,varphi_trial) || return " "
@@ -1591,7 +1593,8 @@ function get_ftype(filter,theta,theta_trial,varphi,varphi_trial,switching_condit
     if theta <= theta_min && switching_condition
         armijo_condition && return "f"
     else
-        is_sufficient_progress(theta_trial,theta,gamma_theta,varphi_trial,varphi,gamma_phi) && return "h"
+        is_sufficient_progress(
+            theta_trial,theta,gamma_theta,varphi_trial,varphi,gamma_phi,has_constraints) && return "h"
     end
 
     return " "
@@ -1625,7 +1628,6 @@ function dual_inf_perturbation!(px,ind_llb,ind_uub,mu,kappa_d)
         @inbounds px[i] += mu*kappa_d
     end
 end
-
 
 # Print functions -----------------------------------------------------------
 function print_init(ips::AbstractInteriorPointSolver)
@@ -1756,4 +1758,7 @@ function madnlp(model::AbstractNLPModel;buffered=true, kwargs...)
     initialize!(ips.kkt)
     return optimize!(ips)
 end
+
+# Utilities
+has_constraints(ips) = ips.m != 0
 
