@@ -31,6 +31,14 @@ testset = [
         []
     ],
     [
+        "LapackCPU-CHOLESKY",
+        ()->MadNLP.Optimizer(
+            linear_solver=MadNLPLapackCPU,
+            lapackcpu_algorithm=MadNLPLapackCPU.CHOLESKY,
+            print_level=MadNLP.ERROR),
+        ["infeasible", "lootsma", "eigmina"]
+    ],
+    [
         "Option: RELAX_BOUND",
         ()->MadNLP.Optimizer(
             fixed_variable_treatment=MadNLP.RELAX_BOUND,
