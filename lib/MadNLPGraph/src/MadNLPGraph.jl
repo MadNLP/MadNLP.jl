@@ -1,7 +1,7 @@
 module MadNLPGraph
 
 import MadNLP:
-    optimize!, Optimizer, Solver,
+    optimize!, Optimizer, InteriorPointSolver,
     MOIU, MOI, get_nnz_hess, get_nnz_jac, set_x!, set_g!, INITIAL, is_jac_hess_constant,
     jacobian_structure, hessian_lagrangian_structure, eval_objective,
     eval_objective_gradient, eval_function, eval_constraint, eval_hessian_lagrangian, eval_constraint_jacobian,
