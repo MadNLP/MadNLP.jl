@@ -20,7 +20,7 @@ end
 ConstraintInfo(func, set) = ConstraintInfo(func, set, nothing)
 
 mutable struct Optimizer <: MOI.AbstractOptimizer
-    ips::Union{Nothing,Solver}
+    ips::Union{Nothing,InteriorPointSolver}
     nlp::Union{Nothing,AbstractNLPModel}
     result::Union{Nothing,MadNLPExecutionStats{Float64}}
 
@@ -657,7 +657,7 @@ end
 
 function eval_function(quad::MOI.ScalarQuadraticFunction, x)
     function_value = quad.constant
-    
+
     for term in quad.affine_terms
         function_value += term.coefficient*x[term.variable_index.value]
     end
@@ -879,7 +879,7 @@ const status_dual_dict = Dict(
     INFEASIBLE_PROBLEM_DETECTED => MOI.INFEASIBLE_POINT)
 
 termination_status(result::MadNLPExecutionStats) = haskey(status_moi_dict,result.status) ? status_moi_dict[result.status] : MOI.UNKNOWN_RESULT_STATUS
-termination_status(ips::Solver) = haskey(status_moi_dict,ips.status) ? status_moi_dict[ips.status] : MOI.UNKNOWN_RESULT_STATUS
+termination_status(ips::InteriorPointSolver) = haskey(status_moi_dict,ips.status) ? status_moi_dict[ips.status] : MOI.UNKNOWN_RESULT_STATUS
 primal_status(result::MadNLPExecutionStats) = haskey(status_primal_dict,result.status) ?
     status_primal_dict[result.status] : MOI.UNKNOWN_RESULT_STATUS
 dual_status(result::MadNLPExecutionStats) = haskey(status_dual_dict,result.status) ?
@@ -1149,9 +1149,9 @@ function MOIModel(model::Optimizer)
 end
 
 function MOI.optimize!(model::Optimizer)
-    
+
     model.nlp = MOIModel(model)
-    model.ips = Solver(model.nlp;option_dict=copy(model.option_dict))
+    model.ips = InteriorPointSolver(model.nlp;option_dict=copy(model.option_dict))
     model.result = optimize!(model.ips)
     model.solve_time = model.ips.cnt.total_time
 
