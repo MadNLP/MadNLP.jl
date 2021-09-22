@@ -765,7 +765,6 @@ function regular!(ips::AbstractInteriorPointSolver)
         ips.x.=ips.x_trial
         ips.c.=ips.c_trial
         ips.obj_val=ips.obj_val_trial
-
         adjusted = adjust_boundary!(ips.x_lr,ips.xl_r,ips.x_ur,ips.xu_r,ips.mu)
         adjusted > 0 &&
             @warn(ips.logger,"In iteration $(ips.cnt.k), $adjusted Slack too small, adjusting variable bound")
@@ -815,7 +814,7 @@ function restore!(ips::AbstractInteriorPointSolver)
         jtprod!(ips.jacl,ips.kkt,ips.l)
 
         F_trial = get_F(
-            ips.c,ips.f,ips.zl,ips.zu,ips.jacl,ips.x_lr,ips.xl_r,ips.zl_r,ips.xu_r,ips.x_ur,ips.zu_r,ips.mu)  
+            ips.c,ips.f,ips.zl,ips.zu,ips.jacl,ips.x_lr,ips.xl_r,ips.zl_r,ips.xu_r,ips.x_ur,ips.zu_r,ips.mu)
         if F_trial > ips.opt.soft_resto_pderror_reduction_factor*F
             ips.x.=ips._w1x
             ips.l.=ips._w1l
@@ -835,7 +834,7 @@ function restore!(ips::AbstractInteriorPointSolver)
         
         ips.cnt.k+=1
         
-        is_filter_acceptable(ips.filter,theta,varphi) ? (ips.cnt.t+=1) : return REGULAR
+        is_filter_acceptable(ips.filter,theta,varphi) ? (return REGULAR) : (ips.cnt.t+=1)
         ips.cnt.k>=ips.opt.max_iter && return MAXIMUM_ITERATIONS_EXCEEDED
         time()-ips.cnt.start_time>=ips.opt.max_wall_time && return MAXIMUM_WALLTIME_EXCEEDED
 
@@ -961,6 +960,7 @@ function robust!(ips::Solver)
             theta_R_trial  = get_theta_R(ips.c_trial,RR.pp_trial,RR.nn_trial)
             varphi_R_trial = get_varphi_R(
                 RR.obj_val_R_trial,ips.x_trial_lr,ips.xl_r,ips.xu_r,ips.x_trial_ur,RR.pp_trial,RR.nn_trial,RR.mu_R)
+
             armijo_condition = is_armijo(varphi_R_trial,varphi_R,0.,ips.alpha,varphi_d_R) #####
 
             small_search_norm && break
@@ -1019,7 +1019,7 @@ function robust!(ips::Solver)
         theta = get_theta(ips.c)
         varphi= get_varphi(ips.obj_val,ips.x_lr,ips.xl_r,ips.xu_r,ips.x_ur,ips.mu)
 
-        if !is_filter_acceptable(ips.filter,theta,varphi) &&
+        if is_filter_acceptable(ips.filter,theta,varphi) &&
             theta <= ips.opt.required_infeasibility_reduction * RR.theta_ref
 
             @trace(ips.logger,"Going back to the regular phase.")
@@ -1158,7 +1158,7 @@ function second_order_correction(ips::AbstractInteriorPointSolver,alpha_max::Flo
         theta_soc = get_theta(ips.c_trial)
         varphi_soc= get_varphi(ips.obj_val_trial,ips.x_trial_lr,ips.xl_r,ips.xu_r,ips.x_trial_ur,ips.mu)
 
-        is_filter_acceptable(ips.filter,theta_soc,varphi_soc) && break
+        !is_filter_acceptable(ips.filter,theta_soc,varphi_soc) && break
 
         if theta <=ips.theta_min && switching_condition
             # Case I
@@ -1573,11 +1573,15 @@ is_sufficient_progress(theta_trial,theta,gamma_theta,varphi_trial,varphi,gamma_p
     ((varphi_trial<=varphi-gamma_phi*theta +10*eps(Float64)*abs(varphi))))
 augment_filter!(filter,theta,varphi,gamma_theta) = push!(filter,((1-gamma_theta)*theta,varphi-gamma_theta*theta))
 function is_filter_acceptable(filter,theta,varphi)
-    is_filter_acceptable_bool = true
+    !isnan(theta) || return false
+    !isinf(theta) || return false
+    !isnan(varphi) || return false
+    !isinf(varphi) || return false
+
     for (theta_F,varphi_F) in filter
-        is_filter_acceptable_bool = (is_filter_acceptable_bool && !(theta>theta_F && varphi>varphi_F))
+        theta <= theta_F || varphi <= varphi_F || return false
     end
-    return !is_filter_acceptable_bool
+    return true
 end
 is_barr_obj_rapid_increase(varphi,varphi_trial,obj_max_inc) =
     varphi_trial >= varphi && log(10,varphi_trial-varphi) > obj_max_inc + max(1.,log(10,abs(varphi)))
@@ -1585,9 +1589,7 @@ reset_bound_dual!(z,x,mu,kappa_sigma) = (z.=max.(min.(z,kappa_sigma.*mu./x),mu/k
 reset_bound_dual!(z,x1,x2,mu,kappa_sigma) = (z.=max.(min.(z,(kappa_sigma*mu)./(x1.-x2)),(mu/kappa_sigma)./(x1.-x2)))
 function get_ftype(filter,theta,theta_trial,varphi,varphi_trial,switching_condition,armijo_condition,
                    theta_min,obj_max_inc,gamma_theta,gamma_phi,has_constraints)
-    !isnan(varphi_trial) || return " "
-    !isnan(theta_trial) || return " "
-    !is_filter_acceptable(filter,theta_trial,varphi_trial) || return " "
+    is_filter_acceptable(filter,theta_trial,varphi_trial) || return " "
     !is_barr_obj_rapid_increase(varphi,varphi_trial,obj_max_inc) || return " "
 
     if theta <= theta_min && switching_condition
