@@ -57,7 +57,7 @@ end
 
 abstract type AbstractInteriorPointSolver end
 
-mutable struct Solver{KKTSystem} <: AbstractInteriorPointSolver
+mutable struct InteriorPointSolver{KKTSystem} <: AbstractInteriorPointSolver
     nlp::AbstractNLPModel
     kkt::KKTSystem
 
@@ -173,14 +173,14 @@ end
 
 struct MadNLPExecutionStats{T} <: AbstractExecutionStats
     status::Status
-    solution::StrideOneVector{T} 
-    objective::T 
+    solution::StrideOneVector{T}
+    objective::T
     constraints::StrideOneVector{T}
-    dual_feas::T 
-    primal_feas::T 
-    multipliers::StrideOneVector{T} 
-    multipliers_L::StrideOneVector{T} 
-    multipliers_U::StrideOneVector{T} 
+    dual_feas::T
+    primal_feas::T
+    multipliers::StrideOneVector{T}
+    multipliers_L::StrideOneVector{T}
+    multipliers_U::StrideOneVector{T}
     iter::Int
     counters::NLPModelsCounters
     elapsed_time::Real
@@ -189,9 +189,9 @@ end
 struct InvalidNumberException <: Exception end
 struct NotEnoughDegreesOfFreedomException <: Exception end
 
-MadNLPExecutionStats(ips::Solver) =MadNLPExecutionStats(
+MadNLPExecutionStats(ips::InteriorPointSolver) =MadNLPExecutionStats(
     ips.status,view(ips.x,1:get_nvar(ips.nlp)),ips.obj_val,ips.c,
-    ips.inf_du, ips.inf_pr, 
+    ips.inf_du, ips.inf_pr,
     ips.l,view(ips.zl,1:get_nvar(ips.nlp)),view(ips.zu,1:get_nvar(ips.nlp)),
     ips.cnt.k, ips.nlp.counters,ips.cnt.total_time)
 getStatus(result::MadNLPExecutionStats) = STATUS_OUTPUT_DICT[result.status]
@@ -246,13 +246,13 @@ function initialize_robust_restorer!(ips::AbstractInteriorPointSolver)
     ips.del_w = 0
 end
 
-function factorize_wrapper!(ips::Solver)
+function factorize_wrapper!(ips::InteriorPointSolver)
     @trace(ips.logger,"Factorization started.")
     build_kkt!(ips.kkt)
     ips.cnt.linear_solver_time += @elapsed factorize!(ips.linear_solver)
 end
 
-function solve_refine_wrapper!(ips::Solver, x,b)
+function solve_refine_wrapper!(ips::InteriorPointSolver, x,b)
     cnt = ips.cnt
     @trace(ips.logger,"Iterative solution started.")
     fixed_variable_treatment_vec!(b, ips.ind_fixed)
@@ -274,7 +274,7 @@ function solve_refine_wrapper!(ips::Solver, x,b)
     return solve_status
 end
 
-function eval_f_wrapper(ips::Solver, x::Vector{Float64})
+function eval_f_wrapper(ips::InteriorPointSolver, x::Vector{Float64})
     nlp = ips.nlp
     cnt = ips.cnt
     @trace(ips.logger,"Evaluating objective.")
@@ -284,7 +284,7 @@ function eval_f_wrapper(ips::Solver, x::Vector{Float64})
     return obj_val*ips.obj_scale[]
 end
 
-function eval_grad_f_wrapper!(ips::Solver, f::Vector{Float64},x::Vector{Float64})
+function eval_grad_f_wrapper!(ips::InteriorPointSolver, f::Vector{Float64},x::Vector{Float64})
     nlp = ips.nlp
     cnt = ips.cnt
     @trace(ips.logger,"Evaluating objective gradient.")
@@ -295,7 +295,7 @@ function eval_grad_f_wrapper!(ips::Solver, f::Vector{Float64},x::Vector{Float64}
     return f
 end
 
-function eval_cons_wrapper!(ips::Solver, c::Vector{Float64},x::Vector{Float64})
+function eval_cons_wrapper!(ips::InteriorPointSolver, c::Vector{Float64},x::Vector{Float64})
     nlp = ips.nlp
     cnt = ips.cnt
     @trace(ips.logger, "Evaluating constraints.")
@@ -308,7 +308,7 @@ function eval_cons_wrapper!(ips::Solver, c::Vector{Float64},x::Vector{Float64})
     return c
 end
 
-function eval_jac_wrapper!(ipp::Solver, kkt::AbstractKKTSystem, x::Vector{Float64})
+function eval_jac_wrapper!(ipp::InteriorPointSolver, kkt::AbstractKKTSystem, x::Vector{Float64})
     nlp = ipp.nlp
     cnt = ipp.cnt
     ns = length(ipp.ind_ineq)
@@ -322,7 +322,7 @@ function eval_jac_wrapper!(ipp::Solver, kkt::AbstractKKTSystem, x::Vector{Float6
     return jac
 end
 
-function eval_lag_hess_wrapper!(ipp::Solver, kkt::AbstractKKTSystem, x::Vector{Float64},l::Vector{Float64};is_resto=false)
+function eval_lag_hess_wrapper!(ipp::InteriorPointSolver, kkt::AbstractKKTSystem, x::Vector{Float64},l::Vector{Float64};is_resto=false)
     nlp = ipp.nlp
     cnt = ipp.cnt
     @trace(ipp.logger,"Evaluating Lagrangian Hessian.")
@@ -338,7 +338,7 @@ function eval_lag_hess_wrapper!(ipp::Solver, kkt::AbstractKKTSystem, x::Vector{F
 end
 
 
-function eval_jac_wrapper!(ipp::Solver, kkt::DenseKKTSystem, x::Vector{Float64})
+function eval_jac_wrapper!(ipp::InteriorPointSolver, kkt::DenseKKTSystem, x::Vector{Float64})
     nlp = ipp.nlp
     cnt = ipp.cnt
     ns = length(ipp.ind_ineq)
@@ -352,7 +352,7 @@ function eval_jac_wrapper!(ipp::Solver, kkt::DenseKKTSystem, x::Vector{Float64})
     return jac
 end
 
-function eval_lag_hess_wrapper!(ipp::Solver, kkt::DenseKKTSystem, x::Vector{Float64},l::Vector{Float64};is_resto=false)
+function eval_lag_hess_wrapper!(ipp::InteriorPointSolver, kkt::DenseKKTSystem, x::Vector{Float64},l::Vector{Float64};is_resto=false)
     nlp = ipp.nlp
     cnt = ipp.cnt
     @trace(ipp.logger,"Evaluating Lagrangian Hessian.")
@@ -367,7 +367,7 @@ function eval_lag_hess_wrapper!(ipp::Solver, kkt::DenseKKTSystem, x::Vector{Floa
     return hess
 end
 
-function Solver(nlp::AbstractNLPModel;
+function InteriorPointSolver(nlp::AbstractNLPModel;
                 option_dict::Dict{Symbol,Any}=Dict{Symbol,Any}(),
                 kwargs...)
 
@@ -495,7 +495,7 @@ function Solver(nlp::AbstractNLPModel;
 
     !isempty(option_dict) && print_ignored_options(logger,option_dict)
 
-    return Solver{typeof(kkt)}(nlp,kkt,opt,cnt,logger,
+    return InteriorPointSolver{typeof(kkt)}(nlp,kkt,opt,cnt,logger,
                   n,m,nlb,nub,x,l,zl,zu,xl,xu,0.,f,c,
                   jacl,
                   d,dx,dl,dzl,dzu,p,px,pl,pzl,pzu,
@@ -768,7 +768,7 @@ function regular!(ips::AbstractInteriorPointSolver)
         adjusted = adjust_boundary!(ips.x_lr,ips.xl_r,ips.x_ur,ips.xu_r,ips.mu)
         adjusted > 0 &&
             @warn(ips.logger,"In iteration $(ips.cnt.k), $adjusted Slack too small, adjusting variable bound")
-        
+
         axpy!(ips.alpha,ips.dl,ips.l)
         axpy!(ips.alpha_z,ips.dzl,ips.zl_r)
         axpy!(ips.alpha_z,ips.dzu,ips.zu_r)
@@ -796,7 +796,7 @@ function restore!(ips::AbstractInteriorPointSolver)
     ips.cnt.t = 0
     ips.alpha_z = 0.
     ips.ftype = "R"
-    
+
     while true
         ips.alpha = min(get_alpha_max(ips.x,ips.xl,ips.xu,ips.dx,ips.tau),
                         get_alpha_z(ips.zl_r,ips.zu_r,ips.dzl,ips.dzu,ips.tau))
@@ -805,7 +805,7 @@ function restore!(ips::AbstractInteriorPointSolver)
         ips.l .+= ips.alpha.*ips.dl
         ips.zl_r.+=ips.alpha.*ips.dzl
         ips.zu_r.+=ips.alpha.*ips.dzu
-        
+
         eval_cons_wrapper!(ips,ips.c,ips.x)
         eval_grad_f_wrapper!(ips,ips.f,ips.x)
         ips.obj_val = eval_f_wrapper(ips,ips.x)
@@ -828,12 +828,12 @@ function restore!(ips::AbstractInteriorPointSolver)
 
 
         F = F_trial
-        
+
         theta = get_theta(ips.c)
         varphi= get_varphi(ips.obj_val,ips.x_lr,ips.xl_r,ips.xu_r,ips.x_ur,ips.mu)
-        
+
         ips.cnt.k+=1
-        
+
         is_filter_acceptable(ips.filter,theta,varphi) ? (return REGULAR) : (ips.cnt.t+=1)
         ips.cnt.k>=ips.opt.max_iter && return MAXIMUM_ITERATIONS_EXCEEDED
         time()-ips.cnt.start_time>=ips.opt.max_wall_time && return MAXIMUM_WALLTIME_EXCEEDED
@@ -847,7 +847,7 @@ function restore!(ips::AbstractInteriorPointSolver)
         ips.inf_compl = get_inf_compl(ips.x_lr,ips.xl_r,ips.zl_r,ips.xu_r,ips.x_ur,ips.zu_r,0.,sc)
         inf_compl_mu = get_inf_compl(ips.x_lr,ips.xl_r,ips.zl_r,ips.xu_r,ips.x_ur,ips.zu_r,ips.mu,sc)
         print_iter(ips)
-        
+
         !ips.opt.hessian_constant && eval_lag_hess_wrapper!(ips,ips.kkt,ips.x,ips.l)
         set_aug_diagonal!(ips.kkt,ips)
         set_aug_rhs!(ips, ips.kkt, ips.c)
@@ -856,12 +856,12 @@ function restore!(ips::AbstractInteriorPointSolver)
         factorize_wrapper!(ips)
         solve_refine_wrapper!(ips,ips.d,ips.p)
         finish_aug_solve!(ips, ips.kkt, ips.mu)
-        
+
         ips.ftype = "f"
     end
 end
 
-function robust!(ips::Solver)
+function robust!(ips::InteriorPointSolver)
     initialize_robust_restorer!(ips)
     RR = ips.RR
     while true
@@ -919,7 +919,7 @@ function robust!(ips::Solver)
 
         # without inertia correction,
         @trace(ips.logger,"Solving restoration phase primal-dual system.")
-        factorize_wrapper!(ips)        
+        factorize_wrapper!(ips)
         solve_refine_wrapper!(ips,ips.d,ips.p)
 
         finish_aug_solve!(ips, ips.kkt, RR.mu_R)
@@ -1046,7 +1046,7 @@ function robust!(ips::Solver)
     end
 end
 
-function inertia_based_reg(ips::AbstractInteriorPointSolver)
+function inertia_based_reg(ips::InteriorPointSolver)
     @trace(ips.logger,"Inertia-based regularization started.")
 
     factorize_wrapper!(ips)
@@ -1083,7 +1083,7 @@ function inertia_based_reg(ips::AbstractInteriorPointSolver)
 end
 
 
-function inertia_free_reg(ips::Solver)
+function inertia_free_reg(ips::InteriorPointSolver)
 
     @trace(ips.logger,"Inertia-free regularization started.")
     p0 = ips._w1
@@ -1189,11 +1189,11 @@ end
 
 # KKT system updates -------------------------------------------------------
 # Set diagonal
-function set_aug_diagonal!(kkt::AbstractKKTSystem, ips::Solver)
+function set_aug_diagonal!(kkt::AbstractKKTSystem, ips::InteriorPointSolver)
     kkt.pr_diag .= ips.zl./(ips.x.-ips.xl) .+ ips.zu./(ips.xu.-ips.x)
     fill!(kkt.du_diag, 0.0)
 end
-function set_aug_diagonal!(kkt::SparseUnreducedKKTSystem, ips::Solver)
+function set_aug_diagonal!(kkt::SparseUnreducedKKTSystem, ips::InteriorPointSolver)
     kkt.pr_diag .= 0.0
     kkt.du_diag .= 0.0
     kkt.l_lower .= .-sqrt.(ips.zl_r)
@@ -1203,11 +1203,11 @@ function set_aug_diagonal!(kkt::SparseUnreducedKKTSystem, ips::Solver)
 end
 
 # Robust restoration
-function set_aug_RR!(kkt::AbstractKKTSystem, ips::Solver, RR::RobustRestorer)
+function set_aug_RR!(kkt::AbstractKKTSystem, ips::InteriorPointSolver, RR::RobustRestorer)
     kkt.pr_diag .= ips.zl./(ips.x.-ips.xl) .+ ips.zu./(ips.xu.-ips.x) .+ RR.zeta.*RR.D_R.^2
     kkt.du_diag .= .-RR.pp./RR.zp .- RR.nn./RR.zn
 end
-function set_aug_RR!(kkt::SparseUnreducedKKTSystem, ips::Solver, RR::RobustRestorer)
+function set_aug_RR!(kkt::SparseUnreducedKKTSystem, ips::InteriorPointSolver, RR::RobustRestorer)
     kkt.pr_diag.= RR.zeta.*RR.D_R.^2
     kkt.du_diag.= .-RR.pp./RR.zp.-RR.nn./RR.zn
     kkt.l_lower.=.-sqrt.(ips.zl_r)
@@ -1217,19 +1217,19 @@ function set_aug_RR!(kkt::SparseUnreducedKKTSystem, ips::Solver, RR::RobustResto
 end
 
 # Set RHS
-function set_aug_rhs!(ips::Solver, kkt::AbstractKKTSystem, c)
+function set_aug_rhs!(ips::InteriorPointSolver, kkt::AbstractKKTSystem, c)
     ips.px.=.-ips.f.+ips.mu./(ips.x.-ips.xl).-ips.mu./(ips.xu.-ips.x).-ips.jacl
     ips.pl.=.-c
 end
 
-function set_aug_rhs!(ips::Solver, kkt::SparseUnreducedKKTSystem, c)
+function set_aug_rhs!(ips::InteriorPointSolver, kkt::SparseUnreducedKKTSystem, c)
     ips.px.=.-ips.f.+ips.zl.-ips.zu.-ips.jacl
     ips.pl.=.-c
     ips.pzl.=(ips.xl_r-ips.x_lr).*kkt.l_lower .+ ips.mu./kkt.l_lower
     ips.pzu.=(ips.xu_r-ips.x_ur).*kkt.u_lower .- ips.mu./kkt.u_lower
 end
 
-function set_aug_rhs_ifr!(ips::Solver, kkt::SparseUnreducedKKTSystem,c)
+function set_aug_rhs_ifr!(ips::InteriorPointSolver, kkt::SparseUnreducedKKTSystem,c)
     ips._w1x .= 0.
     ips._w1l .= .-c
     ips._w1zl.= 0.
@@ -1238,19 +1238,19 @@ end
 
 # Set RHS RR
 function set_aug_rhs_RR!(
-    ips::Solver, kkt::AbstractKKTSystem, RR::RobustRestorer, rho,
+    ips::InteriorPointSolver, kkt::AbstractKKTSystem, RR::RobustRestorer, rho,
 )
     ips.px.=.-RR.f_R.-ips.jacl.+RR.mu_R./(ips.x.-ips.xl).-RR.mu_R./(ips.xu.-ips.x)
     ips.pl.=.-ips.c.+RR.pp.-RR.nn.+(RR.mu_R.-(rho.-ips.l).*RR.pp)./RR.zp.-(RR.mu_R.-(rho.+ips.l).*RR.nn)./RR.zn
 end
 
 # Finish
-function finish_aug_solve!(ips::Solver, kkt::AbstractKKTSystem, mu)
+function finish_aug_solve!(ips::InteriorPointSolver, kkt::AbstractKKTSystem, mu)
     ips.dzl.= (mu.-ips.zl_r.*ips.dx_lr)./(ips.x_lr.-ips.xl_r).-ips.zl_r
     ips.dzu.= (mu.+ips.zu_r.*ips.dx_ur)./(ips.xu_r.-ips.x_ur).-ips.zu_r
 end
 
-function finish_aug_solve!(ips::Solver, kkt::SparseUnreducedKKTSystem, mu)
+function finish_aug_solve!(ips::InteriorPointSolver, kkt::SparseUnreducedKKTSystem, mu)
     ips.dzl.*=.-kkt.l_lower
     ips.dzu.*=kkt.u_lower
     ips.dzl.= (mu.-ips.zl_r.*ips.dx_lr)./(ips.x_lr.-ips.xl_r).-ips.zl_r
@@ -1258,11 +1258,11 @@ function finish_aug_solve!(ips::Solver, kkt::SparseUnreducedKKTSystem, mu)
 end
 
 # Initial
-function set_initial_rhs!(ips::Solver, kkt::AbstractKKTSystem)
+function set_initial_rhs!(ips::InteriorPointSolver, kkt::AbstractKKTSystem)
     ips.px .= .-ips.f.+ips.zl.-ips.zu
     ips.pl .= 0.0
 end
-function set_initial_rhs!(ips::Solver, kkt::SparseUnreducedKKTSystem)
+function set_initial_rhs!(ips::InteriorPointSolver, kkt::SparseUnreducedKKTSystem)
     ips.px .= .-ips.f.+ips.zl.-ips.zu
     ips.pl .= 0.0
     ips.pzl.= 0.0
@@ -1270,7 +1270,7 @@ function set_initial_rhs!(ips::Solver, kkt::SparseUnreducedKKTSystem)
 end
 
 # Set ifr
-function set_aug_rhs_ifr!(ips::Solver, kkt::AbstractKKTSystem)
+function set_aug_rhs_ifr!(ips::InteriorPointSolver, kkt::AbstractKKTSystem)
     ips._w1x .= 0.0
     ips._w1l .= .-ips.c
 end
@@ -1611,7 +1611,7 @@ function _get_fixed_variable_index(
         append!(fixed_aug_index,append!(collect(mat.colptr[i]+1:mat.colptr[i+1]-1)))
     end
     append!(fixed_aug_index,setdiff!(Base._findin(mat.rowval,ind_fixed),mat.colptr))
-    
+
     return fixed_aug_index
 end
 fixed_variable_treatment_vec!(vec,ind_fixed) = (vec[ind_fixed] .= 0.)

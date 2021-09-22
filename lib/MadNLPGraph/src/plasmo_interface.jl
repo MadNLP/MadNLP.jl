@@ -63,7 +63,7 @@ end
 function jacobian_structure(
     graph::OptiGraph,I,J,ninds,minds,pinds,nnzs_jac_inds,nnzs_link_jac_inds,
     x_index_map,g_index_map,modelnodes,linkedges)
-    
+
     @blas_safe_threads for k=1:length(modelnodes)
         isempty(nnzs_jac_inds[k]) && continue
         offset_i = minds[k][1]-1
@@ -72,10 +72,10 @@ function jacobian_structure(
         JJ = view(J,nnzs_jac_inds[k])
         jacobian_structure(
             moi_optimizer(modelnodes[k]),II,JJ)
-        II.+= offset_i 
-        JJ.+= offset_j 
+        II.+= offset_i
+        JJ.+= offset_j
     end
-    
+
     @blas_safe_threads for q=1:length(linkedges)
         isempty(nnzs_link_jac_inds[q]) && continue
         II = view(I,nnzs_link_jac_inds[q])
@@ -148,7 +148,7 @@ function eval_constraint_jacobian(linkcon,jac,offset)
 end
 get_vars(linkcon) = keys(linkcon.func.terms)
 get_coeffs(linkcon) = values(linkcon.func.terms)
-          
+
 function eval_constraint_jacobian(graph::OptiGraph,jac,x,
                                   ninds,minds,nnzs_jac_inds,nnzs_link_jac_inds,modelnodes,linkedges)
     @blas_safe_threads for k=1:length(modelnodes)
@@ -170,13 +170,13 @@ struct GraphModel{T} <: AbstractNLPModel{T,Vector{T}}
     nnzs_jac_inds::Vector{UnitRange{Int}}
     nnzs_hess_inds::Vector{UnitRange{Int}}
     nnzs_link_jac_inds::Vector{UnitRange{Int}}
-    
+
     x_index_map::Dict #
     g_index_map::Dict #
-    
+
     modelnodes::Vector{OptiNode}
     linkedges::Vector{OptiEdge}
-    
+
     meta::NLPModelMeta{T, Vector{T}}
     graph::OptiGraph
     counters::NLPModelsCounters
@@ -241,7 +241,7 @@ function GraphModel(graph::OptiGraph)
     minds = [(i==1 ? 0 : ms_cumsum[i-1])+1:ms_cumsum[i] for i=1:K]
     nnzs_hess_inds = [(i==1 ? 0 : nnzs_hess_cumsum[i-1])+1:nnzs_hess_cumsum[i] for i=1:K]
     nnzs_jac_inds = [(i==1 ? 0 : nnzs_jac_cumsum[i-1])+1:nnzs_jac_cumsum[i] for i=1:K]
-    
+
     Q = length(linkedges)
     ps= [num_linkconstraints(modeledge) for modeledge in linkedges]
     ps_cumsum =  cumsum(ps)
@@ -249,7 +249,7 @@ function GraphModel(graph::OptiGraph)
     pinds = [(i==1 ? m : m+ps_cumsum[i-1])+1:m+ps_cumsum[i] for i=1:Q]
     nnzs_link_jac_inds =
         [(i==1 ? nnz_jac : nnz_jac+nnzs_link_jac_cumsum[i-1])+1: nnz_jac + nnzs_link_jac_cumsum[i] for i=1:Q]
-    
+
     x =Vector{Float64}(undef,n)
     xl=Vector{Float64}(undef,n)
     xu=Vector{Float64}(undef,n)
@@ -285,7 +285,7 @@ function GraphModel(graph::OptiGraph)
 
     ext = Dict{Symbol,Any}(:n=>n,:m=>m,:p=>p,:ninds=>ninds,:minds=>minds,:pinds=>pinds,
                            :linkedges=>linkedges,:jac_constant=>jac_constant,:hess_constant=>hess_constant)
-    
+
     return GraphModel(
         ninds,minds,pinds,nnzs_jac_inds,nnzs_hess_inds,nnzs_link_jac_inds,
         x_index_map,g_index_map,modelnodes,linkedges,
@@ -312,16 +312,16 @@ function get_part(graph::OptiGraph,nlp::GraphModel)
     n = nlp.ext[:n]
     m = nlp.ext[:m]
     p = nlp.ext[:p]
-    
+
     ninds = nlp.ninds
     minds = nlp.minds
     pinds = nlp.pinds
-    
+
     ind_ineq = findall(get_lcon(nlp).!=get_ucon(nlp))
     l = length(ind_ineq)
 
     part = Vector{Int}(undef,n+m+l+p)
-    
+
     for k=1:length(ninds)
         part[ninds[k]].=k
     end
@@ -343,23 +343,23 @@ function get_part(graph::OptiGraph,nlp::GraphModel)
         cnt+=1
         part[n+cnt] = part[n+l+q]
     end
-    
-    
+
+
     return part
 end
 
 function optimize!(graph::OptiGraph; option_dict = Dict{Symbol,Any}(), kwargs...)
     graph.objective_function.constant = 0.
-    nlp = GraphModel(graph)    
-    
-    K = num_all_nodes(graph) 
+    nlp = GraphModel(graph)
+
+    K = num_all_nodes(graph)
     if (haskey(kwargs,:schwarz_custom_partition) && kwargs[:schwarz_custom_partition]) ||
         (haskey(option_dict,:schwarz_custom_partition) && option_dict[:schwarz_custom_partition])
-        
+
         part= get_part(graph,nlp)
         option_dict[:schwarz_part] = part
         option_dict[:schwarz_num_parts] = num_all_nodes(graph)
-        
+
     elseif (haskey(kwargs,:schur_custom_partition) && kwargs[:schur_custom_partition]) ||
         (haskey(option_dict,:schur_custom_partition) && option_dict[:schur_custom_partition])
 
@@ -368,10 +368,10 @@ function optimize!(graph::OptiGraph; option_dict = Dict{Symbol,Any}(), kwargs...
         option_dict[:schur_part] = part
         option_dict[:schur_num_parts] = K
     end
-    
+
     option_dict[:jacobian_constant] = nlp.ext[:jac_constant]
     option_dict[:hessian_constant] = nlp.ext[:hess_constant]
-    ips = Solver(nlp;option_dict=option_dict,kwargs...)
+    ips = InteriorPointSolver(nlp;option_dict=option_dict,kwargs...)
     result = optimize!(ips)
 
     graph.optimizer = ips
@@ -382,7 +382,7 @@ function optimize!(graph::OptiGraph; option_dict = Dict{Symbol,Any}(), kwargs...
             ips.status,view(result.solution,nlp.ninds[k]),
             ips.obj_val,
             view(result.constraints,nlp.minds[k]),
-            ips.inf_du, ips.inf_pr, 
+            ips.inf_du, ips.inf_pr,
             view(result.multipliers,nlp.minds[k]),
             view(result.multipliers_L,nlp.ninds[k]),
             view(result.multipliers_U,nlp.ninds[k]),

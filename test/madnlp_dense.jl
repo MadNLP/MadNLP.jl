@@ -68,12 +68,12 @@ function DenseDummyQP(; n=100, m=10, fixed_variables=Int[])
     end
 
     Random.seed!(1)
-    
+
     # Build QP problem 0.5 * x' * P * x + q' * x
     P = randn(n , n)
     P += P' # P is symmetric
     P += 100.0 * I
-    
+
     q = randn(n)
 
     # Build constraints gl <= Ax <= gu
@@ -85,7 +85,7 @@ function DenseDummyQP(; n=100, m=10, fixed_variables=Int[])
 
     x0 = zeros(n)
     y0 = zeros(m)
-    
+
     # Bound constraints
     xu =   ones(n)
     xl = - ones(n)
@@ -93,7 +93,7 @@ function DenseDummyQP(; n=100, m=10, fixed_variables=Int[])
     gu = ones(m)
 
     xl[fixed_variables] .= xu[fixed_variables]
-    
+
     hrows = [i for i in 1:n for j in 1:i]
     hcols = [j for i in 1:n for j in 1:i]
     nnzh = div(n * (n + 1), 2)
@@ -101,7 +101,7 @@ function DenseDummyQP(; n=100, m=10, fixed_variables=Int[])
     jrows = [j for i in 1:n for j in 1:m]
     jcols = [i for i in 1:n for j in 1:m]
     nnzj = n * m
-    
+
     return DenseDummyQP(
         NLPModels.NLPModelMeta(
             n,
@@ -130,7 +130,7 @@ end
         )
         m = 0
         nlp = DenseDummyQP(; n=n, m=m)
-        ipd = MadNLP.Solver(nlp, option_dict=dense_options)
+        ipd = MadNLP.InteriorPointSolver(nlp, option_dict=dense_options)
 
         kkt = ipd.kkt
         @test isa(kkt, MadNLP.DenseKKTSystem)
@@ -146,7 +146,7 @@ end
             :kkt_system=>MadNLP.DENSE_KKT_SYSTEM,
             :linear_solver=>MadNLPUmfpack,
         )
-        @test_throws Exception MadNLP.Solver(nlp, dense_options_error)
+        @test_throws Exception MadNLP.InteriorPointSolver(nlp, dense_options_error)
     end
     @testset "Constrained" begin
         dense_options = Dict{Symbol, Any}(
@@ -155,7 +155,7 @@ end
         )
         m = 5
         nlp = DenseDummyQP(; n=n, m=m)
-        ipd = MadNLP.Solver(nlp, option_dict=dense_options)
+        ipd = MadNLP.InteriorPointSolver(nlp, option_dict=dense_options)
         ns = length(ipd.ind_ineq)
 
         kkt = ipd.kkt
@@ -182,10 +182,10 @@ function _compare_dense_with_sparse(n, m, ind_fixed)
     )
 
     nlp = DenseDummyQP(; n=n, m=m, fixed_variables=ind_fixed)
-    
-    ips = MadNLP.Solver(nlp, option_dict=sparse_options)
-    ipd = MadNLP.Solver(nlp, option_dict=dense_options)
-    
+
+    ips = MadNLP.InteriorPointSolver(nlp, option_dict=sparse_options)
+    ipd = MadNLP.InteriorPointSolver(nlp, option_dict=dense_options)
+
     MadNLP.optimize!(ips)
     MadNLP.optimize!(ipd)
 
