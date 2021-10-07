@@ -251,7 +251,7 @@ function NLPModels.hess_coord!(qp::DenseDummyQP,x, l, hess::AbstractVector; obj_
 end
 # Hessian: dense callback
 function MadNLP.hess_dense!(qp::DenseDummyQP, x, l,hess::AbstractMatrix; obj_weight=1.0)
-    hess .= obj_weight .* qp.P
+    copyto!(hess, obj_weight .* qp.P)
 end
 
 function DenseDummyQP(; n=100, m=10, fixed_variables=Int[])

@@ -9,20 +9,18 @@ function _compare_gpu_with_cpu(n, m, ind_fixed)
         :print_level=>MadNLP.ERROR,
     )
 
-    nlp = MadNLPTests.build_qp_test(; n=n, m=m, fixed_variables=ind_fixed)
-    x, l = copy(nlp.x), copy(nlp.l)
+    nlp = MadNLPTests.DenseDummyQP(; n=n, m=m, fixed_variables=ind_fixed)
 
-    h_ips = MadNLP.Solver(nlp; option_dict=copy(madnlp_options))
+    h_ips = MadNLP.InteriorPointSolver(nlp; option_dict=copy(madnlp_options))
     MadNLP.optimize!(h_ips)
 
     # Reinit NonlinearProgram to avoid side effect
-    nlp = MadNLPTests.build_qp_test(; n=n, m=m, fixed_variables=ind_fixed)
     ind_cons = MadNLP.get_index_constraints(nlp)
     ns = length(ind_cons.ind_ineq)
 
     # Init KKT on the GPU
     TKKTGPU = MadNLP.DenseKKTSystem{Float64, CuVector{Float64}, CuMatrix{Float64}}
-    opt = MadNLP.Options(madnlp_options)
+    opt = MadNLP.Options(; madnlp_options...)
     # Instantiate Solver with KKT on the GPU
     d_ips = MadNLP.InteriorPointSolver{TKKTGPU}(nlp, opt; option_linear_solver=copy(madnlp_options))
     MadNLP.optimize!(d_ips)
