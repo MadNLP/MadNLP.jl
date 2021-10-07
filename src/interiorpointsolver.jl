@@ -367,15 +367,32 @@ function eval_lag_hess_wrapper!(ipp::InteriorPointSolver, kkt::DenseKKTSystem, x
 end
 
 function InteriorPointSolver(nlp::AbstractNLPModel;
-    kkt=nothing, option_dict::Dict{Symbol,Any}=Dict{Symbol,Any}(), kwargs...
+    option_dict::Dict{Symbol,Any}=Dict{Symbol,Any}(), kwargs...
 )
-
-    cnt = Counters(start_time=time())
     opt = Options(linear_solver=default_linear_solver())
     set_options!(opt,option_dict,kwargs)
     check_option_sanity(opt)
 
-    # If we are using DenseKKTSystem, ensure that dense callbacks are available
+    KKTSystem = if opt.kkt_system == SPARSE_KKT_SYSTEM
+        MT = (opt.linear_solver.INPUT_MATRIX_TYPE == :csc) ? SparseMatrixCSC{Float64, Int32} : Matrix{Float64}
+        SparseKKTSystem{Float64, MT}
+    elseif opt.kkt_system == SPARSE_UNREDUCED_KKT_SYSTEM
+        MT = (opt.linear_solver.INPUT_MATRIX_TYPE == :csc) ? SparseMatrixCSC{Float64, Int32} : Matrix{Float64}
+        SparseUnreducedKKTSystem{Float64, MT}
+    elseif opt.kkt_system == DENSE_KKT_SYSTEM
+        MT = Matrix{Float64}
+        VT = Vector{Float64}
+        DenseKKTSystem{Float64, VT, MT}
+    end
+    return InteriorPointSolver{KKTSystem}(nlp, opt; option_linear_solver=option_dict)
+end
+
+# Inner constructor
+function InteriorPointSolver{KKTSystem}(nlp::AbstractNLPModel, opt::Options;
+    option_linear_solver::Dict{Symbol,Any}=Dict{Symbol,Any}(),
+) where {KKTSystem<:AbstractKKTSystem}
+    cnt = Counters(start_time=time())
+
     logger = Logger(print_level=opt.print_level,file_print_level=opt.file_print_level,
                     file = opt.output_file == "" ? nothing : open(opt.output_file,"w+"))
     @trace(logger,"Logger is initialized.")
@@ -392,19 +409,7 @@ function InteriorPointSolver(nlp::AbstractNLPModel;
     m = get_ncon(nlp)
 
     # Initialize KKT
-    if !isa(kkt, AbstractKKTSystem)
-        kkt = if opt.kkt_system == SPARSE_KKT_SYSTEM
-            MT = (opt.linear_solver.INPUT_MATRIX_TYPE == :csc) ? SparseMatrixCSC{Float64, Int32} : Matrix{Float64}
-            SparseKKTSystem{Float64, MT}(nlp, ind_cons)
-        elseif opt.kkt_system == SPARSE_UNREDUCED_KKT_SYSTEM
-            MT = (opt.linear_solver.INPUT_MATRIX_TYPE == :csc) ? SparseMatrixCSC{Float64, Int32} : Matrix{Float64}
-            SparseUnreducedKKTSystem{Float64, MT}(nlp, ind_cons)
-        elseif opt.kkt_system == DENSE_KKT_SYSTEM
-            MT = Matrix{Float64}
-            VT = Vector{Float64}
-            DenseKKTSystem{Float64, VT, MT}(nlp, ind_cons)
-        end
-    end
+    kkt = KKTSystem(nlp, ind_cons)
 
     xl = [get_lvar(nlp);view(get_lcon(nlp),ind_cons.ind_ineq)]
     xu = [get_uvar(nlp);view(get_ucon(nlp),ind_cons.ind_ineq)]
@@ -481,12 +486,12 @@ function InteriorPointSolver(nlp::AbstractNLPModel;
 
     @trace(logger,"Initializing linear solver.")
     cnt.linear_solver_time =
-        @elapsed linear_solver = opt.linear_solver.Solver(get_kkt(kkt) ; option_dict=option_dict,logger=logger)
+        @elapsed linear_solver = opt.linear_solver.Solver(get_kkt(kkt) ; option_dict=option_linear_solver,logger=logger)
 
     @trace(logger,"Initializing iterative solver.")
     iterator = opt.iterator.Solver(
         similar(d),
-        (b, x)->mul!(b, kkt, x), (x)->solve!(linear_solver, x) ; option_dict=option_dict)
+        (b, x)->mul!(b, kkt, x), (x)->solve!(linear_solver, x) ; option_dict=option_linear_solver)
 
     @trace(logger,"Initializing fixed variable treatment scheme.")
 
@@ -494,20 +499,21 @@ function InteriorPointSolver(nlp::AbstractNLPModel;
         opt.inertia_correction_method = is_inertia(linear_solver) ? INERTIA_BASED : INERTIA_FREE
     end
 
-    !isempty(option_dict) && print_ignored_options(logger,option_dict)
+    !isempty(option_linear_solver) && print_ignored_options(logger, option_linear_solver)
 
-    return InteriorPointSolver{typeof(kkt)}(nlp,kkt,opt,cnt,logger,
-                  n,m,nlb,nub,x,l,zl,zu,xl,xu,0.,f,c,
-                  jacl,
-                  d,dx,dl,dzl,dzu,p,px,pl,pzl,pzu,
-                  _w1,_w1x,_w1l,_w1zl,_w1zu,_w2,_w2x,_w2l,_w2zl,_w2zu,_w3,_w3x,_w3l,_w4,_w4x,_w4l,
-                  x_trial,c_trial,0.,x_slk,c_slk,rhs,
-                  ind_cons.ind_ineq,ind_cons.ind_fixed,ind_cons.ind_llb,ind_cons.ind_uub,
-                  x_lr,x_ur,xl_r,xu_r,zl_r,zu_r,dx_lr,dx_ur,x_trial_lr,x_trial_ur,
-                  linear_solver,iterator,
-                  obj_scale,con_scale,con_jac_scale,
-                  0.,0.,0.,0.,0.,0.,0.,0.,0.," ",0.,0.,0.,
-                  Vector{Float64}[],nothing,INITIAL,Dict())
+    return InteriorPointSolver{KKTSystem}(nlp,kkt,opt,cnt,logger,
+        n,m,nlb,nub,x,l,zl,zu,xl,xu,0.,f,c,
+        jacl,
+        d,dx,dl,dzl,dzu,p,px,pl,pzl,pzu,
+        _w1,_w1x,_w1l,_w1zl,_w1zu,_w2,_w2x,_w2l,_w2zl,_w2zu,_w3,_w3x,_w3l,_w4,_w4x,_w4l,
+        x_trial,c_trial,0.,x_slk,c_slk,rhs,
+        ind_cons.ind_ineq,ind_cons.ind_fixed,ind_cons.ind_llb,ind_cons.ind_uub,
+        x_lr,x_ur,xl_r,xu_r,zl_r,zu_r,dx_lr,dx_ur,x_trial_lr,x_trial_ur,
+        linear_solver,iterator,
+        obj_scale,con_scale,con_jac_scale,
+        0.,0.,0.,0.,0.,0.,0.,0.,0.," ",0.,0.,0.,
+        Vector{Float64}[],nothing,INITIAL,Dict(),
+    )
 end
 
 function initialize!(ips::AbstractInteriorPointSolver)

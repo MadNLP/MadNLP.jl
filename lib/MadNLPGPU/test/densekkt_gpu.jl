@@ -21,11 +21,10 @@ function _compare_gpu_with_cpu(n, m, ind_fixed)
     ns = length(ind_cons.ind_ineq)
 
     # Init KKT on the GPU
-    kkt = MadNLP.DenseKKTSystem{Float64, CuVector{Float64}, CuMatrix{Float64}}(
-        nlp, ind_cons,
-    )
+    TKKTGPU = MadNLP.DenseKKTSystem{Float64, CuVector{Float64}, CuMatrix{Float64}}
+    opt = MadNLP.Options(madnlp_options)
     # Instantiate Solver with KKT on the GPU
-    d_ips = MadNLP.Solver(nlp, kkt; option_dict=copy(madnlp_options))
+    d_ips = MadNLP.InteriorPointSolver{TKKTGPU}(nlp, opt; option_linear_solver=copy(madnlp_options))
     MadNLP.optimize!(d_ips)
 
     # Check that both results match exactly
