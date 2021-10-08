@@ -39,10 +39,13 @@ testset = [
     ],
 ]
 
-@testset "MadNLPGPU test" begin
+# Test LapackGPU wrapper
+@testset "LapackGPU test" begin
     for (name,optimizer_constructor,exclude) in testset
         test_madnlp(name,optimizer_constructor,exclude)
     end
 end
 
+# Test DenseKKTSystem on GPU
+include("densekkt_gpu.jl")
 
