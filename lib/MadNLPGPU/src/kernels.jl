@@ -134,3 +134,14 @@ function MadNLP._build_dense_kkt_system!(
     wait(ev)
 end
 
+function MadNLP.compress_jacobian!(kkt::MadNLP.DenseKKTSystem{T, VT, MT}) where {T, VT<:CuVector{T}, MT<:CuMatrix{T}}
+    m = size(kkt.jac, 1)
+    n = size(kkt.hess, 1)
+    # Extract diagonal terms corresponding to inequalities
+    index = (LinearAlgebra.diagind(kkt.jac) .+ n * m)[kkt.ind_ineq]
+    # Add slack indexes
+    kkt.jac[index] .= -one(T)
+    # Scale
+    kkt.jac .*= kkt.jacobian_scaling
+    return
+end
