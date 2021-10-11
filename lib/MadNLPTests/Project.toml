@@ -1,7 +1,7 @@
 name = "MadNLPTests"
 uuid = "b52a2a03-04ab-4a5f-9698-6a2deff93217"
 authors = ["Sungho Shin <sungho.shin.ss@gmail.com>"]
-version = "0.2.0"
+version = "0.3.0"
 
 [deps]
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
