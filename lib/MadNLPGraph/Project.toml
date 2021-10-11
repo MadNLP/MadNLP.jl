@@ -1,7 +1,7 @@
 name = "MadNLPGraph"
 uuid = "2f590f30-ea46-438a-a78d-e5bfe3109704"
 authors = ["Sungho Shin <sungho.shin.ss@gmail.com>"]
-version = "0.1.0"
+version = "0.2.0"
 
 [deps]
 MadNLP = "2621e9c9-9eb4-46b1-8089-e8c72242dfb6"
@@ -11,7 +11,7 @@ LightGraphs = "093fc24a-ae57-5d10-9952-331d41423f4d"
 Metis = "2679e427-3c69-5b7f-982b-ece356f1e94b"
 
 [compat]
-MadNLP = "~0.2"
+MadNLP = "~0.3"
 JuMP = "~0.21"
 Plasmo = "~0.4"
 LightGraphs = "~1.3"
