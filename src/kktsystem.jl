@@ -53,7 +53,7 @@ function jac_dense! end
 function hess_dense! end
 
 "Number of variables associated to the KKT system."
-function n_variables end
+function num_variables end
 
 "Check if inertia is correct."
 function is_inertia_correct end
@@ -104,7 +104,7 @@ function treat_fixed_variable!(kkt::AbstractKKTSystem{T, MT}) where {T, MT<:Matr
 end
 
 function is_inertia_correct(kkt::AbstractKKTSystem, num_pos, num_zero, num_neg)
-    return (num_zero == 0) && (num_pos == n_variables(kkt))
+    return (num_zero == 0) && (num_pos == num_variables(kkt))
 end
 
 #=
@@ -268,7 +268,7 @@ function SparseKKTSystem{T, MT}(nlp::AbstractNLPModel, ind_cons=get_index_constr
 end
 
 is_reduced(::SparseKKTSystem) = true
-n_variables(kkt::SparseKKTSystem) = length(kkt.pr_diag)
+num_variables(kkt::SparseKKTSystem) = length(kkt.pr_diag)
 
 #=
     SparseUnreducedKKTSystem
@@ -410,7 +410,7 @@ function initialize!(kkt::SparseUnreducedKKTSystem)
 end
 
 is_reduced(::SparseUnreducedKKTSystem) = false
-n_variables(kkt::SparseUnreducedKKTSystem) = length(kkt.pr_diag)
+num_variables(kkt::SparseUnreducedKKTSystem) = length(kkt.pr_diag)
 
 #=
     DenseKKTSystem
@@ -472,7 +472,7 @@ function DenseKKTSystem{T, VT, MT}(nlp::AbstractNLPModel, info_constraints=get_i
 end
 
 is_reduced(::DenseKKTSystem) = true
-n_variables(kkt::DenseKKTSystem) = length(kkt.pr_diag)
+num_variables(kkt::DenseKKTSystem) = length(kkt.pr_diag)
 
 # Special getters for Jacobian
 function get_jacobian(kkt::DenseKKTSystem)
