@@ -1062,7 +1062,7 @@ function inertia_based_reg(ips::InteriorPointSolver)
 
     n_trial = 0
     ips.del_w = del_w_prev = 0.0
-    while num_zero!= 0 || num_pos != ips.n || !solve_status
+    while !is_inertia_correct(ips.kkt, num_pos, num_zero, num_neg) || !solve_status
         @debug(ips.logger,"Primal-dual perturbed.")
         if ips.del_w == 0.0
             ips.del_w = ips.del_w_last==0. ? ips.opt.first_hessian_perturbation :
