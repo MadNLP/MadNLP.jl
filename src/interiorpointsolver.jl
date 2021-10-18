@@ -1763,7 +1763,7 @@ function get_index_constraints(nlp::AbstractNLPModel; fixed_variable_treatment=M
 end
 
 function madnlp(model::AbstractNLPModel;buffered=true, kwargs...)
-    ips = Solver(model;kwargs...)
+    ips = InteriorPointSolver(model;kwargs...)
     initialize!(ips.kkt)
     return optimize!(ips)
 end
