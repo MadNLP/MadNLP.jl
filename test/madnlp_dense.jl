@@ -93,3 +93,18 @@ end
     end
 end
 
+@testset "MadNLP: restart (PR #113)" begin
+    n, m = 10, 5
+    nlp = MadNLPTests.DenseDummyQP(; n=n, m=m)
+    sparse_options = Dict{Symbol, Any}(
+        :kkt_system=>MadNLP.SPARSE_KKT_SYSTEM,
+        :linear_solver=>MadNLPLapackCPU,
+        :print_level=>MadNLP.ERROR,
+    )
+    ips = MadNLP.InteriorPointSolver(nlp, option_dict=sparse_options)
+    MadNLP.optimize!(ips)
+    # Restart (should hit MadNLP.reinitialize function)
+    res = MadNLP.optimize!(ips)
+    @test ips.status == MadNLP.SOLVE_SUCCEEDED
+end
+

@@ -579,8 +579,6 @@ end
 
 function reinitialize!(ips::AbstractInteriorPointSolver)
     view(ips.x,1:get_nvar(ips.nlp)) .= get_x0(ips.nlp)
-    view(ips.zl,1:get_nvar(ips.nlp)) .= get_zl(ips.nlp)
-    view(ips.zu,1:get_nvar(ips.nlp)) .= get_zu(ips.nlp)
 
     ips.obj_val = eval_f_wrapper(ips, ips.x)
     eval_grad_f_wrapper!(ips, ips.f, ips.x)
