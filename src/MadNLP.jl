@@ -32,7 +32,7 @@ include("utils.jl")
 include("options.jl")
 include("matrixtools.jl")
 include(joinpath("LinearSolvers","linearsolvers.jl"))
-include("kktsystem.jl")
+include(joinpath("KKT", "KKTsystem.jl"))
 include("interiorpointsolver.jl")
 include(joinpath("Interfaces","interfaces.jl"))
 
