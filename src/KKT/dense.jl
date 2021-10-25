@@ -144,6 +144,9 @@ end
 function mul!(y::AbstractVector, kkt::DenseKKTSystem, x::AbstractVector)
     mul!(y, kkt.aug_com, x)
 end
+function mul!(y::ReducedKKTVector, kkt::DenseKKTSystem, x::ReducedKKTVector)
+    mul!(y.x, kkt.aug_com, x.x)
+end
 
 function jtprod!(y::AbstractVector, kkt::DenseKKTSystem, x::AbstractVector)
     mul!(y, kkt.jac', x)

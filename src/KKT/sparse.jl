@@ -186,6 +186,9 @@ end
 is_reduced(::SparseKKTSystem) = true
 num_variables(kkt::SparseKKTSystem) = length(kkt.pr_diag)
 
+function mul!(y::ReducedKKTVector, kkt::SparseKKTSystem, x::ReducedKKTVector)
+    mul!(y.x, Symmetric(kkt.aug_com, :L), x.x)
+end
 
 #=
     SparseUnreducedKKTSystem
@@ -304,4 +307,8 @@ end
 
 is_reduced(::SparseUnreducedKKTSystem) = false
 num_variables(kkt::SparseUnreducedKKTSystem) = length(kkt.pr_diag)
+
+function mul!(y::UnreducedKKTVector, kkt::SparseUnreducedKKTSystem, x::UnreducedKKTVector)
+    mul!(y.values, Symmetric(kkt.aug_com, :L), x.values)
+end
 

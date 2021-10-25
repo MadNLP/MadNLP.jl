@@ -83,38 +83,14 @@ mutable struct InteriorPointSolver{KKTSystem} <: AbstractInteriorPointSolver
 
     jacl::Vector{Float64}
 
-    d::Vector{Float64}
-    dx::StrideOneVector{Float64}
-    dl::StrideOneVector{Float64}
-    dzl::StrideOneVector{Float64}
-    dzu::StrideOneVector{Float64}
+    d::AbstractKKTVector{Float64, Vector{Float64}}
+    p::AbstractKKTVector{Float64, Vector{Float64}}
 
-    p::Vector{Float64}
-    px::StrideOneVector{Float64}
-    pl::StrideOneVector{Float64}
+    _w1::AbstractKKTVector{Float64, Vector{Float64}}
+    _w2::AbstractKKTVector{Float64, Vector{Float64}}
 
-    pzl::Union{Nothing,StrideOneVector{Float64}}
-    pzu::Union{Nothing,StrideOneVector{Float64}}
-
-    _w1::Vector{Float64}
-    _w1x::StrideOneVector{Float64}
-    _w1l::StrideOneVector{Float64}
-    _w1zl::Union{Nothing,StrideOneVector{Float64}}
-    _w1zu::Union{Nothing,StrideOneVector{Float64}}
-
-    _w2::Vector{Float64}
-    _w2x::StrideOneVector{Float64}
-    _w2l::StrideOneVector{Float64}
-    _w2zl::Union{Nothing,StrideOneVector{Float64}}
-    _w2zu::Union{Nothing,StrideOneVector{Float64}}
-
-    _w3::Vector{Float64}
-    _w3x::StrideOneVector{Float64}
-    _w3l::StrideOneVector{Float64}
-
-    _w4::Vector{Float64}
-    _w4x::StrideOneVector{Float64}
-    _w4l::StrideOneVector{Float64}
+    _w3::AbstractKKTVector{Float64, Vector{Float64}}
+    _w4::AbstractKKTVector{Float64, Vector{Float64}}
 
     x_trial::Vector{Float64}
     c_trial::Vector{Float64}
@@ -208,8 +184,8 @@ function RobustRestorer(ips::AbstractInteriorPointSolver)
     pp_trial = Vector{Float64}(undef,ips.m)
     nn_trial = Vector{Float64}(undef,ips.m)
 
-    return RobustRestorer(0.,ips._w2x,ips._w1x,0.,ips._w3x,0.,ips._w3l,ips._w4l,
-                          zp,zn,dpp,dnn,dzp,dzn,ips._w2l,ips._w1l,
+    return RobustRestorer(0.,ips._w2.xp,ips._w1.xp,0.,ips._w3.xp,0.,ips._w3.xl,ips._w4.xl,
+                          zp,zn,dpp,dnn,dzp,dzn,ips._w2.xl,ips._w1.xl,
                           0.,0.,0.,0.,0.,0.,Tuple{Float64,Float64}[])
 end
 
@@ -252,25 +228,58 @@ function factorize_wrapper!(ips::InteriorPointSolver)
     ips.cnt.linear_solver_time += @elapsed factorize!(ips.linear_solver)
 end
 
-function solve_refine_wrapper!(ips::InteriorPointSolver, x,b)
+# MadNLP supports solving a ReducedKKTSystem both with ReducedKKTVector and UnreducedKKTVector
+# (by default the descent direction is defined as a UnreducedKKTVector)
+function solve_refine_wrapper!(
+    ips::InteriorPointSolver{<:AbstractReducedKKTSystem},
+    x::AbstractKKTVector,
+    b::AbstractKKTVector,
+)
     cnt = ips.cnt
     @trace(ips.logger,"Iterative solution started.")
-    fixed_variable_treatment_vec!(b, ips.ind_fixed)
+    fixed_variable_treatment_vec!(b.x, ips.ind_fixed)
 
-    cnt.linear_solver_time += @elapsed (result = solve_refine!(x, ips.iterator, b))
+    cnt.linear_solver_time += @elapsed (result = solve_refine!(x.x, ips.iterator, b.x))
     if result == :Solved
         solve_status =  true
     else
         if improve!(ips.linear_solver)
             cnt.linear_solver_time += @elapsed begin
                 factorize!(ips.linear_solver)
-                solve_status = (solve_refine!(x, ips.iterator, b) == :Solved ? true : false)
+                solve_status = (solve_refine!(x.x, ips.iterator, b.x) == :Solved ? true : false)
             end
         else
             solve_status = false
         end
     end
-    fixed_variable_treatment_vec!(x, ips.ind_fixed)
+    fixed_variable_treatment_vec!(x.x, ips.ind_fixed)
+    return solve_status
+end
+
+# Currently, solving an UnreducedKKTSystem works only with UnreducedKKTVector
+function solve_refine_wrapper!(
+    ips::InteriorPointSolver{<:AbstractUnreducedKKTSystem},
+    x::UnreducedKKTVector,
+    b::UnreducedKKTVector,
+)
+    cnt = ips.cnt
+    @trace(ips.logger,"Iterative solution started.")
+    fixed_variable_treatment_vec!(b.values, ips.ind_fixed)
+
+    cnt.linear_solver_time += @elapsed (result = solve_refine!(x.values, ips.iterator, b.values))
+    if result == :Solved
+        solve_status =  true
+    else
+        if improve!(ips.linear_solver)
+            cnt.linear_solver_time += @elapsed begin
+                factorize!(ips.linear_solver)
+                solve_status = (solve_refine!(x.values, ips.iterator, b.values) == :Solved ? true : false)
+            end
+        else
+            solve_status = false
+        end
+    end
+    fixed_variable_treatment_vec!(x.values, ips.ind_fixed)
     return solve_status
 end
 
@@ -326,10 +335,10 @@ function eval_lag_hess_wrapper!(ipp::InteriorPointSolver, kkt::AbstractKKTSystem
     nlp = ipp.nlp
     cnt = ipp.cnt
     @trace(ipp.logger,"Evaluating Lagrangian Hessian.")
-    ipp._w1l .= l.*ipp.con_scale
+    ipp._w1.xl .= l.*ipp.con_scale
     hess = get_hessian(kkt)
     cnt.eval_function_time += @elapsed hess_coord!(
-        nlp, view(x,1:get_nvar(nlp)), ipp._w1l, hess;
+        nlp, view(x,1:get_nvar(nlp)), ipp._w1.xl, hess;
         obj_weight = (get_minimize(nlp) ? 1. : -1.) * (is_resto ? 0.0 : ipp.obj_scale[]))
     compress_hessian!(kkt)
     cnt.lag_hess_cnt+=1
@@ -355,10 +364,10 @@ function eval_lag_hess_wrapper!(ipp::InteriorPointSolver, kkt::DenseKKTSystem, x
     nlp = ipp.nlp
     cnt = ipp.cnt
     @trace(ipp.logger,"Evaluating Lagrangian Hessian.")
-    ipp._w1l .= l.*ipp.con_scale
+    ipp._w1.xl .= l.*ipp.con_scale
     hess = get_hessian(kkt)
     cnt.eval_function_time += @elapsed hess_dense!(
-        nlp, view(x,1:get_nvar(nlp)), ipp._w1l, hess;
+        nlp, view(x,1:get_nvar(nlp)), ipp._w1.xl, hess;
         obj_weight = (get_minimize(nlp) ? 1. : -1.) * (is_resto ? 0.0 : ipp.obj_scale[]))
     compress_hessian!(kkt)
     cnt.lag_hess_cnt+=1
@@ -442,43 +451,20 @@ function InteriorPointSolver{KKTSystem}(nlp::AbstractNLPModel, opt::Options;
     x_trial_lr = view(x_trial, ind_cons.ind_lb)
     x_trial_ur = view(x_trial, ind_cons.ind_ub)
 
-    aug_vec_length = is_reduced(kkt) ? n+m : n+m+nlb+nub
+    _w1 = is_reduced(kkt) ? ReducedKKTVector(n, m) : UnreducedKKTVector(n, m, nlb, nub)
+    _w2 = is_reduced(kkt) ? ReducedKKTVector(n, m) : UnreducedKKTVector(n, m, nlb, nub)
+    _w3 = is_reduced(kkt) ? ReducedKKTVector(n, m) : UnreducedKKTVector(n, m, nlb, nub)
+    _w4 = is_reduced(kkt) ? ReducedKKTVector(n, m) : UnreducedKKTVector(n, m, nlb, nub)
 
-    _w1 = Vector{Float64}(undef,aug_vec_length)
-    _w1x= view(_w1,1:n)
-    _w1l= view(_w1,n+1:n+m)
-    _w1zl = is_reduced(kkt) ? nothing : view(_w1,n+m+1:n+m+nlb)
-    _w1zu = is_reduced(kkt) ? nothing : view(_w1,n+m+nlb+1:n+m+nlb+nub)
-
-
-    _w2 = Vector{Float64}(undef,aug_vec_length)
-    _w2x= view(_w2,1:n)
-    _w2l= view(_w2,n+1:n+m)
-    _w2zl = is_reduced(kkt) ? nothing : view(_w2,n+m+1:n+m+nlb)
-    _w2zu = is_reduced(kkt) ? nothing : view(_w2,n+m+nlb+1:n+m+nlb+nub)
-
-    _w3 = Vector{Float64}(undef,aug_vec_length)
-    _w3x= view(_w3,1:n)
-    _w3l= view(_w3,n+1:n+m)
-    _w4 = zeros(aug_vec_length) # need to initialize to zero due to mul!
-    _w4x= view(_w4,1:n)
-    _w4l= view(_w4,n+1:n+m)
+    fill!(_w4.x, 0.0) # need to initialize to zero due to mul!
 
     jacl = zeros(n) # spblas may throw an error if not initialized to zero
 
-    d = Vector{Float64}(undef,aug_vec_length)
-    dx= view(d,1:n)
-    dl= view(d,n+1:n+m)
-    dzl= is_reduced(kkt) ? Vector{Float64}(undef,nlb) : view(d,n+m+1:n+m+nlb)
-    dzu= is_reduced(kkt) ? Vector{Float64}(undef,nub) : view(d,n+m+nlb+1:n+m+nlb+nub)
-    dx_lr = view(dx,ind_cons.ind_lb)
-    dx_ur = view(dx,ind_cons.ind_ub)
+    d = UnreducedKKTVector(n, m, nlb, nub)
+    dx_lr = view(d.xp, ind_cons.ind_lb)
+    dx_ur = view(d.xp, ind_cons.ind_ub)
 
-    p = Vector{Float64}(undef,aug_vec_length)
-    px= view(p,1:n)
-    pl= view(p,n+1:n+m)
-    pzl= is_reduced(kkt) ? Vector{Float64}(undef,nlb) : view(p,n+m+1:n+m+nlb)
-    pzu= is_reduced(kkt) ? Vector{Float64}(undef,nub) : view(p,n+m+nlb+1:n+m+nlb+nub)
+    p = UnreducedKKTVector(n, m, nlb, nub)
 
     obj_scale = [1.0]
     con_scale = ones(m)
@@ -490,8 +476,11 @@ function InteriorPointSolver{KKTSystem}(nlp::AbstractNLPModel, opt::Options;
 
     @trace(logger,"Initializing iterative solver.")
     iterator = opt.iterator.Solver(
-        similar(d),
-        (b, x)->mul!(b, kkt, x), (x)->solve!(linear_solver, x) ; option_dict=option_linear_solver)
+        similar(d.x, size(kkt, 1)),
+        (b, x)->mul!(b, kkt, x),
+        (x)->solve!(linear_solver, x) ;
+        option_dict=option_linear_solver
+    )
 
     @trace(logger,"Initializing fixed variable treatment scheme.")
 
@@ -504,8 +493,8 @@ function InteriorPointSolver{KKTSystem}(nlp::AbstractNLPModel, opt::Options;
     return InteriorPointSolver{KKTSystem}(nlp,kkt,opt,cnt,logger,
         n,m,nlb,nub,x,l,zl,zu,xl,xu,0.,f,c,
         jacl,
-        d,dx,dl,dzl,dzu,p,px,pl,pzl,pzu,
-        _w1,_w1x,_w1l,_w1zl,_w1zu,_w2,_w2x,_w2l,_w2zl,_w2zu,_w3,_w3x,_w3l,_w4,_w4x,_w4l,
+        d, p,
+        _w1, _w2, _w3, _w4,
         x_trial,c_trial,0.,x_slk,c_slk,rhs,
         ind_cons.ind_ineq,ind_cons.ind_fixed,ind_cons.ind_llb,ind_cons.ind_uub,
         x_lr,x_ur,xl_r,xu_r,zl_r,zu_r,dx_lr,dx_ur,x_trial_lr,x_trial_ur,
@@ -558,7 +547,7 @@ function initialize!(ips::AbstractInteriorPointSolver)
         initialize!(ips.kkt)
         factorize_wrapper!(ips)
         solve_refine_wrapper!(ips,ips.d,ips.p)
-        norm(ips.dl,Inf)>ips.opt.constr_mult_init_max ? (ips.l.= 0.) : (ips.l.= ips.dl)
+        norm(ips.d.xl,Inf)>ips.opt.constr_mult_init_max ? (ips.l.= 0.) : (ips.l.= ips.d.xl)
     end
 
     # Initializing
@@ -699,7 +688,7 @@ function regular!(ips::AbstractInteriorPointSolver)
         if ips.opt.inertia_correction_method == INERTIA_FREE
             set_aug_rhs_ifr!(ips, ips.kkt)
         end
-        dual_inf_perturbation!(ips.px,ips.ind_llb,ips.ind_uub,ips.mu,ips.opt.kappa_d)
+        dual_inf_perturbation!(ips.p.xp,ips.ind_llb,ips.ind_uub,ips.mu,ips.opt.kappa_d)
 
         # start inertia conrrection
         @trace(ips.logger,"Solving primal-dual system.")
@@ -715,23 +704,23 @@ function regular!(ips::AbstractInteriorPointSolver)
         @trace(ips.logger,"Backtracking line search initiated.")
         theta = get_theta(ips.c)
         varphi= get_varphi(ips.obj_val,ips.x_lr,ips.xl_r,ips.xu_r,ips.x_ur,ips.mu)
-        varphi_d = get_varphi_d(ips.f,ips.x,ips.xl,ips.xu,ips.dx,ips.mu)
+        varphi_d = get_varphi_d(ips.f,ips.x,ips.xl,ips.xu,ips.d.xp,ips.mu)
 
 
-        alpha_max = get_alpha_max(ips.x,ips.xl,ips.xu,ips.dx,ips.tau)
-        ips.alpha_z = get_alpha_z(ips.zl_r,ips.zu_r,ips.dzl,ips.dzu,ips.tau)
+        alpha_max = get_alpha_max(ips.x,ips.xl,ips.xu,ips.d.xp,ips.tau)
+        ips.alpha_z = get_alpha_z(ips.zl_r,ips.zu_r,ips.d.xzl,ips.d.xzu,ips.tau)
         alpha_min = get_alpha_min(theta,varphi_d,ips.theta_min,ips.opt.gamma_theta,ips.opt.gamma_phi,
                                   ips.opt.alpha_min_frac,ips.opt.delta,ips.opt.s_theta,ips.opt.s_phi)
         ips.cnt.l = 1
         ips.alpha = alpha_max
         varphi_trial= 0.
             theta_trial = 0.
-            small_search_norm = get_rel_search_norm(ips.x,ips.dx) < 10*eps(Float64)
+            small_search_norm = get_rel_search_norm(ips.x,ips.d.xp) < 10*eps(Float64)
         switching_condition = is_switching(varphi_d,ips.alpha,ips.opt.s_phi,ips.opt.delta,2.,ips.opt.s_theta)
         armijo_condition = false
         while true
             copyto!(ips.x_trial,ips.x)
-            axpy!(ips.alpha,ips.dx,ips.x_trial)
+            axpy!(ips.alpha,ips.d.xp,ips.x_trial)
 
             ips.obj_val_trial = eval_f_wrapper(ips, ips.x_trial)
             eval_cons_wrapper!(ips, ips.c_trial, ips.x_trial)
@@ -760,7 +749,7 @@ function regular!(ips::AbstractInteriorPointSolver)
                 return RESTORE
             else
                 @trace(ips.logger,"Step rejected; proceed with the next trial step.")
-                ips.alpha * norm(ips.dx) < eps(Float64)*10 &&
+                ips.alpha * norm(ips.d.xp) < eps(Float64)*10 &&
                     return ips.cnt.acceptable_cnt >0 ?
                     SOLVED_TO_ACCEPTABLE_LEVEL : SEARCH_DIRECTION_BECOMES_TOO_SMALL
             end
@@ -774,9 +763,9 @@ function regular!(ips::AbstractInteriorPointSolver)
         adjusted > 0 &&
             @warn(ips.logger,"In iteration $(ips.cnt.k), $adjusted Slack too small, adjusting variable bound")
 
-        axpy!(ips.alpha,ips.dl,ips.l)
-        axpy!(ips.alpha_z,ips.dzl,ips.zl_r)
-        axpy!(ips.alpha_z,ips.dzu,ips.zu_r)
+        axpy!(ips.alpha,ips.d.xl,ips.l)
+        axpy!(ips.alpha_z,ips.d.xzl,ips.zl_r)
+        axpy!(ips.alpha_z,ips.d.xzu,ips.zu_r)
         reset_bound_dual!(ips.zl,ips.x,ips.xl,ips.mu,ips.opt.kappa_sigma)
         reset_bound_dual!(ips.zu,ips.xu,ips.x,ips.mu,ips.opt.kappa_sigma)
         eval_grad_f_wrapper!(ips, ips.f,ips.x)
@@ -793,9 +782,9 @@ end
 
 function restore!(ips::AbstractInteriorPointSolver)
     ips.del_w=0
-    ips._w1x .= ips.x # backup the previous primal iterate
-    ips._w1l .= ips.l # backup the previous primal iterate
-    ips._w2l .= ips.c # backup the previous primal iterate
+    ips._w1.xp .= ips.x # backup the previous primal iterate
+    ips._w1.xl .= ips.l # backup the previous dual iterate
+    ips._w2.xl .= ips.c # backup the previous primal iterate
 
     F = get_F(ips.c,ips.f,ips.zl,ips.zu,ips.jacl,ips.x_lr,ips.xl_r,ips.zl_r,ips.xu_r,ips.x_ur,ips.zu_r,ips.mu)
     ips.cnt.t = 0
@@ -803,13 +792,13 @@ function restore!(ips::AbstractInteriorPointSolver)
     ips.ftype = "R"
 
     while true
-        ips.alpha = min(get_alpha_max(ips.x,ips.xl,ips.xu,ips.dx,ips.tau),
-                        get_alpha_z(ips.zl_r,ips.zu_r,ips.dzl,ips.dzu,ips.tau))
+        ips.alpha = min(get_alpha_max(ips.x,ips.xl,ips.xu,ips.d.xp,ips.tau),
+                        get_alpha_z(ips.zl_r,ips.zu_r,ips.d.xzl,ips.d.xzu,ips.tau))
 
-        ips.x .+= ips.alpha.*ips.dx
-        ips.l .+= ips.alpha.*ips.dl
-        ips.zl_r.+=ips.alpha.*ips.dzl
-        ips.zu_r.+=ips.alpha.*ips.dzu
+        ips.x .+= ips.alpha.*ips.d.xp
+        ips.l .+= ips.alpha.*ips.d.xl
+        ips.zl_r.+=ips.alpha.*ips.d.xzl
+        ips.zu_r.+=ips.alpha.*ips.d.xzu
 
         eval_cons_wrapper!(ips,ips.c,ips.x)
         eval_grad_f_wrapper!(ips,ips.f,ips.x)
@@ -821,9 +810,9 @@ function restore!(ips::AbstractInteriorPointSolver)
         F_trial = get_F(
             ips.c,ips.f,ips.zl,ips.zu,ips.jacl,ips.x_lr,ips.xl_r,ips.zl_r,ips.xu_r,ips.x_ur,ips.zu_r,ips.mu)
         if F_trial > ips.opt.soft_resto_pderror_reduction_factor*F
-            ips.x.=ips._w1x
-            ips.l.=ips._w1l
-            ips.c.=ips._w2l # backup the previous primal iterate
+            ips.x.=ips._w1.xp
+            ips.l.=ips._w1.xl
+            ips.c.=ips._w2.xl # backup the previous primal iterate
             return ROBUST
         end
 
@@ -857,7 +846,7 @@ function restore!(ips::AbstractInteriorPointSolver)
         set_aug_diagonal!(ips.kkt,ips)
         set_aug_rhs!(ips, ips.kkt, ips.c)
 
-        dual_inf_perturbation!(ips.px,ips.ind_llb,ips.ind_uub,ips.mu,ips.opt.kappa_d)
+        dual_inf_perturbation!(ips.p.xp,ips.ind_llb,ips.ind_uub,ips.mu,ips.opt.kappa_d)
         factorize_wrapper!(ips)
         solve_refine_wrapper!(ips,ips.d,ips.p)
         finish_aug_solve!(ips, ips.kkt, ips.mu)
@@ -928,16 +917,16 @@ function robust!(ips::InteriorPointSolver)
         solve_refine_wrapper!(ips,ips.d,ips.p)
 
         finish_aug_solve!(ips, ips.kkt, RR.mu_R)
-        finish_aug_solve_RR!(RR.dpp,RR.dnn,RR.dzp,RR.dzn,ips.l,ips.dl,RR.pp,RR.nn,RR.zp,RR.zn,RR.mu_R,ips.opt.rho)
+        finish_aug_solve_RR!(RR.dpp,RR.dnn,RR.dzp,RR.dzn,ips.l,ips.d.xl,RR.pp,RR.nn,RR.zp,RR.zn,RR.mu_R,ips.opt.rho)
 
 
         theta_R = get_theta_R(ips.c,RR.pp,RR.nn)
         varphi_R = get_varphi_R(RR.obj_val_R,ips.x_lr,ips.xl_r,ips.xu_r,ips.x_ur,RR.pp,RR.nn,RR.mu_R)
-        varphi_d_R = get_varphi_d_R(RR.f_R,ips.x,ips.xl,ips.xu,ips.dx,RR.pp,RR.nn,RR.dpp,RR.dnn,RR.mu_R,ips.opt.rho)
+        varphi_d_R = get_varphi_d_R(RR.f_R,ips.x,ips.xl,ips.xu,ips.d.xp,RR.pp,RR.nn,RR.dpp,RR.dnn,RR.mu_R,ips.opt.rho)
 
         # set alpha_min
-        alpha_max = get_alpha_max_R(ips.x,ips.xl,ips.xu,ips.dx,RR.pp,RR.dpp,RR.nn,RR.dnn,RR.tau_R)
-        ips.alpha_z = get_alpha_z_R(ips.zl_r,ips.zu_r,ips.dzl,ips.dzu,RR.zp,RR.dzp,RR.zn,RR.dzn,RR.tau_R)
+        alpha_max = get_alpha_max_R(ips.x,ips.xl,ips.xu,ips.d.xp,RR.pp,RR.dpp,RR.nn,RR.dnn,RR.tau_R)
+        ips.alpha_z = get_alpha_z_R(ips.zl_r,ips.zu_r,ips.d.xzl,ips.d.xzu,RR.zp,RR.dzp,RR.zn,RR.dzn,RR.tau_R)
         alpha_min = get_alpha_min(theta_R,varphi_d_R,ips.theta_min,ips.opt.gamma_theta,ips.opt.gamma_phi,
                                   ips.opt.alpha_min_frac,ips.opt.delta,ips.opt.s_theta,ips.opt.s_phi)
 
@@ -947,7 +936,7 @@ function robust!(ips::InteriorPointSolver)
         ips.cnt.l = 1
         theta_R_trial = 0.
         varphi_R_trial = 0.
-        small_search_norm = get_rel_search_norm(ips.x,ips.dx) < 10*eps(Float64)
+        small_search_norm = get_rel_search_norm(ips.x,ips.d.xp) < 10*eps(Float64)
         switching_condition = is_switching(varphi_d_R,ips.alpha,ips.opt.s_phi,ips.opt.delta,theta_R,ips.opt.s_theta)
         armijo_condition = false
 
@@ -955,7 +944,7 @@ function robust!(ips::InteriorPointSolver)
             copyto!(ips.x_trial,ips.x)
             copyto!(RR.pp_trial,RR.pp)
             copyto!(RR.nn_trial,RR.nn)
-            axpy!(ips.alpha,ips.dx,ips.x_trial)
+            axpy!(ips.alpha,ips.d.xp,ips.x_trial)
             axpy!(ips.alpha,RR.dpp,RR.pp_trial)
             axpy!(ips.alpha,RR.dnn,RR.nn_trial)
 
@@ -997,9 +986,9 @@ function robust!(ips::InteriorPointSolver)
         RR.obj_val_R=RR.obj_val_R_trial
         RR.f_R .= RR.zeta.*RR.D_R.^2 .*(ips.x.-RR.x_ref)
 
-        axpy!(ips.alpha, ips.dl,ips.l )
-        axpy!(ips.alpha_z, ips.dzl,ips.zl_r)
-        axpy!(ips.alpha_z, ips.dzu,ips.zu_r)
+        axpy!(ips.alpha, ips.d.xl, ips.l)
+        axpy!(ips.alpha_z, ips.d.xzl,ips.zl_r)
+        axpy!(ips.alpha_z, ips.d.xzu,ips.zu_r)
         axpy!(ips.alpha_z, RR.dzp,RR.zp)
         axpy!(ips.alpha_z, RR.dzn,RR.zn)
 
@@ -1036,7 +1025,7 @@ function robust!(ips::InteriorPointSolver)
 
             factorize_wrapper!(ips)
             solve_refine_wrapper!(ips,ips.d,ips.p)
-            norm(ips.dl,Inf)>ips.opt.constr_mult_init_max ? (ips.l.= 0) : (ips.l.= ips.dl)
+            norm(ips.d.xl,Inf)>ips.opt.constr_mult_init_max ? (ips.l.= 0) : (ips.l.= ips.d.xl)
             ips.cnt.k+=1
 
             return REGULAR
@@ -1092,23 +1081,23 @@ function inertia_free_reg(ips::InteriorPointSolver)
 
     @trace(ips.logger,"Inertia-free regularization started.")
     p0 = ips._w1
-    d0= ips._w2
-    t = ips._w3x
-    n = ips._w2x
-    wx= ips._w4x
-    ips._w3l.=0
+    d0 = ips._w2
+    t = ips._w3.xp
+    n = ips._w2.xp
+    wx= ips._w4.xp
+    ips._w3.xl.=0
 
     g = ips.x_trial # just to avoid new allocation
     g .= ips.f.-ips.mu./(ips.x.-ips.xl).+ips.mu./(ips.xu.-ips.x).+ips.jacl
 
-    fixed_variable_treatment_vec!(ips._w1x,ips.ind_fixed)
-    fixed_variable_treatment_vec!(ips.px,ips.ind_fixed)
+    fixed_variable_treatment_vec!(ips._w1.xp,ips.ind_fixed)
+    fixed_variable_treatment_vec!(ips.p.xp,ips.ind_fixed)
     fixed_variable_treatment_vec!(g,ips.ind_fixed)
     # end
 
     factorize_wrapper!(ips)
     solve_status = (solve_refine_wrapper!(ips,d0,p0) && solve_refine_wrapper!(ips,ips.d,ips.p))
-    t .= ips.dx.-n
+    t .= ips.d.xp.-n
     mul!(ips._w4, ips.kkt, ips._w3) # prepartation for curv_test
     n_trial = 0
     ips.del_w = del_w_prev = 0.
@@ -1132,7 +1121,7 @@ function inertia_free_reg(ips::InteriorPointSolver)
 
         factorize_wrapper!(ips)
         solve_status = (solve_refine_wrapper!(ips,d0,p0) && solve_refine_wrapper!(ips,ips.d,ips.p))
-        t .= ips.dx.-n
+        t .= ips.d.xp.-n
         mul!(ips._w4, ips.kkt, ips._w3) # prepartation for curv_test
         n_trial += 1
     end
@@ -1147,16 +1136,16 @@ function second_order_correction(ips::AbstractInteriorPointSolver,alpha_max::Flo
                                  theta_trial::Float64,varphi_d::Float64,switching_condition::Bool)
     @trace(ips.logger,"Second-order correction started.")
 
-    ips._w1l .= alpha_max .* ips.c .+ ips.c_trial
+    ips._w1.xl .= alpha_max .* ips.c .+ ips.c_trial
     theta_soc_old = theta_trial
     for p=1:ips.opt.max_soc
         # compute second order correction
-        set_aug_rhs!(ips, ips.kkt, ips._w1l)
-        dual_inf_perturbation!(ips.px,ips.ind_llb,ips.ind_uub,ips.mu,ips.opt.kappa_d)
+        set_aug_rhs!(ips, ips.kkt, ips._w1.xl)
+        dual_inf_perturbation!(ips.p.xp,ips.ind_llb,ips.ind_uub,ips.mu,ips.opt.kappa_d)
         solve_refine_wrapper!(ips,ips._w1,ips.p)
-        alpha_soc = get_alpha_max(ips.x,ips.xl,ips.xu,ips._w1x,ips.tau)
+        alpha_soc = get_alpha_max(ips.x,ips.xl,ips.xu,ips._w1.xp,ips.tau)
 
-        ips.x_trial .= ips.x.+alpha_soc.*ips._w1x
+        ips.x_trial .= ips.x.+alpha_soc.*ips._w1.xp
         eval_cons_wrapper!(ips, ips.c_trial,ips.x_trial)
         ips.obj_val_trial = eval_f_wrapper(ips, ips.x_trial)
 
@@ -1223,61 +1212,61 @@ end
 
 # Set RHS
 function set_aug_rhs!(ips::InteriorPointSolver, kkt::AbstractKKTSystem, c)
-    ips.px.=.-ips.f.+ips.mu./(ips.x.-ips.xl).-ips.mu./(ips.xu.-ips.x).-ips.jacl
-    ips.pl.=.-c
+    ips.p.xp.=.-ips.f.+ips.mu./(ips.x.-ips.xl).-ips.mu./(ips.xu.-ips.x).-ips.jacl
+    ips.p.xl.=.-c
 end
 
 function set_aug_rhs!(ips::InteriorPointSolver, kkt::SparseUnreducedKKTSystem, c)
-    ips.px.=.-ips.f.+ips.zl.-ips.zu.-ips.jacl
-    ips.pl.=.-c
-    ips.pzl.=(ips.xl_r-ips.x_lr).*kkt.l_lower .+ ips.mu./kkt.l_lower
-    ips.pzu.=(ips.xu_r-ips.x_ur).*kkt.u_lower .- ips.mu./kkt.u_lower
+    ips.p.xp.=.-ips.f.+ips.zl.-ips.zu.-ips.jacl
+    ips.p.xl.=.-c
+    ips.p.xzl.=(ips.xl_r-ips.x_lr).*kkt.l_lower .+ ips.mu./kkt.l_lower
+    ips.p.xzu.=(ips.xu_r-ips.x_ur).*kkt.u_lower .- ips.mu./kkt.u_lower
 end
 
 function set_aug_rhs_ifr!(ips::InteriorPointSolver, kkt::SparseUnreducedKKTSystem,c)
-    ips._w1x .= 0.
-    ips._w1l .= .-c
-    ips._w1zl.= 0.
-    ips._w1zu.= 0.
+    ips._w1.xp .= 0.0
+    ips._w1.xl .= .-c
+    ips._w1.xzl.= 0.0
+    ips._w1.xzu.= 0.0
 end
 
 # Set RHS RR
 function set_aug_rhs_RR!(
     ips::InteriorPointSolver, kkt::AbstractKKTSystem, RR::RobustRestorer, rho,
 )
-    ips.px.=.-RR.f_R.-ips.jacl.+RR.mu_R./(ips.x.-ips.xl).-RR.mu_R./(ips.xu.-ips.x)
-    ips.pl.=.-ips.c.+RR.pp.-RR.nn.+(RR.mu_R.-(rho.-ips.l).*RR.pp)./RR.zp.-(RR.mu_R.-(rho.+ips.l).*RR.nn)./RR.zn
+    ips.p.xp.=.-RR.f_R.-ips.jacl.+RR.mu_R./(ips.x.-ips.xl).-RR.mu_R./(ips.xu.-ips.x)
+    ips.p.xl.=.-ips.c.+RR.pp.-RR.nn.+(RR.mu_R.-(rho.-ips.l).*RR.pp)./RR.zp.-(RR.mu_R.-(rho.+ips.l).*RR.nn)./RR.zn
 end
 
 # Finish
 function finish_aug_solve!(ips::InteriorPointSolver, kkt::AbstractKKTSystem, mu)
-    ips.dzl.= (mu.-ips.zl_r.*ips.dx_lr)./(ips.x_lr.-ips.xl_r).-ips.zl_r
-    ips.dzu.= (mu.+ips.zu_r.*ips.dx_ur)./(ips.xu_r.-ips.x_ur).-ips.zu_r
+    ips.d.xzl.= (mu.-ips.zl_r.*ips.dx_lr)./(ips.x_lr.-ips.xl_r).-ips.zl_r
+    ips.d.xzu.= (mu.+ips.zu_r.*ips.dx_ur)./(ips.xu_r.-ips.x_ur).-ips.zu_r
 end
 
 function finish_aug_solve!(ips::InteriorPointSolver, kkt::SparseUnreducedKKTSystem, mu)
-    ips.dzl.*=.-kkt.l_lower
-    ips.dzu.*=kkt.u_lower
-    ips.dzl.= (mu.-ips.zl_r.*ips.dx_lr)./(ips.x_lr.-ips.xl_r).-ips.zl_r
-    ips.dzu.= (mu.+ips.zu_r.*ips.dx_ur)./(ips.xu_r.-ips.x_ur).-ips.zu_r
+    ips.d.xzl.*=.-kkt.l_lower
+    ips.d.xzu.*=kkt.u_lower
+    ips.d.xzl.= (mu.-ips.zl_r.*ips.dx_lr)./(ips.x_lr.-ips.xl_r).-ips.zl_r
+    ips.d.xzu.= (mu.+ips.zu_r.*ips.dx_ur)./(ips.xu_r.-ips.x_ur).-ips.zu_r
 end
 
 # Initial
 function set_initial_rhs!(ips::InteriorPointSolver, kkt::AbstractKKTSystem)
-    ips.px .= .-ips.f.+ips.zl.-ips.zu
-    ips.pl .= 0.0
+    ips.p.xp .= .-ips.f.+ips.zl.-ips.zu
+    ips.p.xl .= 0.0
 end
 function set_initial_rhs!(ips::InteriorPointSolver, kkt::SparseUnreducedKKTSystem)
-    ips.px .= .-ips.f.+ips.zl.-ips.zu
-    ips.pl .= 0.0
-    ips.pzl.= 0.0
-    ips.pzu.= 0.0
+    ips.p.xp .= .-ips.f.+ips.zl.-ips.zu
+    ips.p.xl .= 0.0
+    ips.p.xzl .= 0.0
+    ips.p.xzu .= 0.0
 end
 
 # Set ifr
 function set_aug_rhs_ifr!(ips::InteriorPointSolver, kkt::AbstractKKTSystem)
-    ips._w1x .= 0.0
-    ips._w1l .= .-ips.c
+    ips._w1.xp .= 0.0
+    ips._w1.xl .= .-ips.c
 end
 
 # Finish RR

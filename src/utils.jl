@@ -63,8 +63,8 @@ macro blas_safe_threads(args...)
 end
 
 # Type definitions
-SubVector{Tv}=SubArray{Tv, 1, Vector{Tv}, Tuple{Vector{Int}}, false}
-StrideOneVector{Tv}=Union{
+const SubVector{Tv} = SubArray{Tv, 1, Vector{Tv}, Tuple{Vector{Int}}, false}
+const StrideOneVector{Tv} = Union{
     Vector{Tv},
     SubArray{Tv,1,Vector{Tv},Tuple{UnitRange{Int}},true},
     SubArray{Tv, 1, Matrix{Tv}, Tuple{Base.Slice{Base.OneTo{Int}}, Int}, true}
