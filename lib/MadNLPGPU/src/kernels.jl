@@ -62,7 +62,7 @@ end
 #=
     DenseKKTSystem kernels
 =#
-function MadNLP.mul!(y::AbstractVector, kkt::MadNLP.DenseKKTSystem{T, VT, MT}, x::AbstractVector) where {T, VT<:CuVector{T}, MT<:CuMatrix{T}}
+function LinearAlgebra.mul!(y::AbstractVector, kkt::MadNLP.DenseKKTSystem{T, VT, MT}, x::AbstractVector) where {T, VT<:CuVector{T}, MT<:CuMatrix{T}}
     # Load buffers
     haskey(kkt.etc, :hess_w1) || (kkt.etc[:hess_w1] = CuVector{T}(undef, size(kkt.aug_com, 1)))
     haskey(kkt.etc, :hess_w2) || (kkt.etc[:hess_w2] = CuVector{T}(undef, size(kkt.aug_com, 1)))
@@ -70,11 +70,15 @@ function MadNLP.mul!(y::AbstractVector, kkt::MadNLP.DenseKKTSystem{T, VT, MT}, x
     d_x = kkt.etc[:hess_w1]::VT
     d_y = kkt.etc[:hess_w2]::VT
 
-    # x and y can be host arrays. Copy them on the device to avoid side effect.
+    # x and y can be host arrays. Copy them on the device.
     copyto!(d_x, x)
     LinearAlgebra.mul!(d_y, kkt.aug_com, d_x)
     copyto!(y, d_y)
 end
+function LinearAlgebra.mul!(y::MadNLP.ReducedKKTVector, kkt::MadNLP.DenseKKTSystem{T, VT, MT}, x::MadNLP.ReducedKKTVector) where {T, VT<:CuVector{T}, MT<:CuMatrix{T}}
+    LinearAlgebra.mul!(y.x, kkt, x.x)
+end
+
 
 function MadNLP.jtprod!(y::AbstractVector, kkt::MadNLP.DenseKKTSystem{T, VT, MT}, x::AbstractVector) where {T, VT<:CuVector{T}, MT<:CuMatrix{T}}
     # Load buffers
@@ -84,7 +88,7 @@ function MadNLP.jtprod!(y::AbstractVector, kkt::MadNLP.DenseKKTSystem{T, VT, MT}
     d_x = kkt.etc[:jac_w1]::VT
     d_y = kkt.etc[:jac_w2]::VT
 
-    # x and y can be host arrays. Copy them on the device to avoid side effect.
+    # x and y can be host arrays. Copy them on the device.
     copyto!(d_x, x)
     LinearAlgebra.mul!(d_y, kkt.jac', d_x)
     copyto!(y, d_y)
