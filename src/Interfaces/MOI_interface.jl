@@ -105,6 +105,7 @@ MOI.supports_constraint(::Optimizer,::Type{MOI.ScalarAffineFunction{Float64}},::
 MOI.supports_constraint(::Optimizer,::Type{MOI.ScalarQuadraticFunction{Float64}},::Type{MOI.Interval{Float64}})=false
 
 MOI.get(::Optimizer, ::MOI.SolverName) = "MadNLP"
+MOI.get(::Optimizer, ::MOI.SolverVersion) = version()
 MOI.get(model::Optimizer,::MOI.ObjectiveFunctionType)=typeof(model.objective)
 MOI.get(model::Optimizer,::MOI.NumberOfVariables)=length(model.variable_info)
 MOI.get(model::Optimizer,::MOI.NumberOfConstraints{MOI.ScalarAffineFunction{Float64},MOI.LessThan{Float64}})=length(model.linear_le_constraints)
@@ -841,14 +842,14 @@ end
 
 
 
-MOI.get(model::Optimizer, ::MOI.TerminationStatus) = model.nlp === nothing ?
-    MOI.OPTIMIZE_NOT_CALLED : termination_status(model.nlp)
-MOI.get(model::Optimizer, ::MOI.RawStatusString) = string(model.nlp.status)
-MOI.get(model::Optimizer, ::MOI.ResultCount) = (model.nlp !== nothing) ? 1 : 0
+MOI.get(model::Optimizer, ::MOI.TerminationStatus) = model.result === nothing ?
+    MOI.OPTIMIZE_NOT_CALLED : termination_status(model.result)
+MOI.get(model::Optimizer, ::MOI.RawStatusString) = string(model.result.status)
+MOI.get(model::Optimizer, ::MOI.ResultCount) = (model.result !== nothing) ? 1 : 0
 MOI.get(model::Optimizer, attr::MOI.PrimalStatus) = !(1 <= attr.result_index <= MOI.get(model, MOI.ResultCount())) ?
-    MOI.NO_SOLUTION : primal_status(model.ips)
+    MOI.NO_SOLUTION : primal_status(model.result)
 MOI.get(model::Optimizer, attr::MOI.DualStatus) = !(1 <= attr.result_index <= MOI.get(model, MOI.ResultCount())) ?
-    MOI.NO_SOLUTION : dual_status(model.ips)
+    MOI.NO_SOLUTION : dual_status(model.result)
 
 const status_moi_dict = Dict(
     SOLVE_SUCCEEDED => MOI.LOCALLY_SOLVED,
@@ -925,7 +926,7 @@ function MOI.get(model::Optimizer, attr::MOI.ConstraintPrimal,
     if !has_upper_bound(model, vi)
         error("Variable $vi has no upper bound -- ConstraintPrimal not defined.")
     end
-    return model.nlp.x[vi.value]
+    return model.result.solution[vi.value]
 end
 
 function MOI.get(model::Optimizer, attr::MOI.ConstraintPrimal,
