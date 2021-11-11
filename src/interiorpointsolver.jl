@@ -628,9 +628,10 @@ function optimize!(ips::AbstractInteriorPointSolver)
             ips.opt.rethrow_error && rethrow(e)
         end
     finally
-        unscale!(ips)
         ips.cnt.total_time = time() - ips.cnt.start_time
         !(ips.status < SOLVE_SUCCEEDED) && (print_summary_1(ips);print_summary_2(ips))
+        # Unscale once the summary has been printed out
+        unscale!(ips)
         @notice(ips.logger,"EXIT: $(STATUS_OUTPUT_DICT[ips.status])")
         ips.opt.disable_garbage_collector &&
             (GC.enable(true); @warn(ips.logger,"Julia garbage collector is turned back on"))
