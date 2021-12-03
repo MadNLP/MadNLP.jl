@@ -22,7 +22,9 @@
 @enum(KKTLinearSystem::Int,
       SPARSE_KKT_SYSTEM = 1,
       SPARSE_UNREDUCED_KKT_SYSTEM = 2,
-      DENSE_KKT_SYSTEM = 3)
+      DENSE_KKT_SYSTEM = 3,
+      DENSE_CONDENSED_KKT_SYSTEM = 4,
+)
 
 @enum(Status::Int,
       SOLVE_SUCCEEDED = 1,
