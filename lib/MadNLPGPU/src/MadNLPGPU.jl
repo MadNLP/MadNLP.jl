@@ -2,7 +2,8 @@ module MadNLPGPU
 
 import LinearAlgebra
 # CUDA
-import CUDA: CUBLAS, CUSOLVER, CuVector, CuMatrix, CuArray, toolkit_version, R_64F, has_cuda
+import CUDA
+import CUDA: CUBLAS, CUSOLVER, CuVector, CuMatrix, CuArray, R_64F, has_cuda
 # Kernels
 import KernelAbstractions: @kernel, @index, wait
 import CUDAKernels: CUDADevice
