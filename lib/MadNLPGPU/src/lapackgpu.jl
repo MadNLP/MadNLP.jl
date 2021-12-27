@@ -5,7 +5,7 @@ import ..MadNLPGPU:
     AbstractOptions, AbstractLinearSolver, set_options!,
     SymbolicException,FactorizationException,SolveException,InertiaException,
     introduce, factorize!, solve!, improve!, is_inertia, inertia, MadNLPLapackCPU, tril_to_full!,
-    CUBLAS, CUSOLVER, CuVector, CuMatrix, toolkit_version, R_64F
+    CUDA, CUBLAS, CUSOLVER, CuVector, CuMatrix, R_64F
 import .CUSOLVER:
     cusolverDnDsytrf_bufferSize, cusolverDnDsytrf,
     cusolverDnDpotrf_bufferSize, cusolverDnDpotrf, cusolverDnDpotrs,
@@ -85,7 +85,7 @@ end
 improve!(M::Solver) = false
 introduce(M::Solver) = "Lapack-GPU ($(M.opt.lapackgpu_algorithm))"
 
-if toolkit_version() >= v"11.3.1"
+if CUDA.version() >= v"11.3.1"
 
     is_inertia(M::Solver) = M.opt.lapackgpu_algorithm == CHOLESKY  # TODO: implement inertia(M::Solver) for BUNCHKAUFMAN
 
