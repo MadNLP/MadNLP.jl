@@ -85,7 +85,7 @@ end
 improve!(M::Solver) = false
 introduce(M::Solver) = "Lapack-GPU ($(M.opt.lapackgpu_algorithm))"
 
-if CUDA.version() >= v"11.3.1"
+if CUDA.runtime_version() >= v"11.3.1"
 
     is_inertia(M::Solver) = M.opt.lapackgpu_algorithm == CHOLESKY  # TODO: implement inertia(M::Solver) for BUNCHKAUFMAN
 
