@@ -16,7 +16,7 @@ import MadNLP:
     get_lcon, get_ucon, jac_structure!, hess_structure!, obj, grad!, cons!, jac_coord!, hess_coord!
 import Metis: partition
 import LightGraphs: Graph, Edge, add_edge!, edges, src, dst, neighbors, nv
-import Plasmo: OptiGraph, OptiNode, OptiEdge, all_nodes, all_edges, all_variables, num_all_nodes, getlinkconstraints, getnode, num_variables, num_constraints
+import Plasmo: OptiGraph, OptiNode, OptiEdge, all_nodes, all_edges, all_variables, num_all_nodes, link_constraints, getnode, num_variables, num_constraints
 import JuMP: _create_nlp_block_data, set_optimizer, GenericAffExpr
 
 include("plasmo_interface.jl")
