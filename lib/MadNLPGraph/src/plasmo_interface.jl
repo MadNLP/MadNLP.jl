@@ -192,11 +192,17 @@ hess_coord!(nlp::GraphModel,x,l,hess;obj_weight=1.) =eval_hessian_lagrangian(
 jac_coord!(nlp::GraphModel,x,jac)=eval_constraint_jacobian(
     nlp.graph,jac,x,nlp.ninds,nlp.minds,nlp.nnzs_jac_inds,nlp.nnzs_link_jac_inds,
     nlp.modelnodes,nlp.linkedges)
-hess_structure!(nlp::GraphModel,I,J)=hessian_lagrangian_structure(
-    nlp.graph,I,J,nlp.ninds,nlp.nnzs_hess_inds,nlp.modelnodes)
-jac_structure!(nlp::GraphModel,I,J) =jacobian_structure(
-    nlp.graph,I,J,nlp.ninds,nlp.minds,nlp.pinds,nlp.nnzs_jac_inds,nlp.nnzs_link_jac_inds,
-    nlp.x_index_map,nlp.g_index_map,nlp.modelnodes,nlp.linkedges)
+function hess_structure!(nlp::GraphModel, I::AbstractVector{T}, J::AbstractVector{T}) where T
+    hessian_lagrangian_structure(
+        nlp.graph,I,J,nlp.ninds,nlp.nnzs_hess_inds,nlp.modelnodes,
+    )
+end
+function jac_structure!(nlp::GraphModel, I::AbstractVector{T}, J::AbstractVector{T}) where T
+    jacobian_structure(
+        nlp.graph,I,J,nlp.ninds,nlp.minds,nlp.pinds,nlp.nnzs_jac_inds,nlp.nnzs_link_jac_inds,
+        nlp.x_index_map,nlp.g_index_map,nlp.modelnodes,nlp.linkedges,
+    )
+end
 
 function GraphModel(graph::OptiGraph)
     modelnodes = all_nodes(graph)
