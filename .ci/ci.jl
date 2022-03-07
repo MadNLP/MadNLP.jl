@@ -1,7 +1,11 @@
+
 rm(joinpath(@__DIR__, "Project.toml");force=true)
 rm(joinpath(@__DIR__, "Manifest.toml");force=true)
 
 using Pkg
+
+println(@__DIR__)
+Pkg.activate(@__DIR__)
 
 if ARGS[1] == "full"
     pkgs = ["MadNLPHSL","MadNLPPardiso","MadNLPMumps","MadNLPGraph","MadNLPKrylov"]
