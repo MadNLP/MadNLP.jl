@@ -1105,8 +1105,12 @@ jac_coord!(nlp::MOIModel,x::StrideOneVector{Float64},jac::StrideOneVector{Float6
     eval_constraint_jacobian(nlp.model,jac,x)
 hess_coord!(nlp::MOIModel,x::StrideOneVector{Float64},l::StrideOneVector{Float64},hess::StrideOneVector{Float64};
             obj_weight::Float64=1.) = eval_hessian_lagrangian(nlp.model,hess,x,obj_weight,l)
-hess_structure!(nlp::MOIModel,I,J)= hessian_lagrangian_structure(nlp.model,I,J)
-jac_structure!(nlp::MOIModel,I,J) = jacobian_structure(nlp.model,I,J)
+function hess_structure!(nlp::MOIModel, I::AbstractVector{T}, J::AbstractVector{T}) where T
+    return hessian_lagrangian_structure(nlp.model,I,J)
+end
+function jac_structure!(nlp::MOIModel, I::AbstractVector{T}, J::AbstractVector{T}) where T
+    return jacobian_structure(nlp.model,I,J)
+end
 
 function MOIModel(model::Optimizer)
     :Hess in MOI.features_available(model.nlp_data.evaluator) || error("Hessian information is needed.")
