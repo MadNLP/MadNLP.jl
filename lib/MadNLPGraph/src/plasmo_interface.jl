@@ -183,9 +183,9 @@ struct GraphModel{T} <: AbstractNLPModel{T,Vector{T}}
     ext::Dict{Symbol,Any}
 end
 
-obj(nlp::GraphModel,x) =  eval_objective(nlp.graph,x,nlp.ninds,nlp.x_index_map,nlp.modelnodes)
-grad!(nlp::GraphModel,x,f) =eval_objective_gradient(nlp.graph,f,x,nlp.ninds,nlp.modelnodes)
-cons!(nlp::GraphModel,x,c) = eval_constraint(
+obj(nlp::GraphModel, x::AbstractVector) =  eval_objective(nlp.graph,x,nlp.ninds,nlp.x_index_map,nlp.modelnodes)
+grad!(nlp::GraphModel, x::AbstractVector, f::AbstractVector) =eval_objective_gradient(nlp.graph,f,x,nlp.ninds,nlp.modelnodes)
+cons!(nlp::GraphModel, x::AbstractVector, c::AbstractVector) = eval_constraint(
     nlp.graph,c,x,nlp.ninds,nlp.minds,nlp.pinds,nlp.x_index_map,nlp.modelnodes,nlp.linkedges)
 hess_coord!(nlp::GraphModel,x,l,hess;obj_weight=1.) =eval_hessian_lagrangian(
     nlp.graph,hess,x,obj_weight,l,nlp.ninds,nlp.minds,nlp.nnzs_hess_inds,nlp.modelnodes)
