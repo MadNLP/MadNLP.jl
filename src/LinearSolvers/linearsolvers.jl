@@ -16,7 +16,7 @@ inertia(::EmptyLinearSolver) = (0,0,0)
 improve!(::EmptyLinearSolver) = false
 solve_refine!(y,::AbstractIterator,x) = nothing
 
-# LinearSolverExceptions 
+# LinearSolverExceptions
 struct SymbolicException <: Exception end
 struct FactorizationException <: Exception end
 struct SolveException <: Exception end
@@ -31,4 +31,4 @@ include("lapack.jl")
 
 # direct solvers
 include("umfpack.jl")
-BLAS.vendor() == :mkl && include("pardisomkl.jl")
+has_mkl() && include("pardisomkl.jl")
