@@ -187,11 +187,18 @@ obj(nlp::GraphModel, x::AbstractVector) =  eval_objective(nlp.graph,x,nlp.ninds,
 grad!(nlp::GraphModel, x::AbstractVector, f::AbstractVector) =eval_objective_gradient(nlp.graph,f,x,nlp.ninds,nlp.modelnodes)
 cons!(nlp::GraphModel, x::AbstractVector, c::AbstractVector) = eval_constraint(
     nlp.graph,c,x,nlp.ninds,nlp.minds,nlp.pinds,nlp.x_index_map,nlp.modelnodes,nlp.linkedges)
-hess_coord!(nlp::GraphModel,x,l,hess;obj_weight=1.) =eval_hessian_lagrangian(
-    nlp.graph,hess,x,obj_weight,l,nlp.ninds,nlp.minds,nlp.nnzs_hess_inds,nlp.modelnodes)
-jac_coord!(nlp::GraphModel,x,jac)=eval_constraint_jacobian(
-    nlp.graph,jac,x,nlp.ninds,nlp.minds,nlp.nnzs_jac_inds,nlp.nnzs_link_jac_inds,
-    nlp.modelnodes,nlp.linkedges)
+function hess_coord!(nlp::GraphModel,x::AbstractVector,l::AbstractVector,hess::AbstractVector;obj_weight=1.)
+    eval_hessian_lagrangian(
+        nlp.graph,hess,x,obj_weight,l,nlp.ninds,nlp.minds,
+        nlp.nnzs_hess_inds,nlp.modelnodes,
+    )
+end
+function jac_coord!(nlp::GraphModel,x::AbstractVector,jac::AbstractVector)
+    eval_constraint_jacobian(
+        nlp.graph,jac,x,nlp.ninds,nlp.minds,nlp.nnzs_jac_inds,nlp.nnzs_link_jac_inds,
+        nlp.modelnodes,nlp.linkedges,
+    )
+end
 function hess_structure!(nlp::GraphModel, I::AbstractVector{T}, J::AbstractVector{T}) where T
     hessian_lagrangian_structure(
         nlp.graph,I,J,nlp.ninds,nlp.nnzs_hess_inds,nlp.modelnodes,
