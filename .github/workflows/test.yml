@@ -30,7 +30,7 @@ jobs:
       JULIA_VERSION: ${{matrix.julia-version}}
     steps:
       - uses: actions/checkout@v2
-      - run: julia-${JULIA_VERSION} --color=yes --project=.ci .ci/ci.jl full
+      - run: julia-${JULIA_VERSION} --color=yes .ci/ci.jl full
       - uses: julia-actions/julia-processcoverage@v1
         with:
           directories: src,lib/MadNLPGPU/src,lib/MadNLPHSL/src,lib/MadNLPPardiso/src,lib/MadNLPMumps/src,lib/MadNLPKrylov/src,lib/MadNLPGraph
