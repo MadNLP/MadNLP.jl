@@ -1,6 +1,6 @@
 using Test, MadNLP, MadNLPTests, MINLPTests
 import MathOptInterface
-import AmplNLReader: AmplModel
+# import AmplNLReader: AmplModel
 import SparseArrays: sparse
 
 @testset "MadNLP test" begin

@@ -46,7 +46,7 @@ end
 
 function jacobian_structure(linkedge::OptiEdge,I,J,ninds,x_index_map,g_index_map)
     offset=1
-    for linkcon in getlinkconstraints(linkedge)
+    for linkcon in link_constraints(linkedge)
         offset += jacobian_structure(linkcon,I,J,ninds,x_index_map,g_index_map,offset)
     end
 end
@@ -107,7 +107,7 @@ function eval_function(aff::GenericAffExpr,x,ninds,x_index_map)
 end
 function eval_constraint(linkedge::OptiEdge,c,x,ninds,x_index_map)
     cnt = 1
-    for linkcon in getlinkconstraints(linkedge)
+    for linkcon in link_constraints(linkedge)
         c[cnt] = eval_function(get_func(linkcon),x,ninds,x_index_map)
         cnt += 1
     end
@@ -134,7 +134,7 @@ end
 
 function eval_constraint_jacobian(linkedge::OptiEdge,jac,x)
     offset=0
-    for linkcon in getlinkconstraints(linkedge)
+    for linkcon in link_constraints(linkedge)
         offset+=eval_constraint_jacobian(linkcon,jac,offset)
     end
 end
@@ -400,5 +400,9 @@ function optimize!(graph::OptiGraph; option_dict = Dict{Symbol,Any}(), kwargs...
             view(result.multipliers_L,nlp.ninds[k]),
             view(result.multipliers_U,nlp.ninds[k]),
             ips.cnt.k, ips.nlp.counters,ips.cnt.total_time)
+            # TODO: quick hack to specify to JuMP that the
+            # model is not dirty (so we do not run in `OptimizeNotCalled`
+            # exception).
+            nlp.modelnodes[k].model.is_model_dirty = false
     end
 end
