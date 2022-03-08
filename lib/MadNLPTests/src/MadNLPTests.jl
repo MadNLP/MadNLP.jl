@@ -211,28 +211,28 @@ struct DenseDummyQP <: NLPModels.AbstractNLPModel{Float64,Vector{Float64}}
     counters::NLPModels.Counters
 end
 
-function NLPModels.jac_structure!(qp::DenseDummyQP,I, J)
+function NLPModels.jac_structure!(qp::DenseDummyQP, I::AbstractVector{T}, J::AbstractVector{T}) where T
     copyto!(I, qp.jrows)
     copyto!(J, qp.jcols)
 end
-function NLPModels.hess_structure!(qp::DenseDummyQP,I, J)
+function NLPModels.hess_structure!(qp::DenseDummyQP, I::AbstractVector{T}, J::AbstractVector{T}) where T
     copyto!(I, qp.hrows)
     copyto!(J, qp.hcols)
 end
 
-function NLPModels.obj(qp::DenseDummyQP,x)
+function NLPModels.obj(qp::DenseDummyQP, x::AbstractVector)
     return 0.5 * dot(x, qp.P, x) + dot(qp.q, x)
 end
-function NLPModels.grad!(qp::DenseDummyQP,x,g)
+function NLPModels.grad!(qp::DenseDummyQP, x::AbstractVector, g::AbstractVector)
     mul!(g, qp.P, x)
     g .+= qp.q
     return
 end
-function NLPModels.cons!(qp::DenseDummyQP,x,c)
+function NLPModels.cons!(qp::DenseDummyQP, x::AbstractVector, c::AbstractVector)
     mul!(c, qp.A, x)
 end
 # Jacobian: sparse callback
-function NLPModels.jac_coord!(qp::DenseDummyQP, x, J::AbstractVector)
+function NLPModels.jac_coord!(qp::DenseDummyQP, x::AbstractVector, J::AbstractVector)
     index = 1
     for (i, j) in zip(qp.jrows, qp.jcols)
         J[index] = qp.A[i, j]
