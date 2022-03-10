@@ -4,7 +4,13 @@ rm(joinpath(@__DIR__, "Manifest.toml");force=true)
 
 using Pkg
 Pkg.gc()
-println(Pkg.depots())
+
+for _dep in Pkg.depots()
+    moi_directory = joinpath(_dep, "MathOptInterface")
+    if isdir(moi_directory)
+        rm(moi_directory; force=true)
+    end
+end
 
 Pkg.activate(@__DIR__)
 
