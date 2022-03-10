@@ -4,6 +4,7 @@ rm(joinpath(@__DIR__, "Manifest.toml");force=true)
 
 using Pkg
 Pkg.gc()
+println(Pkg.depots())
 
 Pkg.activate(@__DIR__)
 
