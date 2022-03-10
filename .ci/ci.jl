@@ -8,7 +8,7 @@ Pkg.gc()
 for _dep in Pkg.depots()
     moi_directory = joinpath(_dep, "packages", "MathOptInterface")
     if isdir(moi_directory)
-        rm(moi_directory; force=true)
+        rm(moi_directory; force=true, recursive=true)
     end
 end
 
