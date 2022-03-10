@@ -7,9 +7,9 @@ using Pkg
 Pkg.activate(@__DIR__)
 
 if ARGS[1] == "full"
-    pkgs = ["MadNLPHSL","MadNLPPardiso","MadNLPMumps","MadNLPGraph","MadNLPKrylov"]
+    pkgs = ["MadNLPHSL","MadNLPPardiso","MadNLPMumps","MadNLPGPU","MadNLPKrylov"]
 elseif ARGS[1] == "basic"
-    pkgs = ["MadNLPMumps","MadNLPGraph","MadNLPKrylov"]
+    pkgs = ["MadNLPMumps","MadNLPKrylov"]
 else
     error("proper argument should be given - full or basic")
 end
