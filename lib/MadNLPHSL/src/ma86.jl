@@ -179,8 +179,7 @@ end
 finalize(M::Solver) = ma86_finalize_d(M.keep,M.control)
 function improve!(M::Solver)
     if M.control.u == M.opt.ma86_umax
-        @debug(M.logger,"improve quality failed.",
-                                            color=:red)
+        @debug(M.logger,"improve quality failed.")
         return false
     end
     M.control.u = min(M.opt.ma86_umax,M.control.u^.75)
