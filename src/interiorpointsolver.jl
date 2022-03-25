@@ -444,7 +444,7 @@ function InteriorPointSolver{KKTSystem}(nlp::AbstractNLPModel, opt::Options;
 
     aug_vec_length = is_reduced(kkt) ? n+m : n+m+nlb+nub
 
-    _w1 = Vector{Float64}(undef,aug_vec_length)
+    _w1 = zeros(aug_vec_length) # fixes the random failure for inertia-free + Unreduced
     _w1x= view(_w1,1:n)
     _w1l= view(_w1,n+1:n+m)
     _w1zl = is_reduced(kkt) ? nothing : view(_w1,n+m+1:n+m+nlb)
@@ -457,12 +457,13 @@ function InteriorPointSolver{KKTSystem}(nlp::AbstractNLPModel, opt::Options;
     _w2zl = is_reduced(kkt) ? nothing : view(_w2,n+m+1:n+m+nlb)
     _w2zu = is_reduced(kkt) ? nothing : view(_w2,n+m+nlb+1:n+m+nlb+nub)
 
-    _w3 = Vector{Float64}(undef,aug_vec_length)
+    _w3 = zeros(aug_vec_length) # fixes the random failure for inertia-free + Unreduced
     _w3x= view(_w3,1:n)
     _w3l= view(_w3,n+1:n+m)
     _w4 = zeros(aug_vec_length) # need to initialize to zero due to mul!
     _w4x= view(_w4,1:n)
     _w4l= view(_w4,n+1:n+m)
+
 
     jacl = zeros(n) # spblas may throw an error if not initialized to zero
 
