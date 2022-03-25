@@ -1,14 +1,12 @@
-# MadNLP.jl
-# Created by Sungho Shin (sungho.shin@wisc.edu)
-
 module MadNLPPardisoMKL
 
 import ..MadNLP:
     @kwdef, Logger, @debug, @warn, @error,
-    SubVector, StrideOneVector, SparseMatrixCSC, libblas,
+    SubVector, StrideOneVector, SparseMatrixCSC, 
     SymbolicException,FactorizationException,SolveException,InertiaException,
     AbstractOptions, AbstractLinearSolver, set_options!,
     introduce, factorize!, solve!, improve!, is_inertia, inertia, blas_num_threads
+import ..MadNLPPardiso: libmkl_rt
 
 const INPUT_MATRIX_TYPE = :csc
 
@@ -36,7 +34,7 @@ end
 
 pardisomkl_pardisoinit(pt,mtype::Ref{Cint},iparm::Vector{Cint}) =
     ccall(
-        (:pardisoinit,libblas),
+        (:pardisoinit,libmkl_rt),
         Cvoid,
         (Ptr{Cvoid},Ptr{Cint},Ptr{Cint}),
         pt,mtype,iparm)
@@ -45,7 +43,7 @@ pardisomkl_pardiso(pt,maxfct::Ref{Cint},mnum::Ref{Cint},mtype::Ref{Cint},
                    perm::Vector{Cint},nrhs::Ref{Cint},iparm::Vector{Cint},msglvl::Ref{Cint},
                    b::StrideOneVector{Cdouble},x::StrideOneVector{Cdouble},err::Ref{Cint}) =
                        ccall(
-                           (:pardiso,libblas),
+                           (:pardiso,libmkl_rt),
                            Cvoid,
                            (Ptr{Cvoid}, Ptr{Cint}, Ptr{Cint}, Ptr{Cint}, Ptr{Cint},
                             Ptr{Cint}, Ptr{Cdouble}, Ptr{Cint}, Ptr{Cint}, Ptr{Cint},
@@ -53,11 +51,11 @@ pardisomkl_pardiso(pt,maxfct::Ref{Cint},mnum::Ref{Cint},mtype::Ref{Cint},
                            pt,maxfct,mnum,mtype,phase,n,a,ia,ja,perm,nrhs,iparm,msglvl,b,x,err)
 
 function pardisomkl_set_num_threads!(n)
-    ccall((:mkl_set_dynamic, libblas),
+    ccall((:mkl_set_dynamic, libmkl_rt),
          Cvoid,
          (Ptr{Cint},),
           Ref{Cint}(0))
-    ccall((:mkl_set_num_threads, libblas),
+    ccall((:mkl_set_num_threads, libmkl_rt),
           Cvoid,
           (Ptr{Cint},),
           Ref{Cint}(n))
