@@ -45,11 +45,16 @@ end
 MadNLP.is_valid(src::CuArray) = true
 
 # Constraint scaling
-function MadNLP.set_con_scale!(con_scale::AbstractVector, jac::CuMatrix, nlp_scaling_max_gradient)
+function MadNLP.scale_constraints!(
+    nlp::AbstractNLPModel,
+    con_scale::AbstractVector,
+    jac::CuMatrix;
+    max_gradient=1e-8,
+)
     # Compute reduction on the GPU with built-in CUDA.jl function
     d_con_scale = maximum(abs, jac, dims=2)
     copyto!(con_scale, d_con_scale)
-    con_scale .= min.(1.0, nlp_scaling_max_gradient ./ con_scale)
+    con_scale .= min.(1.0, max_gradient ./ con_scale)
 end
 
 @kernel function _treat_fixed_variable_kernell!(dest, ind_fixed)

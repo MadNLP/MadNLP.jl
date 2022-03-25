@@ -502,7 +502,7 @@ function InteriorPointSolver{KKTSystem}(nlp::AbstractNLPModel, opt::Options;
 
     aug_vec_length = is_reduced(kkt) ? n+m : n+m+nlb+nub
 
-    _w1 = Vector{Float64}(undef,aug_vec_length)
+    _w1 = zeros(aug_vec_length) # fixes the random failure for inertia-free + Unreduced
     _w1x= view(_w1,1:n)
     _w1l= view(_w1,n+1:n+m)
     _w1zl = is_reduced(kkt) ? nothing : view(_w1,n+m+1:n+m+nlb)
@@ -515,12 +515,13 @@ function InteriorPointSolver{KKTSystem}(nlp::AbstractNLPModel, opt::Options;
     _w2zl = is_reduced(kkt) ? nothing : view(_w2,n+m+1:n+m+nlb)
     _w2zu = is_reduced(kkt) ? nothing : view(_w2,n+m+nlb+1:n+m+nlb+nub)
 
-    _w3 = Vector{Float64}(undef,aug_vec_length)
+    _w3 = zeros(aug_vec_length) # fixes the random failure for inertia-free + Unreduced
     _w3x= view(_w3,1:n)
     _w3l= view(_w3,n+1:n+m)
     _w4 = zeros(aug_vec_length) # need to initialize to zero due to mul!
     _w4x= view(_w4,1:n)
     _w4l= view(_w4,n+1:n+m)
+
 
     jacl = zeros(n) # spblas may throw an error if not initialized to zero
 
@@ -596,7 +597,7 @@ function initialize!(ips::AbstractInteriorPointSolver)
     compress_jacobian!(ips.kkt)
     if (ips.m > 0) && ips.opt.nlp_scaling
         jac = get_raw_jacobian(ips.kkt)
-        set_con_scale!(ips.con_scale, jac, ips.opt.nlp_scaling_max_gradient)
+        scale_constraints!(ips.nlp, ips.con_scale, jac; max_gradient=ips.opt.nlp_scaling_max_gradient)
         set_jacobian_scaling!(ips.kkt, ips.con_scale)
         ips.l./=ips.con_scale
     end
@@ -606,7 +607,7 @@ function initialize!(ips::AbstractInteriorPointSolver)
     eval_grad_f_wrapper!(ips, ips.f,ips.x)
     @trace(ips.logger,"Computing objective scaling.")
     if ips.opt.nlp_scaling
-        ips.obj_scale[] = min(1,ips.opt.nlp_scaling_max_gradient/norm(ips.f,Inf))
+        ips.obj_scale[] = scale_objective(ips.nlp, ips.f; max_gradient=ips.opt.nlp_scaling_max_gradient)
         ips.f.*=ips.obj_scale[]
     end
 
@@ -1562,22 +1563,6 @@ function initialize_variables!(x,xl,xu,bound_push,bound_fac)
             x[i]=min(xu[i]-bound_push*max(1,abs(xu[i])),x[i])
         end
     end
-end
-
-function set_con_scale!(con_scale::AbstractVector, jac::SparseMatrixCOO, nlp_scaling_max_gradient)
-    @simd for i in 1:nnz(jac)
-        row = @inbounds jac.I[i]
-        @inbounds con_scale[row] = max(con_scale[row], abs(jac.V[i]))
-    end
-    con_scale .= min.(1.0, nlp_scaling_max_gradient ./ con_scale)
-end
-function set_con_scale!(con_scale::AbstractVector, jac::Matrix, nlp_scaling_max_gradient)
-    for row in 1:size(jac, 1)
-        for col in 1:size(jac, 2)
-            @inbounds con_scale[row] = max(con_scale[row], abs(jac[row, col]))
-        end
-    end
-    con_scale .= min.(1.0, nlp_scaling_max_gradient ./ con_scale)
 end
 
 function adjust_boundary!(x_lr,xl_r,x_ur,xu_r,mu)

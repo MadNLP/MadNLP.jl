@@ -70,17 +70,6 @@ testset = [
     ],
 ]
 
-@isdefined(MadNLPPardisoMKL) && push!(
-    testset,
-    [
-        "PardisoMKL",
-        ()->MadNLP.Optimizer(
-            linear_solver=MadNLPPardisoMKL,
-            print_level=MadNLP.ERROR),
-        ["eigmina"]
-    ]
-)
-
 for (name,optimizer_constructor,exclude) in testset
     test_madnlp(name,optimizer_constructor,exclude)
 end
