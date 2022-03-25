@@ -47,17 +47,6 @@ for (name,level,color) in [(:trace,TRACE,7),(:debug,DEBUG,6),(:info,INFO,256),(:
     end
 end
 
-if VERSION >= v"1.7.0"
-    function has_mkl()
-        blasconfig = string(BLAS.get_config())
-        return occursin("mkl", blasconfig)
-    end
-else
-    function has_mkl()
-        return BLAS.vendor() == :mkl
-    end
-end
-
 # BLAS
 const blas_num_threads = Ref{Int}(1)
 function set_blas_num_threads(n::Integer;permanent::Bool=false)
