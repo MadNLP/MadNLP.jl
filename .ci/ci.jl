@@ -4,15 +4,6 @@ rm(joinpath(@__DIR__, "Manifest.toml"); force=true)
 
 using Pkg
 
-# Delete MathOptInterface directory to avoid side effect
-# with coverage files generated in a previous CI run.
-for _dep in Pkg.depots()
-    moi_directory = joinpath(_dep, "packages", "MathOptInterface")
-    if isdir(moi_directory)
-        rm(moi_directory; force=true, recursive=true)
-    end
-end
-
 Pkg.activate(@__DIR__)
 
 
