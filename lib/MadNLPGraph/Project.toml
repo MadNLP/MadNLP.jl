@@ -1,7 +1,7 @@
 name = "MadNLPGraph"
 uuid = "2f590f30-ea46-438a-a78d-e5bfe3109704"
 authors = ["Sungho Shin <sungho.shin.ss@gmail.com>"]
-version = "0.4.0"
+version = "0.2.0"
 
 [deps]
 MadNLP = "2621e9c9-9eb4-46b1-8089-e8c72242dfb6"

@@ -1,7 +1,7 @@
 name = "MadNLPKrylov"
 uuid = "1888cb03-ce40-4a36-8d45-ae8231a0e17c"
 authors = ["Sungho Shin <sungho.shin.ss@gmail.com>"]
-version = "0.4.0"
+version = "0.2.0"
 
 [deps]
 IterativeSolvers = "42fd0dbc-a981-5370-80f2-aaf504508153"
