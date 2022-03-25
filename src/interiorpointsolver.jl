@@ -537,7 +537,7 @@ function initialize!(ips::AbstractInteriorPointSolver)
     compress_jacobian!(ips.kkt)
     if (ips.m > 0) && ips.opt.nlp_scaling
         jac = get_raw_jacobian(ips.kkt)
-        set_con_scale!(ips.con_scale, jac, ips.opt.nlp_scaling_max_gradient)
+        scale_constraints!(ips.nlp, ips.con_scale, jac; max_gradient=ips.opt.nlp_scaling_max_gradient)
         set_jacobian_scaling!(ips.kkt, ips.con_scale)
         ips.l./=ips.con_scale
     end
@@ -547,7 +547,7 @@ function initialize!(ips::AbstractInteriorPointSolver)
     eval_grad_f_wrapper!(ips, ips.f,ips.x)
     @trace(ips.logger,"Computing objective scaling.")
     if ips.opt.nlp_scaling
-        ips.obj_scale[] = min(1,ips.opt.nlp_scaling_max_gradient/norm(ips.f,Inf))
+        ips.obj_scale[] = scale_objective(ips.nlp, ips.f; max_gradient=ips.opt.nlp_scaling_max_gradient)
         ips.f.*=ips.obj_scale[]
     end
 
@@ -1503,22 +1503,6 @@ function initialize_variables!(x,xl,xu,bound_push,bound_fac)
             x[i]=min(xu[i]-bound_push*max(1,abs(xu[i])),x[i])
         end
     end
-end
-
-function set_con_scale!(con_scale::AbstractVector, jac::SparseMatrixCOO, nlp_scaling_max_gradient)
-    @simd for i in 1:nnz(jac)
-        row = @inbounds jac.I[i]
-        @inbounds con_scale[row] = max(con_scale[row], abs(jac.V[i]))
-    end
-    con_scale .= min.(1.0, nlp_scaling_max_gradient ./ con_scale)
-end
-function set_con_scale!(con_scale::AbstractVector, jac::Matrix, nlp_scaling_max_gradient)
-    for row in 1:size(jac, 1)
-        for col in 1:size(jac, 2)
-            @inbounds con_scale[row] = max(con_scale[row], abs(jac[row, col]))
-        end
-    end
-    con_scale .= min.(1.0, nlp_scaling_max_gradient ./ con_scale)
 end
 
 function adjust_boundary!(x_lr,xl_r,x_ur,xu_r,mu)
