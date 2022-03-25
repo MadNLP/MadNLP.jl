@@ -31,4 +31,3 @@ include("lapack.jl")
 
 # direct solvers
 include("umfpack.jl")
-has_mkl() && include("pardisomkl.jl")

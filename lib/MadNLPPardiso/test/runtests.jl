@@ -9,6 +9,13 @@ testset = [
         [],
         @isdefined(MadNLPPardiso)
     ],
+    [
+        "PardisoMKL",
+        ()->MadNLP.Optimizer(
+            linear_solver=MadNLPPardisoMKL,
+            print_level=MadNLP.ERROR),
+        ["eigmina"]
+    ]
 ]
 
 @testset "MadNLPPardiso test" begin
