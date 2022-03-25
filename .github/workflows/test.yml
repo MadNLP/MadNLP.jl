@@ -26,8 +26,6 @@ jobs:
     strategy:
       matrix:
         julia-version: ['1.6','^1.7']
-    env:
-      JULIA_VERSION: ${{matrix.julia-version}}
     steps:
       - uses: actions/checkout@v2
       - uses: julia-actions/setup-julia@latest
