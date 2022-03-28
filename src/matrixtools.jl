@@ -116,3 +116,13 @@ function get_csc_view(csc::SparseMatrixCSC{Tv,Ti},Ix,Jx;inds=collect(1:nnz(csc))
         cscindsub.rowval,Vector{Tv}(undef,nnz(cscindsub))), view(csc.nzval,cscindsub.nzval)
 end
 
+function force_lower_triangular!(I,J)
+    @simd for i=1:length(I)
+        @inbounds if J[i] > I[i]
+            tmp=J[i]
+            J[i]=I[i]
+            I[i]=tmp
+        end
+    end
+end
+
