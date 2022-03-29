@@ -3,7 +3,7 @@
 
 abstract type AbstractInteriorPointSolver end
 
-include("robust_restorer.jl")
+include("restoration.jl")
 
 mutable struct InteriorPointSolver{KKTSystem} <: AbstractInteriorPointSolver
     nlp::AbstractNLPModel
