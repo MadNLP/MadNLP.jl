@@ -69,3 +69,25 @@ StrideOneVector{Tv}=Union{
     SubArray{Tv,1,Vector{Tv},Tuple{UnitRange{Int}},true},
     SubArray{Tv, 1, Matrix{Tv}, Tuple{Base.Slice{Base.OneTo{Int}}, Int}, true}
 }
+
+
+@kwdef mutable struct Counters
+    k::Int = 0 # total iteration counter
+    l::Int = 0 # backtracking line search counter
+    t::Int = 0 # restoration phase counter
+
+    start_time::Float64
+
+    linear_solver_time::Float64 = 0.
+    eval_function_time::Float64 = 0.
+    solver_time::Float64 = 0.
+    total_time::Float64 = 0.
+
+    obj_cnt::Int = 0
+    obj_grad_cnt::Int = 0
+    con_cnt::Int = 0
+    con_jac_cnt::Int = 0
+    lag_hess_cnt::Int = 0
+
+    acceptable_cnt::Int = 0
+end
