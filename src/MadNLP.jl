@@ -25,15 +25,14 @@ export MadNLPUmfpack, MadNLPLapackCPU, MadNLPPardisoMKL, madnlp
 version() = parsefile(joinpath(@__DIR__,"..","Project.toml"))["version"]
 introduce() = "MadNLP version v$(version())"
 
-# Linear solver dependencies
 include("enums.jl")
 include("utils.jl")
 include("options.jl")
 include("matrixtools.jl")
-include("scaling.jl")
+include("nlpmodels.jl")
 include(joinpath("LinearSolvers","linearsolvers.jl"))
 include(joinpath("KKT", "KKTsystem.jl"))
-include("interiorpointsolver.jl")
+include(joinpath("IPM", "IPM.jl"))
 include(joinpath("Interfaces","interfaces.jl"))
 
 # Initialize

@@ -6,11 +6,46 @@ using MadNLPTests
 using SparseArrays
 using Random
 
-@testset "MadNLP: dense API" begin
-    n = 10
+function _compare_dense_with_sparse(kkt_system, n, m, ind_fixed, ind_eq)
+    sparse_options = Dict{Symbol, Any}(
+        :kkt_system=>MadNLP.SPARSE_KKT_SYSTEM,
+        :linear_solver=>MadNLPLapackCPU,
+        :print_level=>MadNLP.ERROR,
+    )
+    dense_options = Dict{Symbol, Any}(
+        :kkt_system=>kkt_system,
+        :linear_solver=>MadNLPLapackCPU,
+        :print_level=>MadNLP.ERROR,
+    )
+
+    nlp = MadNLPTests.DenseDummyQP(; n=n, m=m, fixed_variables=ind_fixed, equality_cons=ind_eq)
+
+    ips = MadNLP.InteriorPointSolver(nlp, option_dict=sparse_options)
+    ipd = MadNLP.InteriorPointSolver(nlp, option_dict=dense_options)
+
+    MadNLP.optimize!(ips)
+    MadNLP.optimize!(ipd)
+
+    # Check that dense formulation matches exactly sparse formulation
+    @test ips.cnt.k == ipd.cnt.k
+    @test ips.obj_val ≈ ipd.obj_val atol=1e-10
+    @test ips.x ≈ ipd.x atol=1e-10
+    @test ips.l ≈ ipd.l atol=1e-10
+    @test ips.kkt.jac_com[:, 1:n] == ipd.kkt.jac
+    if isa(ipd.kkt, MadNLP.AbstractReducedKKTSystem)
+        @test Symmetric(ips.kkt.aug_com, :L) ≈ ipd.kkt.aug_com atol=1e-10
+    end
+end
+
+@testset "MadNLP: API $(kkt_type)" for (kkt_type, kkt_options) in [
+        (MadNLP.DenseKKTSystem, MadNLP.DENSE_KKT_SYSTEM),
+        (MadNLP.DenseCondensedKKTSystem, MadNLP.DENSE_CONDENSED_KKT_SYSTEM),
+    ]
+
+    n = 10 # number of variables
     @testset "Unconstrained" begin
         dense_options = Dict{Symbol, Any}(
-            :kkt_system=>MadNLP.DENSE_KKT_SYSTEM,
+            :kkt_system=>kkt_options,
             :linear_solver=>MadNLPLapackCPU,
         )
         m = 0
@@ -18,9 +53,12 @@ using Random
         ipd = MadNLP.InteriorPointSolver(nlp, option_dict=dense_options)
 
         kkt = ipd.kkt
-        @test isa(kkt, MadNLP.DenseKKTSystem)
+        @test isa(kkt, kkt_type)
         @test isempty(kkt.jac)
-        @test kkt.hess === kkt.aug_com
+        # Special test for DenseKKTSystem
+        if kkt_type <: MadNLP.DenseKKTSystem
+            @test kkt.hess === kkt.aug_com
+        end
         @test ipd.linear_solver.dense === kkt.aug_com
         @test size(kkt.hess) == (n, n)
         @test length(kkt.pr_diag) == n
@@ -28,7 +66,7 @@ using Random
 
         # Test that using a sparse solver is forbidden in dense mode
         dense_options_error = Dict{Symbol, Any}(
-            :kkt_system=>MadNLP.DENSE_KKT_SYSTEM,
+            :kkt_system=>kkt_options,
             :linear_solver=>MadNLPUmfpack,
         )
         @test_throws Exception MadNLP.InteriorPointSolver(nlp, dense_options_error)
@@ -45,7 +83,7 @@ using Random
 
         kkt = ipd.kkt
         @test isa(kkt, MadNLP.DenseKKTSystem)
-        @test size(kkt.jac) == (m, n + ns)
+        @test size(kkt.jac) == (m, n)
         @test ipd.linear_solver.dense === kkt.aug_com
         @test size(kkt.hess) == (n, n)
         @test length(kkt.pr_diag) == n + ns
@@ -54,42 +92,17 @@ using Random
 end
 
 
-function _compare_dense_with_sparse(n, m, ind_fixed)
-    sparse_options = Dict{Symbol, Any}(
-        :kkt_system=>MadNLP.SPARSE_KKT_SYSTEM,
-        :linear_solver=>MadNLPLapackCPU,
-        :print_level=>MadNLP.ERROR,
-    )
-    dense_options = Dict{Symbol, Any}(
-        :kkt_system=>MadNLP.DENSE_KKT_SYSTEM,
-        :linear_solver=>MadNLPLapackCPU,
-        :print_level=>MadNLP.ERROR,
-    )
-
-    nlp = MadNLPTests.DenseDummyQP(; n=n, m=m, fixed_variables=ind_fixed)
-
-    ips = MadNLP.InteriorPointSolver(nlp, option_dict=sparse_options)
-    ipd = MadNLP.InteriorPointSolver(nlp, option_dict=dense_options)
-
-    MadNLP.optimize!(ips)
-    MadNLP.optimize!(ipd)
-
-    # Check that dense formulation matches exactly sparse formulation
-    @test ips.cnt.k == ipd.cnt.k
-    @test ips.obj_val ≈ ipd.obj_val atol=1e-10
-    @test ips.x ≈ ipd.x atol=1e-10
-    @test ips.l ≈ ipd.l atol=1e-10
-    @test ips.kkt.jac_com == ipd.kkt.jac
-    @test Symmetric(ips.kkt.aug_com, :L) ≈ ipd.kkt.aug_com atol=1e-10
-end
-
-@testset "MadNLP: dense versus sparse" begin
+@testset "MadNLP: option kkt_system=$(kkt_system)" for kkt_system in [MadNLP.DENSE_KKT_SYSTEM, MadNLP.DENSE_CONDENSED_KKT_SYSTEM]
     @testset "Size: ($n, $m)" for (n, m) in [(10, 0), (10, 5), (50, 10)]
-        _compare_dense_with_sparse(n, m, Int[])
+        _compare_dense_with_sparse(kkt_system, n, m, Int[], Int[])
+    end
+    @testset "Equality constraints" begin
+        n, m = 20, 15
+        _compare_dense_with_sparse(kkt_system, n, m, Int[], Int[1, 8]) # test with non-trivial equality constraints
     end
     @testset "Fixed variables" begin
         n, m = 10, 5
-        _compare_dense_with_sparse(10, 5, Int[1, 2])
+        _compare_dense_with_sparse(kkt_system, n, m, Int[1, 2], Int[])
     end
 end
 
