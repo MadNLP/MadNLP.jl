@@ -8,29 +8,33 @@ end
 function solve_refine_wrapper!(ips::InteriorPointSolver, x,b)
     cnt = ips.cnt
     @trace(ips.logger,"Iterative solution started.")
-    fixed_variable_treatment_vec!(b, ips.ind_fixed)
+    fixed_variable_treatment_vec!(primaldual(b), ips.ind_fixed)
 
-    cnt.linear_solver_time += @elapsed (result = solve_refine!(x, ips.iterator, b))
+    cnt.linear_solver_time += @elapsed begin
+        result = solve_refine!(primaldual(x), ips.iterator, primaldual(b))
+    end
+
     if result == :Solved
         solve_status =  true
     else
         if improve!(ips.linear_solver)
             cnt.linear_solver_time += @elapsed begin
                 factorize!(ips.linear_solver)
-                solve_status = (solve_refine!(x, ips.iterator, b) == :Solved ? true : false)
+                ret = solve_refine!(primaldual(x), ips.iterator, primaldual(b))
+                solve_status = (ret == :Solved)
             end
         else
             solve_status = false
         end
     end
-    fixed_variable_treatment_vec!(x, ips.ind_fixed)
+    fixed_variable_treatment_vec!(primaldual(x), ips.ind_fixed)
     return solve_status
 end
 
 function solve_refine_wrapper!(ips::InteriorPointSolver{<:DenseCondensedKKTSystem}, x, b)
     cnt = ips.cnt
     @trace(ips.logger,"Iterative solution started.")
-    fixed_variable_treatment_vec!(b, ips.ind_fixed)
+    fixed_variable_treatment_vec!(primaldual(b), ips.ind_fixed)
 
     kkt = ips.kkt
 
@@ -77,7 +81,7 @@ function solve_refine_wrapper!(ips::InteriorPointSolver{<:DenseCondensedKKTSyste
     xz .= sqrt.(Σs) ./ α .* jv_x .- Σs .* bz ./ α.^2 .- bs ./ α
     xs .= (bs .+ α .* xz) ./ Σs
 
-    fixed_variable_treatment_vec!(x, ips.ind_fixed)
+    fixed_variable_treatment_vec!(primaldual(x), ips.ind_fixed)
     return solve_status
 end
 
