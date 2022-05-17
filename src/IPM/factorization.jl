@@ -5,13 +5,17 @@ function factorize_wrapper!(ips::InteriorPointSolver)
     ips.cnt.linear_solver_time += @elapsed factorize!(ips.linear_solver)
 end
 
-function solve_refine_wrapper!(ips::InteriorPointSolver, x, b)
+function solve_refine_wrapper!(
+    ips::InteriorPointSolver,
+    x::AbstractKKTVector,
+    b::AbstractKKTVector,
+)
     cnt = ips.cnt
     @trace(ips.logger,"Iterative solution started.")
-    fixed_variable_treatment_vec!(primaldual(b), ips.ind_fixed)
+    fixed_variable_treatment_vec!(values(b), ips.ind_fixed)
 
     cnt.linear_solver_time += @elapsed begin
-        result = solve_refine!(primaldual(x), ips.iterator, primaldual(b))
+        result = solve_refine!(x, ips.iterator, b)
     end
 
     if result == :Solved
@@ -20,14 +24,14 @@ function solve_refine_wrapper!(ips::InteriorPointSolver, x, b)
         if improve!(ips.linear_solver)
             cnt.linear_solver_time += @elapsed begin
                 factorize!(ips.linear_solver)
-                ret = solve_refine!(primaldual(x), ips.iterator, primaldual(b))
+                ret = solve_refine!(x, ips.iterator, b)
                 solve_status = (ret == :Solved)
             end
         else
             solve_status = false
         end
     end
-    fixed_variable_treatment_vec!(primaldual(x), ips.ind_fixed)
+    fixed_variable_treatment_vec!(values(x), ips.ind_fixed)
     return solve_status
 end
 
@@ -38,7 +42,7 @@ function solve_refine_wrapper!(
 )
     cnt = ips.cnt
     @trace(ips.logger,"Iterative solution started.")
-    fixed_variable_treatment_vec!(primaldual(b), ips.ind_fixed)
+    fixed_variable_treatment_vec!(values(b), ips.ind_fixed)
 
     kkt = ips.kkt
 
@@ -85,7 +89,7 @@ function solve_refine_wrapper!(
     xz .= sqrt.(Σs) ./ α .* jv_x .- Σs .* bz ./ α.^2 .- bs ./ α
     xs .= (bs .+ α .* xz) ./ Σs
 
-    fixed_variable_treatment_vec!(primaldual(x), ips.ind_fixed)
+    fixed_variable_treatment_vec!(values(x), ips.ind_fixed)
     return solve_status
 end
 

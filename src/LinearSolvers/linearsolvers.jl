@@ -28,7 +28,7 @@ inside the `AbstractLinearSolver` instance.
 function factorize! end
 
 """
-    solve!(::AbstractLinearSolver, x)
+    solve!(::AbstractLinearSolver, x::AbstractVector)
 
 Solve the linear system ``Ax = b``.
 
@@ -61,6 +61,11 @@ with
 function inertia end
 
 function improve! end
+
+# Default function for AbstractKKTVector
+function solve!(s::AbstractLinearSolver, x::AbstractKKTVector)
+    solve!(s, values(x))
+end
 
 #=
     Iterator's interface
