@@ -4,7 +4,6 @@
 # Build info
 default_linear_solver() = MadNLPUmfpack
 default_dense_solver() = MadNLPLapackCPU
-default_iterator() = MadNLPRichardson
 
 
 # Dummy module

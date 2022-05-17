@@ -23,7 +23,7 @@ end
     disable_garbage_collector::Bool = false
     blas_num_threads::Int = 1
     linear_solver::Module
-    iterator::Module = default_iterator()
+    iterator::Type = RichardsonIterator
 
     # Output options
     output_file::String = ""

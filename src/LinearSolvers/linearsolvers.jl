@@ -24,7 +24,11 @@ struct InertiaException <: Exception end
 LinearSolverException=Union{SymbolicException,FactorizationException,SolveException,InertiaException}
 
 # iterative solvers
-include("richardson.jl")
+include("backsolve.jl")
+
+#=
+    DEFAULT SOLVERS
+=#
 
 # dense solvers
 include("lapack.jl")

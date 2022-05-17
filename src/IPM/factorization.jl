@@ -5,7 +5,7 @@ function factorize_wrapper!(ips::InteriorPointSolver)
     ips.cnt.linear_solver_time += @elapsed factorize!(ips.linear_solver)
 end
 
-function solve_refine_wrapper!(ips::InteriorPointSolver, x,b)
+function solve_refine_wrapper!(ips::InteriorPointSolver, x, b)
     cnt = ips.cnt
     @trace(ips.logger,"Iterative solution started.")
     fixed_variable_treatment_vec!(primaldual(b), ips.ind_fixed)
@@ -31,7 +31,11 @@ function solve_refine_wrapper!(ips::InteriorPointSolver, x,b)
     return solve_status
 end
 
-function solve_refine_wrapper!(ips::InteriorPointSolver{<:DenseCondensedKKTSystem}, x, b)
+function solve_refine_wrapper!(
+    ips::InteriorPointSolver{<:DenseCondensedKKTSystem},
+    x::AbstractKKTVector,
+    b::AbstractKKTVector,
+)
     cnt = ips.cnt
     @trace(ips.logger,"Iterative solution started.")
     fixed_variable_treatment_vec!(primaldual(b), ips.ind_fixed)
@@ -43,26 +47,26 @@ function solve_refine_wrapper!(ips::InteriorPointSolver{<:DenseCondensedKKTSyste
     n_condensed = n + n_eq
 
     # load buffers
-    b_c = view(ips._w1, 1:n_condensed)
-    x_c = view(ips._w2, 1:n_condensed)
-    jv_x = view(ips._w3, 1:ns) # for jprod
-    jv_t = ips._w4x            # for jtprod
-    v_c = ips._w4l
+    b_c = view(values(ips._w1), 1:n_condensed)
+    x_c = view(values(ips._w2), 1:n_condensed)
+    jv_x = view(values(ips._w3), 1:ns) # for jprod
+    jv_t = primal(ips._w4)             # for jtprod
+    v_c = dual(ips._w4)
 
     Σs = get_slack_regularization(kkt)
     α = get_scaling_inequalities(kkt)
 
     # Decompose right hand side
-    bx = view(b, 1:n)
-    bs = view(b, n+1:n+ns)
-    by = view(b, kkt.ind_eq_shifted)
-    bz = view(b, kkt.ind_ineq_shifted)
+    bx = view(values(b), 1:n)
+    bs = view(values(b), n+1:n+ns)
+    by = view(values(b), kkt.ind_eq_shifted)
+    bz = view(values(b), kkt.ind_ineq_shifted)
 
     # Decompose results
-    xx = view(x, 1:n)
-    xs = view(x, n+1:n+ns)
-    xy = view(x, kkt.ind_eq_shifted)
-    xz = view(x, kkt.ind_ineq_shifted)
+    xx = view(values(x), 1:n)
+    xs = view(values(x), n+1:n+ns)
+    xy = view(values(x), kkt.ind_eq_shifted)
+    xz = view(values(x), kkt.ind_ineq_shifted)
 
     v_c .= 0.0
     v_c[kkt.ind_ineq] .= (Σs .* bz .+ α .* bs) ./ α.^2
