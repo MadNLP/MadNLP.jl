@@ -1,5 +1,5 @@
 
-function eval_f_wrapper(ips::InteriorPointSolver, x::Vector{Float64})
+function eval_f_wrapper(ips::InteriorPointSolver, x::Vector{T}) where T
     nlp = ips.nlp
     cnt = ips.cnt
     @trace(ips.logger,"Evaluating objective.")
@@ -9,7 +9,7 @@ function eval_f_wrapper(ips::InteriorPointSolver, x::Vector{Float64})
     return obj_val*ips.obj_scale[]
 end
 
-function eval_grad_f_wrapper!(ips::InteriorPointSolver, f::Vector{Float64},x::Vector{Float64})
+function eval_grad_f_wrapper!(ips::InteriorPointSolver, f::Vector{T},x::Vector{T}) where T
     nlp = ips.nlp
     cnt = ips.cnt
     @trace(ips.logger,"Evaluating objective gradient.")
@@ -20,7 +20,7 @@ function eval_grad_f_wrapper!(ips::InteriorPointSolver, f::Vector{Float64},x::Ve
     return f
 end
 
-function eval_cons_wrapper!(ips::InteriorPointSolver, c::Vector{Float64},x::Vector{Float64})
+function eval_cons_wrapper!(ips::InteriorPointSolver, c::Vector{T},x::Vector{T}) where T
     nlp = ips.nlp
     cnt = ips.cnt
     @trace(ips.logger, "Evaluating constraints.")
@@ -33,7 +33,7 @@ function eval_cons_wrapper!(ips::InteriorPointSolver, c::Vector{Float64},x::Vect
     return c
 end
 
-function eval_jac_wrapper!(ipp::InteriorPointSolver, kkt::AbstractKKTSystem, x::Vector{Float64})
+function eval_jac_wrapper!(ipp::InteriorPointSolver, kkt::AbstractKKTSystem, x::Vector{T}) where T
     nlp = ipp.nlp
     cnt = ipp.cnt
     ns = length(ipp.ind_ineq)
@@ -47,7 +47,7 @@ function eval_jac_wrapper!(ipp::InteriorPointSolver, kkt::AbstractKKTSystem, x::
     return jac
 end
 
-function eval_lag_hess_wrapper!(ipp::InteriorPointSolver, kkt::AbstractKKTSystem, x::Vector{Float64},l::Vector{Float64};is_resto=false)
+function eval_lag_hess_wrapper!(ipp::InteriorPointSolver, kkt::AbstractKKTSystem, x::Vector{T},l::Vector{T};is_resto=false) where T
     nlp = ipp.nlp
     cnt = ipp.cnt
     @trace(ipp.logger,"Evaluating Lagrangian Hessian.")
@@ -62,7 +62,7 @@ function eval_lag_hess_wrapper!(ipp::InteriorPointSolver, kkt::AbstractKKTSystem
     return hess
 end
 
-function eval_jac_wrapper!(ipp::InteriorPointSolver, kkt::AbstractDenseKKTSystem, x::Vector{Float64})
+function eval_jac_wrapper!(ipp::InteriorPointSolver, kkt::AbstractDenseKKTSystem, x::Vector{T}) where T
     nlp = ipp.nlp
     cnt = ipp.cnt
     ns = length(ipp.ind_ineq)
@@ -76,7 +76,7 @@ function eval_jac_wrapper!(ipp::InteriorPointSolver, kkt::AbstractDenseKKTSystem
     return jac
 end
 
-function eval_lag_hess_wrapper!(ipp::InteriorPointSolver, kkt::AbstractDenseKKTSystem, x::Vector{Float64},l::Vector{Float64};is_resto=false)
+function eval_lag_hess_wrapper!(ipp::InteriorPointSolver, kkt::AbstractDenseKKTSystem, x::Vector{T},l::Vector{T};is_resto=false) where T
     nlp = ipp.nlp
     cnt = ipp.cnt
     @trace(ipp.logger,"Evaluating Lagrangian Hessian.")

@@ -626,8 +626,8 @@ end
 
 curv_test(t,n,g,wx,inertia_free_tol) = dot(wx,t) + max(dot(wx,n)-dot(g,n),0) - inertia_free_tol*dot(t,t) >=0
 
-function second_order_correction(ips::AbstractInteriorPointSolver,alpha_max::Float64,theta::Float64,varphi::Float64,
-                                 theta_trial::Float64,varphi_d::Float64,switching_condition::Bool)
+function second_order_correction(ips::AbstractInteriorPointSolver,alpha_max,theta,varphi,
+                                 theta_trial,varphi_d,switching_condition::Bool)
     @trace(ips.logger,"Second-order correction started.")
 
     ips._w1l .= alpha_max .* ips.c .+ ips.c_trial

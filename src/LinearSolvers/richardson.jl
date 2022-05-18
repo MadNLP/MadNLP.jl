@@ -15,24 +15,24 @@ import ..MadNLP:
     richardson_acceptable_tol::Float64 = 1e-5
 end
 
-mutable struct Solver <: AbstractIterator
-    res::Vector{Float64}
+mutable struct Solver{T} <: AbstractIterator
+    res::Vector{T}
     mul!::Function
     div!::Function
     opt::Options
     logger::Logger
 end
-function Solver(res::Vector{Float64},mul!,div!;
+function Solver(res::Vector{T},mul!,div!;
                 opt=Options(),logger=Logger(),
-                option_dict::Dict{Symbol,Any}=Dict{Symbol,Any}(),kwargs...)
+                option_dict::Dict{Symbol,Any}=Dict{Symbol,Any}(),kwargs...) where T
     !isempty(kwargs) && (for (key,val) in kwargs; option_dict[key]=val; end)
     set_options!(opt,option_dict)
     return Solver(res,mul!,div!,opt,logger)
 end
 
-function solve_refine!(x::StrideOneVector{Float64},
-                       IS::Solver,
-                       b::AbstractVector{Float64})
+function solve_refine!(x::StrideOneVector{T},
+                       IS::Solver{T},
+                       b::AbstractVector{T}) where T
     @debug(IS.logger,"Iterative solver initiated")
     norm_b = norm(b,Inf)
     x.=0
