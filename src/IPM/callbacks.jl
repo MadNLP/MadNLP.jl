@@ -39,7 +39,7 @@ function eval_jac_wrapper!(ipp::InteriorPointSolver, kkt::AbstractKKTSystem, x::
     ns = length(ipp.ind_ineq)
     @trace(ipp.logger, "Evaluating constraint Jacobian.")
     jac = get_jacobian(kkt)
-    cnt.eval_function_time += @elapsed jac_coord!(nlp,view(x,1:get_nvar(nlp)),jac)
+    cnt.eval_function_time += @elapsed jac_coord!(nlp,view(x,1:get_nvar(nlp)),view(jac,1:get_nnzj(nlp)))
     compress_jacobian!(kkt)
     cnt.con_jac_cnt+=1
     cnt.con_jac_cnt==1 && (is_valid(jac) || throw(InvalidNumberException()))
@@ -54,7 +54,7 @@ function eval_lag_hess_wrapper!(ipp::InteriorPointSolver, kkt::AbstractKKTSystem
     ipp._w1l .= l.*ipp.con_scale
     hess = get_hessian(kkt)
     cnt.eval_function_time += @elapsed hess_coord!(
-        nlp, view(x,1:get_nvar(nlp)), ipp._w1l, hess;
+        nlp, view(x,1:get_nvar(nlp)), ipp._w1l, view(hess,1:get_nnzh(nlp));
         obj_weight = (get_minimize(nlp) ? 1. : -1.) * (is_resto ? 0.0 : ipp.obj_scale[]))
     compress_hessian!(kkt)
     cnt.lag_hess_cnt+=1
