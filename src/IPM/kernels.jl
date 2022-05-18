@@ -311,10 +311,10 @@ function initialize_variables!(x,xl,xu,bound_push,bound_fac)
     end
 end
 
-function adjust_boundary!(x_lr,xl_r,x_ur,xu_r,mu)
+function adjust_boundary!(x_lr::A,xl_r,x_ur,xu_r,mu) where {T, A <: AbstractArray{T}}
     adjusted = 0
-    c1 = eps(Float64)*mu
-    c2= eps(Float64)^(3/4)
+    c1 = eps(T)*mu
+    c2= eps(T)^(3/4)
     @simd for i=1:length(xl_r)
         @inbounds x_lr[i]-xl_r[i] < c1 && (xl_r[i] -= c2*max(1,abs(x_lr[i]));adjusted+=1)
     end
@@ -355,9 +355,9 @@ function get_alpha_min(theta,varphi_d,theta_min,gamma_theta,gamma_phi,alpha_min_
 end
 is_switching(varphi_d,alpha,s_phi,del,theta,s_theta) = varphi_d < 0 && alpha*(-varphi_d)^s_phi > del*theta^s_theta
 is_armijo(varphi_trial,varphi,eta_phi,alpha,varphi_d) = varphi_trial <= varphi + eta_phi*alpha*varphi_d
-is_sufficient_progress(theta_trial,theta,gamma_theta,varphi_trial,varphi,gamma_phi,has_constraints) =
-    (has_constraints && ((theta_trial<=(1-gamma_theta)*theta+10*eps(Float64)*abs(theta))) ||
-    ((varphi_trial<=varphi-gamma_phi*theta +10*eps(Float64)*abs(varphi))))
+is_sufficient_progress(theta_trial::T,theta,gamma_theta,varphi_trial,varphi,gamma_phi,has_constraints) where T =
+    (has_constraints && ((theta_trial<=(1-gamma_theta)*theta+10*eps(T)*abs(theta))) ||
+    ((varphi_trial<=varphi-gamma_phi*theta +10*eps(T)*abs(varphi))))
 augment_filter!(filter,theta,varphi,gamma_theta) = push!(filter,((1-gamma_theta)*theta,varphi-gamma_theta*theta))
 function is_filter_acceptable(filter,theta,varphi)
     !isnan(theta) || return false

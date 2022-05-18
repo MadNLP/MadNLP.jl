@@ -1,11 +1,11 @@
 # MadNLP.jl
 # Created by Sungho Shin (sungho.shin@wisc.edu)
 
-abstract type AbstractInteriorPointSolver end
+abstract type AbstractInteriorPointSolver{T} end
 
 include("restoration.jl")
 
-mutable struct InteriorPointSolver{T,KKTSystem <: AbstractKKTSystem{T}} <: AbstractInteriorPointSolver
+mutable struct InteriorPointSolver{T,KKTSystem <: AbstractKKTSystem{T}} <: AbstractInteriorPointSolver{T}
     nlp::AbstractNLPModel
     kkt::KKTSystem
 

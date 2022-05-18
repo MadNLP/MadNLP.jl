@@ -27,7 +27,7 @@ function solve_refine_wrapper!(ips::InteriorPointSolver, x,b)
     return solve_status
 end
 
-function solve_refine_wrapper!(ips::InteriorPointSolver{<:DenseCondensedKKTSystem}, x, b)
+function solve_refine_wrapper!(ips::InteriorPointSolver{T,<:DenseCondensedKKTSystem}, x, b) where T
     cnt = ips.cnt
     @trace(ips.logger,"Iterative solution started.")
     fixed_variable_treatment_vec!(b, ips.ind_fixed)

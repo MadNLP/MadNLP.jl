@@ -210,7 +210,7 @@ function regular!(ips::AbstractInteriorPointSolver)
         ips.alpha = alpha_max
         varphi_trial= 0.
             theta_trial = 0.
-            small_search_norm = get_rel_search_norm(ips.x,ips.dx) < 10*eps(Float64)
+            small_search_norm = get_rel_search_norm(ips.x,ips.dx) < 10*eps(eltype(ips.x))
         switching_condition = is_switching(varphi_d,ips.alpha,ips.opt.s_phi,ips.opt.delta,2.,ips.opt.s_theta)
         armijo_condition = false
         while true
@@ -244,7 +244,7 @@ function regular!(ips::AbstractInteriorPointSolver)
                 return RESTORE
             else
                 @trace(ips.logger,"Step rejected; proceed with the next trial step.")
-                ips.alpha * norm(ips.dx) < eps(Float64)*10 &&
+                ips.alpha * norm(ips.dx) < eps(eltype(ips.x))*10 &&
                     return ips.cnt.acceptable_cnt >0 ?
                     SOLVED_TO_ACCEPTABLE_LEVEL : SEARCH_DIRECTION_BECOMES_TOO_SMALL
             end
@@ -431,7 +431,7 @@ function robust!(ips::InteriorPointSolver)
         ips.cnt.l = 1
         theta_R_trial = 0.
         varphi_R_trial = 0.
-        small_search_norm = get_rel_search_norm(ips.x,ips.dx) < 10*eps(Float64)
+        small_search_norm = get_rel_search_norm(ips.x,ips.dx) < 10*eps(eltype(ips.x))
         switching_condition = is_switching(varphi_d_R,ips.alpha,ips.opt.s_phi,ips.opt.delta,theta_R,ips.opt.s_theta)
         armijo_condition = false
 
@@ -467,7 +467,7 @@ function robust!(ips::InteriorPointSolver)
                 return RESTORATION_FAILED
             else
                 @trace(ips.logger,"Step rejected; proceed with the next trial step.")
-                ips.alpha < eps(Float64)*10 && return ips.cnt.acceptable_cnt >0 ?
+                ips.alpha < eps(eltype(ips.x))*10 && return ips.cnt.acceptable_cnt >0 ?
                     SOLVED_TO_ACCEPTABLE_LEVEL : SEARCH_DIRECTION_BECOMES_TOO_SMALL
             end
         end

@@ -7,33 +7,37 @@ using SparseArrays
 using Random
 
 function _compare_dense_with_sparse(kkt_system, n, m, ind_fixed, ind_eq)
-    sparse_options = Dict{Symbol, Any}(
-        :kkt_system=>MadNLP.SPARSE_KKT_SYSTEM,
-        :linear_solver=>MadNLPLapackCPU,
-        :print_level=>MadNLP.ERROR,
-    )
-    dense_options = Dict{Symbol, Any}(
-        :kkt_system=>kkt_system,
-        :linear_solver=>MadNLPLapackCPU,
-        :print_level=>MadNLP.ERROR,
-    )
+    for (T,tol,atol) in [(Float32,1e-3,1e-1), (Float64,1e-8,1e-6)]
+        sparse_options = Dict{Symbol, Any}(
+            :kkt_system=>MadNLP.SPARSE_KKT_SYSTEM,
+            :linear_solver=>MadNLPLapackCPU,
+            :print_level=>MadNLP.ERROR,
+            :tol=>tol
+        )
+        dense_options = Dict{Symbol, Any}(
+            :kkt_system=>kkt_system,
+            :linear_solver=>MadNLPLapackCPU,
+            :print_level=>MadNLP.ERROR,
+            :tol=>tol
+        )
+        
+        nlp = MadNLPTests.DenseDummyQP{T}(; n=n, m=m, fixed_variables=ind_fixed, equality_cons=ind_eq)
 
-    nlp = MadNLPTests.DenseDummyQP(; n=n, m=m, fixed_variables=ind_fixed, equality_cons=ind_eq)
+        ips = MadNLP.InteriorPointSolver(nlp, option_dict=sparse_options)
+        ipd = MadNLP.InteriorPointSolver(nlp, option_dict=dense_options)
 
-    ips = MadNLP.InteriorPointSolver(nlp, option_dict=sparse_options)
-    ipd = MadNLP.InteriorPointSolver(nlp, option_dict=dense_options)
+        MadNLP.optimize!(ips)
+        MadNLP.optimize!(ipd)
 
-    MadNLP.optimize!(ips)
-    MadNLP.optimize!(ipd)
-
-    # Check that dense formulation matches exactly sparse formulation
-    @test ips.cnt.k == ipd.cnt.k
-    @test ips.obj_val ≈ ipd.obj_val atol=1e-10
-    @test ips.x ≈ ipd.x atol=1e-10
-    @test ips.l ≈ ipd.l atol=1e-10
-    @test ips.kkt.jac_com[:, 1:n] == ipd.kkt.jac
-    if isa(ipd.kkt, MadNLP.AbstractReducedKKTSystem)
-        @test Symmetric(ips.kkt.aug_com, :L) ≈ ipd.kkt.aug_com atol=1e-10
+        # Check that dense formulation matches exactly sparse formulation
+        @test ips.cnt.k == ipd.cnt.k
+        @test ips.obj_val ≈ ipd.obj_val atol=atol
+        @test ips.x ≈ ipd.x atol=atol
+        @test ips.l ≈ ipd.l atol=atol
+        @test ips.kkt.jac_com[:, 1:n] == ipd.kkt.jac
+        if isa(ipd.kkt, MadNLP.AbstractReducedKKTSystem)
+            @test Symmetric(ips.kkt.aug_com, :L) ≈ ipd.kkt.aug_com atol=atol
+        end
     end
 end
 
@@ -120,4 +124,3 @@ end
     res = MadNLP.optimize!(ips)
     @test ips.status == MadNLP.SOLVE_SUCCEEDED
 end
-

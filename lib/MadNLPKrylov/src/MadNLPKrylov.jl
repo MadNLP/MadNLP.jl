@@ -29,33 +29,33 @@ struct VirtualPreconditioner
 end
 ldiv!(Pl::VirtualPreconditioner,x::StrideOneVector{Float64}) = Pl.ldiv!(x)
 
-mutable struct Solver <: AbstractIterator
+mutable struct Solver{T} <: AbstractIterator
     g::Union{Nothing,GMRESIterable}
-    res::Vector{Float64}
+    res::Vector{T}
     opt::Options
     logger::Logger
 end
 
-function Solver(res::Vector{Float64},_mul!,_ldiv!;
+function Solver(res::Vector{T},_mul!,_ldiv!;
                 opt=Options(),logger=Logger(),
-                option_dict::Dict{Symbol,Any}=Dict{Symbol,Any}(),kwargs...)
+                option_dict::Dict{Symbol,Any}=Dict{Symbol,Any}(),kwargs...) where T
     !isempty(kwargs) && (for (key,val) in kwargs; option_dict[key]=val; end)
     set_options!(opt,option_dict)
 
     g = GMRESIterable(VirtualPreconditioner(_ldiv!),
-                      Identity(),Float64[],Float64[],res,
-                      ArnoldiDecomp(VirtualMatrix(_mul!,length(res),length(res)),opt.krylov_restart, Float64),
-                      Residual(opt.krylov_restart, Float64),
+                      Identity(),T[],T[],res,
+                      ArnoldiDecomp(VirtualMatrix(_mul!,length(res),length(res)),opt.krylov_restart, T),
+                      Residual(opt.krylov_restart, T),
                       0,opt.krylov_restart,1,
                       opt.krylov_max_iter,opt.krylov_tol,0.,
                       ModifiedGramSchmidt())
 
-    return Solver(g,res,opt,logger)
+    return Solver{T}(g,res,opt,logger)
 end
 
-function solve_refine!(x::StridedVector{Float64},
+function solve_refine!(x::StridedVector{T},
                        is::Solver,
-                       b::AbstractVector{Float64})
+                       b::AbstractVector{T}) where T
     @debug(is.logger,"Iterator initiated")
     is.res.=0
     x.=0
