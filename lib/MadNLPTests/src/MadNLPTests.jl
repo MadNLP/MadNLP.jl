@@ -233,6 +233,9 @@ function NLPModels.cons!(qp::DenseDummyQP, x::AbstractVector, c::AbstractVector)
 end
 # Jacobian: sparse callback
 function NLPModels.jac_coord!(qp::DenseDummyQP, x::AbstractVector, J::AbstractVector)
+
+    NLPModels.@lencheck NLPModels.get_nnzj(qp) J
+    
     index = 1
     for (i, j) in zip(qp.jrows, qp.jcols)
         J[index] = qp.A[i, j]
@@ -243,6 +246,8 @@ end
 MadNLP.jac_dense!(qp::DenseDummyQP, x, J::AbstractMatrix) = copyto!(J, qp.A)
 # Hessian: sparse callback
 function NLPModels.hess_coord!(qp::DenseDummyQP,x, l, hess::AbstractVector; obj_weight=1.0)
+    NLPModels.@lencheck NLPModels.get_nnzh(qp) hess
+    
     index = 1
     for i in 1:NLPModels.get_nvar(qp) , j in 1:i
         hess[index] = obj_weight * qp.P[j, i]
