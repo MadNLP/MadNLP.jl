@@ -27,16 +27,23 @@ else
     const with_blas = `-L$libblas_dir $rpath$libblas_dir -lopenblas`
 end
     
-const targets = [
-    "ddeps.f",  "fakemetis.f",  "sdeps.f",
-    "deps.f", "deps90.f90", "dump.f90", "hsl_mc68i_ciface.f90",
-    "ma27d.f", "ma27s.f", "ma57d.f", "ma57s.f",
-    "hsl_ma77d.f90", "hsl_ma77d_ciface.f90",
-    "hsl_ma77s.f90", "hsl_ma77s_ciface.f90",
-    "hsl_ma86d.f90", "hsl_ma86d_ciface.f90",
-    "hsl_ma86s.f90", "hsl_ma86s_ciface.f90",
-    "hsl_ma97d.f90", "hsl_ma97d_ciface.f90", 
-    "hsl_ma97s.f90", "hsl_ma97s_ciface.f90", 
+const targets =[
+    [
+        "deps.f", "deps90.f90",
+    ],
+    [
+        "ma27d.f", "ma27s.f",
+        "ma57d.f", "ma57s.f",
+        "hsl_ma77d.f90", "hsl_ma77s.f90", 
+        "hsl_ma86d.f90", "hsl_ma86s.f90", 
+        "hsl_ma97d.f90", "hsl_ma97s.f90",
+    ],
+    [
+        "hsl_mc68i_ciface.f90",
+        "hsl_ma77d_ciface.f90", "hsl_ma77s_ciface.f90",
+        "hsl_ma86d_ciface.f90", "hsl_ma86s_ciface.f90",
+        "hsl_ma97d_ciface.f90", "hsl_ma97s_ciface.f90", 
+    ]
 ]
 
 rm(libdir;recursive=true,force=true)
@@ -50,24 +57,27 @@ if hsl_source_path != ""
         OC = OutputCollector[]
         cd(hsl_source_path)
 
-        names = []
-        for (root, dirs, files) in walkdir(hsl_source_path)
-            for file in files;
-                if file in targets;
-                    name = splitext(relpath(joinpath(root,file),hsl_source_path))
-                    push!(names, name)
-                    @info "$(name[1])$(name[2]) source code detected."
+        names_succeeded = []
+        for i=1:3
+            names = []
+            for (root, dirs, files) in walkdir(hsl_source_path)
+                for file in files;
+                    if file in targets[i];
+                        filter!(x->x != file,files)
+                        name = splitext(relpath(joinpath(root,file),hsl_source_path))
+                        push!(names, name)
+                        @info "$(name[1])$(name[2]) source code detected."
+                    end
                 end
             end
+            succeeded = wait.(
+                [OutputCollector(`$FC -fopenmp -fPIC -c -O3 -o $name.o $name$ext`,verbose=verbose)
+                 for (name,ext) in names])
+            append!(names_succeeded, names[succeeded])
         end
-        
-        succeed = wait.(
-            [OutputCollector(`$FC -fopenmp -fPIC -c -O3 -o $name.o $name$ext`,verbose=verbose)
-             for (name,ext) in names])
-        names_succeed = names[succeed]
 
         cmd = `$FC -o$(libdir)/libhsl.$so -shared -fPIC -O3 -fopenmp`
-        append!(cmd.exec, ["$name.o" for (name,ext) in names_succeed])
+        append!(cmd.exec, ["$name.o" for (name,ext) in names_succeeded])
         append!(cmd.exec, with_metis.exec)
         append!(cmd.exec, with_blas.exec)
         
@@ -87,4 +97,3 @@ else
     @error "Building HSL failed."
     write_deps_file(joinpath(@__DIR__, "deps.jl"),Product[], verbose=verbose)
 end
-
