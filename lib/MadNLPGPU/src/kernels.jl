@@ -136,6 +136,9 @@ function LinearAlgebra.mul!(y::AbstractVector, kkt::MadNLP.DenseKKTSystem{T, VT,
     LinearAlgebra.mul!(d_y, kkt.aug_com, d_x)
     copyto!(y, d_y)
 end
+function LinearAlgebra.mul!(y::MadNLP.ReducedKKTVector, kkt::MadNLP.DenseKKTSystem{T, VT, MT}, x::MadNLP.ReducedKKTVector) where {T, VT<:CuVector{T}, MT<:CuMatrix{T}}
+    LinearAlgebra.mul!(MadNLP.values(y), kkt, MadNLP.values(x))
+end
 
 @kernel function _build_dense_kkt_system_kernel!(
     dest, hess, jac, pr_diag, du_diag, diag_hess, ind_ineq, con_scale, n, m, ns
@@ -278,6 +281,9 @@ function LinearAlgebra.mul!(y::AbstractVector, kkt::MadNLP.DenseCondensedKKTSyst
         MadNLP._mul_expanded!(d_y, kkt, d_x)
         copyto!(y, d_y)
     end
+end
+function LinearAlgebra.mul!(y::MadNLP.ReducedKKTVector, kkt::MadNLP.DenseCondensedKKTSystem{T, VT, MT}, x::MadNLP.ReducedKKTVector) where {T, VT<:CuVector{T}, MT<:CuMatrix{T}}
+    LinearAlgebra.mul!(MadNLP.values(y), kkt, MadNLP.values(x))
 end
 
 function MadNLP.jprod_ineq!(y::AbstractVector, kkt::MadNLP.DenseCondensedKKTSystem{T, VT, MT}, x::AbstractVector) where {T, VT<:CuVector{T}, MT<:CuMatrix{T}}

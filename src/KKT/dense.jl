@@ -377,6 +377,10 @@ function mul!(y::AbstractVector, kkt::DenseCondensedKKTSystem, x::AbstractVector
     end
 end
 
+function mul!(y::ReducedKKTVector, kkt::DenseCondensedKKTSystem, x::ReducedKKTVector)
+    mul!(values(y), kkt, values(x))
+end
+
 function jprod_ineq!(y::AbstractVector, kkt::DenseCondensedKKTSystem, x::AbstractVector)
     mul!(y, kkt.jac_ineq, x)
 end
