@@ -137,7 +137,7 @@ function LinearAlgebra.mul!(y::AbstractVector, kkt::MadNLP.DenseKKTSystem{T, VT,
     copyto!(y, d_y)
 end
 function LinearAlgebra.mul!(y::MadNLP.ReducedKKTVector, kkt::MadNLP.DenseKKTSystem{T, VT, MT}, x::MadNLP.ReducedKKTVector) where {T, VT<:CuVector{T}, MT<:CuMatrix{T}}
-    LinearAlgebra.mul!(MadNLP.values(y), kkt, MadNLP.values(x))
+    LinearAlgebra.mul!(MadNLP.full(y), kkt, MadNLP.full(x))
 end
 
 @kernel function _build_dense_kkt_system_kernel!(
@@ -283,7 +283,7 @@ function LinearAlgebra.mul!(y::AbstractVector, kkt::MadNLP.DenseCondensedKKTSyst
     end
 end
 function LinearAlgebra.mul!(y::MadNLP.ReducedKKTVector, kkt::MadNLP.DenseCondensedKKTSystem{T, VT, MT}, x::MadNLP.ReducedKKTVector) where {T, VT<:CuVector{T}, MT<:CuMatrix{T}}
-    LinearAlgebra.mul!(MadNLP.values(y), kkt, MadNLP.values(x))
+    LinearAlgebra.mul!(MadNLP.full(y), kkt, MadNLP.full(x))
 end
 
 function MadNLP.jprod_ineq!(y::AbstractVector, kkt::MadNLP.DenseCondensedKKTSystem{T, VT, MT}, x::AbstractVector) where {T, VT<:CuVector{T}, MT<:CuMatrix{T}}
