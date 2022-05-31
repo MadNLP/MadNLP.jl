@@ -7,13 +7,13 @@ Supertype for KKT's right-hand-side vectors ``(x, s, y, z, ν, w)``.
 abstract type AbstractKKTVector{T, VT} end
 
 """
-    values(X::AbstractKKTVector)
+    full(X::AbstractKKTVector)
 
-Return the values of the KKT vector `X`.
+Return the all the values stored inside the KKT vector `X`.
 """
-function values end
+function full end
 
-Base.length(rhs::AbstractKKTVector) = length(values(rhs))
+Base.length(rhs::AbstractKKTVector) = length(full(rhs))
 
 """
     number_primal(X::AbstractKKTVector)
@@ -67,14 +67,14 @@ stored in the KKT vector `X`.
 function dual_ub end
 
 function Base.fill!(rhs::AbstractKKTVector{T}, val::T) where T
-    fill!(values(rhs), val)
+    fill!(full(rhs), val)
 end
 
 # Overload basic BLAS operations.
-norm(X::AbstractKKTVector, p::Real) = norm(values(X), p)
-dot(X::AbstractKKTVector, Y::AbstractKKTVector) = dot(values(X), values(Y))
+norm(X::AbstractKKTVector, p::Real) = norm(full(X), p)
+dot(X::AbstractKKTVector, Y::AbstractKKTVector) = dot(full(X), full(Y))
 function axpy!(a::Number, X::AbstractKKTVector, Y::AbstractKKTVector)
-    axpy!(a, values(X), values(Y))
+    axpy!(a, full(X), full(Y))
 end
 
 #=
@@ -110,7 +110,7 @@ function ReducedKKTVector(rhs::AbstractKKTVector)
     return ReducedKKTVector(number_primal(rhs), number_dual(rhs))
 end
 
-values(rhs::ReducedKKTVector) = rhs.values
+full(rhs::ReducedKKTVector) = rhs.values
 primal(rhs::ReducedKKTVector) = rhs.xp
 dual(rhs::ReducedKKTVector) = rhs.xl
 primal_dual(rhs::ReducedKKTVector) = rhs.values
@@ -151,7 +151,7 @@ function UnreducedKKTVector(n::Int, m::Int, nlb::Int, nub::Int)
     return UnreducedKKTVector{Float64, Vector{Float64}}(values, x, xp, xl, xzl, xzu)
 end
 
-values(rhs::UnreducedKKTVector) = rhs.values
+full(rhs::UnreducedKKTVector) = rhs.values
 primal(rhs::UnreducedKKTVector) = rhs.xp
 dual(rhs::UnreducedKKTVector) = rhs.xl
 primal_dual(rhs::UnreducedKKTVector) = rhs.x

@@ -199,7 +199,7 @@ function InteriorPointSolver{KKTSystem}(nlp::AbstractNLPModel, opt::Options;
         @elapsed linear_solver = opt.linear_solver.Solver(get_kkt(kkt) ; option_dict=option_linear_solver,logger=logger)
 
     n_kkt = size(kkt, 1)
-    buffer_vec = similar(values(d), n_kkt)
+    buffer_vec = similar(full(d), n_kkt)
     @trace(logger,"Initializing iterative solver.")
     iterator = opt.iterator(linear_solver, kkt, buffer_vec)
 

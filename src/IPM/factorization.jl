@@ -12,7 +12,7 @@ function solve_refine_wrapper!(
 )
     cnt = ips.cnt
     @trace(ips.logger,"Iterative solution started.")
-    fixed_variable_treatment_vec!(values(b), ips.ind_fixed)
+    fixed_variable_treatment_vec!(full(b), ips.ind_fixed)
 
     cnt.linear_solver_time += @elapsed begin
         result = solve_refine!(x, ips.iterator, b)
@@ -31,7 +31,7 @@ function solve_refine_wrapper!(
             solve_status = false
         end
     end
-    fixed_variable_treatment_vec!(values(x), ips.ind_fixed)
+    fixed_variable_treatment_vec!(full(x), ips.ind_fixed)
     return solve_status
 end
 
@@ -42,7 +42,7 @@ function solve_refine_wrapper!(
 )
     cnt = ips.cnt
     @trace(ips.logger,"Iterative solution started.")
-    fixed_variable_treatment_vec!(values(b), ips.ind_fixed)
+    fixed_variable_treatment_vec!(full(b), ips.ind_fixed)
 
     kkt = ips.kkt
 
@@ -51,9 +51,9 @@ function solve_refine_wrapper!(
     n_condensed = n + n_eq
 
     # load buffers
-    b_c = view(values(ips._w1), 1:n_condensed)
-    x_c = view(values(ips._w2), 1:n_condensed)
-    jv_x = view(values(ips._w3), 1:ns) # for jprod
+    b_c = view(full(ips._w1), 1:n_condensed)
+    x_c = view(full(ips._w2), 1:n_condensed)
+    jv_x = view(full(ips._w3), 1:ns) # for jprod
     jv_t = primal(ips._w4)             # for jtprod
     v_c = dual(ips._w4)
 
@@ -61,16 +61,16 @@ function solve_refine_wrapper!(
     α = get_scaling_inequalities(kkt)
 
     # Decompose right hand side
-    bx = view(values(b), 1:n)
-    bs = view(values(b), n+1:n+ns)
-    by = view(values(b), kkt.ind_eq_shifted)
-    bz = view(values(b), kkt.ind_ineq_shifted)
+    bx = view(full(b), 1:n)
+    bs = view(full(b), n+1:n+ns)
+    by = view(full(b), kkt.ind_eq_shifted)
+    bz = view(full(b), kkt.ind_ineq_shifted)
 
     # Decompose results
-    xx = view(values(x), 1:n)
-    xs = view(values(x), n+1:n+ns)
-    xy = view(values(x), kkt.ind_eq_shifted)
-    xz = view(values(x), kkt.ind_ineq_shifted)
+    xx = view(full(x), 1:n)
+    xs = view(full(x), n+1:n+ns)
+    xy = view(full(x), kkt.ind_eq_shifted)
+    xz = view(full(x), kkt.ind_ineq_shifted)
 
     v_c .= 0.0
     v_c[kkt.ind_ineq] .= (Σs .* bz .+ α .* bs) ./ α.^2
@@ -89,7 +89,7 @@ function solve_refine_wrapper!(
     xz .= sqrt.(Σs) ./ α .* jv_x .- Σs .* bz ./ α.^2 .- bs ./ α
     xs .= (bs .+ α .* xz) ./ Σs
 
-    fixed_variable_treatment_vec!(values(x), ips.ind_fixed)
+    fixed_variable_treatment_vec!(full(x), ips.ind_fixed)
     return solve_status
 end
 

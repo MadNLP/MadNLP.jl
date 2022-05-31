@@ -140,7 +140,7 @@ function mul!(y::AbstractVector, kkt::DenseKKTSystem, x::AbstractVector)
     mul!(y, kkt.aug_com, x)
 end
 function mul!(y::ReducedKKTVector, kkt::DenseKKTSystem, x::ReducedKKTVector)
-    mul!(values(y), kkt.aug_com, values(x))
+    mul!(full(y), kkt.aug_com, full(x))
 end
 
 # Special getters for Jacobian

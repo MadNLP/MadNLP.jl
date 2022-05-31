@@ -36,7 +36,7 @@ function solve_refine!(
     solver::RichardsonIterator{T, VT, KKT},
     b::UnreducedKKTVector{T, VT},
 ) where {T, VT, KKT<:AbstractUnreducedKKTSystem}
-    solve_refine!(values(x), solver, values(b))
+    solve_refine!(full(x), solver, full(b))
 end
 
 function solve_refine!(

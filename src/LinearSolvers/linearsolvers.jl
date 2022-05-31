@@ -64,7 +64,7 @@ function improve! end
 
 # Default function for AbstractKKTVector
 function solve!(s::AbstractLinearSolver, x::AbstractKKTVector)
-    solve!(s, values(x))
+    solve!(s, full(x))
 end
 
 #=

@@ -66,7 +66,7 @@ function mul!(y::AbstractVector, kkt::AbstractSparseKKTSystem, x::AbstractVector
     mul!(y, Symmetric(kkt.aug_com, :L), x)
 end
 function mul!(y::AbstractKKTVector, kkt::AbstractSparseKKTSystem, x::AbstractKKTVector)
-    mul!(values(y), Symmetric(kkt.aug_com, :L), values(x))
+    mul!(full(y), Symmetric(kkt.aug_com, :L), full(x))
 end
 
 function jtprod!(y::AbstractVector, kkt::AbstractSparseKKTSystem, x::AbstractVector)
