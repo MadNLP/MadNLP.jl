@@ -378,7 +378,7 @@ function mul!(y::AbstractVector, kkt::DenseCondensedKKTSystem, x::AbstractVector
 end
 
 function mul!(y::ReducedKKTVector, kkt::DenseCondensedKKTSystem, x::ReducedKKTVector)
-    mul!(values(y), kkt, values(x))
+    mul!(full(y), kkt, full(x))
 end
 
 function jprod_ineq!(y::AbstractVector, kkt::DenseCondensedKKTSystem, x::AbstractVector)

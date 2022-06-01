@@ -11,6 +11,8 @@ if ARGS[1] == "full"
     pkgs = ["MadNLPHSL","MadNLPPardiso","MadNLPMumps","MadNLPGPU","MadNLPKrylov"]
 elseif ARGS[1] == "basic"
     pkgs = ["MadNLPMumps","MadNLPKrylov"]
+elseif ARGS[1] == "gpu"
+    pkgs = ["MadNLPGPU"]
 else
     error("proper argument should be given - full or basic")
 end
