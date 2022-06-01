@@ -41,7 +41,11 @@ function initialize!(ips::AbstractInteriorPointSolver)
         initialize!(ips.kkt)
         factorize_wrapper!(ips)
         solve_refine_wrapper!(ips,ips.d,ips.p)
-        norm(ips.dl,Inf)>ips.opt.constr_mult_init_max ? (ips.l.= 0.) : (ips.l.= ips.dl)
+        if norm(dual(ips.d), Inf) > ips.opt.constr_mult_init_max
+            fill!(ips.l, 0.0)
+        else
+            copyto!(ips.l, dual(ips.d))
+        end
     end
 
     # Initializing
@@ -183,7 +187,7 @@ function regular!(ips::AbstractInteriorPointSolver)
         if ips.opt.inertia_correction_method == INERTIA_FREE
             set_aug_rhs_ifr!(ips, ips.kkt)
         end
-        dual_inf_perturbation!(ips.px,ips.ind_llb,ips.ind_uub,ips.mu,ips.opt.kappa_d)
+        dual_inf_perturbation!(primal(ips.p),ips.ind_llb,ips.ind_uub,ips.mu,ips.opt.kappa_d)
 
         # start inertia conrrection
         @trace(ips.logger,"Solving primal-dual system.")
@@ -199,23 +203,23 @@ function regular!(ips::AbstractInteriorPointSolver)
         @trace(ips.logger,"Backtracking line search initiated.")
         theta = get_theta(ips.c)
         varphi= get_varphi(ips.obj_val,ips.x_lr,ips.xl_r,ips.xu_r,ips.x_ur,ips.mu)
-        varphi_d = get_varphi_d(ips.f,ips.x,ips.xl,ips.xu,ips.dx,ips.mu)
+        varphi_d = get_varphi_d(ips.f,ips.x,ips.xl,ips.xu,primal(ips.d),ips.mu)
 
 
-        alpha_max = get_alpha_max(ips.x,ips.xl,ips.xu,ips.dx,ips.tau)
-        ips.alpha_z = get_alpha_z(ips.zl_r,ips.zu_r,ips.dzl,ips.dzu,ips.tau)
+        alpha_max = get_alpha_max(ips.x,ips.xl,ips.xu,primal(ips.d),ips.tau)
+        ips.alpha_z = get_alpha_z(ips.zl_r,ips.zu_r,dual_lb(ips.d),dual_ub(ips.d),ips.tau)
         alpha_min = get_alpha_min(theta,varphi_d,ips.theta_min,ips.opt.gamma_theta,ips.opt.gamma_phi,
                                   ips.opt.alpha_min_frac,ips.opt.delta,ips.opt.s_theta,ips.opt.s_phi)
         ips.cnt.l = 1
         ips.alpha = alpha_max
         varphi_trial= 0.
             theta_trial = 0.
-            small_search_norm = get_rel_search_norm(ips.x,ips.dx) < 10*eps(Float64)
+            small_search_norm = get_rel_search_norm(ips.x, primal(ips.d)) < 10*eps(Float64)
         switching_condition = is_switching(varphi_d,ips.alpha,ips.opt.s_phi,ips.opt.delta,2.,ips.opt.s_theta)
         armijo_condition = false
         while true
-            copyto!(ips.x_trial,ips.x)
-            axpy!(ips.alpha,ips.dx,ips.x_trial)
+            copyto!(ips.x_trial, ips.x)
+            axpy!(ips.alpha, primal(ips.d), ips.x_trial)
 
             ips.obj_val_trial = eval_f_wrapper(ips, ips.x_trial)
             eval_cons_wrapper!(ips, ips.c_trial, ips.x_trial)
@@ -244,7 +248,7 @@ function regular!(ips::AbstractInteriorPointSolver)
                 return RESTORE
             else
                 @trace(ips.logger,"Step rejected; proceed with the next trial step.")
-                ips.alpha * norm(ips.dx) < eps(Float64)*10 &&
+                ips.alpha * norm(primal(ips.d)) < eps(Float64)*10 &&
                     return ips.cnt.acceptable_cnt >0 ?
                     SOLVED_TO_ACCEPTABLE_LEVEL : SEARCH_DIRECTION_BECOMES_TOO_SMALL
             end
@@ -258,9 +262,9 @@ function regular!(ips::AbstractInteriorPointSolver)
         adjusted > 0 &&
             @warn(ips.logger,"In iteration $(ips.cnt.k), $adjusted Slack too small, adjusting variable bound")
 
-        axpy!(ips.alpha,ips.dl,ips.l)
-        axpy!(ips.alpha_z,ips.dzl,ips.zl_r)
-        axpy!(ips.alpha_z,ips.dzu,ips.zu_r)
+        axpy!(ips.alpha,dual(ips.d),ips.l)
+        axpy!(ips.alpha_z, dual_lb(ips.d), ips.zl_r)
+        axpy!(ips.alpha_z, dual_ub(ips.d), ips.zu_r)
         reset_bound_dual!(ips.zl,ips.x,ips.xl,ips.mu,ips.opt.kappa_sigma)
         reset_bound_dual!(ips.zu,ips.xu,ips.x,ips.mu,ips.opt.kappa_sigma)
         eval_grad_f_wrapper!(ips, ips.f,ips.x)
@@ -277,9 +281,9 @@ end
 
 function restore!(ips::AbstractInteriorPointSolver)
     ips.del_w=0
-    ips._w1x .= ips.x # backup the previous primal iterate
-    ips._w1l .= ips.l # backup the previous primal iterate
-    ips._w2l .= ips.c # backup the previous primal iterate
+    primal(ips._w1) .= ips.x # backup the previous primal iterate
+    dual(ips._w1) .= ips.l # backup the previous primal iterate
+    dual(ips._w2) .= ips.c # backup the previous primal iterate
 
     F = get_F(ips.c,ips.f,ips.zl,ips.zu,ips.jacl,ips.x_lr,ips.xl_r,ips.zl_r,ips.xu_r,ips.x_ur,ips.zu_r,ips.mu)
     ips.cnt.t = 0
@@ -287,13 +291,13 @@ function restore!(ips::AbstractInteriorPointSolver)
     ips.ftype = "R"
 
     while true
-        ips.alpha = min(get_alpha_max(ips.x,ips.xl,ips.xu,ips.dx,ips.tau),
-                        get_alpha_z(ips.zl_r,ips.zu_r,ips.dzl,ips.dzu,ips.tau))
+        ips.alpha = min(get_alpha_max(ips.x,ips.xl,ips.xu,primal(ips.d),ips.tau),
+                        get_alpha_z(ips.zl_r,ips.zu_r,dual_lb(ips.d),dual_ub(ips.d),ips.tau))
 
-        ips.x .+= ips.alpha.*ips.dx
-        ips.l .+= ips.alpha.*ips.dl
-        ips.zl_r.+=ips.alpha.*ips.dzl
-        ips.zu_r.+=ips.alpha.*ips.dzu
+        ips.x .+= ips.alpha.* primal(ips.d)
+        ips.l .+= ips.alpha.* dual(ips.d)
+        ips.zl_r.+=ips.alpha.* dual_lb(ips.d)
+        ips.zu_r.+=ips.alpha.* dual_ub(ips.d)
 
         eval_cons_wrapper!(ips,ips.c,ips.x)
         eval_grad_f_wrapper!(ips,ips.f,ips.x)
@@ -305,9 +309,9 @@ function restore!(ips::AbstractInteriorPointSolver)
         F_trial = get_F(
             ips.c,ips.f,ips.zl,ips.zu,ips.jacl,ips.x_lr,ips.xl_r,ips.zl_r,ips.xu_r,ips.x_ur,ips.zu_r,ips.mu)
         if F_trial > ips.opt.soft_resto_pderror_reduction_factor*F
-            ips.x.=ips._w1x
-            ips.l.=ips._w1l
-            ips.c.=ips._w2l # backup the previous primal iterate
+            ips.x .= primal(ips._w1)
+            ips.l .= dual(ips._w1)
+            ips.c .= dual(ips._w2) # backup the previous primal iterate
             return ROBUST
         end
 
@@ -341,7 +345,7 @@ function restore!(ips::AbstractInteriorPointSolver)
         set_aug_diagonal!(ips.kkt,ips)
         set_aug_rhs!(ips, ips.kkt, ips.c)
 
-        dual_inf_perturbation!(ips.px,ips.ind_llb,ips.ind_uub,ips.mu,ips.opt.kappa_d)
+        dual_inf_perturbation!(primal(ips.p),ips.ind_llb,ips.ind_uub,ips.mu,ips.opt.kappa_d)
         factorize_wrapper!(ips)
         solve_refine_wrapper!(ips,ips.d,ips.p)
         finish_aug_solve!(ips, ips.kkt, ips.mu)
@@ -412,16 +416,16 @@ function robust!(ips::InteriorPointSolver)
         solve_refine_wrapper!(ips,ips.d,ips.p)
 
         finish_aug_solve!(ips, ips.kkt, RR.mu_R)
-        finish_aug_solve_RR!(RR.dpp,RR.dnn,RR.dzp,RR.dzn,ips.l,ips.dl,RR.pp,RR.nn,RR.zp,RR.zn,RR.mu_R,ips.opt.rho)
+        finish_aug_solve_RR!(RR.dpp,RR.dnn,RR.dzp,RR.dzn,ips.l,dual(ips.d),RR.pp,RR.nn,RR.zp,RR.zn,RR.mu_R,ips.opt.rho)
 
 
         theta_R = get_theta_R(ips.c,RR.pp,RR.nn)
         varphi_R = get_varphi_R(RR.obj_val_R,ips.x_lr,ips.xl_r,ips.xu_r,ips.x_ur,RR.pp,RR.nn,RR.mu_R)
-        varphi_d_R = get_varphi_d_R(RR.f_R,ips.x,ips.xl,ips.xu,ips.dx,RR.pp,RR.nn,RR.dpp,RR.dnn,RR.mu_R,ips.opt.rho)
+        varphi_d_R = get_varphi_d_R(RR.f_R,ips.x,ips.xl,ips.xu,primal(ips.d),RR.pp,RR.nn,RR.dpp,RR.dnn,RR.mu_R,ips.opt.rho)
 
         # set alpha_min
-        alpha_max = get_alpha_max_R(ips.x,ips.xl,ips.xu,ips.dx,RR.pp,RR.dpp,RR.nn,RR.dnn,RR.tau_R)
-        ips.alpha_z = get_alpha_z_R(ips.zl_r,ips.zu_r,ips.dzl,ips.dzu,RR.zp,RR.dzp,RR.zn,RR.dzn,RR.tau_R)
+        alpha_max = get_alpha_max_R(ips.x,ips.xl,ips.xu,primal(ips.d),RR.pp,RR.dpp,RR.nn,RR.dnn,RR.tau_R)
+        ips.alpha_z = get_alpha_z_R(ips.zl_r,ips.zu_r,dual_lb(ips.d),dual_ub(ips.d),RR.zp,RR.dzp,RR.zn,RR.dzn,RR.tau_R)
         alpha_min = get_alpha_min(theta_R,varphi_d_R,ips.theta_min,ips.opt.gamma_theta,ips.opt.gamma_phi,
                                   ips.opt.alpha_min_frac,ips.opt.delta,ips.opt.s_theta,ips.opt.s_phi)
 
@@ -431,7 +435,7 @@ function robust!(ips::InteriorPointSolver)
         ips.cnt.l = 1
         theta_R_trial = 0.
         varphi_R_trial = 0.
-        small_search_norm = get_rel_search_norm(ips.x,ips.dx) < 10*eps(Float64)
+        small_search_norm = get_rel_search_norm(ips.x, primal(ips.d)) < 10*eps(Float64)
         switching_condition = is_switching(varphi_d_R,ips.alpha,ips.opt.s_phi,ips.opt.delta,theta_R,ips.opt.s_theta)
         armijo_condition = false
 
@@ -439,7 +443,7 @@ function robust!(ips::InteriorPointSolver)
             copyto!(ips.x_trial,ips.x)
             copyto!(RR.pp_trial,RR.pp)
             copyto!(RR.nn_trial,RR.nn)
-            axpy!(ips.alpha,ips.dx,ips.x_trial)
+            axpy!(ips.alpha,primal(ips.d),ips.x_trial)
             axpy!(ips.alpha,RR.dpp,RR.pp_trial)
             axpy!(ips.alpha,RR.dnn,RR.nn_trial)
 
@@ -481,9 +485,9 @@ function robust!(ips::InteriorPointSolver)
         RR.obj_val_R=RR.obj_val_R_trial
         RR.f_R .= RR.zeta.*RR.D_R.^2 .*(ips.x.-RR.x_ref)
 
-        axpy!(ips.alpha, ips.dl,ips.l )
-        axpy!(ips.alpha_z, ips.dzl,ips.zl_r)
-        axpy!(ips.alpha_z, ips.dzu,ips.zu_r)
+        axpy!(ips.alpha, dual(ips.d), ips.l)
+        axpy!(ips.alpha_z, dual_lb(ips.d),ips.zl_r)
+        axpy!(ips.alpha_z, dual_ub(ips.d),ips.zu_r)
         axpy!(ips.alpha_z, RR.dzp,RR.zp)
         axpy!(ips.alpha_z, RR.dzn,RR.zn)
 
@@ -520,7 +524,11 @@ function robust!(ips::InteriorPointSolver)
 
             factorize_wrapper!(ips)
             solve_refine_wrapper!(ips,ips.d,ips.p)
-            norm(ips.dl,Inf)>ips.opt.constr_mult_init_max ? (ips.l.= 0) : (ips.l.= ips.dl)
+            if norm(dual(ips.d), Inf)>ips.opt.constr_mult_init_max
+                fill!(ips.l, 0.0)
+            else
+                copyto!(ips.l, dual(ips.d))
+            end
             ips.cnt.k+=1
 
             return REGULAR
@@ -575,23 +583,22 @@ function inertia_free_reg(ips::InteriorPointSolver)
 
     @trace(ips.logger,"Inertia-free regularization started.")
     p0 = ips._w1
-    d0= ips._w2
-    t = ips._w3x
-    n = ips._w2x
-    wx= ips._w4x
-    ips._w3l.=0
+    d0 = ips._w2
+    t = primal(ips._w3)
+    n = primal(ips._w2)
+    wx= primal(ips._w4)
+    fill!(dual(ips._w3), 0)
 
     g = ips.x_trial # just to avoid new allocation
     g .= ips.f.-ips.mu./(ips.x.-ips.xl).+ips.mu./(ips.xu.-ips.x).+ips.jacl
 
-    fixed_variable_treatment_vec!(ips._w1x,ips.ind_fixed)
-    fixed_variable_treatment_vec!(ips.px,ips.ind_fixed)
-    fixed_variable_treatment_vec!(g,ips.ind_fixed)
-    # end
+    fixed_variable_treatment_vec!(primal(ips._w1), ips.ind_fixed)
+    fixed_variable_treatment_vec!(primal(ips.p),   ips.ind_fixed)
+    fixed_variable_treatment_vec!(g, ips.ind_fixed)
 
     factorize_wrapper!(ips)
     solve_status = (solve_refine_wrapper!(ips,d0,p0) && solve_refine_wrapper!(ips,ips.d,ips.p))
-    t .= ips.dx.-n
+    t .= primal(ips.d) .- n
     mul!(ips._w4, ips.kkt, ips._w3) # prepartation for curv_test
     n_trial = 0
     ips.del_w = del_w_prev = 0.
@@ -615,7 +622,7 @@ function inertia_free_reg(ips::InteriorPointSolver)
 
         factorize_wrapper!(ips)
         solve_status = (solve_refine_wrapper!(ips,d0,p0) && solve_refine_wrapper!(ips,ips.d,ips.p))
-        t .= ips.dx.-n
+        t .= primal(ips.d) .- n
         mul!(ips._w4, ips.kkt, ips._w3) # prepartation for curv_test
         n_trial += 1
     end
@@ -630,16 +637,16 @@ function second_order_correction(ips::AbstractInteriorPointSolver,alpha_max::Flo
                                  theta_trial::Float64,varphi_d::Float64,switching_condition::Bool)
     @trace(ips.logger,"Second-order correction started.")
 
-    ips._w1l .= alpha_max .* ips.c .+ ips.c_trial
+    dual(ips._w1) .= alpha_max .* ips.c .+ ips.c_trial
     theta_soc_old = theta_trial
     for p=1:ips.opt.max_soc
         # compute second order correction
-        set_aug_rhs!(ips, ips.kkt, ips._w1l)
-        dual_inf_perturbation!(ips.px,ips.ind_llb,ips.ind_uub,ips.mu,ips.opt.kappa_d)
+        set_aug_rhs!(ips, ips.kkt, dual(ips._w1))
+        dual_inf_perturbation!(primal(ips.p),ips.ind_llb,ips.ind_uub,ips.mu,ips.opt.kappa_d)
         solve_refine_wrapper!(ips,ips._w1,ips.p)
-        alpha_soc = get_alpha_max(ips.x,ips.xl,ips.xu,ips._w1x,ips.tau)
+        alpha_soc = get_alpha_max(ips.x,ips.xl,ips.xu,primal(ips._w1),ips.tau)
 
-        ips.x_trial .= ips.x.+alpha_soc.*ips._w1x
+        ips.x_trial .= ips.x .+ alpha_soc .* primal(ips._w1)
         eval_cons_wrapper!(ips, ips.c_trial,ips.x_trial)
         ips.obj_val_trial = eval_f_wrapper(ips, ips.x_trial)
 

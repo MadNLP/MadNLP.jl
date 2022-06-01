@@ -51,10 +51,10 @@ function eval_lag_hess_wrapper!(ipp::InteriorPointSolver, kkt::AbstractKKTSystem
     nlp = ipp.nlp
     cnt = ipp.cnt
     @trace(ipp.logger,"Evaluating Lagrangian Hessian.")
-    ipp._w1l .= l.*ipp.con_scale
+    dual(ipp._w1) .= l.*ipp.con_scale
     hess = get_hessian(kkt)
     cnt.eval_function_time += @elapsed hess_coord!(
-        nlp, view(x,1:get_nvar(nlp)), ipp._w1l, view(hess,1:get_nnzh(nlp));
+        nlp, view(x,1:get_nvar(nlp)), dual(ipp._w1), view(hess, 1:get_nnzh(nlp));
         obj_weight = (get_minimize(nlp) ? 1. : -1.) * (is_resto ? 0.0 : ipp.obj_scale[]))
     compress_hessian!(kkt)
     cnt.lag_hess_cnt+=1
@@ -80,10 +80,10 @@ function eval_lag_hess_wrapper!(ipp::InteriorPointSolver, kkt::AbstractDenseKKTS
     nlp = ipp.nlp
     cnt = ipp.cnt
     @trace(ipp.logger,"Evaluating Lagrangian Hessian.")
-    ipp._w1l .= l.*ipp.con_scale
+    dual(ipp._w1) .= l.*ipp.con_scale
     hess = get_hessian(kkt)
     cnt.eval_function_time += @elapsed hess_dense!(
-        nlp, view(x,1:get_nvar(nlp)), ipp._w1l, hess;
+        nlp, view(x,1:get_nvar(nlp)), dual(ipp._w1), hess;
         obj_weight = (get_minimize(nlp) ? 1. : -1.) * (is_resto ? 0.0 : ipp.obj_scale[]))
     compress_hessian!(kkt)
     cnt.lag_hess_cnt+=1
