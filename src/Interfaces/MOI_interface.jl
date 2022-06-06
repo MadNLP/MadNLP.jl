@@ -1105,14 +1105,14 @@ struct MOIModel{T} <: AbstractNLPModel{T,Vector{T}}
     counters::NLPModelsCounters
 end
 
-obj(nlp::MOIModel,x::StrideOneVector{Float64}) = eval_objective(nlp.model,x)
-grad!(nlp::MOIModel,x::StrideOneVector{Float64},f::StrideOneVector{Float64}) =
+obj(nlp::MOIModel,x::AbstractVector{Float64}) = eval_objective(nlp.model,x)
+grad!(nlp::MOIModel,x::AbstractVector{Float64},f::AbstractVector{Float64}) =
     eval_objective_gradient(nlp.model,f,x)
-cons!(nlp::MOIModel,x::StrideOneVector{Float64},c::StrideOneVector{Float64}) =
+cons!(nlp::MOIModel,x::AbstractVector{Float64},c::AbstractVector{Float64}) =
     eval_constraint(nlp.model,c,x)
-jac_coord!(nlp::MOIModel,x::StrideOneVector{Float64},jac::StrideOneVector{Float64})=
+jac_coord!(nlp::MOIModel,x::AbstractVector{Float64},jac::AbstractVector{Float64})=
     eval_constraint_jacobian(nlp.model,jac,x)
-hess_coord!(nlp::MOIModel,x::StrideOneVector{Float64},l::StrideOneVector{Float64},hess::StrideOneVector{Float64};
+hess_coord!(nlp::MOIModel,x::AbstractVector{Float64},l::AbstractVector{Float64},hess::AbstractVector{Float64};
             obj_weight::Float64=1.) = eval_hessian_lagrangian(nlp.model,hess,x,obj_weight,l)
 function hess_structure!(nlp::MOIModel, I::AbstractVector{T}, J::AbstractVector{T}) where T
     return hessian_lagrangian_structure(nlp.model,I,J)

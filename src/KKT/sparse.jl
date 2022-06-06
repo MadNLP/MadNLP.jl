@@ -5,17 +5,17 @@
 Implement the [`AbstractReducedKKTSystem`](@ref) in sparse COO format.
 
 """
-struct SparseKKTSystem{T, MT} <: AbstractReducedKKTSystem{T, MT}
-    hess::StrideOneVector{T}
-    jac::StrideOneVector{T}
-    pr_diag::StrideOneVector{T}
-    du_diag::StrideOneVector{T}
+struct SparseKKTSystem{T, MT, VT} <: AbstractReducedKKTSystem{T, MT}
+    hess::VT
+    jac::VT
+    pr_diag::VT
+    du_diag::VT
     # Augmented system
-    aug_raw::SparseMatrixCOO{T,Int32}
+    aug_raw::SparseMatrixCOO{T,Int32,Vector{T}}
     aug_com::MT
     aug_csc_map::Union{Nothing, Vector{Int}}
     # Jacobian
-    jac_raw::SparseMatrixCOO{T,Int32}
+    jac_raw::SparseMatrixCOO{T,Int32,VT}
     jac_com::MT
     jac_csc_map::Union{Nothing, Vector{Int}}
     # Info
@@ -31,22 +31,22 @@ end
 Implement the [`AbstractUnreducedKKTSystem`](@ref) in sparse COO format.
 
 """
-struct SparseUnreducedKKTSystem{T, MT} <: AbstractUnreducedKKTSystem{T, MT}
-    hess::StrideOneVector{T}
-    jac::StrideOneVector{T}
-    pr_diag::StrideOneVector{T}
-    du_diag::StrideOneVector{T}
+struct SparseUnreducedKKTSystem{T, MT, VT} <: AbstractUnreducedKKTSystem{T, MT}
+    hess::VT
+    jac::VT
+    pr_diag::VT
+    du_diag::VT
 
-    l_diag::StrideOneVector{T}
-    u_diag::StrideOneVector{T}
-    l_lower::StrideOneVector{T}
-    u_lower::StrideOneVector{T}
+    l_diag::VT
+    u_diag::VT
+    l_lower::VT
+    u_lower::VT
 
-    aug_raw::SparseMatrixCOO{T,Int32}
+    aug_raw::SparseMatrixCOO{T,Int32,Vector{T}}
     aug_com::MT
     aug_csc_map::Union{Nothing, Vector{Int}}
 
-    jac_raw::SparseMatrixCOO{T,Int32}
+    jac_raw::SparseMatrixCOO{T,Int32,VT}
     jac_com::MT
     jac_csc_map::Union{Nothing, Vector{Int}}
     ind_ineq::Vector{Int}
@@ -152,7 +152,7 @@ function SparseKKTSystem{T, MT}(
     end
     jac_scaling = ones(T, n_jac)
 
-    return SparseKKTSystem{T, MT}(
+    return SparseKKTSystem{T, MT, typeof(hess)}(
         hess, jac, pr_diag, du_diag,
         aug_raw, aug_com, aug_csc_map,
         jac_raw, jac_com, jac_csc_map,
@@ -259,7 +259,7 @@ function SparseUnreducedKKTSystem{T, MT}(
         zeros(Int, 0)
     end
 
-    return SparseUnreducedKKTSystem{T, MT}(
+    return SparseUnreducedKKTSystem{T, MT, typeof(hess)}(
         hess, jac, pr_diag, du_diag,
         l_diag, u_diag, l_lower, u_lower,
         aug_raw, aug_com, aug_csc_map,

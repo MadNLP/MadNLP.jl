@@ -31,8 +31,8 @@ mutable struct InteriorPointSolver{KKTSystem} <: AbstractInteriorPointSolver
 
     jacl::Vector{Float64}
 
-    d::AbstractKKTVector{Float64, Vector{Float64}}
-    p::AbstractKKTVector{Float64, Vector{Float64}}
+    d::UnreducedKKTVector{Float64, Vector{Float64}}
+    p::UnreducedKKTVector{Float64, Vector{Float64}}
 
     _w1::AbstractKKTVector{Float64, Vector{Float64}}
     _w2::AbstractKKTVector{Float64, Vector{Float64}}
@@ -44,7 +44,7 @@ mutable struct InteriorPointSolver{KKTSystem} <: AbstractInteriorPointSolver
     c_trial::Vector{Float64}
     obj_val_trial::Float64
 
-    x_slk::StrideOneVector{Float64}
+    x_slk::SubArray{Float64,1,Vector{Float64},Tuple{UnitRange{Int}},true}
     c_slk::SubVector{Float64}
     rhs::Vector{Float64}
 

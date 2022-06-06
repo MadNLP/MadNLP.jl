@@ -1,13 +1,13 @@
 struct MadNLPExecutionStats{T} <: AbstractExecutionStats
     status::Status
-    solution::StrideOneVector{T}
+    solution::AbstractVector{T}
     objective::T
-    constraints::StrideOneVector{T}
+    constraints::AbstractVector{T}
     dual_feas::T
     primal_feas::T
-    multipliers::StrideOneVector{T}
-    multipliers_L::StrideOneVector{T}
-    multipliers_U::StrideOneVector{T}
+    multipliers::AbstractVector{T}
+    multipliers_L::AbstractVector{T}
+    multipliers_U::AbstractVector{T}
     iter::Int
     counters::NLPModelsCounters
     elapsed_time::Real
