@@ -5,7 +5,7 @@ import MUMPS_seq_jll
 import MadNLP:
     parsefile, dlopen,
     @kwdef, Logger, @debug, @warn, @error,
-    SparseMatrixCSC, SubVector, StrideOneVector, 
+    SparseMatrixCSC, SubVector,
     SymbolicException,FactorizationException,SolveException,InertiaException,
     AbstractOptions, AbstractLinearSolver, set_options!,
     introduce, factorize!, solve!, improve!, is_inertia, inertia, findIJ, nnz
@@ -38,7 +38,7 @@ if version == "5.3.5+0"
         keep8::SVector{150,Int64} = zeros(150)
         n::Cint = 0
         nblk::Cint = 0
-        
+
         nz_alloc::Cint = 0
 
         nz::Cint = 0
@@ -81,7 +81,7 @@ if version == "5.3.5+0"
         irhs_ptr::Ptr{Cint} = C_NULL
         isol_loc::Ptr{Cint} = C_NULL
         irhs_loc::Ptr{Cint} = C_NULL
-        
+
         nrhs::Cint = 0
         lrhs::Cint = 0
         lredrhs::Cint = 0
@@ -113,7 +113,7 @@ if version == "5.3.5+0"
         schur::Ptr{Cdouble} = C_NULL ##
 
         instance_number::Cint = 0
-        wk_user::Ptr{Cdouble} = C_NULL 
+        wk_user::Ptr{Cdouble} = C_NULL
 
         version_number::SVector{32,Cchar} = zeros(32)
 
@@ -142,7 +142,7 @@ elseif version == "5.2.1+4"
         dkeep::SVector{230,Cdouble} = zeros(230)
         keep8::SVector{150,Int64} = zeros(150)
         n::Cint = 0
-        
+
         nz_alloc::Cint = 0
 
         nz::Cint = 0
@@ -182,7 +182,7 @@ elseif version == "5.2.1+4"
         irhs_ptr::Ptr{Cint} = C_NULL
         isol_loc::Ptr{Cint} = C_NULL
         irhs_loc::Ptr{Cint} = C_NULL
-        
+
         nrhs::Cint = 0
         lrhs::Cint = 0
         lredrhs::Cint = 0
@@ -214,7 +214,7 @@ elseif version == "5.2.1+4"
         schur::Ptr{Cdouble} = C_NULL ##
 
         instance_number::Cint = 0
-        wk_user::Ptr{Cdouble} = C_NULL 
+        wk_user::Ptr{Cdouble} = C_NULL
 
         version_number::SVector{32,Cchar} = zeros(32)
 
@@ -426,7 +426,7 @@ function factorize!(M::Solver)
     return M
 end
 
-function solve!(M::Solver,rhs::StrideOneVector{Float64})
+function solve!(M::Solver,rhs::AbstractVector{Float64})
     M.is_singular && return rhs
     M.mumps_struc.rhs = pointer(rhs)
     M.mumps_struc.job = 3

@@ -2,7 +2,7 @@ module MadNLPPardisoMKL
 
 import ..MadNLP:
     @kwdef, Logger, @debug, @warn, @error,
-    SubVector, StrideOneVector, SparseMatrixCSC, 
+    SubVector, SparseMatrixCSC,
     SymbolicException,FactorizationException,SolveException,InertiaException,
     AbstractOptions, AbstractLinearSolver, set_options!,
     introduce, factorize!, solve!, improve!, is_inertia, inertia, blas_num_threads
@@ -41,7 +41,7 @@ pardisomkl_pardisoinit(pt,mtype::Ref{Cint},iparm::Vector{Cint}) =
 pardisomkl_pardiso(pt,maxfct::Ref{Cint},mnum::Ref{Cint},mtype::Ref{Cint},
                    phase::Ref{Cint},n::Ref{Cint},a::Vector{Cdouble},ia::Vector{Cint},ja::Vector{Cint},
                    perm::Vector{Cint},nrhs::Ref{Cint},iparm::Vector{Cint},msglvl::Ref{Cint},
-                   b::StrideOneVector{Cdouble},x::StrideOneVector{Cdouble},err::Ref{Cint}) =
+                   b::AbstractVector{Cdouble},x::AbstractVector{Cdouble},err::Ref{Cint}) =
                        ccall(
                            (:pardiso,libmkl_rt),
                            Cvoid,
@@ -126,7 +126,7 @@ function factorize!(M::Solver)
     M.err.x < 0  && throw(FactorizationException())
     return M
 end
-function solve!(M::Solver,rhs::StrideOneVector{Float64})
+function solve!(M::Solver,rhs::AbstractVector{Float64})
     pardisomkl_set_num_threads!(M.opt.pardisomkl_num_threads)
     pardisomkl_pardiso(M.pt,Ref{Int32}(1),Ref{Int32}(1),Ref{Int32}(-2),Ref{Int32}(33),
                      Ref{Int32}(M.csc.n),M.csc.nzval,M.csc.colptr,M.csc.rowval,M.perm,

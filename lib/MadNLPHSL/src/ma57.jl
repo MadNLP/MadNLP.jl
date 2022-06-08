@@ -5,7 +5,7 @@ module MadNLPMa57
 
 import ..MadNLPHSL:
     @kwdef, Logger, @debug, @warn, @error, libhsl,
-    AbstractOptions, set_options!, AbstractLinearSolver, StrideOneVector,
+    AbstractOptions, set_options!, AbstractLinearSolver,
     SymbolicException,FactorizationException,SolveException,InertiaException,
     SparseMatrixCSC, introduce, factorize!, solve!, improve!, is_inertia, inertia, findIJ, nnz
 
@@ -54,7 +54,7 @@ mutable struct Solver <: AbstractLinearSolver
 end
 
 
-ma57ad!(n::Cint,nz::Cint,I::StrideOneVector{Cint},J::StrideOneVector{Cint},lkeep::Cint,
+ma57ad!(n::Cint,nz::Cint,I::AbstractVector{Cint},J::AbstractVector{Cint},lkeep::Cint,
         keep::Vector{Cint},iwork::Vector{Cint},icntl::Vector{Cint},
         info::Vector{Cint},rinfo::Vector{Cdouble}) = ccall(
             (:ma57ad_,libhsl),
@@ -64,7 +64,7 @@ ma57ad!(n::Cint,nz::Cint,I::StrideOneVector{Cint},J::StrideOneVector{Cint},lkeep
              Ptr{Cint},Ptr{Cdouble}),
             n,nz,I,J,lkeep,keep,iwork,icntl,info,rinfo)
 
-ma57bd!(n::Cint,nz::Cint,V::StrideOneVector{Cdouble},fact::Vector{Cdouble},
+ma57bd!(n::Cint,nz::Cint,V::AbstractVector{Cdouble},fact::Vector{Cdouble},
         lfact::Cint,ifact::Vector{Cint},lifact::Cint,lkeep::Cint,
         keep::Vector{Cint},iwork::Vector{Cint},icntl::Vector{Cint},cntl::Vector{Cdouble},
         info::Vector{Cint},rinfo::Vector{Cdouble}) = ccall(
@@ -77,7 +77,7 @@ ma57bd!(n::Cint,nz::Cint,V::StrideOneVector{Cdouble},fact::Vector{Cdouble},
             n,nz,V,fact,lfact,ifact,lifact,lkeep,keep,iwork,icntl,cntl,info,rinfo)
 
 ma57cd!(job::Cint,n::Cint,fact::Vector{Cdouble},lfact::Cint,
-        ifact::Vector{Cint},lifact::Cint,nrhs::Cint,rhs::StrideOneVector{Cdouble},
+        ifact::Vector{Cint},lifact::Cint,nrhs::Cint,rhs::AbstractVector{Cdouble},
         lrhs::Cint,work::Vector{Cdouble},lwork::Cint,iwork::Vector{Cint},
         icntl::Vector{Cint},info::Vector{Cint}) = ccall(
             (:ma57cd_,libhsl),
@@ -155,7 +155,7 @@ function factorize!(M::Solver)
     return M
 end
 
-function solve!(M::Solver,rhs::StrideOneVector{Float64})
+function solve!(M::Solver,rhs::AbstractVector{Float64})
     ma57cd!(one(Int32),Int32(M.csc.n),M.fact,M.lfact,M.ifact,
             M.lifact,one(Int32),rhs,Int32(M.csc.n),M.work,M.lwork,M.iwork,M.icntl,M.info)
     M.info[1]<0 && throw(SolveException())

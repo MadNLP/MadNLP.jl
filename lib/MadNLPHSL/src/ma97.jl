@@ -5,7 +5,7 @@ module MadNLPMa97
 
 import ..MadNLPHSL:
     @kwdef, Logger, @debug, @warn, @error, libhsl,
-    AbstractOptions, AbstractLinearSolver, set_options!, SparseMatrixCSC, SubVector, StrideOneVector,
+    AbstractOptions, AbstractLinearSolver, set_options!, SparseMatrixCSC, SubVector,
     SymbolicException,FactorizationException,SolveException,InertiaException,
     introduce, factorize!, solve!, improve!, is_inertia, inertia
 import ..MadNLPHSL: Mc68
@@ -91,7 +91,7 @@ ma97_default_control_d(control::Control) = ccall(
     (Ref{Control},),
     control)
 
-ma97_analyse_d(check::Cint,n::Cint,ptr::StrideOneVector{Cint},row::StrideOneVector{Cint},
+ma97_analyse_d(check::Cint,n::Cint,ptr::AbstractVector{Cint},row::AbstractVector{Cint},
                val::Ptr{Nothing},akeep::Vector{Ptr{Nothing}},
                control::Control,info::Info,
                order::Ptr{Nothing}) = ccall(
@@ -101,14 +101,14 @@ ma97_analyse_d(check::Cint,n::Cint,ptr::StrideOneVector{Cint},row::StrideOneVect
                           Ptr{Ptr{Nothing}},Ref{Control},Ref{Info},Ptr{Cint}),
                          check,n,ptr,row,val,akeep,control,info,order)
 ma97_factor_d(matrix_type::Cint,ptr::Ptr{Nothing},row::Ptr{Nothing},
-              val::StrideOneVector{Cdouble},akeep::Vector{Ptr{Nothing}},fkeep::Vector{Ptr{Nothing}},
+              val::AbstractVector{Cdouble},akeep::Vector{Ptr{Nothing}},fkeep::Vector{Ptr{Nothing}},
               control::Control,info::Info,scale::Ptr{Nothing}) = ccall(
                   (:ma97_factor_d,libhsl),
                   Nothing,
                   (Cint,Ptr{Cint},Ptr{Cint},Ptr{Cdouble},Ptr{Ptr{Nothing}},
                    Ptr{Ptr{Nothing}},Ref{Control},Ref{Info},Ptr{Cdouble}),
                   matrix_type,ptr,row,val,akeep,fkeep,control,info,scale)
-ma97_solve_d(job::Cint,nrhs::Cint,x::StrideOneVector{Cdouble},ldx::Cint,
+ma97_solve_d(job::Cint,nrhs::Cint,x::AbstractVector{Cdouble},ldx::Cint,
              akeep::Vector{Ptr{Nothing}},fkeep::Vector{Ptr{Nothing}},
              control::Control,info::Info) = ccall(
                  (:ma97_solve_d,libhsl),
@@ -164,7 +164,7 @@ function factorize!(M::Solver)
     M.info.flag<0 && throw(FactorizationException())
     return M
 end
-function solve!(M::Solver,rhs::StrideOneVector{Float64})
+function solve!(M::Solver,rhs::AbstractVector{Float64})
     ma97_solve_d(Int32(0),Int32(1),rhs,M.n,M.akeep,M.fkeep,M.control,M.info)
     M.info.flag<0 && throw(SolveException())
     return rhs

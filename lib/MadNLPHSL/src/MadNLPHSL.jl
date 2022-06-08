@@ -1,8 +1,8 @@
 module MadNLPHSL
 
 import Libdl: dlopen, RTLD_DEEPBIND
-import MadNLP: @kwdef, Logger, @debug, @warn, @error, 
-    AbstractOptions, AbstractLinearSolver, set_options!, SparseMatrixCSC, SubVector, StrideOneVector,
+import MadNLP: @kwdef, Logger, @debug, @warn, @error,
+    AbstractOptions, AbstractLinearSolver, set_options!, SparseMatrixCSC, SubVector,
     SymbolicException,FactorizationException,SolveException,InertiaException,
     introduce, factorize!, solve!, improve!, is_inertia, inertia, findIJ, nnz,
     get_tril_to_full, transfer!
