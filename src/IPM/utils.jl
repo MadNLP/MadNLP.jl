@@ -64,7 +64,7 @@ function print_iter(ips::AbstractInteriorPointSolver;is_resto=false)
         is_resto ? ips.RR.inf_pr_R : ips.inf_pr,
         is_resto ? ips.RR.inf_du_R : ips.inf_du,
         is_resto ? log(10,ips.RR.mu_R) : log(10,ips.mu),
-        ips.cnt.k == 0 ? 0. : norm(ips.dx,Inf),
+        ips.cnt.k == 0 ? 0. : norm(primal(ips.d),Inf),
         ips.del_w == 0 ? "   - " : @sprintf("%5.1f",log(10,ips.del_w)),
         ips.alpha_z,ips.alpha,ips.ftype,ips.cnt.l))
     return
