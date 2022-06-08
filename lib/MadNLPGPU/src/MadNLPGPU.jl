@@ -11,16 +11,18 @@ import MadNLP
 
 import MadNLP:
     @kwdef, Logger, @debug, @warn, @error,
-    AbstractOptions, AbstractLinearSolver, AbstractNLPModel, set_options!, MadNLPLapackCPU,
+    AbstractOptions, AbstractLinearSolver, AbstractNLPModel, set_options!,
     SymbolicException,FactorizationException,SolveException,InertiaException,
-    introduce, factorize!, solve!, improve!, is_inertia, inertia, tril_to_full!
+    introduce, factorize!, solve!, improve!, is_inertia, inertia, tril_to_full!,
+    LapackOptions, input_type
+
 
 
 include("kernels.jl")
 
 if has_cuda()
     include("lapackgpu.jl")
-    export MadNLPLapackGPU
+    export LapackGPUSolver
 end
 
 end # module

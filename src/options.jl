@@ -1,5 +1,4 @@
 # Options
-abstract type AbstractOptions end
 
 parse_option(::Type{Module},str::String) = eval(Symbol(str))
 
@@ -22,7 +21,7 @@ end
     rethrow_error::Bool = true
     disable_garbage_collector::Bool = false
     blas_num_threads::Int = 1
-    linear_solver::Module
+    linear_solver::Type = LapackCPUSolver
     iterator::Type = RichardsonIterator
 
     # Output options
@@ -95,9 +94,9 @@ end
 end
 
 function check_option_sanity(options)
-    if options.linear_solver.INPUT_MATRIX_TYPE == :csc && options.kkt_system == DENSE_KKT_SYSTEM
-        error("[options] Sparse Linear solver is not supported in dense mode.\n"*
-              "Please use a dense linear solver or change `kkt_system` ")
-    end
+    # if options.linear_solver.INPUT_MATRIX_TYPE == :csc && options.kkt_system == DENSE_KKT_SYSTEM
+    #     error("[options] Sparse Linear solver is not supported in dense mode.\n"*
+    #           "Please use a dense linear solver or change `kkt_system` ")
+    # end
 end
 
