@@ -81,7 +81,7 @@ of a [`AbstractLinearSolver`](@ref) for the backsolve
 operations.
 
 ### Notes
-This function assumes the matrix stores in the linear solver
+This function assumes the matrix stored in the linear solver
 has been factorized previously.
 
 """
