@@ -13,9 +13,11 @@ makedocs(
     checkdocs = :exports,
     pages = [
         "Home" => "index.md",
+        "Installation" => "installation.md",
         "Quickstart" => "quickstart.md",
         "Options" => "options.md",
         "Manual" => [
+            "Solver" => "man/solver.md",
             "KKT systems" => "man/kkt.md",
             "Linear Solvers" => "man/linear_solvers.md",
         ],

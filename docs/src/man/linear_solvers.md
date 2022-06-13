@@ -1,12 +1,15 @@
+```@meta
+CurrentModule = MadNLP
+```
 # Linear solvers
 
 We suppose that the KKT system has been assembled previously
-into a given `AbstractKKTSystem`. Then, it remains to compute
+into a given [`AbstractKKTSystem`](@ref). Then, it remains to compute
 the Newton step by solving the KKT system for a given
-right-hand-side (given as a `AbstractKKTVector`).
+right-hand-side (given as a [`AbstractKKTVector`](@ref)).
 That's exactly the role of the linear solver.
 
-If we do not assume any structure, the KKT system writes
+If we do not assume any structure, the KKT system writes in generic form
 ```math
 K x = b
 ```
@@ -19,8 +22,8 @@ If the matrix $$K$$ has negative eigenvalues, we have no guarantee
 that the solution of the KKT system is a descent direction with regards
 to the original nonlinear problem. That's the reason why most of the linear
 solvers compute the inertia
-of the linear system when factorizing the matrix $$K$$ when employed inside
-an interior-point algorithm. The inertia counts the number of positive,
+of the linear system when factorizing the matrix $$K$$.
+The inertia counts the number of positive,
 negative and zero eigenvalues in the matrix. If the inertia does not
 meet a given criteria, then the matrix $$K$$ is regularized by adding
 a multiple of the identity to it: $$K_r = K + \alpha I$$.
@@ -47,7 +50,8 @@ of the matrix directly as a result of the factorization.
 
 ## Solving a KKT system with MadNLP
 
-We suppose available a `AbstractKKTSystem` `kkt`, properly assembled.
+We suppose available a [`AbstractKKTSystem`](@ref) `kkt`, properly assembled
+following the procedure presented [previously](kkt.md).
 We can query the assembled matrix $$K$$ as
 ```julia
 K = MadNLP.get_kkt(kkt)
@@ -78,5 +82,5 @@ for a right-hand-side `b` simply amounts to
 MadNLP.solve!(linear_solver, b)
 ```
 The values of `b` being modified inplace to store the solution $$x$$ of the linear
-system $$Kx =b $$.
+system $$Kx =b$$.
 
