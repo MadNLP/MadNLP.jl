@@ -8,7 +8,7 @@ makedocs(
         mathengine = Documenter.KaTeX()
     ),
     modules = [MadNLP],
-    repo = "https://github.com/exanauts/MadNLP.jl/blob/{commit}{path}#{line}",
+    repo = "https://github.com/MadNLP/MadNLP.jl/blob/{commit}{path}#{line}",
     strict = true,
     checkdocs = :exports,
     pages = [
@@ -29,7 +29,7 @@ makedocs(
 )
 
 deploydocs(
-    repo = "github.com/exanauts/MadNLP.jl.git",
+    repo = "github.com/MadNLP/MadNLP.jl.git",
     target = "build",
     devbranch = "master",
     devurl = "dev",
