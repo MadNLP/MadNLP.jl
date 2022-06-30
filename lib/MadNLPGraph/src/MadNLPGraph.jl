@@ -7,7 +7,7 @@ import MadNLP:
     eval_objective_gradient, eval_function, eval_constraint, eval_hessian_lagrangian, eval_constraint_jacobian,
     @kwdef, Logger, @debug, @warn, @error, @sprintf,
     AbstractOptions, AbstractLinearSolver, EmptyLinearSolver, set_options!,
-    SparseMatrixCSC, SubVector, StrideOneVector,
+    SparseMatrixCSC, SubVector, 
     SymbolicException,FactorizationException,SolveException,InertiaException,
     introduce, factorize!, solve!, improve!, is_inertia, inertia,
     default_linear_solver, default_dense_solver, get_csc_view, get_cscsy_view, nnz, mul!,

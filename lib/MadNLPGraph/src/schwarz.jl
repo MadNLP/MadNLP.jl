@@ -2,7 +2,7 @@ module MadNLPSchwarz
 
 import ..MadNLPGraph:
     @kwdef, Logger, @debug, @warn, @error,
-    default_linear_solver,SparseMatrixCSC, SubVector, StrideOneVector, get_cscsy_view, nnz,
+    default_linear_solver,SparseMatrixCSC, SubVector, get_cscsy_view, nnz,
     SymbolicException,FactorizationException,SolveException,InertiaException,
     AbstractOptions, AbstractLinearSolver, set_options!,
     MonolevelPartition, MonolevelStruc, BilevelPartition, BilevelStruc,
