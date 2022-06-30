@@ -33,7 +33,7 @@ _pardiso(
     pt::Vector{Int},maxfct::Ref{Cint},mnum::Ref{Cint},mtype::Ref{Cint},
     phase::Ref{Cint},n::Ref{Cint},a::Vector{Cdouble},ia::Vector{Cint},ja::Vector{Cint},
     perm::Vector{Cint},nrhs::Ref{Cint},iparm::Vector{Cint},msglvl::Ref{Cint},
-    b::StrideOneVector{Cdouble},x::StrideOneVector{Cdouble},err::Ref{Cint},dparm::Vector{Cdouble}) =
+    b::Vector{Cdouble},x::Vector{Cdouble},err::Ref{Cint},dparm::Vector{Cdouble}) =
         ccall(
             (:pardiso,libpardiso),
             Cvoid,
@@ -98,7 +98,7 @@ function factorize!(M::Solver)
     M.err.x < 0  && throw(FactorizationException())
     return M
 end
-function solve!(M::Solver,rhs::StrideOneVector{Float64})
+function solve!(M::Solver,rhs::Vector{Float64})
     _pardiso(M.pt,Ref{Int32}(1),Ref{Int32}(1),Ref{Int32}(-2),Ref{Int32}(33),
              Ref{Int32}(M.csc.n),M.csc.nzval,M.csc.colptr,M.csc.rowval,M.perm,
              Ref{Int32}(1),M.iparm,M.msglvl,rhs,M.w,M.err,M.dparm)

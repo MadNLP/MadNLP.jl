@@ -231,16 +231,16 @@ function SparseUnreducedKKTSystem{T, MT}(
     J[offset+2nlb+1:offset+2nlb+nub] .= (1:nub).+(n+m+nlb)
     J[offset+2nlb+nub+1:offset+2nlb+2nub] .= ind_ub
 
-    pr_diag = view(V,1:n)
-    du_diag = view(V,n_jac+n_hess+n+1:n_jac+n_hess+n+m)
+    pr_diag = unsafe_wrap(Vector{Float64},pointer(V),n)
+    du_diag = unsafe_wrap(Vector{Float64},pointer(V+n_jac+n_hess+n+1),m)
 
-    l_diag = view(V,offset+1:offset+nlb)
-    l_lower= view(V,offset+nlb+1:offset+2nlb)
-    u_diag = view(V,offset+2nlb+1:offset+2nlb+nub)
-    u_lower= view(V,offset+2nlb+nub+1:offset+2nlb+2nub)
+    l_diag = unsafe_wrap(Vector{Float64},pointer(V,offset+1), nlb)
+    l_lower= unsafe_wrap(Vector{Float64},pointer(V,offset+nlb+1), nlb)
+    u_diag = unsafe_wrap(Vector{Float64},pointer(V,offset+2nlb+1), nub)
+    u_lower= unsafe_wrap(Vector{Float64},pointer(V,offset+2nlb+nub+1), nub)
 
-    hess = view(V, n+1:n+n_hess)
-    jac = view(V, n_hess+n+1:n_hess+n+n_jac)
+    hess = unsafe_wrap(Vector{Float64},pointer(V,n+1), n_hess)
+    jac = unsafe_wrap(Vector{Float64},pointer(V, n_hess+n+1), n_jac)
 
     aug_raw = SparseMatrixCOO(aug_vec_length,aug_vec_length,I,J,V)
     jac_raw = SparseMatrixCOO(m,n,jac_sparsity_I,jac_sparsity_J,jac)

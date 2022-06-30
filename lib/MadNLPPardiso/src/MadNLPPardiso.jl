@@ -7,7 +7,7 @@ const INPUT_MATRIX_TYPE = :csc
 import Libdl: dlopen, RTLD_DEEPBIND
 import MadNLP:
     MadNLP, @kwdef, Logger, @debug, @warn, @error,
-    SubVector, StrideOneVector, SparseMatrixCSC, 
+    SubVector, SparseMatrixCSC, 
     SymbolicException,FactorizationException,SolveException,InertiaException,
     AbstractOptions, AbstractLinearSolver, set_options!,
     introduce, factorize!, solve!, improve!, is_inertia, inertia

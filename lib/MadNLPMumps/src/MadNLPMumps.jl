@@ -5,7 +5,7 @@ import MUMPS_seq_jll
 import MadNLP:
     parsefile, dlopen,
     @kwdef, Logger, @debug, @warn, @error,
-    SparseMatrixCSC, SubVector, StrideOneVector, 
+    SparseMatrixCSC, SubVector,
     SymbolicException,FactorizationException,SolveException,InertiaException,
     AbstractOptions, AbstractLinearSolver, set_options!,
     introduce, factorize!, solve!, improve!, is_inertia, inertia, findIJ, nnz
@@ -426,7 +426,7 @@ function factorize!(M::Solver)
     return M
 end
 
-function solve!(M::Solver,rhs::StrideOneVector{Float64})
+function solve!(M::Solver,rhs::Vector{Float64})
     M.is_singular && return rhs
     M.mumps_struc.rhs = pointer(rhs)
     M.mumps_struc.job = 3

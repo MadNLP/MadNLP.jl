@@ -5,7 +5,7 @@ module MadNLPMa77
 
 import ..MadNLPHSL:
     @kwdef, Logger, @debug, @warn, @error, libhsl,
-    SparseMatrixCSC, SparseMatrixCSC, SubVector, StrideOneVector,
+    SparseMatrixCSC, SparseMatrixCSC, SubVector, 
     get_tril_to_full, transfer!,
     AbstractOptions, AbstractLinearSolver, set_options!,
     SymbolicException,FactorizationException,SolveException,InertiaException,
@@ -188,14 +188,14 @@ ma77_open_d(n::Cint,fname1::String,fname2::String,fname3::String,fname4::String,
                 (Cint,Ptr{Cchar},Ptr{Cchar},Ptr{Cchar},Ptr{Cchar},
                  Ptr{Ptr{Cvoid}},Ref{Control},Ref{Info}),
                 n,fname1,fname2,fname3,fname4,keep,control,info)
-ma77_input_vars_d(idx::Cint,nvar::Cint,list::StrideOneVector{Cint},
+ma77_input_vars_d(idx::Cint,nvar::Cint,list::Vector{Cint},
                   keep::Vector{Ptr{Cvoid}},control::Control,info::Info) = ccall(
                       (:ma77_input_vars_d,libhsl),
                       Cvoid,
                       (Cint,Cint,Ptr{Cint},
                        Ptr{Ptr{Cvoid}},Ref{Control},Ref{Info}),
                       idx,nvar,list,keep,control,info)
-ma77_input_reals_d(idx::Cint,length::Cint,reals::StrideOneVector{Cdouble},
+ma77_input_reals_d(idx::Cint,length::Cint,reals::Vector{Cdouble},
                    keep::Vector{Ptr{Cvoid}},control::Control,info::Info) = ccall(
                        (:ma77_input_reals_d,libhsl),
                        Cvoid,
@@ -311,7 +311,7 @@ function factorize!(M::Solver)
     M.info.flag < 0 && throw(FactorizationException())
     return M
 end
-function solve!(M::Solver,rhs::StrideOneVector{Float64})
+function solve!(M::Solver,rhs::Vector{Float64})
     ma77_solve_d(Int32(0),Int32(1),Int32(M.full.n),rhs,M.keep,M.control,M.info,C_NULL);
     M.info.flag < 0 && throw(SolveException())
     return rhs
