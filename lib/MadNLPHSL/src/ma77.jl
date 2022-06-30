@@ -266,9 +266,14 @@ function Ma77Solver(csc::SparseMatrixCSC{Float64,Int32};
     info.flag < 0 && throw(SymbolicException())
 
     for i=1:full.n
-        ma77_input_vars_d(Int32(i),full.colptr[i+1]-full.colptr[i],
-                          view(full.rowval,full.colptr[i]:full.colptr[i+1]-1),
-                          keep,control,info);
+        ma77_input_vars_d(
+            Int32(i),full.colptr[i+1]-full.colptr[i],
+            unsafe_wrap(
+                Vector{Int32},
+                pointer(full.rowval,full.colptr[i]),
+                full.colptr[i+1]-full.colptr[i]
+            ),
+            keep,control,info);
         info.flag < 0 && throw(LinearSymbolicException())
     end
 
@@ -276,7 +281,7 @@ function Ma77Solver(csc::SparseMatrixCSC{Float64,Int32};
     info.flag<0 && throw(SymbolicException())
 
     M = Ma77Solver(csc,full,tril_to_full_view,
-               control,info,mc68_control,mc68_info,order,keep,opt,logger)
+                   control,info,mc68_control,mc68_info,order,keep,opt,logger)
     finalizer(finalize,M)
     return M
 end
@@ -284,9 +289,15 @@ end
 function factorize!(M::Ma77Solver)
     M.full.nzval.=M.tril_to_full_view
     for i=1:M.full.n
-        ma77_input_reals_d(Int32(i),M.full.colptr[i+1]-M.full.colptr[i],
-                           view(M.full.nzval,M.full.colptr[i]:M.full.colptr[i+1]-1),
-                           M.keep,M.control,M.info)
+        ma77_input_reals_d(
+            Int32(i),M.full.colptr[i+1]-M.full.colptr[i],
+            unsafe_wrap(
+                Vector{Int32},
+                pointer(M.full.nzval,M.full.colptr[i]),
+                M.full.colptr[i+1]-M.full.colptr[i]
+            ),
+            M.keep,M.control,M.info
+        )
         M.info.flag < 0 && throw(FactorizationException())
     end
     ma77_factor_d(Int32(0),M.keep,M.control,M.info,C_NULL)

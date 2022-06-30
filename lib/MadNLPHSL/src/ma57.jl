@@ -146,7 +146,7 @@ function factorize!(M::Ma57Solver)
     return M
 end
 
-function solve!(M::Ma77Solver,rhs::Vector{Float64})
+function solve!(M::Ma57Solver,rhs::Vector{Float64})
     ma57cd!(one(Int32),Int32(M.csc.n),M.fact,M.lfact,M.ifact,
             M.lifact,one(Int32),rhs,Int32(M.csc.n),M.work,M.lwork,M.iwork,M.icntl,M.info)
     M.info[1]<0 && throw(SolveException())

@@ -1,6 +1,3 @@
-# MadNLP.jl
-# Created by Sungho Shin (sungho.shin@wisc.edu)
-
 @kwdef mutable struct Ma86Options <: AbstractOptions
     ma86_num_threads::Int = 1
     ma86_print_level::Float64 = -1
