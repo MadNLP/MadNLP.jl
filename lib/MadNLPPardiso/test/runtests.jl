@@ -13,7 +13,7 @@ testset = [
     [
         "PardisoMKL",
         ()->MadNLP.Optimizer(
-            linear_solver=MadNLPPardisoMKL,
+            linear_solver=PardisoMKLSolver,
             print_level=MadNLP.ERROR),
         ["eigmina"]
     ]
