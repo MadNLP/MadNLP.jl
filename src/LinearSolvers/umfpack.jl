@@ -1,21 +1,7 @@
-# MadNLP.jl
-# Created by Sungho Shin (sungho.shin@wisc.edu)
-
-module MadNLPUmfpack
-
-import ..MadNLP:
-    @kwdef, Logger, @debug, @warn, @error,
-    SubVector, Vector, SparseMatrixCSC, get_tril_to_full,
-    SymbolicException,FactorizationException,SolveException,InertiaException,
-    AbstractOptions, AbstractLinearSolver, set_options!, UMFPACK,
-    introduce, factorize!, solve!, mul!, improve!, is_inertia, inertia
-
-const INPUT_MATRIX_TYPE = :csc
-
 const umfpack_default_ctrl = copy(UMFPACK.umf_ctrl)
 const umfpack_default_info = copy(UMFPACK.umf_info)
 
-@kwdef mutable struct Options <: AbstractOptions
+@kwdef mutable struct UmfpackOptions <: AbstractOptions
     umfpack_pivtol::Float64 = 1e-4
     umfpack_pivtolmax::Float64 = 1e-1
     umfpack_sym_pivtol::Float64 = 1e-3
@@ -23,7 +9,7 @@ const umfpack_default_info = copy(UMFPACK.umf_info)
     umfpack_strategy::Float64 = 2.
 end
 
-mutable struct Solver <: AbstractLinearSolver
+mutable struct UmfpackSolver <: AbstractLinearSolver
     inner::UMFPACK.UmfpackLU
     tril::SparseMatrixCSC{Float64}
     full::SparseMatrixCSC{Float64}
@@ -35,7 +21,7 @@ mutable struct Solver <: AbstractLinearSolver
     ctrl::Vector{Float64}
     info::Vector{Float64}
 
-    opt::Options
+    opt::UmfpackOptions
     logger::Logger
 end
 
@@ -57,10 +43,10 @@ umfpack_di_solve(typ,colptr,rowval,nzval,x,b,numeric,ctrl,info) = ccall(
 
 
 
-function Solver(csc::SparseMatrixCSC;
-                option_dict::Dict{Symbol,Any}=Dict{Symbol,Any}(),
-                opt=Options(),logger=Logger(),
-                kwargs...)
+function UmfpackSolver(csc::SparseMatrixCSC;
+    option_dict::Dict{Symbol,Any}=Dict{Symbol,Any}(),
+    opt=UmfpackOptions(),logger=Logger(),
+    kwargs...)
 
     set_options!(opt,option_dict,kwargs)
 
@@ -81,10 +67,10 @@ function Solver(csc::SparseMatrixCSC;
 
     tmp = Vector{Ptr{Cvoid}}(undef, 1)
 
-    return Solver(inner,csc,full,tril_to_full_view,p,tmp,ctrl,info,opt,logger)
+    return UmfpackSolver(inner,csc,full,tril_to_full_view,p,tmp,ctrl,info,opt,logger)
 end
 
-function factorize!(M::Solver)
+function factorize!(M::UmfpackSolver)
     UMFPACK.umfpack_free_numeric(M.inner)
     M.full.nzval.=M.tril_to_full_view
     status = umfpack_di_numeric(M.inner.colptr,M.inner.rowval,M.inner.nzval,M.inner.symbolic,M.tmp,M.ctrl,M.info)
@@ -93,15 +79,16 @@ function factorize!(M::Solver)
     M.inner.status = status
     return M
 end
-function solve!(M::Solver,rhs::Vector{Float64})
+function solve!(M::UmfpackSolver,rhs::Vector{Float64})
     status = umfpack_di_solve(1,M.inner.colptr,M.inner.rowval,M.inner.nzval,M.p,rhs,M.inner.numeric,M.ctrl,M.info)
     rhs .= M.p
     return rhs
 end
-is_inertia(::Solver) = false
-inertia(M::Solver) = throw(InertiaException())
+is_inertia(::UmfpackSolver) = false
+inertia(M::UmfpackSolver) = throw(InertiaException())
+input_type(::Type{UmfpackSolver}) = :csc
 
-function improve!(M::Solver)
+function improve!(M::UmfpackSolver)
     if M.ctrl[4] == M.opt.umfpack_pivtolmax
         @debug(M.logger,"improve quality failed.")
         return false
@@ -112,6 +99,5 @@ function improve!(M::Solver)
 
     return false
 end
-introduce(::Solver)="umfpack"
+introduce(::UmfpackSolver)="umfpack"
 
-end # module

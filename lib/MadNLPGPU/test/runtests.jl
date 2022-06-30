@@ -4,38 +4,34 @@ testset = [
     [
         "LapackGPU-BUNCHKAUFMAN",
         ()->MadNLP.Optimizer(
-            linear_solver=MadNLPLapackGPU,
-            lapackgpu_algorithm=MadNLPLapackGPU.BUNCHKAUFMAN,
+            linear_solver=LapackGPUSolver,
+            lapackgpu_algorithm=MadNLP.BUNCHKAUFMAN,
             print_level=MadNLP.ERROR),
         [],
-        @isdefined(MadNLPLapackGPU)
     ],
     [
         "LapackGPU-LU",
         ()->MadNLP.Optimizer(
-            linear_solver=MadNLPLapackGPU,
-            lapackgpu_algorithm=MadNLPLapackGPU.LU,
+            linear_solver=LapackGPUSolver,
+            lapackgpu_algorithm=MadNLP.LU,
             print_level=MadNLP.ERROR),
         [],
-        @isdefined(MadNLPLapackGPU)
     ],
     [
         "LapackGPU-QR",
         ()->MadNLP.Optimizer(
-            linear_solver=MadNLPLapackGPU,
-            lapackgpu_algorithm=MadNLPLapackGPU.QR,
+            linear_solver=LapackGPUSolver,
+            lapackgpu_algorithm=MadNLP.QR,
             print_level=MadNLP.ERROR),
         [],
-        @isdefined(MadNLPLapackGPU)
     ],
     [
         "LapackGPU-CHOLESKY",
         ()->MadNLP.Optimizer(
-            linear_solver=MadNLPLapackGPU,
-            lapackgpu_algorithm=MadNLPLapackGPU.CHOLESKY,
+            linear_solver=LapackGPUSolver,
+            lapackgpu_algorithm=MadNLP.CHOLESKY,
             print_level=MadNLP.ERROR),
         ["infeasible", "lootsma", "eigmina"],
-        @isdefined(MadNLPLapackGPU)
     ],
 ]
 

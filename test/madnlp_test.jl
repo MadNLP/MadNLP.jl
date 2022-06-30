@@ -2,39 +2,39 @@ testset = [
     [
         "Umfpack",
         ()->MadNLP.Optimizer(
-            linear_solver=MadNLPUmfpack,
+            linear_solver=MadNLP.UmfpackSolver,
             print_level=MadNLP.ERROR),
         []
     ],
     [
         "LapackCPU-BUNCHKAUFMAN",
         ()->MadNLP.Optimizer(
-            linear_solver=MadNLPLapackCPU,
-            lapackcpu_algorithm=MadNLPLapackCPU.BUNCHKAUFMAN,
+            linear_solver=MadNLP.LapackCPUSolver,
+            lapackcpu_algorithm=MadNLP.BUNCHKAUFMAN,
             print_level=MadNLP.ERROR),
         []
     ],
     [
         "LapackCPU-LU",
         ()->MadNLP.Optimizer(
-            linear_solver=MadNLPLapackCPU,
-            lapackcpu_algorithm=MadNLPLapackCPU.LU,
+            linear_solver=MadNLP.LapackCPUSolver,
+            lapackcpu_algorithm=MadNLP.LU,
             print_level=MadNLP.ERROR),
         []
     ],
     [
         "LapackCPU-QR",
         ()->MadNLP.Optimizer(
-            linear_solver=MadNLPLapackCPU,
-            lapackcpu_algorithm=MadNLPLapackCPU.QR,
+            linear_solver=MadNLP.LapackCPUSolver,
+            lapackcpu_algorithm=MadNLP.QR,
             print_level=MadNLP.ERROR),
         []
     ],
     [
         "LapackCPU-CHOLESKY",
         ()->MadNLP.Optimizer(
-            linear_solver=MadNLPLapackCPU,
-            lapackcpu_algorithm=MadNLPLapackCPU.CHOLESKY,
+            linear_solver=MadNLP.LapackCPUSolver,
+            lapackcpu_algorithm=MadNLP.CHOLESKY,
             print_level=MadNLP.ERROR),
         ["infeasible", "lootsma", "eigmina"]
     ],

@@ -7,13 +7,12 @@ import MadNLP:
     @kwdef, Logger, @debug, @warn, @error,
     SparseMatrixCSC, SubVector,
     SymbolicException,FactorizationException,SolveException,InertiaException,
-    AbstractOptions, AbstractLinearSolver, set_options!,
+    AbstractOptions, AbstractLinearSolver, set_options!, input_type,
     introduce, factorize!, solve!, improve!, is_inertia, inertia, findIJ, nnz
 
-const INPUT_MATRIX_TYPE = :csc
 const version = parsefile(joinpath(dirname(pathof(MUMPS_seq_jll)),"..","Project.toml"))["version"]
 
-@kwdef mutable struct Options <: AbstractOptions
+@kwdef mutable struct MumpsOptions <: AbstractOptions
     mumps_dep_tol::Float64 = 0.
     mumps_mem_percent::Int = 1000
     mumps_permuting_scaling::Int = 7
@@ -318,7 +317,7 @@ else
     error("MUMPS_seq_jll version not supported")
 end
 
-mutable struct Solver <: AbstractLinearSolver
+mutable struct MumpsSolver <: AbstractLinearSolver
     csc::SparseMatrixCSC{Float64,Int32}
     I::Vector{Int32}
     J::Vector{Int32}
@@ -326,7 +325,7 @@ mutable struct Solver <: AbstractLinearSolver
     pivnul_list::Vector{Int32}
     mumps_struc::Struc
     is_singular::Bool
-    opt::Options
+    opt::MumpsOptions
     logger::Logger
 end
 
@@ -348,9 +347,9 @@ function locked_dmumps_c(mumps_struc::Struc)
 end
 # ---------------------------------------------------------------------------------------
 
-function Solver(csc::SparseMatrixCSC{Float64,Int32};
+function MumpsSolver(csc::SparseMatrixCSC{Float64,Int32};
                 option_dict::Dict{Symbol,Any}=Dict{Symbol,Any}(),
-                opt=Options(),logger=Logger(),
+                opt=MumpsOptions(),logger=Logger(),
                 kwargs...)
 
     set_options!(opt,option_dict,kwargs)
@@ -398,13 +397,13 @@ function Solver(csc::SparseMatrixCSC{Float64,Int32};
 
     csc.nzval.=a
 
-    M = Solver(csc,I,J,sym_perm,pivnul_list,mumps_struc,false,opt,logger)
+    M = MumpsSolver(csc,I,J,sym_perm,pivnul_list,mumps_struc,false,opt,logger)
     finalizer(finalize,M)
 
     return M
 end
 
-function factorize!(M::Solver)
+function factorize!(M::MumpsSolver)
     M.is_singular = false
     M.mumps_struc.job = 2;
     cnt = 0
@@ -426,7 +425,7 @@ function factorize!(M::Solver)
     return M
 end
 
-function solve!(M::Solver,rhs::Vector{Float64})
+function solve!(M::MumpsSolver,rhs::Vector{Float64})
     M.is_singular && return rhs
     M.mumps_struc.rhs = pointer(rhs)
     M.mumps_struc.job = 3
@@ -435,15 +434,15 @@ function solve!(M::Solver,rhs::Vector{Float64})
     return rhs
 end
 
-is_inertia(::Solver) = true
-function inertia(M::Solver)
+is_inertia(::MumpsSolver) = true
+function inertia(M::MumpsSolver)
     return (M.csc.n-M.is_singular-M.mumps_struc.infog[12],
             M.is_singular,
             M.mumps_struc.infog[12])
 end
 
 
-function improve!(M::Solver)
+function improve!(M::MumpsSolver)
     if M.mumps_struc.cntl[1] == M.opt.mumps_pivtolmax
         @debug(M.logger,"improve quality failed.")
         return false
@@ -453,11 +452,12 @@ function improve!(M::Solver)
     return true
 end
 
-function finalize(M::Solver)
+function finalize(M::MumpsSolver)
     M.mumps_struc.job = -2
     locked_dmumps_c(M.mumps_struc);
 end
 
-introduce(::Solver)="mumps"
+introduce(::MumpsSolver)="mumps"
+input_type(::Type{MumpsSolver}) = :csc
 
 end # module

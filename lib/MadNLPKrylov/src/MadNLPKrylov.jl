@@ -9,7 +9,8 @@ import IterativeSolvers:
     orthogonalize_and_normalize!, update_residual!, gmres_iterable!, GMRESIterable, converged,
     ModifiedGramSchmidt
 
-@kwdef mutable struct Options <: AbstractOptions
+
+@kwdef mutable struct KrylovOptions <: AbstractOptions
     krylov_restart::Int = 5
     krylov_max_iter::Int = 10
     krylov_tol::Float64 = 1e-10
@@ -29,15 +30,15 @@ struct VirtualPreconditioner
 end
 ldiv!(Pl::VirtualPreconditioner,x::Vector{Float64}) = Pl.ldiv!(x)
 
-mutable struct Solver <: AbstractIterator
+mutable struct KrylovSolver <: AbstractIterator
     g::Union{Nothing,GMRESIterable}
     res::Vector{Float64}
-    opt::Options
+    opt::KrylovOptions
     logger::Logger
 end
 
-function Solver(res::Vector{Float64},_mul!,_ldiv!;
-                opt=Options(),logger=Logger(),
+function KrylovSolver(res::Vector{Float64},_mul!,_ldiv!;
+                opt=KrylovOptions(),logger=Logger(),
                 option_dict::Dict{Symbol,Any}=Dict{Symbol,Any}(),kwargs...)
     !isempty(kwargs) && (for (key,val) in kwargs; option_dict[key]=val; end)
     set_options!(opt,option_dict)
@@ -50,11 +51,11 @@ function Solver(res::Vector{Float64},_mul!,_ldiv!;
                       opt.krylov_max_iter,opt.krylov_tol,0.,
                       ModifiedGramSchmidt())
 
-    return Solver(g,res,opt,logger)
+    return KrylovSolver(g,res,opt,logger)
 end
 
 function solve_refine!(x::StridedVector{Float64},
-                       is::Solver,
+                       is::KrylovSolver,
                        b::AbstractVector{Float64})
     @debug(is.logger,"Iterator initiated")
     is.res.=0

@@ -5,7 +5,7 @@ using MadNLPTests
 function _compare_gpu_with_cpu(kkt_system, n, m, ind_fixed)
     madnlp_options = Dict{Symbol, Any}(
         :kkt_system=>MadNLP.DENSE_CONDENSED_KKT_SYSTEM,
-        :linear_solver=>MadNLPLapackGPU,
+        :linear_solver=>LapackGPUSolver,
         :print_level=>MadNLP.ERROR,
     )
 

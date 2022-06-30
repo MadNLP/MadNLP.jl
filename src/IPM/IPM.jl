@@ -103,10 +103,10 @@ function InteriorPointSolver(nlp::AbstractNLPModel;
     check_option_sanity(opt)
 
     KKTSystem = if opt.kkt_system == SPARSE_KKT_SYSTEM
-        MT = (opt.linear_solver.INPUT_MATRIX_TYPE == :csc) ? SparseMatrixCSC{Float64, Int32} : Matrix{Float64}
+        MT = (input_type(opt.linear_solver) == :csc) ? SparseMatrixCSC{Float64, Int32} : Matrix{Float64}
         SparseKKTSystem{Float64, MT}
     elseif opt.kkt_system == SPARSE_UNREDUCED_KKT_SYSTEM
-        MT = (opt.linear_solver.INPUT_MATRIX_TYPE == :csc) ? SparseMatrixCSC{Float64, Int32} : Matrix{Float64}
+        MT = (input_type(opt.linear_solver) == :csc) ? SparseMatrixCSC{Float64, Int32} : Matrix{Float64}
         SparseUnreducedKKTSystem{Float64, MT}
     elseif opt.kkt_system == DENSE_KKT_SYSTEM
         MT = Matrix{Float64}
@@ -196,7 +196,7 @@ function InteriorPointSolver{KKTSystem}(nlp::AbstractNLPModel, opt::Options;
 
     @trace(logger,"Initializing linear solver.")
     cnt.linear_solver_time =
-        @elapsed linear_solver = opt.linear_solver.Solver(get_kkt(kkt) ; option_dict=option_linear_solver,logger=logger)
+        @elapsed linear_solver = opt.linear_solver(get_kkt(kkt) ; option_dict=option_linear_solver,logger=logger)
 
     n_kkt = size(kkt, 1)
     buffer_vec = similar(full(d), n_kkt)

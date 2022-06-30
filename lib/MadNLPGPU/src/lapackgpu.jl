@@ -1,11 +1,4 @@
-module MadNLPLapackGPU
 
-import ..MadNLPGPU:
-    @kwdef, Logger, @debug, @warn, @error,
-    AbstractOptions, AbstractLinearSolver, set_options!,
-    SymbolicException,FactorizationException,SolveException,InertiaException,
-    introduce, factorize!, solve!, improve!, is_inertia, inertia, MadNLPLapackCPU, tril_to_full!,
-    CUBLAS, CUSOLVER, CuVector, CuMatrix, R_64F, runtime_version
 import .CUSOLVER:
     cusolverDnDsytrf_bufferSize, cusolverDnDsytrf,
     cusolverDnDpotrf_bufferSize, cusolverDnDpotrf, cusolverDnDpotrs,
@@ -16,14 +9,8 @@ import .CUSOLVER:
 import .CUBLAS: cublasDtrsm_v2, handle, CUBLAS_DIAG_NON_UNIT,
     CUBLAS_FILL_MODE_LOWER, CUBLAS_FILL_MODE_UPPER, CUBLAS_SIDE_LEFT, CUBLAS_OP_N, CUBLAS_OP_T
 
-const INPUT_MATRIX_TYPE = :dense
 
-@enum(Algorithms::Int, BUNCHKAUFMAN = 1, LU = 2, QR = 3, CHOLESKY = 4)
-@kwdef mutable struct Options <: AbstractOptions
-    lapackgpu_algorithm::Algorithms = BUNCHKAUFMAN
-end
-
-mutable struct Solver{MT} <: AbstractLinearSolver
+mutable struct LapackGPUSolver{MT} <: AbstractLinearSolver
     dense::MT
     fact::CuMatrix{Float64}
     rhs::CuVector{Float64}
@@ -33,13 +20,13 @@ mutable struct Solver{MT} <: AbstractLinearSolver
     lwork_host
     info::CuVector{Int32}
     etc::Dict{Symbol,Any} # throw some algorithm-specific things here
-    opt::Options
+    opt::LapackOptions
     logger::Logger
 end
 
-function Solver(dense::MT;
+function LapackGPUSolver(dense::MT;
                 option_dict::Dict{Symbol,Any}=Dict{Symbol,Any}(),
-                opt=Options(),logger=Logger(),
+                opt=LapackOptions(),logger=Logger(),
                 kwargs...) where {MT <: AbstractMatrix}
 
     set_options!(opt,option_dict,kwargs...)
@@ -52,44 +39,44 @@ function Solver(dense::MT;
     info = CuVector{Int32}(undef,1)
     etc = Dict{Symbol,Any}()
 
-    return Solver(dense,fact,rhs,work,lwork,work_host,lwork_host,info,etc,opt,logger)
+    return LapackGPUSolver(dense,fact,rhs,work,lwork,work_host,lwork_host,info,etc,opt,logger)
 end
 
-function factorize!(M::Solver)
-    if M.opt.lapackgpu_algorithm == BUNCHKAUFMAN
+function factorize!(M::LapackGPUSolver)
+    if M.opt.lapack_algorithm == MadNLP.BUNCHKAUFMAN
         factorize_bunchkaufman!(M)
-    elseif M.opt.lapackgpu_algorithm == LU
+    elseif M.opt.lapack_algorithm == MadNLP.LU
         factorize_lu!(M)
-    elseif M.opt.lapackgpu_algorithm == QR
+    elseif M.opt.lapack_algorithm == MadNLP.QR
         factorize_qr!(M)
-    elseif M.opt.lapackgpu_algorithm == CHOLESKY
+    elseif M.opt.lapack_algorithm == MadNLP.CHOLESKY
         factorize_cholesky!(M)
     else
-        error(LOGGER,"Invalid lapackgpu_algorithm")
+        error(LOGGER,"Invalid lapack_algorithm")
     end
 end
-function solve!(M::Solver,x)
-    if M.opt.lapackgpu_algorithm == BUNCHKAUFMAN
+function solve!(M::LapackGPUSolver,x)
+    if M.opt.lapack_algorithm == MadNLP.BUNCHKAUFMAN
         solve_bunchkaufman!(M,x)
-    elseif M.opt.lapackgpu_algorithm == LU
+    elseif M.opt.lapack_algorithm == MadNLP.LU
         solve_lu!(M,x)
-    elseif M.opt.lapackgpu_algorithm == QR
+    elseif M.opt.lapack_algorithm == MadNLP.QR
         solve_qr!(M,x)
-    elseif M.opt.lapackgpu_algorithm == CHOLESKY
+    elseif M.opt.lapack_algorithm == MadNLP.CHOLESKY
         solve_cholesky!(M,x)
     else
-        error(LOGGER,"Invalid lapackgpu_algorithm")
+        error(LOGGER,"Invalid lapack_algorithm")
     end
 end
 
-improve!(M::Solver) = false
-introduce(M::Solver) = "Lapack-GPU ($(M.opt.lapackgpu_algorithm))"
+improve!(M::LapackGPUSolver) = false
+introduce(M::LapackGPUSolver) = "Lapack-GPU ($(M.opt.lapack_algorithm))"
 
 if runtime_version() >= v"11.3.1"
 
-    is_inertia(M::Solver) = M.opt.lapackgpu_algorithm == CHOLESKY  # TODO: implement inertia(M::Solver) for BUNCHKAUFMAN
+    is_inertia(M::LapackGPUSolver) = M.opt.lapack_algorithm == MadNLP.CHOLESKY  # TODO: implement inertia(M::Solver) for BUNCHKAUFMAN
 
-    function factorize_bunchkaufman!(M::Solver)
+    function factorize_bunchkaufman!(M::LapackGPUSolver)
         haskey(M.etc,:ipiv) || (M.etc[:ipiv] = CuVector{Int32}(undef,size(M.dense,1)))
         haskey(M.etc,:ipiv64) || (M.etc[:ipiv64] = CuVector{Int64}(undef,length(M.etc[:ipiv])))
 
@@ -104,7 +91,7 @@ if runtime_version() >= v"11.3.1"
         return M
     end
 
-    function solve_bunchkaufman!(M::Solver,x)
+    function solve_bunchkaufman!(M::LapackGPUSolver,x)
 
         copyto!(M.etc[:ipiv64],M.etc[:ipiv])
         copyto!(M.rhs,x)
@@ -130,10 +117,10 @@ if runtime_version() >= v"11.3.1"
         return x
     end
 else
-    is_inertia(M::Solver) =
-        M.opt.lapackgpu_algorithm == CHOLESKY || M.opt.lapackgpu_algorithm == CHOLESKY
+    is_inertia(M::LapackGPUSolver) =
+        M.opt.lapack_algorithm == MadNLP.CHOLESKY
 
-    function factorize_bunchkaufman!(M::Solver)
+    function factorize_bunchkaufman!(M::LapackGPUSolver)
         haskey(M.etc,:ipiv) || (M.etc[:ipiv] = CuVector{Int32}(undef,size(M.dense,1)))
 
         copyto!(M.fact,M.dense)
@@ -156,7 +143,7 @@ else
         return M
     end
 
-    function solve_bunchkaufman!(M::Solver,x)
+    function solve_bunchkaufman!(M::LapackGPUSolver,x)
         ccall(
             (:dsytrs_64_,"libopenblas64_"), # MKL doesn't work for some reason...
             Cvoid,
@@ -167,7 +154,7 @@ else
     end
 end
 
-function factorize_lu!(M::Solver)
+function factorize_lu!(M::LapackGPUSolver)
     haskey(M.etc,:ipiv) || (M.etc[:ipiv] = CuVector{Int32}(undef,size(M.dense,1)))
     tril_to_full!(M.dense)
     copyto!(M.fact,M.dense)
@@ -181,7 +168,7 @@ function factorize_lu!(M::Solver)
     return M
 end
 
-function solve_lu!(M::Solver,x)
+function solve_lu!(M::LapackGPUSolver,x)
     copyto!(M.rhs,x)
     cusolverDnDgetrs(
         dense_handle(),CUBLAS_OP_N,
@@ -191,7 +178,7 @@ function solve_lu!(M::Solver,x)
     return x
 end
 
-function factorize_qr!(M::Solver)
+function factorize_qr!(M::LapackGPUSolver)
     haskey(M.etc,:tau) || (M.etc[:tau] = CuVector{Float64}(undef,size(M.dense,1)))
     haskey(M.etc,:one) || (M.etc[:one] = ones(1))
     tril_to_full!(M.dense)
@@ -202,7 +189,7 @@ function factorize_qr!(M::Solver)
     return M
 end
 
-function solve_qr!(M::Solver,x)
+function solve_qr!(M::LapackGPUSolver,x)
     copyto!(M.rhs,x)
     cusolverDnDormqr_bufferSize(dense_handle(),CUBLAS_SIDE_LEFT,CUBLAS_OP_T,
                                 Int32(size(M.fact,1)),Int32(1),Int32(length(M.etc[:tau])),M.fact,Int32(size(M.fact,2)),M.etc[:tau],M.rhs,Int32(length(M.rhs)),M.lwork)
@@ -215,7 +202,7 @@ function solve_qr!(M::Solver,x)
     return x
 end
 
-function factorize_cholesky!(M::Solver)
+function factorize_cholesky!(M::LapackGPUSolver)
     copyto!(M.fact,M.dense)
     cusolverDnDpotrf_bufferSize(
         dense_handle(),CUBLAS_FILL_MODE_LOWER,
@@ -228,7 +215,7 @@ function factorize_cholesky!(M::Solver)
     return M
 end
 
-function solve_cholesky!(M::Solver,x)
+function solve_cholesky!(M::LapackGPUSolver,x)
     copyto!(M.rhs,x)
     cusolverDnDpotrs(
         dense_handle(),CUBLAS_FILL_MODE_LOWER,
@@ -238,14 +225,15 @@ function solve_cholesky!(M::Solver,x)
     return x
 end
 
-function inertia(M::Solver)
-    if M.opt.lapackgpu_algorithm == BUNCHKAUFMAN
+function inertia(M::LapackGPUSolver)
+    if M.opt.lapack_algorithm == MadNLP.BUNCHKAUFMAN
         inertia(M.etc[:fact_cpu],M.etc[:ipiv_cpu],M.etc[:info_cpu][])
-    elseif M.opt.lapackgpu_algorithm == CHOLESKY
+    elseif M.opt.lapack_algorithm == MadNLP.CHOLESKY
         sum(M.info) == 0 ? (size(M.fact,1),0,0) : (0,size(M.fact,1),0)
     else
         error(LOGGER,"Invalid lapackcpu_algorithm")
     end
 end
 
-end # module
+input_type(::Type{LapackGPUSolver}) = :dense
+
