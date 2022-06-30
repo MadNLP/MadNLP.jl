@@ -5,7 +5,7 @@ module MadNLPMa27
 
 import ..MadNLPHSL:
     @kwdef, Logger, @debug, @warn, @error, libhsl,
-    AbstractOptions, AbstractLinearSolver, set_options!, SparseMatrixCSC, SubVector,
+    AbstractOptions, AbstractLinearSolver, set_options!, SparseMatrixCSC, SubVector, 
     SymbolicException,FactorizationException,SolveException,InertiaException,
     introduce, factorize!, solve!, improve!, is_inertia, inertia, findIJ, nnz
 
@@ -33,7 +33,7 @@ mutable struct Solver <: AbstractLinearSolver
     info::Vector{Int32}
 
     a::Vector{Float64}
-    a_view::SubArray{Float64,1,Vector{Float64},Tuple{UnitRange{Int}},true}
+    a_view::Vector{Float64}
     la::Int32
     ikeep::Vector{Int32}
 
@@ -48,7 +48,7 @@ mutable struct Solver <: AbstractLinearSolver
     logger::Logger
 end
 
-ma27ad!(n::Cint,nz::Cint,I::AbstractVector{Cint},J::AbstractVector{Cint},
+ma27ad!(n::Cint,nz::Cint,I::Vector{Cint},J::Vector{Cint},
         iw::Vector{Cint},liw::Cint,ikeep::Vector{Cint},iw1::Vector{Cint},
         nsteps::Vector{Cint},iflag::Cint,icntl::Vector{Cint},cntl::Vector{Cdouble},
         info::Vector{Cint},ops::Cdouble) = ccall(
@@ -60,8 +60,8 @@ ma27ad!(n::Cint,nz::Cint,I::AbstractVector{Cint},J::AbstractVector{Cint},
              Ptr{Cint},Ref{Cdouble}),
             n,nz,I,J,iw,liw,ikeep,iw1,nsteps,iflag,icntl,cntl,info,ops)
 
-ma27bd!(n::Cint,nz::Cint,I::AbstractVector{Cint},J::AbstractVector{Cint},
-        a::AbstractVector{Cdouble},la::Cint,iw::Vector{Cint},liw::Cint,
+ma27bd!(n::Cint,nz::Cint,I::Vector{Cint},J::Vector{Cint},
+        a::Vector{Cdouble},la::Cint,iw::Vector{Cint},liw::Cint,
         ikeep::Vector{Cint},nsteps::Vector{Cint},maxfrt::Vector{Cint},iw1::Vector{Cint},
         icntl::Vector{Cint},cntl::Vector{Cdouble},info::Vector{Cint}) = ccall(
             (:ma27bd_,libhsl),
@@ -110,7 +110,7 @@ function Solver(csc::SparseMatrixCSC;
 
     la = ceil(Int32,max(nz,opt.ma27_la_init_factor*info[5]))
     a = Vector{Float64}(undef,la)
-    a_view = view(a,1:nnz(csc))
+    a_view = unsafe_wrap(Vector{Float64},pointer(a),nnz(csc))
     liw= ceil(Int32,opt.ma27_liw_init_factor*info[6])
     resize!(iw,liw)
     maxfrt=Int32[1]
@@ -143,7 +143,7 @@ function factorize!(M::Solver)
     return M
 end
 
-function solve!(M::Solver,rhs::AbstractVector{Float64})
+function solve!(M::Solver,rhs::Vector{Float64})
     length(M.w)<M.maxfrt[1] && resize!(M.w,M.maxfrt[1])
     length(M.iw1)<M.nsteps[1] && resize!(M.iw1,M.nsteps[1])
     ma27cd!(Int32(M.csc.n),M.a,M.la,M.iw,M.liw,M.w,M.maxfrt,rhs,

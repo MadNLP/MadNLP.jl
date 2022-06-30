@@ -1,9 +1,8 @@
-
 function eval_f_wrapper(ips::InteriorPointSolver, x::Vector{Float64})
     nlp = ips.nlp
     cnt = ips.cnt
     @trace(ips.logger,"Evaluating objective.")
-    cnt.eval_function_time += @elapsed obj_val = (get_minimize(nlp) ? 1. : -1.) * obj(nlp,view(x,1:get_nvar(nlp)))
+    cnt.eval_function_time += @elapsed obj_val = (get_minimize(nlp) ? 1. : -1.) * obj(nlp,unsafe_wrap(Vector{Float64},pointer(x),get_nvar(nlp)))
     cnt.obj_cnt+=1
     cnt.obj_cnt==1 && (is_valid(obj_val) || throw(InvalidNumberException()))
     return obj_val*ips.obj_scale[]
@@ -13,7 +12,11 @@ function eval_grad_f_wrapper!(ips::InteriorPointSolver, f::Vector{Float64},x::Ve
     nlp = ips.nlp
     cnt = ips.cnt
     @trace(ips.logger,"Evaluating objective gradient.")
-    cnt.eval_function_time += @elapsed grad!(nlp,view(x,1:get_nvar(nlp)),view(f,1:get_nvar(nlp)))
+    cnt.eval_function_time += @elapsed grad!(
+        nlp,
+        unsafe_wrap(Vector{Float64},pointer(x),get_nvar(nlp)),
+        unsafe_wrap(Vector{Float64},pointer(f),get_nvar(nlp))
+    )
     f.*=ips.obj_scale[] * (get_minimize(nlp) ? 1. : -1.)
     cnt.obj_grad_cnt+=1
     cnt.obj_grad_cnt==1 && (is_valid(f)  || throw(InvalidNumberException()))
@@ -24,7 +27,11 @@ function eval_cons_wrapper!(ips::InteriorPointSolver, c::Vector{Float64},x::Vect
     nlp = ips.nlp
     cnt = ips.cnt
     @trace(ips.logger, "Evaluating constraints.")
-    cnt.eval_function_time += @elapsed cons!(nlp,view(x,1:get_nvar(nlp)),view(c,1:get_ncon(nlp)))
+    cnt.eval_function_time += @elapsed cons!(
+        nlp,
+        unsafe_wrap(Vector{Float64},pointer(x),get_nvar(nlp)),
+        unsafe_wrap(Vector{Float64},pointer(c),get_ncon(nlp))
+    )
     view(c,ips.ind_ineq).-=view(x,get_nvar(nlp)+1:ips.n)
     c.-=ips.rhs
     c.*=ips.con_scale
@@ -39,7 +46,11 @@ function eval_jac_wrapper!(ipp::InteriorPointSolver, kkt::AbstractKKTSystem, x::
     ns = length(ipp.ind_ineq)
     @trace(ipp.logger, "Evaluating constraint Jacobian.")
     jac = get_jacobian(kkt)
-    cnt.eval_function_time += @elapsed jac_coord!(nlp,view(x,1:get_nvar(nlp)),view(jac,1:get_nnzj(nlp)))
+    cnt.eval_function_time += @elapsed jac_coord!(
+        nlp,
+        unsafe_wrap(Vector{Float64},pointer(x),get_nvar(nlp)),
+        unsafe_wrap(Vector{Float64},pointer(jac),get_nnzj(nlp))
+    )
     compress_jacobian!(kkt)
     cnt.con_jac_cnt+=1
     cnt.con_jac_cnt==1 && (is_valid(jac) || throw(InvalidNumberException()))
@@ -54,8 +65,12 @@ function eval_lag_hess_wrapper!(ipp::InteriorPointSolver, kkt::AbstractKKTSystem
     dual(ipp._w1) .= l.*ipp.con_scale
     hess = get_hessian(kkt)
     cnt.eval_function_time += @elapsed hess_coord!(
-        nlp, view(x,1:get_nvar(nlp)), dual(ipp._w1), view(hess, 1:get_nnzh(nlp));
-        obj_weight = (get_minimize(nlp) ? 1. : -1.) * (is_resto ? 0.0 : ipp.obj_scale[]))
+        nlp,
+        unsafe_wrap(Vector{Float64},pointer(x), get_nvar(nlp)),
+        dual(ipp._w1),
+        unsafe_wrap(Vector{Float64},pointer(hess), get_nnzh(nlp));
+        obj_weight = (get_minimize(nlp) ? 1. : -1.) * (is_resto ? 0.0 : ipp.obj_scale[])
+    )
     compress_hessian!(kkt)
     cnt.lag_hess_cnt+=1
     cnt.lag_hess_cnt==1 && (is_valid(hess) || throw(InvalidNumberException()))
@@ -68,7 +83,11 @@ function eval_jac_wrapper!(ipp::InteriorPointSolver, kkt::AbstractDenseKKTSystem
     ns = length(ipp.ind_ineq)
     @trace(ipp.logger, "Evaluating constraint Jacobian.")
     jac = get_jacobian(kkt)
-    cnt.eval_function_time += @elapsed jac_dense!(nlp,view(x,1:get_nvar(nlp)),jac)
+    cnt.eval_function_time += @elapsed jac_dense!(
+        nlp,
+        unsafe_wrap(Vector{Float64},pointer(x),get_nvar(nlp)),
+        jac
+    )
     compress_jacobian!(kkt)
     cnt.con_jac_cnt+=1
     cnt.con_jac_cnt==1 && (is_valid(jac) || throw(InvalidNumberException()))
@@ -83,8 +102,12 @@ function eval_lag_hess_wrapper!(ipp::InteriorPointSolver, kkt::AbstractDenseKKTS
     dual(ipp._w1) .= l.*ipp.con_scale
     hess = get_hessian(kkt)
     cnt.eval_function_time += @elapsed hess_dense!(
-        nlp, view(x,1:get_nvar(nlp)), dual(ipp._w1), hess;
-        obj_weight = (get_minimize(nlp) ? 1. : -1.) * (is_resto ? 0.0 : ipp.obj_scale[]))
+        nlp,
+        unsafe_wrap(Vector{Float64},pointer(x),get_nvar(nlp)),
+        dual(ipp._w1),
+        hess;
+        obj_weight = (get_minimize(nlp) ? 1. : -1.) * (is_resto ? 0.0 : ipp.obj_scale[])
+    )
     compress_hessian!(kkt)
     cnt.lag_hess_cnt+=1
     cnt.lag_hess_cnt==1 && (is_valid(hess) || throw(InvalidNumberException()))

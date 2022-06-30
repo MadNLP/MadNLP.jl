@@ -64,7 +64,6 @@ end
 # Type definitions for noncontiguous views
 const SubVector{Tv} = SubArray{Tv, 1, Vector{Tv}, Tuple{Vector{Int}}, false}
 
-
 @kwdef mutable struct Counters
     k::Int = 0 # total iteration counter
     l::Int = 0 # backtracking line search counter

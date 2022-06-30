@@ -5,7 +5,7 @@ module MadNLPMa86
 
 import ..MadNLPHSL:
     @kwdef, Logger, @debug, @warn, @error, libhsl,
-    SparseMatrixCSC, SubVector,
+    SparseMatrixCSC, SubVector, 
     SymbolicException,FactorizationException,SolveException,InertiaException,
     AbstractOptions, AbstractLinearSolver, set_options!,
     introduce, factorize!, solve!, improve!, is_inertia, inertia
@@ -86,16 +86,16 @@ ma86_default_control_d(control::Control) = ccall(
     Nothing,
     (Ref{Control},),
     control)
-ma86_analyse_d(n::Cint,colptr::AbstractVector{Cint},rowval::AbstractVector{Cint},
-               order::AbstractVector{Cint},keep::Vector{Ptr{Nothing}},
+ma86_analyse_d(n::Cint,colptr::Vector{Cint},rowval::Vector{Cint},
+               order::Vector{Cint},keep::Vector{Ptr{Nothing}},
                control::Control,info::Info) = ccall(
                    (:ma86_analyse_d,libhsl),
                    Nothing,
                    (Cint,Ptr{Cint},Ptr{Cint},Ptr{Cdouble},
                     Ptr{Ptr{Nothing}},Ref{Control},Ref{Info}),
                    n,colptr,rowval,order,keep,control,info)
-ma86_factor_d(n::Cint,colptr::AbstractVector{Cint},rowval::AbstractVector{Cint},
-              nzval::AbstractVector{Cdouble},order::AbstractVector{Cint},
+ma86_factor_d(n::Cint,colptr::Vector{Cint},rowval::Vector{Cint},
+              nzval::Vector{Cdouble},order::Vector{Cint},
               keep::Vector{Ptr{Nothing}},control::Control,info::Info,
               scale::Ptr{Nothing}) = ccall(
                   (:ma86_factor_d,libhsl),
@@ -166,7 +166,7 @@ function factorize!(M::Solver)
     M.info.flag<0 && throw(FactorizationException())
     return M
 end
-function solve!(M::Solver,rhs::AbstractVector{Float64})
+function solve!(M::Solver,rhs::Vector{Float64})
     ma86_solve_d(Int32(0),Int32(1),Int32(M.csc.n),rhs,
                  M.order,M.keep,M.control,M.info,C_NULL)
     M.info.flag<0 && throw(SolveException())

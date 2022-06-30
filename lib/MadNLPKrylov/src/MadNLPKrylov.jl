@@ -27,7 +27,7 @@ size(A::VirtualMatrix,i) = (A.m,A.n)[i]
 struct VirtualPreconditioner
     ldiv!::Function
 end
-ldiv!(Pl::VirtualPreconditioner,x::AbstractVector{Float64}) = Pl.ldiv!(x)
+ldiv!(Pl::VirtualPreconditioner,x::Vector{Float64}) = Pl.ldiv!(x)
 
 mutable struct Solver <: AbstractIterator
     g::Union{Nothing,GMRESIterable}

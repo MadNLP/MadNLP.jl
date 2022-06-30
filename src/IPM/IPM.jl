@@ -44,7 +44,7 @@ mutable struct InteriorPointSolver{KKTSystem} <: AbstractInteriorPointSolver
     c_trial::Vector{Float64}
     obj_val_trial::Float64
 
-    x_slk::SubArray{Float64,1,Vector{Float64},Tuple{UnitRange{Int}},true}
+    x_slk::Vector{Float64}
     c_slk::SubVector{Float64}
     rhs::Vector{Float64}
 
@@ -162,7 +162,7 @@ function InteriorPointSolver{KKTSystem}(nlp::AbstractNLPModel, opt::Options;
     x_trial=Vector{Float64}(undef,n)
     c_trial=Vector{Float64}(undef,m)
 
-    x_slk= view(x,get_nvar(nlp)+1:n)
+    x_slk= unsafe_wrap(Vector{Float64},pointer(x,get_nvar(nlp)+1),ns)
     c_slk= view(c,ind_cons.ind_ineq)
     rhs = (get_lcon(nlp).==get_ucon(nlp)).*get_lcon(nlp)
 

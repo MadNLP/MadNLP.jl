@@ -2,7 +2,7 @@ module MadNLPSchur
 
 import ..MadNLPGraph:
     @kwdef, Logger, @debug, @warn, @error,
-    AbstractOptions, AbstractLinearSolver, EmptyLinearSolver, set_options!, SparseMatrixCSC, SubVector,
+    AbstractOptions, AbstractLinearSolver, EmptyLinearSolver, set_options!, SparseMatrixCSC, SubVector, 
     SymbolicException,FactorizationException,SolveException,InertiaException,
     introduce, factorize!, solve!, improve!, is_inertia, inertia,
     default_linear_solver, default_dense_solver, get_csc_view, get_cscsy_view, nnz, mul!,

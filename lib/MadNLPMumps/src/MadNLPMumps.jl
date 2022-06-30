@@ -426,7 +426,7 @@ function factorize!(M::Solver)
     return M
 end
 
-function solve!(M::Solver,rhs::AbstractVector{Float64})
+function solve!(M::Solver,rhs::Vector{Float64})
     M.is_singular && return rhs
     M.mumps_struc.rhs = pointer(rhs)
     M.mumps_struc.job = 3

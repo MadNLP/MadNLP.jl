@@ -99,7 +99,7 @@ function factorize!(M::Solver)
         error(LOGGER,"Invalid lapackcpu_algorithm")
     end
 end
-function solve!(M::Solver, x::AbstractVector{Float64})
+function solve!(M::Solver, x::Vector{Float64})
     if M.opt.lapackcpu_algorithm == BUNCHKAUFMAN
         solve_bunchkaufman!(M,x)
     elseif M.opt.lapackcpu_algorithm == LU
