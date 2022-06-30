@@ -17,7 +17,7 @@ mutable struct PardisoSolver <: AbstractLinearSolver
     err::Ref{Int32}
     csc::SparseMatrixCSC{Float64,Int32}
     w::Vector{Float64}
-    opt::Options
+    opt::PardisoOptions
     logger::Logger
 end
 
@@ -121,5 +121,5 @@ function improve!(M::PardisoSolver)
     return false
 end
 
-introduce(::Solver)="pardiso"
+introduce(::PardisoSolver)="pardiso"
 input_type(::Type{PardisoSolver}) = :csc
