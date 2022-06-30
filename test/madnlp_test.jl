@@ -73,3 +73,14 @@ testset = [
 for (name,optimizer_constructor,exclude) in testset
     test_madnlp(name,optimizer_constructor,exclude)
 end
+
+@testset "HS15 problem" begin
+    options = Dict{Symbol, Any}(
+        :print_level=>MadNLP.ERROR,
+    )
+    nlp = MadNLPTests.HS15Model()
+    ips = MadNLP.InteriorPointSolver(nlp; option_dict=options)
+    MadNLP.optimize!(ips)
+    @test ips.status == MadNLP.SOLVE_SUCCEEDED
+end
+
