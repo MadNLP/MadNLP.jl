@@ -2,6 +2,7 @@ module MadNLPTests
 
 # Standard packages
 import LinearAlgebra: norm, I, mul!, dot
+import SparseArrays: sparse
 import Random
 import Test: @test, @testset
 
@@ -17,6 +18,35 @@ function solcmp(x,sol;atol=1e-4,rtol=1e-4)
     aerr = norm(x-sol,Inf)
     rerr = aerr/norm(sol,Inf)
     return (aerr < atol || rerr < rtol)
+end
+
+function test_linear_solver(solver)
+    m = 2
+    n = 2
+    row = Int32[1,2,2]
+    col = Int32[1,1,2]
+    val = Float64[1.,.1,2.]
+    b = [1.0,3.0]
+    x = similar(b)
+
+    @testset "Linear solver $solver" begin
+        csc = sparse(row,col,val,m,n)
+        dense = Array(csc)
+        sol= [0.8542713567839195, 1.4572864321608041]
+        if MadNLP.input_type(solver) == :csc
+            M = solver(csc)
+        elseif MadNLP.input_type(solver) == :dense
+            M = solver(dense)
+        end
+        MadNLP.introduce(M)
+        MadNLP.improve!(M)
+        MadNLP.factorize!(M)
+        if MadNLP.is_inertia(M)
+            @test MadNLP.inertia(M) == (2, 0, 0)
+        end
+        x = MadNLP.solve!(M,copy(b))
+        @test solcmp(x,sol)
+    end
 end
 
 function test_madnlp(name,optimizer_constructor::Function,exclude)
