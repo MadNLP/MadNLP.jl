@@ -1,6 +1,6 @@
 @enum(MatchingStrategy::Int,COMPLETE=1,COMPLETE2x2=2,CONSTRAINTS=3)
 
-@kwdef mutable struct Options <: AbstractOptions
+@kwdef mutable struct PardisoOptions <: AbstractOptions
     pardiso_matching_strategy::MatchingStrategy = COMPLETE2x2
     pardiso_max_inner_refinement_steps::Int = 1
     pardiso_msglvl::Int = 0
@@ -8,7 +8,7 @@
     pardiso_log_level::String = ""
 end
 
-mutable struct Solver <: AbstractLinearSolver
+mutable struct PardisoSolver <: AbstractLinearSolver
     pt::Vector{Int}
     iparm::Vector{Int32}
     dparm::Vector{Float64}
@@ -41,8 +41,8 @@ _pardiso(
              Ptr{Cint},Ptr{Cint},Ptr{Cint},Ptr{Cdouble},Ptr{Cdouble},Ptr{Cint},Ptr{Cdouble}),
             pt,maxfct,mnum,mtype,phase,n,a,ia,ja,perm,nrhs,iparm,msglvl,b,x,err,dparm)
 
-function Solver(csc::SparseMatrixCSC{Float64,Int32};
-                opt=Options(),logger=Logger(),
+function PardisoSolver(csc::SparseMatrixCSC{Float64,Int32};
+                opt=PardisoOptions(),logger=Logger(),
                 option_dict::Dict{Symbol,Any}=Dict{Symbol,Any}(),
                 kwargs...)
     !isempty(kwargs) && (for (key,val) in kwargs; option_dict[key]=val; end)
@@ -80,13 +80,13 @@ function Solver(csc::SparseMatrixCSC{Float64,Int32};
              Ref{Int32}(1),iparm,msglvl,Float64[],Float64[],err,dparm)
     err.x < 0  && throw(SymbolicException())
 
-    M = Solver(pt,iparm,dparm,perm,msglvl,err,csc,w,opt,logger)
+    M = PardisoSolver(pt,iparm,dparm,perm,msglvl,err,csc,w,opt,logger)
 
     finalizer(finalize,M)
 
     return M
 end
-function factorize!(M::Solver)
+function factorize!(M::PardisoSolver)
     _pardiso(M.pt,Ref{Int32}(1),Ref{Int32}(1),Ref{Int32}(-2),Ref{Int32}(22),
              Ref{Int32}(M.csc.n),M.csc.nzval,M.csc.colptr,M.csc.rowval,M.perm,
              Ref{Int32}(1),M.iparm,M.msglvl,Float64[],Float64[],M.err,M.dparm)
@@ -98,27 +98,28 @@ function factorize!(M::Solver)
     M.err.x < 0  && throw(FactorizationException())
     return M
 end
-function solve!(M::Solver,rhs::StrideOneVector{Float64})
+function solve!(M::PardisoSolver,rhs::StrideOneVector{Float64})
     _pardiso(M.pt,Ref{Int32}(1),Ref{Int32}(1),Ref{Int32}(-2),Ref{Int32}(33),
              Ref{Int32}(M.csc.n),M.csc.nzval,M.csc.colptr,M.csc.rowval,M.perm,
              Ref{Int32}(1),M.iparm,M.msglvl,rhs,M.w,M.err,M.dparm)
     M.err.x < 0  && throw(SolveException())
     return rhs
 end
-function finalize(M::Solver)
+function finalize(M::PardisoSolver)
     _pardiso(M.pt,Ref{Int32}(1),Ref{Int32}(1),Ref{Int32}(-2),Ref{Int32}(-1),
              Ref{Int32}(M.csc.n),M.csc.nzval,M.csc.colptr,M.csc.rowval,M.perm,
              Ref{Int32}(1),M.iparm,M.msglvl,Float64[],M.w,M.err,M.dparm)
 end
-is_inertia(::Solver)=true
-function inertia(M::Solver)
+is_inertia(::PardisoSolver)=true
+function inertia(M::PardisoSolver)
     pos = M.iparm[22]
     neg = M.iparm[23]
     return (pos,M.csc.n-pos-neg,neg)
 end
-function improve!(M::Solver)
+function improve!(M::PardisoSolver)
     @debug(M.logger,"improve quality failed.")
     return false
 end
 
 introduce(::Solver)="pardiso"
+input_type(::Type{PardisoSolver}) = :csc
