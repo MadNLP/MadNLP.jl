@@ -63,12 +63,6 @@ end
 
 # Type definitions
 SubVector{Tv}=SubArray{Tv, 1, Vector{Tv}, Tuple{Vector{Int}}, false}
-StrideOneVector{Tv}=Union{
-    Vector{Tv},
-    SubArray{Tv,1,Vector{Tv},Tuple{UnitRange{Int}},true},
-    SubArray{Tv, 1, Matrix{Tv}, Tuple{Base.Slice{Base.OneTo{Int}}, Int}, true}
-}
-
 
 @kwdef mutable struct Counters
     k::Int = 0 # total iteration counter

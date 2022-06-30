@@ -6,9 +6,9 @@ abstract type AbstractSparseMatrixCOO{Tv,Ti<:Integer} <: AbstractSparseMatrix{Tv
 mutable struct SparseMatrixCOO{Tv,Ti<:Integer} <: AbstractSparseMatrixCOO{Tv,Ti}
     m::Int
     n::Int
-    I::StrideOneVector{Ti}
-    J::StrideOneVector{Ti}
-    V::StrideOneVector{Tv}
+    I::Vector{Ti}
+    J::Vector{Ti}
+    V::Vector{Tv}
 end
 size(A::SparseMatrixCOO) = (A.m,A.n)
 getindex(A::SparseMatrixCOO{Float64,Ti},i::Int,j::Int) where Ti <: Integer = sum(A.V[(A.I.==i) .* (A.J.==j)])

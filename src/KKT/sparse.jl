@@ -6,10 +6,10 @@ Implement the [`AbstractReducedKKTSystem`](@ref) in sparse COO format.
 
 """
 struct SparseKKTSystem{T, MT} <: AbstractReducedKKTSystem{T, MT}
-    hess::StrideOneVector{T}
-    jac::StrideOneVector{T}
-    pr_diag::StrideOneVector{T}
-    du_diag::StrideOneVector{T}
+    hess::Vector{T}
+    jac::Vector{T}
+    pr_diag::Vector{T}
+    du_diag::Vector{T}
     # Augmented system
     aug_raw::SparseMatrixCOO{T,Int32}
     aug_com::MT
@@ -32,15 +32,15 @@ Implement the [`AbstractUnreducedKKTSystem`](@ref) in sparse COO format.
 
 """
 struct SparseUnreducedKKTSystem{T, MT} <: AbstractUnreducedKKTSystem{T, MT}
-    hess::StrideOneVector{T}
-    jac::StrideOneVector{T}
-    pr_diag::StrideOneVector{T}
-    du_diag::StrideOneVector{T}
+    hess::Vector{T}
+    jac::Vector{T}
+    pr_diag::Vector{T}
+    du_diag::Vector{T}
 
-    l_diag::StrideOneVector{T}
-    u_diag::StrideOneVector{T}
-    l_lower::StrideOneVector{T}
-    u_lower::StrideOneVector{T}
+    l_diag::Vector{T}
+    u_diag::Vector{T}
+    l_lower::Vector{T}
+    u_lower::Vector{T}
 
     aug_raw::SparseMatrixCOO{T,Int32}
     aug_com::MT
@@ -130,11 +130,11 @@ function SparseKKTSystem{T, MT}(
     J[n+n_hess+1:n+n_hess+n_jac] .= jac_sparsity_J
     J[n+n_hess+n_jac+1:offset] .= (n+1:n+m)
 
-    pr_diag = view(V, 1:n)
-    du_diag = view(V, n_jac+n_hess+n+1:n_jac+n_hess+n+m)
+    pr_diag = unsafe_wrap(Vector{Float64}, pointer(V), n)
+    du_diag = unsafe_wrap(Vector{Float64}, pointer(V, n_jac+n_hess+n+1) , m)
 
-    hess = view(V, n+1:n+n_hess)
-    jac = view(V, n_hess+n+1:n_hess+n+n_jac)
+    hess = unsafe_wrap(Vector{Float64}, pointer(V, n+1), n_hess)
+    jac = unsafe_wrap(Vector{Float64}, pointer(V, n_hess+n+1), n_jac)
 
     aug_raw = SparseMatrixCOO(aug_vec_length,aug_vec_length,I,J,V)
     jac_raw = SparseMatrixCOO(m,n,jac_sparsity_I,jac_sparsity_J,jac)

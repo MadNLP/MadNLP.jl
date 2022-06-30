@@ -5,7 +5,7 @@ module MadNLPUmfpack
 
 import ..MadNLP:
     @kwdef, Logger, @debug, @warn, @error,
-    SubVector, StrideOneVector, SparseMatrixCSC, get_tril_to_full,
+    SubVector, Vector, SparseMatrixCSC, get_tril_to_full,
     SymbolicException,FactorizationException,SolveException,InertiaException,
     AbstractOptions, AbstractLinearSolver, set_options!, UMFPACK,
     introduce, factorize!, solve!, mul!, improve!, is_inertia, inertia
@@ -39,8 +39,8 @@ mutable struct Solver <: AbstractLinearSolver
     logger::Logger
 end
 
-umfpack_di_numeric(colptr::StrideOneVector{Int32},rowval::StrideOneVector{Int32},
-                   nzval::StrideOneVector{Float64},symbolic::Ptr{Nothing},
+umfpack_di_numeric(colptr::Vector{Int32},rowval::Vector{Int32},
+                   nzval::Vector{Float64},symbolic::Ptr{Nothing},
                    tmp::Vector{Ptr{Nothing}},ctrl::Vector{Float64},
                    info::Vector{Float64}) = ccall(
                        (:umfpack_di_numeric,:libumfpack),
@@ -93,7 +93,7 @@ function factorize!(M::Solver)
     M.inner.status = status
     return M
 end
-function solve!(M::Solver,rhs::StrideOneVector{Float64})
+function solve!(M::Solver,rhs::Vector{Float64})
     status = umfpack_di_solve(1,M.inner.colptr,M.inner.rowval,M.inner.nzval,M.p,rhs,M.inner.numeric,M.ctrl,M.info)
     rhs .= M.p
     return rhs

@@ -2,7 +2,7 @@ module MadNLPLapackCPU
 
 import ..MadNLP:
     @kwdef, Logger, @debug, @warn, @error,
-    AbstractOptions, AbstractLinearSolver, StrideOneVector, set_options!, tril_to_full!,
+    AbstractOptions, AbstractLinearSolver, set_options!, tril_to_full!,
     libblas, BlasInt, @blasfunc,
     SymbolicException,FactorizationException,SolveException,InertiaException,
     introduce, factorize!, solve!, improve!, is_inertia, inertia
@@ -99,7 +99,7 @@ function factorize!(M::Solver)
         error(LOGGER,"Invalid lapackcpu_algorithm")
     end
 end
-function solve!(M::Solver, x::StrideOneVector{Float64})
+function solve!(M::Solver, x::Vector{Float64})
     if M.opt.lapackcpu_algorithm == BUNCHKAUFMAN
         solve_bunchkaufman!(M,x)
     elseif M.opt.lapackcpu_algorithm == LU
