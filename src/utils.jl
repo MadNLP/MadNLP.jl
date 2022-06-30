@@ -2,7 +2,13 @@
 # Created by Sungho Shin (sungho.shin@wisc.edu)
 
 # Build info
+"""
+TODO
+"""
 default_linear_solver() = MadNLPUmfpack
+"""
+TODO
+"""
 default_dense_solver() = MadNLPLapackCPU
 
 
@@ -10,6 +16,9 @@ default_dense_solver() = MadNLPLapackCPU
 module DummyModule end
 
 # Logger
+"""
+TODO
+"""
 @kwdef mutable struct Logger
     print_level::LogLevels = INFO
     file_print_level::LogLevels = INFO
@@ -48,10 +57,18 @@ end
 
 # BLAS
 const blas_num_threads = Ref{Int}(1)
+
+"""
+TODO
+"""
 function set_blas_num_threads(n::Integer;permanent::Bool=false)
     permanent && (blas_num_threads[]=n)
     BLAS.set_num_threads(n)
 end
+
+"""
+TODO
+"""
 macro blas_safe_threads(args...)
     code = quote
         set_blas_num_threads(1)
@@ -69,7 +86,9 @@ StrideOneVector{Tv}=Union{
     SubArray{Tv, 1, Matrix{Tv}, Tuple{Base.Slice{Base.OneTo{Int}}, Int}, true}
 }
 
-
+"""
+TODO
+"""
 @kwdef mutable struct Counters
     k::Int = 0 # total iteration counter
     l::Int = 0 # backtracking line search counter

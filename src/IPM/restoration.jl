@@ -1,3 +1,6 @@
+"""
+TODO
+"""
 mutable struct RobustRestorer
     obj_val_R::Float64
     f_R::Vector{Float64}
@@ -31,6 +34,9 @@ mutable struct RobustRestorer
     filter::Vector{Tuple{Float64,Float64}}
 end
 
+"""
+TODO
+"""
 function RobustRestorer(ips::AbstractInteriorPointSolver)
 
     nn = Vector{Float64}(undef,ips.m)
@@ -61,6 +67,9 @@ function RobustRestorer(ips::AbstractInteriorPointSolver)
     )
 end
 
+"""
+TODO
+"""
 function initialize_robust_restorer!(ips::AbstractInteriorPointSolver)
     @trace(ips.logger,"Initializing restoration phase variables.")
     ips.RR == nothing && (ips.RR = RobustRestorer(ips))

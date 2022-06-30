@@ -1,4 +1,6 @@
-
+"""
+TODO
+"""
 function initialize!(ips::AbstractInteriorPointSolver)
     # initializing slack variables
     @trace(ips.logger,"Initializing slack variables.")
@@ -64,6 +66,9 @@ function initialize!(ips::AbstractInteriorPointSolver)
 end
 
 
+"""
+TODO
+"""
 function reinitialize!(ips::AbstractInteriorPointSolver)
     view(ips.x,1:get_nvar(ips.nlp)) .= get_x0(ips.nlp)
 
@@ -84,6 +89,9 @@ function reinitialize!(ips::AbstractInteriorPointSolver)
 end
 
 # major loops ---------------------------------------------------------
+"""
+TODO
+"""
 function optimize!(ips::AbstractInteriorPointSolver)
     try
         if ips.status == INITIAL
@@ -134,6 +142,9 @@ function unscale!(ips::AbstractInteriorPointSolver)
     ips.c_slk .+= ips.x_slk
 end
 
+"""
+TODO
+"""
 function regular!(ips::AbstractInteriorPointSolver)
     while true
         if (ips.cnt.k!=0 && !ips.opt.jacobian_constant)
@@ -279,6 +290,9 @@ function regular!(ips::AbstractInteriorPointSolver)
     end
 end
 
+"""
+TODO
+"""
 function restore!(ips::AbstractInteriorPointSolver)
     ips.del_w=0
     primal(ips._w1) .= ips.x # backup the previous primal iterate
@@ -354,6 +368,9 @@ function restore!(ips::AbstractInteriorPointSolver)
     end
 end
 
+"""
+TODO
+"""
 function robust!(ips::InteriorPointSolver)
     initialize_robust_restorer!(ips)
     RR = ips.RR

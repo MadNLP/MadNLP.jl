@@ -1,10 +1,16 @@
 
+"""
+TODO
+"""
 function factorize_wrapper!(ips::InteriorPointSolver)
     @trace(ips.logger,"Factorization started.")
     build_kkt!(ips.kkt)
     ips.cnt.linear_solver_time += @elapsed factorize!(ips.linear_solver)
 end
 
+"""
+TODO
+"""
 function solve_refine_wrapper!(
     ips::InteriorPointSolver,
     x::AbstractKKTVector,
@@ -35,6 +41,9 @@ function solve_refine_wrapper!(
     return solve_status
 end
 
+"""
+TODO
+"""
 function solve_refine_wrapper!(
     ips::InteriorPointSolver{<:DenseCondensedKKTSystem},
     x::AbstractKKTVector,
@@ -51,7 +60,7 @@ function solve_refine_wrapper!(
     n_condensed = n + n_eq
 
     # load buffers
-    b_c = view(full(ips._w1), 1:n_condensed)
+    b_c = unsafe_wrapper(full(ips._w1), 1:n_condensed)
     x_c = view(full(ips._w2), 1:n_condensed)
     jv_x = view(full(ips._w3), 1:ns) # for jprod
     jv_t = primal(ips._w4)             # for jtprod

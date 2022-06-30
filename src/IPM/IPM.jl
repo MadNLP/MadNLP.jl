@@ -5,6 +5,9 @@ abstract type AbstractInteriorPointSolver end
 
 include("restoration.jl")
 
+"""
+TODO
+"""
 mutable struct InteriorPointSolver{KKTSystem} <: AbstractInteriorPointSolver
     nlp::AbstractNLPModel
     kkt::KKTSystem
@@ -95,6 +98,9 @@ mutable struct InteriorPointSolver{KKTSystem} <: AbstractInteriorPointSolver
     output::Dict
 end
 
+"""
+TODO
+"""
 function InteriorPointSolver(nlp::AbstractNLPModel;
     option_dict::Dict{Symbol,Any}=Dict{Symbol,Any}(), kwargs...
 )
@@ -121,6 +127,9 @@ function InteriorPointSolver(nlp::AbstractNLPModel;
 end
 
 # Inner constructor
+"""
+TODO
+"""
 function InteriorPointSolver{KKTSystem}(nlp::AbstractNLPModel, opt::Options;
     option_linear_solver::Dict{Symbol,Any}=Dict{Symbol,Any}(),
 ) where {KKTSystem<:AbstractKKTSystem}

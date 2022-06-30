@@ -1,4 +1,6 @@
-
+"""
+TODO
+"""
 function eval_f_wrapper(ips::InteriorPointSolver, x::Vector{Float64})
     nlp = ips.nlp
     cnt = ips.cnt
@@ -9,6 +11,9 @@ function eval_f_wrapper(ips::InteriorPointSolver, x::Vector{Float64})
     return obj_val*ips.obj_scale[]
 end
 
+"""
+TODO
+"""
 function eval_grad_f_wrapper!(ips::InteriorPointSolver, f::Vector{Float64},x::Vector{Float64})
     nlp = ips.nlp
     cnt = ips.cnt
@@ -20,6 +25,9 @@ function eval_grad_f_wrapper!(ips::InteriorPointSolver, f::Vector{Float64},x::Ve
     return f
 end
 
+"""
+TODO
+"""
 function eval_cons_wrapper!(ips::InteriorPointSolver, c::Vector{Float64},x::Vector{Float64})
     nlp = ips.nlp
     cnt = ips.cnt
@@ -33,6 +41,9 @@ function eval_cons_wrapper!(ips::InteriorPointSolver, c::Vector{Float64},x::Vect
     return c
 end
 
+"""
+TODO
+"""
 function eval_jac_wrapper!(ipp::InteriorPointSolver, kkt::AbstractKKTSystem, x::Vector{Float64})
     nlp = ipp.nlp
     cnt = ipp.cnt
@@ -47,6 +58,9 @@ function eval_jac_wrapper!(ipp::InteriorPointSolver, kkt::AbstractKKTSystem, x::
     return jac
 end
 
+"""
+TODO
+"""
 function eval_lag_hess_wrapper!(ipp::InteriorPointSolver, kkt::AbstractKKTSystem, x::Vector{Float64},l::Vector{Float64};is_resto=false)
     nlp = ipp.nlp
     cnt = ipp.cnt
@@ -62,6 +76,9 @@ function eval_lag_hess_wrapper!(ipp::InteriorPointSolver, kkt::AbstractKKTSystem
     return hess
 end
 
+"""
+TODO
+"""
 function eval_jac_wrapper!(ipp::InteriorPointSolver, kkt::AbstractDenseKKTSystem, x::Vector{Float64})
     nlp = ipp.nlp
     cnt = ipp.cnt
@@ -76,6 +93,9 @@ function eval_jac_wrapper!(ipp::InteriorPointSolver, kkt::AbstractDenseKKTSystem
     return jac
 end
 
+"""
+TODO
+"""
 function eval_lag_hess_wrapper!(ipp::InteriorPointSolver, kkt::AbstractDenseKKTSystem, x::Vector{Float64},l::Vector{Float64};is_resto=false)
     nlp = ipp.nlp
     cnt = ipp.cnt

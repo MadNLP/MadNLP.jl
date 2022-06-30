@@ -1,3 +1,6 @@
+"""
+TODO
+"""
 struct MadNLPExecutionStats{T} <: AbstractExecutionStats
     status::Status
     solution::StrideOneVector{T}

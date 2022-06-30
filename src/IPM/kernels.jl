@@ -1,6 +1,9 @@
 
 # KKT system updates -------------------------------------------------------
 # Set diagonal
+"""
+TODO
+"""
 function set_aug_diagonal!(kkt::AbstractKKTSystem, ips::InteriorPointSolver)
     kkt.pr_diag .= ips.zl./(ips.x.-ips.xl) .+ ips.zu./(ips.xu.-ips.x)
     fill!(kkt.du_diag, 0.0)
@@ -15,6 +18,9 @@ function set_aug_diagonal!(kkt::SparseUnreducedKKTSystem, ips::InteriorPointSolv
 end
 
 # Robust restoration
+"""
+TODO
+"""
 function set_aug_RR!(kkt::AbstractKKTSystem, ips::InteriorPointSolver, RR::RobustRestorer)
     kkt.pr_diag .= ips.zl./(ips.x.-ips.xl) .+ ips.zu./(ips.xu.-ips.x) .+ RR.zeta.*RR.D_R.^2
     kkt.du_diag .= .-RR.pp./RR.zp .- RR.nn./RR.zn
@@ -29,6 +35,9 @@ function set_aug_RR!(kkt::SparseUnreducedKKTSystem, ips::InteriorPointSolver, RR
 end
 
 # Set RHS
+"""
+TODO
+"""
 function set_aug_rhs!(ips::InteriorPointSolver, kkt::AbstractKKTSystem, c)
     primal(ips.p) .= .-ips.f.+ips.mu./(ips.x.-ips.xl).-ips.mu./(ips.xu.-ips.x).-ips.jacl
     dual(ips.p)   .= .-c
@@ -41,6 +50,9 @@ function set_aug_rhs!(ips::InteriorPointSolver, kkt::SparseUnreducedKKTSystem, c
     dual_ub(ips.p) .= (ips.xu_r-ips.x_ur).*kkt.u_lower .- ips.mu./kkt.u_lower
 end
 
+"""
+TODO
+"""
 function set_aug_rhs_ifr!(ips::InteriorPointSolver, kkt::SparseUnreducedKKTSystem,c)
     primal(ips._w1) .= 0.0
     dual(ips._w1) .= .-c
@@ -49,6 +61,9 @@ function set_aug_rhs_ifr!(ips::InteriorPointSolver, kkt::SparseUnreducedKKTSyste
 end
 
 # Set RHS RR
+"""
+TODO
+"""
 function set_aug_rhs_RR!(
     ips::InteriorPointSolver, kkt::AbstractKKTSystem, RR::RobustRestorer, rho,
 )
@@ -57,11 +72,17 @@ function set_aug_rhs_RR!(
 end
 
 # Finish
+"""
+TODO
+"""
 function finish_aug_solve!(ips::InteriorPointSolver, kkt::AbstractKKTSystem, mu)
     dual_lb(ips.d) .= (mu.-ips.zl_r.*ips.dx_lr)./(ips.x_lr.-ips.xl_r).-ips.zl_r
     dual_ub(ips.d) .= (mu.+ips.zu_r.*ips.dx_ur)./(ips.xu_r.-ips.x_ur).-ips.zu_r
 end
 
+"""
+TODO
+"""
 function finish_aug_solve!(ips::InteriorPointSolver, kkt::SparseUnreducedKKTSystem, mu)
     dual_lb(ips.d) .*= .-kkt.l_lower
     dual_ub(ips.d) .*= kkt.u_lower
@@ -70,6 +91,9 @@ function finish_aug_solve!(ips::InteriorPointSolver, kkt::SparseUnreducedKKTSyst
 end
 
 # Initial
+"""
+TODO
+"""
 function set_initial_rhs!(ips::InteriorPointSolver, kkt::AbstractKKTSystem)
     primal(ips.p) .= .-ips.f.+ips.zl.-ips.zu
     dual(ips.p) .= 0.0
@@ -82,6 +106,9 @@ function set_initial_rhs!(ips::InteriorPointSolver, kkt::SparseUnreducedKKTSyste
 end
 
 # Set ifr
+"""
+TODO
+"""
 function set_aug_rhs_ifr!(ips::InteriorPointSolver, kkt::AbstractKKTSystem)
     primal(ips._w1) .= 0.0
     dual(ips._w1) .= .-ips.c

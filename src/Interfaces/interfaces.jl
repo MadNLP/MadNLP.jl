@@ -4,6 +4,9 @@
 include("MOI_interface.jl")
 
 # Thin wrapper for NLPModels.jl
+"""
+TODO
+"""
 function madnlp(model::AbstractNLPModel;buffered=true, kwargs...)
     ips = InteriorPointSolver(model;kwargs...)
     initialize!(ips.kkt)

@@ -2,6 +2,9 @@
 # Created by Sungho Shin (sungho.shin@wisc.edu)
 
 # Options
+"""
+TODO
+"""
 @enum(LogLevels::Int,
       TRACE  = 1,
       DEBUG  = 2,
@@ -9,23 +12,31 @@
       NOTICE = 4,
       WARN   = 5,
       ERROR  = 6)
-
+"""
+TODO
+"""
 @enum(FixedVariableTreatments::Int,
       RELAX_BOUND = 1,
       MAKE_PARAMETER = 2)
-
+"""
+TODO
+"""
 @enum(InertiaCorrectionMethod::Int,
       INERTIA_AUTO = 1,
       INERTIA_BASED = 2,
       INERTIA_FREE = 3)
-
+"""
+TODO
+"""
 @enum(KKTLinearSystem::Int,
       SPARSE_KKT_SYSTEM = 1,
       SPARSE_UNREDUCED_KKT_SYSTEM = 2,
       DENSE_KKT_SYSTEM = 3,
       DENSE_CONDENSED_KKT_SYSTEM = 4,
 )
-
+"""
+TODO
+"""
 @enum(Status::Int,
       SOLVE_SUCCEEDED = 1,
       SOLVED_TO_ACCEPTABLE_LEVEL = 2,
@@ -45,6 +56,9 @@
       USER_REQUESTED_STOP = -5,
       INTERNAL_ERROR = -6)
 
+"""
+TODO
+"""
 const STATUS_OUTPUT_DICT = Dict(
     SOLVE_SUCCEEDED => "Optimal Solution Found.",
     SOLVED_TO_ACCEPTABLE_LEVEL => "Solved To Acceptable Level.",

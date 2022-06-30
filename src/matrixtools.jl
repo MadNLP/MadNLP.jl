@@ -14,7 +14,7 @@ size(A::SparseMatrixCOO) = (A.m,A.n)
 getindex(A::SparseMatrixCOO{Float64,Ti},i::Int,j::Int) where Ti <: Integer = sum(A.V[(A.I.==i) .* (A.J.==j)])
 nnz(A::SparseMatrixCOO) = length(A.I)
 
-function findIJ(S::SparseMatrixCSC{Tv,Ti}) where {Tv,Ti}
+function _findIJ(S::SparseMatrixCSC{Tv,Ti}) where {Tv,Ti}
     numnz = nnz(S)
     I = Vector{Ti}(undef,numnz)
     J = Vector{Ti}(undef,numnz)

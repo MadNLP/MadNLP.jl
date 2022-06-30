@@ -1,6 +1,9 @@
 # MadNLP.jl
 # Created by Sungho Shin (sungho.shin@wisc.edu)
 
+"""
+TODO
+"""
 struct RichardsonIterator{T, VT, KKT, LinSolver} <: AbstractIterator
     linear_solver::LinSolver
     kkt::KKT
