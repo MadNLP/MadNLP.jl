@@ -231,7 +231,7 @@ function SparseUnreducedKKTSystem{T, MT}(
     J[offset+2nlb+nub+1:offset+2nlb+2nub] .= ind_ub
 
     pr_diag = unsafe_wrap(Vector{Float64},pointer(V),n)
-    du_diag = unsafe_wrap(Vector{Float64},pointer(V+n_jac+n_hess+n+1),m)
+    du_diag = unsafe_wrap(Vector{Float64},pointer(V,n_jac+n_hess+n+1),m)
 
     l_diag = unsafe_wrap(Vector{Float64},pointer(V,offset+1), nlb)
     l_lower= unsafe_wrap(Vector{Float64},pointer(V,offset+nlb+1), nlb)
