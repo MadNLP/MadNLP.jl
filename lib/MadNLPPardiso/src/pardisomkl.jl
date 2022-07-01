@@ -114,7 +114,7 @@ function factorize!(M::PardisoMKLSolver)
     M.err.x < 0  && throw(FactorizationException())
     return M
 end
-function solve!(M::PardisoMKLSolver,rhs::StrideOneVector{Float64})
+function solve!(M::PardisoMKLSolver,rhs::Vector{Float64})
     pardisomkl_set_num_threads!(M.opt.pardisomkl_num_threads)
     pardisomkl_pardiso(M.pt,Ref{Int32}(1),Ref{Int32}(1),Ref{Int32}(-2),Ref{Int32}(33),
                      Ref{Int32}(M.csc.n),M.csc.nzval,M.csc.colptr,M.csc.rowval,M.perm,
