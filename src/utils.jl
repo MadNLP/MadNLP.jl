@@ -1,14 +1,11 @@
 # MadNLP.jl.
 # Created by Sungho Shin (sungho.shin@wisc.edu)
+abstract type AbstractOptions end
 
 # Build info
-default_linear_solver() = MadNLPUmfpack
-default_dense_solver() = MadNLPLapackCPU
-default_iterator() = MadNLPRichardson
+default_linear_solver() = UmfpackSolver
+default_dense_solver() = LapackCPUSolver
 
-
-# Dummy module
-module DummyModule end
 
 # Logger
 @kwdef mutable struct Logger

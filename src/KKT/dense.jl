@@ -139,6 +139,9 @@ num_variables(kkt::DenseKKTSystem) = length(kkt.pr_diag)
 function mul!(y::AbstractVector, kkt::DenseKKTSystem, x::AbstractVector)
     mul!(y, kkt.aug_com, x)
 end
+function mul!(y::ReducedKKTVector, kkt::DenseKKTSystem, x::ReducedKKTVector)
+    mul!(full(y), kkt.aug_com, full(x))
+end
 
 # Special getters for Jacobian
 function get_jacobian(kkt::DenseKKTSystem)
@@ -372,6 +375,10 @@ function mul!(y::AbstractVector, kkt::DenseCondensedKKTSystem, x::AbstractVector
     else
         _mul_expanded!(y, kkt, x)
     end
+end
+
+function mul!(y::ReducedKKTVector, kkt::DenseCondensedKKTSystem, x::ReducedKKTVector)
+    mul!(full(y), kkt, full(x))
 end
 
 function jprod_ineq!(y::AbstractVector, kkt::DenseCondensedKKTSystem, x::AbstractVector)

@@ -65,6 +65,9 @@ const AbstractSparseKKTSystem{T, MT} = Union{SparseKKTSystem{T, MT}, SparseUnred
 function mul!(y::AbstractVector, kkt::AbstractSparseKKTSystem, x::AbstractVector)
     mul!(y, Symmetric(kkt.aug_com, :L), x)
 end
+function mul!(y::AbstractKKTVector, kkt::AbstractSparseKKTSystem, x::AbstractKKTVector)
+    mul!(full(y), Symmetric(kkt.aug_com, :L), full(x))
+end
 
 function jtprod!(y::AbstractVector, kkt::AbstractSparseKKTSystem, x::AbstractVector)
     mul!(y, kkt.jac_com', x)

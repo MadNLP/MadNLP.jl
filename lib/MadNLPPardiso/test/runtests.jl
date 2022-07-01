@@ -1,18 +1,19 @@
 using Test, MadNLP, MadNLPPardiso, MadNLPTests
 
 testset = [
-    [
-        "Pardiso",
-        ()->MadNLP.Optimizer(
-            linear_solver=MadNLPPardiso,
-            print_level=MadNLP.ERROR),
-        [],
-        @isdefined(MadNLPPardiso)
-    ],
+    # TODO; Pardiso license has expired
+    # [
+    #     "Pardiso",
+    #     ()->MadNLP.Optimizer(
+    #         linear_solver=MadNLPPardiso,
+    #         print_level=MadNLP.ERROR),
+    #     [],
+    #     @isdefined(MadNLPPardiso)
+    # ],
     [
         "PardisoMKL",
         ()->MadNLP.Optimizer(
-            linear_solver=MadNLPPardisoMKL,
+            linear_solver=PardisoMKLSolver,
             print_level=MadNLP.ERROR),
         ["eigmina"]
     ]

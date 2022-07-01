@@ -1,4 +1,9 @@
 
+"""
+    AbstractKKTSystem{T, MT<:AbstractMatrix{T}}
+
+Abstract type for KKT system.
+"""
 abstract type AbstractKKTSystem{T, MT<:AbstractMatrix{T}} end
 
 """
@@ -54,7 +59,7 @@ abstract type AbstractReducedKKTSystem{T, MT} <: AbstractKKTSystem{T, MT} end
 """
     AbstractCondensedKKTSystem{T, MT} <: AbstractKKTSystem{T, MT}
 
-The condensed KKT system simplifies further the [``AbstractReducedKKTSystem`](@ref)
+The condensed KKT system simplifies further the [`AbstractReducedKKTSystem`](@ref)
 by removing the rows associated to the slack variables ``s`` and the inequalities.
 
 At the primal-dual iterate ``(x, y)``, the matrix writes
@@ -242,6 +247,7 @@ end
 compress_hessian!(kkt::AbstractKKTSystem) = nothing
 
 
+include("rhs.jl")
 include("sparse.jl")
 include("dense.jl")
 
