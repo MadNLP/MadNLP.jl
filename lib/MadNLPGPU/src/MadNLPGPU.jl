@@ -2,7 +2,7 @@ module MadNLPGPU
 
 import LinearAlgebra
 # CUDA
-import CUDA: CUBLAS, CUSOLVER, CuVector, CuMatrix, CuArray, toolkit_version, R_64F, has_cuda, @allowscalar, runtime_version
+import CUDA: CUBLAS, CUSOLVER, CuVector, CuMatrix, CuArray, R_64F, has_cuda, @allowscalar, runtime_version
 # Kernels
 import KernelAbstractions: @kernel, @index, wait, Event
 import CUDAKernels: CUDADevice
@@ -24,5 +24,6 @@ if has_cuda()
     include("lapackgpu.jl")
     export LapackGPUSolver
 end
+include("interface.jl")
 
 end # module
