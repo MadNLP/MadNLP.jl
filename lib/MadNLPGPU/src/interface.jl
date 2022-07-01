@@ -2,7 +2,7 @@
 function CuInteriorPointSolver(nlp::AbstractNLPModel;
     option_dict::Dict{Symbol,Any}=Dict{Symbol,Any}(), kwargs...
 )
-    opt = MadNLP.Options(linear_solver=MadNLPLapackGPU)
+    opt = MadNLP.Options(linear_solver=LapackGPUSolver)
     MadNLP.set_options!(opt,option_dict,kwargs)
     MadNLP.check_option_sanity(opt)
 
