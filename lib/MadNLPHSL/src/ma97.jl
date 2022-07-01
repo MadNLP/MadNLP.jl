@@ -85,7 +85,7 @@ ma97_analyse_d(check::Cint,n::Cint,ptr::Vector{Cint},row::Vector{Cint},
                          check,n,ptr,row,val,akeep,control,info,order)
 ma97_factor_d(matrix_type::Cint,ptr::Ptr{Nothing},row::Ptr{Nothing},
               val::Vector{Cdouble},akeep::Vector{Ptr{Nothing}},fkeep::Vector{Ptr{Nothing}},
-              control::Ma97Control,info::Info,scale::Ptr{Nothing}) = ccall(
+              control::Ma97Control,info::Ma97Info,scale::Ptr{Nothing}) = ccall(
                   (:ma97_factor_d,libhsl),
                   Nothing,
                   (Cint,Ptr{Cint},Ptr{Cint},Ptr{Cdouble},Ptr{Ptr{Nothing}},

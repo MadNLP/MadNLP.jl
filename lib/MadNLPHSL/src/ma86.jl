@@ -71,7 +71,7 @@ ma86_default_control_d(control::Ma86Control) = ccall(
     control)
 ma86_analyse_d(n::Cint,colptr::Vector{Cint},rowval::Vector{Cint},
                order::Vector{Cint},keep::Vector{Ptr{Nothing}},
-               control::Ma86Control,info::Info) = ccall(
+               control::Ma86Control,info::Ma86Info) = ccall(
                    (:ma86_analyse_d,libhsl),
                    Nothing,
                    (Cint,Ptr{Cint},Ptr{Cint},Ptr{Cdouble},

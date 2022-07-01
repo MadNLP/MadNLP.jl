@@ -292,7 +292,7 @@ function factorize!(M::Ma77Solver)
         ma77_input_reals_d(
             Int32(i),M.full.colptr[i+1]-M.full.colptr[i],
             unsafe_wrap(
-                Vector{Int32},
+                Vector{Float64},
                 pointer(M.full.nzval,M.full.colptr[i]),
                 M.full.colptr[i+1]-M.full.colptr[i]
             ),
