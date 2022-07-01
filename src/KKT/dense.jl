@@ -4,14 +4,14 @@
 =#
 
 """
-    DenseKKTSystem{T, VT, MT} <: AbstractReducedKKTSystem{T, MT}
+    DenseKKTSystem{T, VT, MT} <: AbstractReducedKKTSystem{T, VT, MT}
 
 Implement [`AbstractReducedKKTSystem`](@ref) with dense matrices.
 
 Requires a dense linear solver to be factorized (otherwise an error is returned).
 
 """
-struct DenseKKTSystem{T, VT, MT} <: AbstractReducedKKTSystem{T, MT}
+struct DenseKKTSystem{T, VT, MT} <: AbstractReducedKKTSystem{T, VT, MT}
     hess::MT
     jac::MT
     pr_diag::VT
@@ -29,14 +29,14 @@ struct DenseKKTSystem{T, VT, MT} <: AbstractReducedKKTSystem{T, MT}
 end
 
 """
-    DenseCondensedKKTSystem{T, VT, MT} <: AbstractCondensedKKTSystem{T, MT}
+    DenseCondensedKKTSystem{T, VT, MT} <: AbstractCondensedKKTSystem{T, VT, MT}
 
 Implement [`AbstractCondensedKKTSystem`](@ref) with dense matrices.
 
 Requires a dense linear solver to factorize the associated KKT system (otherwise an error is returned).
 
 """
-struct DenseCondensedKKTSystem{T, VT, MT} <: AbstractCondensedKKTSystem{T, MT}
+struct DenseCondensedKKTSystem{T, VT, MT} <: AbstractCondensedKKTSystem{T, VT, MT}
     hess::MT
     jac::MT
     jac_ineq::MT

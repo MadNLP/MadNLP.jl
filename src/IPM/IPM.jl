@@ -102,19 +102,18 @@ function InteriorPointSolver(nlp::AbstractNLPModel;
     set_options!(opt,option_dict,kwargs)
     check_option_sanity(opt)
 
+    VT = Vector{Float64}
     KKTSystem = if opt.kkt_system == SPARSE_KKT_SYSTEM
         MT = (input_type(opt.linear_solver) == :csc) ? SparseMatrixCSC{Float64, Int32} : Matrix{Float64}
-        SparseKKTSystem{Float64, MT}
+        SparseKKTSystem{Float64, VT, MT}
     elseif opt.kkt_system == SPARSE_UNREDUCED_KKT_SYSTEM
         MT = (input_type(opt.linear_solver) == :csc) ? SparseMatrixCSC{Float64, Int32} : Matrix{Float64}
-        SparseUnreducedKKTSystem{Float64, MT}
+        SparseUnreducedKKTSystem{Float64, VT, MT}
     elseif opt.kkt_system == DENSE_KKT_SYSTEM
         MT = Matrix{Float64}
-        VT = Vector{Float64}
         DenseKKTSystem{Float64, VT, MT}
     elseif opt.kkt_system == DENSE_CONDENSED_KKT_SYSTEM
         MT = Matrix{Float64}
-        VT = Vector{Float64}
         DenseCondensedKKTSystem{Float64, VT, MT}
     end
     return InteriorPointSolver{KKTSystem}(nlp, opt; option_linear_solver=option_dict)

@@ -1,17 +1,17 @@
 
 """
-    SparseKKTSystem{T, MT} <: AbstractReducedKKTSystem{T, MT}
+    SparseKKTSystem{T, VT, MT} <: AbstractReducedKKTSystem{T, VT, MT}
 
 Implement the [`AbstractReducedKKTSystem`](@ref) in sparse COO format.
 
 """
-struct SparseKKTSystem{T, MT, VT} <: AbstractReducedKKTSystem{T, MT}
+struct SparseKKTSystem{T, VT, MT} <: AbstractReducedKKTSystem{T, VT, MT}
     hess::VT
     jac::VT
     pr_diag::VT
     du_diag::VT
     # Augmented system
-    aug_raw::SparseMatrixCOO{T,Int32,Vector{T}}
+    aug_raw::SparseMatrixCOO{T,Int32,VT}
     aug_com::MT
     aug_csc_map::Union{Nothing, Vector{Int}}
     # Jacobian
@@ -22,16 +22,16 @@ struct SparseKKTSystem{T, MT, VT} <: AbstractReducedKKTSystem{T, MT}
     ind_ineq::Vector{Int}
     ind_fixed::Vector{Int}
     ind_aug_fixed::Vector{Int}
-    jacobian_scaling::Vector{T}
+    jacobian_scaling::VT
 end
 
 """
-    SparseUnreducedKKTSystem{T, MT} <: AbstractUnreducedKKTSystem{T, MT}
+    SparseUnreducedKKTSystem{T, VT, MT} <: AbstractUnreducedKKTSystem{T, VT, MT}
 
 Implement the [`AbstractUnreducedKKTSystem`](@ref) in sparse COO format.
 
 """
-struct SparseUnreducedKKTSystem{T, MT, VT} <: AbstractUnreducedKKTSystem{T, MT}
+struct SparseUnreducedKKTSystem{T, VT, MT} <: AbstractUnreducedKKTSystem{T, VT, MT}
     hess::VT
     jac::VT
     pr_diag::VT
@@ -41,7 +41,7 @@ struct SparseUnreducedKKTSystem{T, MT, VT} <: AbstractUnreducedKKTSystem{T, MT}
     u_diag::VT
     l_lower::VT
     u_lower::VT
-    aug_raw::SparseMatrixCOO{T,Int32,Vector{T}}
+    aug_raw::SparseMatrixCOO{T,Int32,VT}
     aug_com::MT
     aug_csc_map::Union{Nothing, Vector{Int}}
 
@@ -51,11 +51,11 @@ struct SparseUnreducedKKTSystem{T, MT, VT} <: AbstractUnreducedKKTSystem{T, MT}
     ind_ineq::Vector{Int}
     ind_fixed::Vector{Int}
     ind_aug_fixed::Vector{Int}
-    jacobian_scaling::Vector{T}
+    jacobian_scaling::VT
 end
 
 # Template to dispatch on sparse representation
-const AbstractSparseKKTSystem{T, MT} = Union{SparseKKTSystem{T, MT}, SparseUnreducedKKTSystem{T, MT}}
+const AbstractSparseKKTSystem{T, VT, MT} = Union{SparseKKTSystem{T, VT, MT}, SparseUnreducedKKTSystem{T, VT, MT}}
 
 #=
     Generic sparse methods
@@ -74,21 +74,21 @@ end
 
 nnz_jacobian(kkt::AbstractSparseKKTSystem) = nnz(kkt.jac_raw)
 
-function compress_jacobian!(kkt::AbstractSparseKKTSystem{T, MT}) where {T, MT<:SparseMatrixCSC{T, Int32}}
+function compress_jacobian!(kkt::AbstractSparseKKTSystem{T, VT, MT}) where {T, VT, MT<:SparseMatrixCSC{T, Int32}}
     ns = length(kkt.ind_ineq)
     kkt.jac[end-ns+1:end] .= -1.0
     kkt.jac .*= kkt.jacobian_scaling # scaling
     transfer!(kkt.jac_com, kkt.jac_raw, kkt.jac_csc_map)
 end
 
-function compress_jacobian!(kkt::AbstractSparseKKTSystem{T, MT}) where {T, MT<:Matrix{T}}
+function compress_jacobian!(kkt::AbstractSparseKKTSystem{T, VT, MT}) where {T, VT, MT<:Matrix{T}}
     ns = length(kkt.ind_ineq)
     kkt.jac[end-ns+1:end] .= -1.0
     kkt.jac .*= kkt.jacobian_scaling # scaling
     copyto!(kkt.jac_com, kkt.jac_raw)
 end
 
-function set_jacobian_scaling!(kkt::AbstractSparseKKTSystem{T, MT}, constraint_scaling::AbstractVector) where {T, MT}
+function set_jacobian_scaling!(kkt::AbstractSparseKKTSystem{T, VT, MT}, constraint_scaling::AbstractVector) where {T, VT, MT}
     nnzJ = length(kkt.jac)::Int
     @inbounds for i in 1:nnzJ
         index = kkt.jac_raw.I[i]
@@ -101,11 +101,11 @@ end
     SparseKKTSystem
 =#
 
-function SparseKKTSystem{T, MT}(
+function SparseKKTSystem{T, VT, MT}(
     n::Int, m::Int, ind_ineq::Vector{Int}, ind_fixed::Vector{Int},
     hess_sparsity_I, hess_sparsity_J,
     jac_sparsity_I, jac_sparsity_J,
-) where {T, MT}
+) where {T, VT, MT}
     n_jac = length(jac_sparsity_I)
     n_hess = length(hess_sparsity_I)
 
@@ -114,7 +114,7 @@ function SparseKKTSystem{T, MT}(
 
     I = Vector{Int32}(undef, aug_mat_length)
     J = Vector{Int32}(undef, aug_mat_length)
-    V = Vector{T}(undef, aug_mat_length)
+    V = VT(undef, aug_mat_length)
     fill!(V, 0.0)  # Need to initiate V to avoid NaN
 
     offset = n+n_jac+n_hess+m
@@ -151,7 +151,7 @@ function SparseKKTSystem{T, MT}(
     end
     jac_scaling = ones(T, n_jac)
 
-    return SparseKKTSystem{T, MT, typeof(hess)}(
+    return SparseKKTSystem{T, VT, MT}(
         hess, jac, pr_diag, du_diag,
         aug_raw, aug_com, aug_csc_map,
         jac_raw, jac_com, jac_csc_map,
@@ -160,7 +160,7 @@ function SparseKKTSystem{T, MT}(
 end
 
 # Build KKT system directly from AbstractNLPModel
-function SparseKKTSystem{T, MT}(nlp::AbstractNLPModel, ind_cons=get_index_constraints(nlp)) where {T, MT}
+function SparseKKTSystem{T, VT, MT}(nlp::AbstractNLPModel, ind_cons=get_index_constraints(nlp)) where {T, VT, MT}
     n_slack = length(ind_cons.ind_ineq)
     # Deduce KKT size.
     n = get_nvar(nlp) + n_slack
@@ -179,7 +179,7 @@ function SparseKKTSystem{T, MT}(nlp::AbstractNLPModel, ind_cons=get_index_constr
     append!(jac_I, ind_cons.ind_ineq)
     append!(jac_J, get_nvar(nlp)+1:get_nvar(nlp)+n_slack)
 
-    return SparseKKTSystem{T, MT}(
+    return SparseKKTSystem{T, VT, MT}(
         n, m, ind_cons.ind_ineq, ind_cons.ind_fixed,
         hess_I, hess_J, jac_I, jac_J,
     )
@@ -193,12 +193,12 @@ num_variables(kkt::SparseKKTSystem) = length(kkt.pr_diag)
     SparseUnreducedKKTSystem
 =#
 
-function SparseUnreducedKKTSystem{T, MT}(
+function SparseUnreducedKKTSystem{T, VT, MT}(
     n::Int, m::Int, nlb::Int, nub::Int, ind_ineq, ind_fixed,
     hess_sparsity_I, hess_sparsity_J,
     jac_sparsity_I, jac_sparsity_J,
     ind_lb, ind_ub,
-) where {T, MT}
+) where {T, VT, MT}
     n_jac = length(jac_sparsity_I)
     n_hess = length(hess_sparsity_I)
 
@@ -258,7 +258,7 @@ function SparseUnreducedKKTSystem{T, MT}(
         zeros(Int, 0)
     end
 
-    return SparseUnreducedKKTSystem{T, MT, typeof(hess)}(
+    return SparseUnreducedKKTSystem{T, VT, MT}(
         hess, jac, pr_diag, du_diag,
         l_diag, u_diag, l_lower, u_lower,
         aug_raw, aug_com, aug_csc_map,
@@ -267,7 +267,7 @@ function SparseUnreducedKKTSystem{T, MT}(
     )
 end
 
-function SparseUnreducedKKTSystem{T, MT}(nlp::AbstractNLPModel, ind_cons=get_index_constraints(nlp)) where {T, MT}
+function SparseUnreducedKKTSystem{T, VT, MT}(nlp::AbstractNLPModel, ind_cons=get_index_constraints(nlp)) where {T, VT, MT}
     n_slack = length(ind_cons.ind_ineq)
     nlb = length(ind_cons.ind_lb)
     nub = length(ind_cons.ind_ub)
@@ -288,7 +288,7 @@ function SparseUnreducedKKTSystem{T, MT}(nlp::AbstractNLPModel, ind_cons=get_ind
     append!(jac_I, ind_cons.ind_ineq)
     append!(jac_J, get_nvar(nlp)+1:get_nvar(nlp)+n_slack)
 
-    return SparseUnreducedKKTSystem{T, MT}(
+    return SparseUnreducedKKTSystem{T, VT, MT}(
         n, m, nlb, nub, ind_cons.ind_ineq, ind_cons.ind_fixed,
         hess_I, hess_J, jac_I, jac_J, ind_cons.ind_lb, ind_cons.ind_ub,
     )
