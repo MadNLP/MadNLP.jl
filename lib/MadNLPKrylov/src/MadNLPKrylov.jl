@@ -30,14 +30,14 @@ struct VirtualPreconditioner
 end
 ldiv!(Pl::VirtualPreconditioner,x::Vector{Float64}) = Pl.ldiv!(x)
 
-mutable struct KrylovSolver <: AbstractIterator
+mutable struct KrylovIterator <: AbstractIterator
     g::Union{Nothing,GMRESIterable}
     res::Vector{Float64}
     opt::KrylovOptions
     logger::Logger
 end
 
-function KrylovSolver(res::Vector{Float64},_mul!,_ldiv!;
+function KrylovIterator(res::Vector{Float64},_mul!,_ldiv!;
                 opt=KrylovOptions(),logger=Logger(),
                 option_dict::Dict{Symbol,Any}=Dict{Symbol,Any}(),kwargs...)
     !isempty(kwargs) && (for (key,val) in kwargs; option_dict[key]=val; end)
@@ -51,11 +51,11 @@ function KrylovSolver(res::Vector{Float64},_mul!,_ldiv!;
                       opt.krylov_max_iter,opt.krylov_tol,0.,
                       ModifiedGramSchmidt())
 
-    return KrylovSolver(g,res,opt,logger)
+    return KrylovIterator(g,res,opt,logger)
 end
 
 function solve_refine!(x::StridedVector{Float64},
-                       is::KrylovSolver,
+                       is::KrylovIterator,
                        b::AbstractVector{Float64})
     @debug(is.logger,"Iterator initiated")
     is.res.=0

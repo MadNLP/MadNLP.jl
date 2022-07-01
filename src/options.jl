@@ -94,9 +94,9 @@ end
 end
 
 function check_option_sanity(options)
-    # if options.linear_solver.INPUT_MATRIX_TYPE == :csc && options.kkt_system == DENSE_KKT_SYSTEM
-    #     error("[options] Sparse Linear solver is not supported in dense mode.\n"*
-    #           "Please use a dense linear solver or change `kkt_system` ")
-    # end
+    if input_type(options.linear_solver) == :csc && options.kkt_system == DENSE_KKT_SYSTEM
+        error("[options] Sparse Linear solver is not supported in dense mode.\n"*
+              "Please use a dense linear solver or change `kkt_system` ")
+    end
 end
 
