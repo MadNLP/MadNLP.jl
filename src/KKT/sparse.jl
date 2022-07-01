@@ -129,11 +129,11 @@ function SparseKKTSystem{T, VT, MT}(
     J[n+n_hess+1:n+n_hess+n_jac] .= jac_sparsity_J
     J[n+n_hess+n_jac+1:offset] .= (n+1:n+m)
 
-    pr_diag = unsafe_wrap(Vector{Float64}, pointer(V), n)
-    du_diag = unsafe_wrap(Vector{Float64}, pointer(V, n_jac+n_hess+n+1) , m)
+    pr_diag = _madnlp_unsafe_wrap(V, n)
+    du_diag = _madnlp_unsafe_wrap(V, m, n_jac+n_hess+n+1)
 
-    hess = unsafe_wrap(Vector{Float64}, pointer(V, n+1), n_hess)
-    jac = unsafe_wrap(Vector{Float64}, pointer(V, n_hess+n+1), n_jac)
+    hess = _madnlp_unsafe_wrap(V, n_hess, n+1)
+    jac = _madnlp_unsafe_wrap(V, n_jac, n_hess+n+1)
 
     aug_raw = SparseMatrixCOO(aug_vec_length,aug_vec_length,I,J,V)
     jac_raw = SparseMatrixCOO(m,n,jac_sparsity_I,jac_sparsity_J,jac)
@@ -230,16 +230,16 @@ function SparseUnreducedKKTSystem{T, VT, MT}(
     J[offset+2nlb+1:offset+2nlb+nub] .= (1:nub).+(n+m+nlb)
     J[offset+2nlb+nub+1:offset+2nlb+2nub] .= ind_ub
 
-    pr_diag = unsafe_wrap(Vector{Float64},pointer(V),n)
-    du_diag = unsafe_wrap(Vector{Float64},pointer(V,n_jac+n_hess+n+1),m)
+    pr_diag = _madnlp_unsafe_wrap(V,n)
+    du_diag = _madnlp_unsafe_wrap(V,m, n_jac+n_hess+n+1)
 
-    l_diag = unsafe_wrap(Vector{Float64},pointer(V,offset+1), nlb)
-    l_lower= unsafe_wrap(Vector{Float64},pointer(V,offset+nlb+1), nlb)
-    u_diag = unsafe_wrap(Vector{Float64},pointer(V,offset+2nlb+1), nub)
-    u_lower= unsafe_wrap(Vector{Float64},pointer(V,offset+2nlb+nub+1), nub)
+    l_diag = _madnlp_unsafe_wrap(V, nlb, offset+1)
+    l_lower= _madnlp_unsafe_wrap(V, nlb, offset+nlb+1)
+    u_diag = _madnlp_unsafe_wrap(V, nub, offset+2nlb+1)
+    u_lower= _madnlp_unsafe_wrap(V, nub, offset+2nlb+nub+1)
 
-    hess = unsafe_wrap(Vector{Float64},pointer(V,n+1), n_hess)
-    jac = unsafe_wrap(Vector{Float64},pointer(V, n_hess+n+1), n_jac)
+    hess = _madnlp_unsafe_wrap(V, n_hess, n+1)
+    jac = _madnlp_unsafe_wrap(V, n_jac, n_hess+n+1)
 
     aug_raw = SparseMatrixCOO(aug_vec_length,aug_vec_length,I,J,V)
     jac_raw = SparseMatrixCOO(m,n,jac_sparsity_I,jac_sparsity_J,jac)

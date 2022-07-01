@@ -268,10 +268,10 @@ function Ma77Solver(csc::SparseMatrixCSC{Float64,Int32};
     for i=1:full.n
         ma77_input_vars_d(
             Int32(i),full.colptr[i+1]-full.colptr[i],
-            unsafe_wrap(
-                Vector{Int32},
-                pointer(full.rowval,full.colptr[i]),
-                full.colptr[i+1]-full.colptr[i]
+            _madnlp_unsafe_wrap(
+                full.rowval,
+                full.colptr[i+1]-full.colptr[i],
+                full.colptr[i]
             ),
             keep,control,info);
         info.flag < 0 && throw(LinearSymbolicException())
@@ -291,10 +291,10 @@ function factorize!(M::Ma77Solver)
     for i=1:M.full.n
         ma77_input_reals_d(
             Int32(i),M.full.colptr[i+1]-M.full.colptr[i],
-            unsafe_wrap(
-                Vector{Float64},
-                pointer(M.full.nzval,M.full.colptr[i]),
-                M.full.colptr[i+1]-M.full.colptr[i]
+            _madnlp_unsafe_wrap(
+                M.full.nzval,
+                M.full.colptr[i+1]-M.full.colptr[i],
+                M.full.colptr[i]
             ),
             M.keep,M.control,M.info
         )

@@ -17,12 +17,13 @@ struct InvalidNumberException <: Exception end
 struct NotEnoughDegreesOfFreedomException <: Exception end
 
 MadNLPExecutionStats(ips::InteriorPointSolver) =MadNLPExecutionStats(
-    ips.status,unsafe_wrap(Vector{Float64},pointer(ips.x),get_nvar(ips.nlp)),
+    ips.status,
+    _madnlp_unsafe_wrap(ips.x, get_nvar(ips.nlp)),
     ips.obj_val,ips.c,
     ips.inf_du, ips.inf_pr,
     ips.l,
-    unsafe_wrap(Vector{Float64},pointer(ips.zl),get_nvar(ips.nlp)),
-    unsafe_wrap(Vector{Float64},pointer(ips.zu),get_nvar(ips.nlp)),
+    _madnlp_unsafe_wrap(ips.zl, get_nvar(ips.nlp)),
+    _madnlp_unsafe_wrap(ips.zu, get_nvar(ips.nlp)),
     ips.cnt.k, ips.nlp.counters,ips.cnt.total_time
 )
 getStatus(result::MadNLPExecutionStats) = STATUS_OUTPUT_DICT[result.status]

@@ -69,7 +69,7 @@ end
     end
 end
 
-function MadNLP.treat_fixed_variable!(kkt::MadNLP.AbstractKKTSystem{T, MT}) where {T, MT<:CuMatrix{T}}
+function MadNLP.treat_fixed_variable!(kkt::MadNLP.AbstractKKTSystem{T, VT, MT}) where {T, VT, MT<:CuMatrix{T}}
     length(kkt.ind_fixed) == 0 && return
     aug = kkt.aug_com
     d_ind_fixed = kkt.ind_fixed |> CuVector # TODO: allocate ind_fixed directly on the GPU

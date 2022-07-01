@@ -1,11 +1,8 @@
-# MadNLP.jl.
-# Created by Sungho Shin (sungho.shin@wisc.edu)
 abstract type AbstractOptions end
 
 # Build info
 default_linear_solver() = UmfpackSolver
 default_dense_solver() = LapackCPUSolver
-
 
 # Logger
 @kwdef mutable struct Logger
@@ -57,6 +54,11 @@ macro blas_safe_threads(args...)
         set_blas_num_threads(blas_num_threads[])
     end
     return esc(code)
+end
+
+# unsafe wrap
+function _madnlp_unsafe_wrap(vec::VT, n, shift=1) where VT
+    return unsafe_wrap(VT, pointer(vec,shift), n)
 end
 
 # Type definitions for noncontiguous views

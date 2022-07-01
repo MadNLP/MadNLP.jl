@@ -161,7 +161,7 @@ function InteriorPointSolver{KKTSystem}(nlp::AbstractNLPModel, opt::Options;
     x_trial=Vector{Float64}(undef,n)
     c_trial=Vector{Float64}(undef,m)
 
-    x_slk= unsafe_wrap(Vector{Float64},pointer(x,get_nvar(nlp)+1),ns)
+    x_slk= _madnlp_unsafe_wrap(x,ns, get_nvar(nlp)+1)
     c_slk= view(c,ind_cons.ind_ineq)
     rhs = (get_lcon(nlp).==get_ucon(nlp)).*get_lcon(nlp)
 

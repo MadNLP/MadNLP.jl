@@ -98,7 +98,7 @@ function Ma27Solver(csc::SparseMatrixCSC;
 
     la = ceil(Int32,max(nz,opt.ma27_la_init_factor*info[5]))
     a = Vector{Float64}(undef,la)
-    a_view = unsafe_wrap(Vector{Float64},pointer(a),nnz(csc))
+    a_view = _madnlp_unsafe_wrap(a,nnz(csc))
     liw= ceil(Int32,opt.ma27_liw_init_factor*info[6])
     resize!(iw,liw)
     maxfrt=Int32[1]

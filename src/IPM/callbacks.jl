@@ -1,7 +1,3 @@
-function _madnlp_unsafe_wrap(vec::VT, n::Int, shift::Int=0)
-    return unsafe_wrap(VT, pointer(vec,shift), n)
-end
-
 function eval_f_wrapper(ips::InteriorPointSolver, x::Vector{Float64})
     nlp = ips.nlp
     cnt = ips.cnt
@@ -18,7 +14,7 @@ function eval_grad_f_wrapper!(ips::InteriorPointSolver, f::Vector{Float64},x::Ve
     cnt = ips.cnt
     @trace(ips.logger,"Evaluating objective gradient.")
     x_nlpmodel = _madnlp_unsafe_wrap(x, get_nvar(nlp))
-    f_nlpmodel = unsafe_wrap(Vector{Float64},pointer(f),get_nvar(nlp))
+    f_nlpmodel = _madnlp_unsafe_wrap(f, get_nvar(nlp))
     cnt.eval_function_time += @elapsed grad!(
         nlp,
         x_nlpmodel,
@@ -35,7 +31,7 @@ function eval_cons_wrapper!(ips::InteriorPointSolver, c::Vector{Float64},x::Vect
     cnt = ips.cnt
     @trace(ips.logger, "Evaluating constraints.")
     x_nlpmodel = _madnlp_unsafe_wrap(x, get_nvar(nlp))
-    c_nlpmodel = unsafe_wrap(Vector{Float64},pointer(c),get_ncon(nlp))
+    c_nlpmodel = _madnlp_unsafe_wrap(c, get_ncon(nlp))
     cnt.eval_function_time += @elapsed cons!(
         nlp,
         x_nlpmodel,
@@ -56,7 +52,7 @@ function eval_jac_wrapper!(ipp::InteriorPointSolver, kkt::AbstractKKTSystem, x::
     @trace(ipp.logger, "Evaluating constraint Jacobian.")
     jac = get_jacobian(kkt)
     x_nlpmodel = _madnlp_unsafe_wrap(x, get_nvar(nlp))
-    jac_nlpmodel = unsafe_wrap(Vector{Float64},pointer(jac),get_nnzj(nlp))
+    jac_nlpmodel = _madnlp_unsafe_wrap(jac, get_nnzj(nlp))
     cnt.eval_function_time += @elapsed jac_coord!(
         nlp,
         x_nlpmodel, 
@@ -75,8 +71,8 @@ function eval_lag_hess_wrapper!(ipp::InteriorPointSolver, kkt::AbstractKKTSystem
     @trace(ipp.logger,"Evaluating Lagrangian Hessian.")
     dual(ipp._w1) .= l.*ipp.con_scale
     hess = get_hessian(kkt)
-    x_nlpmodel = unsafe_wrap(Vector{Float64},pointer(x), get_nvar(nlp))
-    hess_nlpmodel = unsafe_wrap(Vector{Float64},pointer(hess), get_nnzh(nlp))
+    x_nlpmodel = _madnlp_unsafe_wrap(x, get_nvar(nlp))
+    hess_nlpmodel = _madnlp_unsafe_wrap(hess, get_nnzh(nlp))
     cnt.eval_function_time += @elapsed hess_coord!(
         nlp,
         x_nlpmodel,
