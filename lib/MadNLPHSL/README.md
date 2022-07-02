@@ -9,9 +9,11 @@ To build MadNLP with HSL linear solvers (Ma27, Ma57, Ma77, Ma86, Ma97), the sour
 ```julia
 # either one of the following should be given
 julia> ENV["MADNLP_HSL_SOURCE_PATH"] = "/opt/coinhsl" 
+julia> ENV["MADNLP_HSL_SOURCE_PATH"] = "/opt/coinhsl-archive-2021.05.05" 
+julia> ENV["MADNLP_HSL_SOURCE_PATH"] = "/opt/ma57-3.11.0/" 
 julia> ENV["MADNLP_HSL_LIBRARY_PATH"] = "/usr/lib/libcoinhsl.so"
 # optionally, one can specify
-julia> ENV["MADNLP_HSL_BLAS"] = "openblas" # default is "mkl"
+julia> ENV["MADNLP_HSL_BLAS"] = "mkl" # default is "openblas"
 ```
 After obtaining the source code or the libarary, run
 ```julia

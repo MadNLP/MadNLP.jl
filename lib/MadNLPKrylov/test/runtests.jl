@@ -4,7 +4,7 @@ testset = [
     [
         "Iterative",
         ()->MadNLP.Optimizer(
-            iterative_solver=MadNLPKrylov,
+            iterative_solver=MadNLPKrylov.KrylovIterator,
             print_level=MadNLP.ERROR),
         []
     ],

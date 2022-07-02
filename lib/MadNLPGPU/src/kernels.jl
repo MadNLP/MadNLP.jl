@@ -69,7 +69,7 @@ end
     end
 end
 
-function MadNLP.treat_fixed_variable!(kkt::MadNLP.AbstractKKTSystem{T, MT}) where {T, MT<:CuMatrix{T}}
+function MadNLP.treat_fixed_variable!(kkt::MadNLP.AbstractKKTSystem{T, VT, MT}) where {T, VT, MT<:CuMatrix{T}}
     length(kkt.ind_fixed) == 0 && return
     aug = kkt.aug_com
     d_ind_fixed = kkt.ind_fixed |> CuVector # TODO: allocate ind_fixed directly on the GPU
@@ -123,7 +123,7 @@ end
     DenseKKTSystem kernels
 =#
 
-function MadNLP.mul!(y::AbstractVector, kkt::MadNLP.DenseKKTSystem{T, VT, MT}, x::AbstractVector) where {T, VT<:CuVector{T}, MT<:CuMatrix{T}}
+function LinearAlgebra.mul!(y::AbstractVector, kkt::MadNLP.DenseKKTSystem{T, VT, MT}, x::AbstractVector) where {T, VT<:CuVector{T}, MT<:CuMatrix{T}}
     # Load buffers
     haskey(kkt.etc, :hess_w1) || (kkt.etc[:hess_w1] = CuVector{T}(undef, size(kkt.aug_com, 1)))
     haskey(kkt.etc, :hess_w2) || (kkt.etc[:hess_w2] = CuVector{T}(undef, size(kkt.aug_com, 1)))
@@ -135,6 +135,9 @@ function MadNLP.mul!(y::AbstractVector, kkt::MadNLP.DenseKKTSystem{T, VT, MT}, x
     copyto!(d_x, x)
     LinearAlgebra.mul!(d_y, kkt.aug_com, d_x)
     copyto!(y, d_y)
+end
+function LinearAlgebra.mul!(y::MadNLP.ReducedKKTVector, kkt::MadNLP.DenseKKTSystem{T, VT, MT}, x::MadNLP.ReducedKKTVector) where {T, VT<:CuVector{T}, MT<:CuMatrix{T}}
+    LinearAlgebra.mul!(MadNLP.full(y), kkt, MadNLP.full(x))
 end
 
 @kernel function _build_dense_kkt_system_kernel!(
@@ -252,7 +255,7 @@ function MadNLP._build_condensed_kkt_system!(
     wait(ev)
 end
 
-function MadNLP.mul!(y::AbstractVector, kkt::MadNLP.DenseCondensedKKTSystem{T, VT, MT}, x::AbstractVector) where {T, VT<:CuVector{T}, MT<:CuMatrix{T}}
+function LinearAlgebra.mul!(y::AbstractVector, kkt::MadNLP.DenseCondensedKKTSystem{T, VT, MT}, x::AbstractVector) where {T, VT<:CuVector{T}, MT<:CuMatrix{T}}
     if length(y) == length(x) == size(kkt.aug_com, 1)
         # Load buffers
         haskey(kkt.etc, :hess_w1) || (kkt.etc[:hess_w1] = CuVector{T}(undef, size(kkt.aug_com, 1)))
@@ -278,6 +281,9 @@ function MadNLP.mul!(y::AbstractVector, kkt::MadNLP.DenseCondensedKKTSystem{T, V
         MadNLP._mul_expanded!(d_y, kkt, d_x)
         copyto!(y, d_y)
     end
+end
+function LinearAlgebra.mul!(y::MadNLP.ReducedKKTVector, kkt::MadNLP.DenseCondensedKKTSystem{T, VT, MT}, x::MadNLP.ReducedKKTVector) where {T, VT<:CuVector{T}, MT<:CuMatrix{T}}
+    LinearAlgebra.mul!(MadNLP.full(y), kkt, MadNLP.full(x))
 end
 
 function MadNLP.jprod_ineq!(y::AbstractVector, kkt::MadNLP.DenseCondensedKKTSystem{T, VT, MT}, x::AbstractVector) where {T, VT<:CuVector{T}, MT<:CuMatrix{T}}

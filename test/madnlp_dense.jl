@@ -7,18 +7,17 @@ using SparseArrays
 using Random
 
 function _compare_dense_with_sparse(kkt_system, n, m, ind_fixed, ind_eq)
+
     for (T,tol,atol) in [(Float32,1e-3,1e-1), (Float64,1e-8,1e-6)]
         sparse_options = Dict{Symbol, Any}(
             :kkt_system=>MadNLP.SPARSE_KKT_SYSTEM,
-            :linear_solver=>MadNLPLapackCPU,
+            :linear_solver=>MadNLP.LapackCPUSolver,
             :print_level=>MadNLP.ERROR,
-            :tol=>tol
         )
         dense_options = Dict{Symbol, Any}(
             :kkt_system=>kkt_system,
-            :linear_solver=>MadNLPLapackCPU,
+            :linear_solver=>MadNLP.LapackCPUSolver,
             :print_level=>MadNLP.ERROR,
-            :tol=>tol
         )
         
         nlp = MadNLPTests.DenseDummyQP{T}(; n=n, m=m, fixed_variables=ind_fixed, equality_cons=ind_eq)
@@ -50,7 +49,7 @@ end
     @testset "Unconstrained" begin
         dense_options = Dict{Symbol, Any}(
             :kkt_system=>kkt_options,
-            :linear_solver=>MadNLPLapackCPU,
+            :linear_solver=>MadNLP.LapackCPUSolver,
         )
         m = 0
         nlp = MadNLPTests.DenseDummyQP(; n=n, m=m)
@@ -71,14 +70,14 @@ end
         # Test that using a sparse solver is forbidden in dense mode
         dense_options_error = Dict{Symbol, Any}(
             :kkt_system=>kkt_options,
-            :linear_solver=>MadNLPUmfpack,
+            :linear_solver=>MadNLP.UmfpackSolver,
         )
         @test_throws Exception MadNLP.InteriorPointSolver(nlp, dense_options_error)
     end
     @testset "Constrained" begin
         dense_options = Dict{Symbol, Any}(
             :kkt_system=>MadNLP.DENSE_KKT_SYSTEM,
-            :linear_solver=>MadNLPLapackCPU,
+            :linear_solver=>MadNLP.LapackCPUSolver,
         )
         m = 5
         nlp = MadNLPTests.DenseDummyQP(; n=n, m=m)
@@ -115,7 +114,7 @@ end
     nlp = MadNLPTests.DenseDummyQP(; n=n, m=m)
     sparse_options = Dict{Symbol, Any}(
         :kkt_system=>MadNLP.SPARSE_KKT_SYSTEM,
-        :linear_solver=>MadNLPLapackCPU,
+        :linear_solver=>MadNLP.LapackCPUSolver,
         :print_level=>MadNLP.ERROR,
     )
     ips = MadNLP.InteriorPointSolver(nlp, option_dict=sparse_options)

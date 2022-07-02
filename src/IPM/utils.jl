@@ -1,13 +1,13 @@
 struct MadNLPExecutionStats{T} <: AbstractExecutionStats
     status::Status
-    solution::StrideOneVector{T}
+    solution::Vector{T}
     objective::T
-    constraints::StrideOneVector{T}
+    constraints::Vector{T}
     dual_feas::T
     primal_feas::T
-    multipliers::StrideOneVector{T}
-    multipliers_L::StrideOneVector{T}
-    multipliers_U::StrideOneVector{T}
+    multipliers::Vector{T}
+    multipliers_L::Vector{T}
+    multipliers_U::Vector{T}
     iter::Int
     counters::NLPModelsCounters
     elapsed_time::Real
@@ -17,10 +17,15 @@ struct InvalidNumberException <: Exception end
 struct NotEnoughDegreesOfFreedomException <: Exception end
 
 MadNLPExecutionStats(ips::InteriorPointSolver) =MadNLPExecutionStats(
-    ips.status,view(ips.x,1:get_nvar(ips.nlp)),ips.obj_val,ips.c,
+    ips.status,
+    _madnlp_unsafe_wrap(ips.x, get_nvar(ips.nlp)),
+    ips.obj_val,ips.c,
     ips.inf_du, ips.inf_pr,
-    ips.l,view(ips.zl,1:get_nvar(ips.nlp)),view(ips.zu,1:get_nvar(ips.nlp)),
-    ips.cnt.k, ips.nlp.counters,ips.cnt.total_time)
+    ips.l,
+    _madnlp_unsafe_wrap(ips.zl, get_nvar(ips.nlp)),
+    _madnlp_unsafe_wrap(ips.zu, get_nvar(ips.nlp)),
+    ips.cnt.k, ips.nlp.counters,ips.cnt.total_time
+)
 getStatus(result::MadNLPExecutionStats) = STATUS_OUTPUT_DICT[result.status]
 
 # Utilities
@@ -64,7 +69,7 @@ function print_iter(ips::AbstractInteriorPointSolver;is_resto=false)
         is_resto ? ips.RR.inf_pr_R : ips.inf_pr,
         is_resto ? ips.RR.inf_du_R : ips.inf_du,
         is_resto ? log(10,ips.RR.mu_R) : log(10,ips.mu),
-        ips.cnt.k == 0 ? 0. : norm(ips.dx,Inf),
+        ips.cnt.k == 0 ? 0. : norm(primal(ips.d),Inf),
         ips.del_w == 0 ? "   - " : @sprintf("%5.1f",log(10,ips.del_w)),
         ips.alpha_z,ips.alpha,ips.ftype,ips.cnt.l))
     return

@@ -31,44 +31,20 @@ mutable struct InteriorPointSolver{T,KKTSystem <: AbstractKKTSystem{T}} <: Abstr
 
     jacl::Vector{T}
 
-    d::Vector{T}
-    dx::StrideOneVector{T}
-    dl::StrideOneVector{T}
-    dzl::StrideOneVector{T}
-    dzu::StrideOneVector{T}
+    d::UnreducedKKTVector{T, Vector{T}}
+    p::UnreducedKKTVector{T, Vector{T}}
 
-    p::Vector{T}
-    px::StrideOneVector{T}
-    pl::StrideOneVector{T}
+    _w1::AbstractKKTVector{T, Vector{T}}
+    _w2::AbstractKKTVector{T, Vector{T}}
 
-    pzl::Union{Nothing,StrideOneVector{T}}
-    pzu::Union{Nothing,StrideOneVector{T}}
-
-    _w1::Vector{T}
-    _w1x::StrideOneVector{T}
-    _w1l::StrideOneVector{T}
-    _w1zl::Union{Nothing,StrideOneVector{T}}
-    _w1zu::Union{Nothing,StrideOneVector{T}}
-
-    _w2::Vector{T}
-    _w2x::StrideOneVector{T}
-    _w2l::StrideOneVector{T}
-    _w2zl::Union{Nothing,StrideOneVector{T}}
-    _w2zu::Union{Nothing,StrideOneVector{T}}
-
-    _w3::Vector{T}
-    _w3x::StrideOneVector{T}
-    _w3l::StrideOneVector{T}
-
-    _w4::Vector{T}
-    _w4x::StrideOneVector{T}
-    _w4l::StrideOneVector{T}
+    _w3::AbstractKKTVector{T, Vector{T}}
+    _w4::AbstractKKTVector{T, Vector{T}}
 
     x_trial::Vector{T}
     c_trial::Vector{T}
     obj_val_trial::T
 
-    x_slk::StrideOneVector{T}
+    x_slk::Vector{T}
     c_slk::SubVector{T}
     rhs::Vector{T}
 
@@ -126,19 +102,18 @@ function InteriorPointSolver(nlp::AbstractNLPModel{T};
     set_options!(opt,option_dict,kwargs)
     check_option_sanity(opt)
 
+    VT = Vector{T}
     KKTSystem = if opt.kkt_system == SPARSE_KKT_SYSTEM
-        MT = (opt.linear_solver.INPUT_MATRIX_TYPE == :csc) ? SparseMatrixCSC{T, Int32} : Matrix{T}
-        SparseKKTSystem{T, MT}
+        MT = (input_type(opt.linear_solver) == :csc) ? SparseMatrixCSC{T, Int32} : Matrix{T}
+        SparseKKTSystem{T, VT, MT}
     elseif opt.kkt_system == SPARSE_UNREDUCED_KKT_SYSTEM
-        MT = (opt.linear_solver.INPUT_MATRIX_TYPE == :csc) ? SparseMatrixCSC{T, Int32} : Matrix{T}
-        SparseUnreducedKKTSystem{T, MT}
+        MT = (input_type(opt.linear_solver) == :csc) ? SparseMatrixCSC{T, Int32} : Matrix{T}
+        SparseUnreducedKKTSystem{T, VT, MT}
     elseif opt.kkt_system == DENSE_KKT_SYSTEM
         MT = Matrix{T}
-        VT = Vector{T}
         DenseKKTSystem{T, VT, MT}
     elseif opt.kkt_system == DENSE_CONDENSED_KKT_SYSTEM
         MT = Matrix{T}
-        VT = Vector{T}
         DenseCondensedKKTSystem{T, VT, MT}
     end
     return InteriorPointSolver{T,KKTSystem}(nlp, opt; option_linear_solver=option_dict)
@@ -186,7 +161,7 @@ function InteriorPointSolver{T,KKTSystem}(nlp::AbstractNLPModel, opt::Options;
     x_trial=Vector{T}(undef,n)
     c_trial=Vector{T}(undef,m)
 
-    x_slk= view(x,get_nvar(nlp)+1:n)
+    x_slk= _madnlp_unsafe_wrap(x,ns, get_nvar(nlp)+1)
     c_slk= view(c,ind_cons.ind_ineq)
     rhs = (get_lcon(nlp).==get_ucon(nlp)).*get_lcon(nlp)
 
@@ -201,42 +176,18 @@ function InteriorPointSolver{T,KKTSystem}(nlp::AbstractNLPModel, opt::Options;
 
     aug_vec_length = is_reduced(kkt) ? n+m : n+m+nlb+nub
 
-    _w1 = zeros(T,aug_vec_length) # fixes the random failure for inertia-free + Unreduced
-    _w1x= view(_w1,1:n)
-    _w1l= view(_w1,n+1:n+m)
-    _w1zl = is_reduced(kkt) ? nothing : view(_w1,n+m+1:n+m+nlb)
-    _w1zu = is_reduced(kkt) ? nothing : view(_w1,n+m+nlb+1:n+m+nlb+nub)
-
-
-    _w2 = Vector{T}(undef,aug_vec_length)
-    _w2x= view(_w2,1:n)
-    _w2l= view(_w2,n+1:n+m)
-    _w2zl = is_reduced(kkt) ? nothing : view(_w2,n+m+1:n+m+nlb)
-    _w2zu = is_reduced(kkt) ? nothing : view(_w2,n+m+nlb+1:n+m+nlb+nub)
-
-    _w3 = zeros(T,aug_vec_length) # fixes the random failure for inertia-free + Unreduced
-    _w3x= view(_w3,1:n)
-    _w3l= view(_w3,n+1:n+m)
-    _w4 = zeros(T,aug_vec_length) # need to initialize to zero due to mul!
-    _w4x= view(_w4,1:n)
-    _w4l= view(_w4,n+1:n+m)
-
+    _w1 = is_reduced(kkt) ? ReducedKKTVector(n, m) : UnreducedKKTVector(n, m, nlb, nub)
+    _w2 = is_reduced(kkt) ? ReducedKKTVector(n, m) : UnreducedKKTVector(n, m, nlb, nub)
+    _w3 = is_reduced(kkt) ? ReducedKKTVector(n, m) : UnreducedKKTVector(n, m, nlb, nub)
+    _w4 = is_reduced(kkt) ? ReducedKKTVector(n, m) : UnreducedKKTVector(n, m, nlb, nub)
 
     jacl = zeros(T,n) # spblas may throw an error if not initialized to zero
 
-    d = Vector{T}(undef,aug_vec_length)
-    dx= view(d,1:n)
-    dl= view(d,n+1:n+m)
-    dzl= is_reduced(kkt) ? Vector{T}(undef,nlb) : view(d,n+m+1:n+m+nlb)
-    dzu= is_reduced(kkt) ? Vector{T}(undef,nub) : view(d,n+m+nlb+1:n+m+nlb+nub)
-    dx_lr = view(dx,ind_cons.ind_lb)
-    dx_ur = view(dx,ind_cons.ind_ub)
+    d = UnreducedKKTVector(n, m, nlb, nub)
+    dx_lr = view(d.xp, ind_cons.ind_lb) # TODO
+    dx_ur = view(d.xp, ind_cons.ind_ub) # TODO
 
-    p = Vector{T}(undef,aug_vec_length)
-    px= view(p,1:n)
-    pl= view(p,n+1:n+m)
-    pzl= is_reduced(kkt) ? Vector{T}(undef,nlb) : view(p,n+m+1:n+m+nlb)
-    pzu= is_reduced(kkt) ? Vector{T}(undef,nub) : view(p,n+m+nlb+1:n+m+nlb+nub)
+    p = UnreducedKKTVector(n, m, nlb, nub)
 
     obj_scale = [1.0]
     con_scale = ones(T,m)
@@ -244,13 +195,12 @@ function InteriorPointSolver{T,KKTSystem}(nlp::AbstractNLPModel, opt::Options;
 
     @trace(logger,"Initializing linear solver.")
     cnt.linear_solver_time =
-        @elapsed linear_solver = opt.linear_solver.Solver(get_kkt(kkt) ; option_dict=option_linear_solver,logger=logger)
+        @elapsed linear_solver = opt.linear_solver(get_kkt(kkt) ; option_dict=option_linear_solver,logger=logger)
 
-    n_kkt = size(get_kkt(kkt), 1)
+    n_kkt = size(kkt, 1)
+    buffer_vec = similar(full(d), n_kkt)
     @trace(logger,"Initializing iterative solver.")
-    iterator = opt.iterator.Solver(
-        similar(d, n_kkt),
-        (b, x)->mul!(b, kkt, x), (x)->solve!(linear_solver, x) ; option_dict=option_linear_solver)
+    iterator = opt.iterator(linear_solver, kkt, buffer_vec)
 
     @trace(logger,"Initializing fixed variable treatment scheme.")
 
@@ -263,8 +213,8 @@ function InteriorPointSolver{T,KKTSystem}(nlp::AbstractNLPModel, opt::Options;
     return InteriorPointSolver{T,KKTSystem}(nlp,kkt,opt,cnt,logger,
         n,m,nlb,nub,x,l,zl,zu,xl,xu,0.,f,c,
         jacl,
-        d,dx,dl,dzl,dzu,p,px,pl,pzl,pzu,
-        _w1,_w1x,_w1l,_w1zl,_w1zu,_w2,_w2x,_w2l,_w2zl,_w2zu,_w3,_w3x,_w3l,_w4,_w4x,_w4l,
+        d, p,
+        _w1, _w2, _w3, _w4,
         x_trial,c_trial,0.,x_slk,c_slk,rhs,
         ind_cons.ind_ineq,ind_cons.ind_fixed,ind_cons.ind_llb,ind_cons.ind_uub,
         x_lr,x_ur,xl_r,xu_r,zl_r,zu_r,dx_lr,dx_ur,x_trial_lr,x_trial_ur,

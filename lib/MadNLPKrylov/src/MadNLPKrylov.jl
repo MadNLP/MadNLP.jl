@@ -3,13 +3,14 @@ module MadNLPKrylov
 import MadNLP:
     @kwdef, Logger, @debug, @warn, @error,
     AbstractOptions, AbstractIterator, set_options!, @sprintf,
-    solve_refine!, mul!, ldiv!, size, StrideOneVector
+    solve_refine!, mul!, ldiv!, size
 import IterativeSolvers:
     FastHessenberg, ArnoldiDecomp, Residual, init!, init_residual!, expand!, Identity,
     orthogonalize_and_normalize!, update_residual!, gmres_iterable!, GMRESIterable, converged,
     ModifiedGramSchmidt
 
-@kwdef mutable struct Options <: AbstractOptions
+
+@kwdef mutable struct KrylovOptions <: AbstractOptions
     krylov_restart::Int = 5
     krylov_max_iter::Int = 10
     krylov_tol::Float64 = 1e-10
@@ -27,17 +28,17 @@ size(A::VirtualMatrix,i) = (A.m,A.n)[i]
 struct VirtualPreconditioner
     ldiv!::Function
 end
-ldiv!(Pl::VirtualPreconditioner,x::StrideOneVector{Float64}) = Pl.ldiv!(x)
+ldiv!(Pl::VirtualPreconditioner,x::Vector{Float64}) = Pl.ldiv!(x)
 
-mutable struct Solver{T} <: AbstractIterator
+mutable struct KrylovIterator{T} <: AbstractIterator
     g::Union{Nothing,GMRESIterable}
     res::Vector{T}
-    opt::Options
+    opt::KrylovOptions
     logger::Logger
 end
 
-function Solver(res::Vector{T},_mul!,_ldiv!;
-                opt=Options(),logger=Logger(),
+function KrylovIterator(res::Vector{T},_mul!,_ldiv!;
+                opt=KrylovOptions(),logger=Logger(),
                 option_dict::Dict{Symbol,Any}=Dict{Symbol,Any}(),kwargs...) where T
     !isempty(kwargs) && (for (key,val) in kwargs; option_dict[key]=val; end)
     set_options!(opt,option_dict)
@@ -50,12 +51,13 @@ function Solver(res::Vector{T},_mul!,_ldiv!;
                       opt.krylov_max_iter,opt.krylov_tol,0.,
                       ModifiedGramSchmidt())
 
-    return Solver{T}(g,res,opt,logger)
+    return KrylovIterator{T}(g,res,opt,logger)
 end
 
-function solve_refine!(x::StridedVector{T},
-                       is::Solver,
-                       b::AbstractVector{T}) where T
+function solve_refine!(x::StridedVector{Float64},
+                       is::KrylovIterator,
+                       b::AbstractVector{Float64})
+>>>>>>> master
     @debug(is.logger,"Iterator initiated")
     is.res.=0
     x.=0

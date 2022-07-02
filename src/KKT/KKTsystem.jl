@@ -1,8 +1,13 @@
 
-abstract type AbstractKKTSystem{T, MT<:AbstractMatrix{T}} end
+"""
+    AbstractKKTSystem{T, VT<:AbstractVector{T}, MT<:AbstractMatrix{T}}
+
+Abstract type for KKT system.
+"""
+abstract type AbstractKKTSystem{T, VT, MT<:AbstractMatrix{T}} end
 
 """
-    AbstractUnreducedKKTSystem{T, MT} <: AbstractKKTSystem{T, MT}
+    AbstractUnreducedKKTSystem{T, VT, MT} <: AbstractKKTSystem{T, VT, MT}
 
 Augmented KKT system associated to the linearization of the KKT
 conditions at the current primal-dual iterate ``(x, s, y, z, ν, w)``.
@@ -25,10 +30,10 @@ with
 * ``V = diag(ν)``
 * ``W = diag(w)``
 """
-abstract type AbstractUnreducedKKTSystem{T, MT} <: AbstractKKTSystem{T, MT} end
+abstract type AbstractUnreducedKKTSystem{T, VT, MT} <: AbstractKKTSystem{T, VT, MT} end
 
 """
-    AbstractReducedKKTSystem{T, MT} <: AbstractKKTSystem{T, MT}
+    AbstractReducedKKTSystem{T, VT, MT} <: AbstractKKTSystem{T, VT, MT}
 
 The reduced KKT system is a simplification of the original Augmented KKT system.
 Comparing to [`AbstractUnreducedKKTSystem`](@ref)), `AbstractReducedKKTSystem` removes
@@ -49,12 +54,12 @@ with
 * ``Σₛ = S⁻¹ W``
 
 """
-abstract type AbstractReducedKKTSystem{T, MT} <: AbstractKKTSystem{T, MT} end
+abstract type AbstractReducedKKTSystem{T, VT, MT} <: AbstractKKTSystem{T, VT, MT} end
 
 """
-    AbstractCondensedKKTSystem{T, MT} <: AbstractKKTSystem{T, MT}
+    AbstractCondensedKKTSystem{T, VT, MT} <: AbstractKKTSystem{T, VT, MT}
 
-The condensed KKT system simplifies further the [``AbstractReducedKKTSystem`](@ref)
+The condensed KKT system simplifies further the [`AbstractReducedKKTSystem`](@ref)
 by removing the rows associated to the slack variables ``s`` and the inequalities.
 
 At the primal-dual iterate ``(x, y)``, the matrix writes
@@ -69,7 +74,7 @@ with
 * ``Σₓ = X⁻¹ V``
 * ``Σₛ = S⁻¹ W``
 """
-abstract type AbstractCondensedKKTSystem{T, MT} <: AbstractKKTSystem{T, MT} end
+abstract type AbstractCondensedKKTSystem{T, VT, MT} <: AbstractKKTSystem{T, VT, MT} end
 
 #=
     Templates
@@ -205,7 +210,7 @@ get_raw_jacobian(kkt::AbstractKKTSystem) = kkt.jac_raw
 
 
 # Fix variable treatment
-function treat_fixed_variable!(kkt::AbstractKKTSystem{T, MT}) where {T, MT<:SparseMatrixCSC{T, Int32}}
+function treat_fixed_variable!(kkt::AbstractKKTSystem{T, VT, MT}) where {T, VT, MT<:SparseMatrixCSC{T, Int32}}
     length(kkt.ind_fixed) == 0 && return
     aug = kkt.aug_com
 
@@ -215,7 +220,7 @@ function treat_fixed_variable!(kkt::AbstractKKTSystem{T, MT}) where {T, MT<:Spar
     fixed_aug .= 0.0
     return
 end
-function treat_fixed_variable!(kkt::AbstractKKTSystem{T, MT}) where {T, MT<:Matrix{T}}
+function treat_fixed_variable!(kkt::AbstractKKTSystem{T, VT, MT}) where {T, VT, MT<:Matrix{T}}
     length(kkt.ind_fixed) == 0 && return
     aug = kkt.aug_com
     @inbounds for i in kkt.ind_fixed
@@ -229,12 +234,12 @@ function is_inertia_correct(kkt::AbstractKKTSystem, num_pos, num_zero, num_neg)
     return (num_zero == 0) && (num_pos == num_variables(kkt))
 end
 
-function build_kkt!(kkt::AbstractKKTSystem{T, MT}) where {T, MT<:Matrix{T}}
+function build_kkt!(kkt::AbstractKKTSystem{T, VT, MT}) where {T, VT, MT<:Matrix{T}}
     copyto!(kkt.aug_com, kkt.aug_raw)
     treat_fixed_variable!(kkt)
 end
 
-function build_kkt!(kkt::AbstractKKTSystem{T, MT}) where {T, MT<:SparseMatrixCSC{T, Int32}}
+function build_kkt!(kkt::AbstractKKTSystem{T, VT, MT}) where {T, VT, MT<:SparseMatrixCSC{T, Int32}}
     transfer!(kkt.aug_com, kkt.aug_raw, kkt.aug_csc_map)
     treat_fixed_variable!(kkt)
 end
@@ -242,6 +247,7 @@ end
 compress_hessian!(kkt::AbstractKKTSystem) = nothing
 
 
+include("rhs.jl")
 include("sparse.jl")
 include("dense.jl")
 

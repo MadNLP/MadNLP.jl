@@ -574,51 +574,94 @@ os = "windows"
     sha256 = "499fd4686fcf399113eadc4a6e23149147952a4a13fa57231ab72d4c73b1acb6"
     url = "https://github.com/JuliaBinaryWrappers/OpenBLAS32_jll.jl/releases/download/OpenBLAS32-v0.3.13+4/OpenBLAS32.v0.3.13.x86_64-w64-mingw32-libgfortran5.tar.gz"
 
-# MKL
-[[MKL]]
-arch = "i686"
-git-tree-sha1 = "51c68267c3ef9625c44f086a8211376f9e10aaff"
-lazy = true
-os = "windows"
-
-    [[MKL.download]]
-    sha256 = "693a00fe1c2fef57891617b023bcbe2e40955ca55df930e0b6be5435c26f04fa"
-    url = "https://github.com/JuliaBinaryWrappers/MKL_jll.jl/releases/download/MKL-v2021.1.1+1/MKL.v2021.1.1.i686-w64-mingw32.tar.gz"
 [[MKL]]
 arch = "x86_64"
-git-tree-sha1 = "073ff95e2c63501547247d6e1321bf4ee2a78933"
+git-tree-sha1 = "c284c144ceaa0b7ab2811b3726c4efc008a13bf0"
+lazy = true
+libc = "glibc"
+os = "linux"
+
+    [[MKL.download]]
+    sha256 = "28fafe3bf0a5d9025dba311b2a152fac5da1fc4050659cd0cb423591eb96f3ca"
+    url = "https://github.com/JuliaBinaryWrappers/MKL_jll.jl/releases/download/MKL-v2022.0.0+0/MKL.v2022.0.0.x86_64-linux-gnu.tar.gz"
+[[MKL]]
+arch = "i686"
+git-tree-sha1 = "169de1a9101def0abb5bd1e42838dfbd84c800c6"
+lazy = true
+libc = "glibc"
+os = "linux"
+
+    [[MKL.download]]
+    sha256 = "db2e00483b159ecdcdccbeec8a36c269b7907c3e2dd629e07e6c8eaf69d6d8d7"
+    url = "https://github.com/JuliaBinaryWrappers/MKL_jll.jl/releases/download/MKL-v2022.0.0+0/MKL.v2022.0.0.i686-linux-gnu.tar.gz"
+[[MKL]]
+arch = "x86_64"
+git-tree-sha1 = "5be07e58a7aedaa7b3028bed3cb71e2f05c76c2d"
 lazy = true
 os = "macos"
 
     [[MKL.download]]
-    sha256 = "b7a5dd32e4a005a752bc4c3e6d425bf3b5bb1861730bbc4214216aa2c520f42d"
-    url = "https://github.com/JuliaBinaryWrappers/MKL_jll.jl/releases/download/MKL-v2021.1.1+1/MKL.v2021.1.1.x86_64-apple-darwin.tar.gz"
+    sha256 = "b60065229efa1f795630ab7c0033d81213a8507bd616cc03f611c02d7040c17a"
+    url = "https://github.com/JuliaBinaryWrappers/MKL_jll.jl/releases/download/MKL-v2022.0.0+0/MKL.v2022.0.0.x86_64-apple-darwin.tar.gz"
 [[MKL]]
-arch = "x86_64"
-git-tree-sha1 = "b30e86ec62f2d592fcea7086c63f61ebecd6f83e"
+arch = "i686"
+git-tree-sha1 = "ee1f9da32eace02b0d1042d03186111e83474966"
 lazy = true
 os = "windows"
 
     [[MKL.download]]
-    sha256 = "56e783ad5f4f96ce6545b870ad80c4d6865129a59d6f7b317c6b14bda9d157ad"
-    url = "https://github.com/JuliaBinaryWrappers/MKL_jll.jl/releases/download/MKL-v2021.1.1+1/MKL.v2021.1.1.x86_64-w64-mingw32.tar.gz"
-[[MKL]]
-arch = "i686"
-git-tree-sha1 = "7f8c7caca0280096e7c4348da12931ae0c8a7dce"
-lazy = true
-libc = "glibc"
-os = "linux"
-
-    [[MKL.download]]
-    sha256 = "3280ae5ce7209f184b4d948b85dcb86f0cd124385d92d8ccbaa640b42d92b158"
-    url = "https://github.com/JuliaBinaryWrappers/MKL_jll.jl/releases/download/MKL-v2021.1.1+1/MKL.v2021.1.1.i686-linux-gnu.tar.gz"
+    sha256 = "d549e44f06276963c85210362d5b4b5505cc93e085e24018ddd1671069506d7c"
+    url = "https://github.com/JuliaBinaryWrappers/MKL_jll.jl/releases/download/MKL-v2022.0.0+0/MKL.v2022.0.0.i686-w64-mingw32.tar.gz"
 [[MKL]]
 arch = "x86_64"
-git-tree-sha1 = "a8e009985328801a84c9af6610f94f77a7c12852"
+git-tree-sha1 = "6523dce43888d76b70c34c4c68ce2ee4e02970e7"
 lazy = true
+os = "windows"
+
+    [[MKL.download]]
+    sha256 = "61e0605b102c9f434abcb1798e25005eac32e284a2bf120740d09589827fb986"
+    url = "https://github.com/JuliaBinaryWrappers/MKL_jll.jl/releases/download/MKL-v2022.0.0+0/MKL.v2022.0.0.x86_64-w64-mingw32.tar.gz"
+
+
+[[IntelOpenMP]]
+arch = "x86_64"
+git-tree-sha1 = "e76af028a823f7e7c18226c8079d03035c2e4c46"
+os = "macos"
+
+    [[IntelOpenMP.download]]
+    sha256 = "a6b58de42a450fa0253bbd417572e8f1549ebe5aaddae3bf088b2e29007de1bd"
+    url = "https://github.com/JuliaBinaryWrappers/IntelOpenMP_jll.jl/releases/download/IntelOpenMP-v2018.0.3+2/IntelOpenMP.v2018.0.3.x86_64-apple-darwin.tar.gz"
+[[IntelOpenMP]]
+arch = "i686"
+git-tree-sha1 = "2abeb9a6b565e7cb08542447d6c05b28c638f4a1"
 libc = "glibc"
 os = "linux"
 
-    [[MKL.download]]
-    sha256 = "70800f6e75e8ac3a0ff66069bec20ef410e9b240ef4a0f3b96cbbab3df81700f"
-    url = "https://github.com/JuliaBinaryWrappers/MKL_jll.jl/releases/download/MKL-v2021.1.1+1/MKL.v2021.1.1.x86_64-linux-gnu.tar.gz" 
+    [[IntelOpenMP.download]]
+    sha256 = "9e5659180ce6f80e771f436a840de8355f998fe3cae8dbfc1f9634c9dabca7ae"
+    url = "https://github.com/JuliaBinaryWrappers/IntelOpenMP_jll.jl/releases/download/IntelOpenMP-v2018.0.3+2/IntelOpenMP.v2018.0.3.i686-linux-gnu.tar.gz"
+[[IntelOpenMP]]
+arch = "i686"
+git-tree-sha1 = "1aef321e2cf79fc656be96b261396342d8f6d017"
+os = "windows"
+
+    [[IntelOpenMP.download]]
+    sha256 = "f9999c7d9ccc222f90db23513dc0b28d19bd9b92015d24b16640378e2a753b5b"
+    url = "https://github.com/JuliaBinaryWrappers/IntelOpenMP_jll.jl/releases/download/IntelOpenMP-v2018.0.3+2/IntelOpenMP.v2018.0.3.i686-w64-mingw32.tar.gz"
+[[IntelOpenMP]]
+arch = "x86_64"
+git-tree-sha1 = "947793e42b663bacd09f00d96aa96a47095f3b1c"
+libc = "glibc"
+os = "linux"
+
+    [[IntelOpenMP.download]]
+    sha256 = "f40e3d5f625eb5ba907c9b73fd8d4adf5e74dadbc0022f5be2185e93228d0703"
+    url = "https://github.com/JuliaBinaryWrappers/IntelOpenMP_jll.jl/releases/download/IntelOpenMP-v2018.0.3+2/IntelOpenMP.v2018.0.3.x86_64-linux-gnu.tar.gz"
+[[IntelOpenMP]]
+arch = "x86_64"
+git-tree-sha1 = "e32fbb6cb3c81caf8ba4aecdf54a6fc215996b78"
+os = "windows"
+
+    [[IntelOpenMP.download]]
+    sha256 = "684f9554587017d5487a9121ff10c173b4e232842f462fe25ce4fb279e84a5e7"
+    url = "https://github.com/JuliaBinaryWrappers/IntelOpenMP_jll.jl/releases/download/IntelOpenMP-v2018.0.3+2/IntelOpenMP.v2018.0.3.x86_64-w64-mingw32.tar.gz"

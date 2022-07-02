@@ -1,11 +1,7 @@
 # MadNLP.jl
 # Created by Sungho Shin (sungho.shin@wisc.edu)
 
-module Mc68
-
-import ..MadNLPHSL: @kwdef, libhsl
-
-@kwdef mutable struct Control
+@kwdef mutable struct Mc68Control
     f_array_in::Cint = 0
     f_array_out::Cint = 0
     min_l_workspace::Clong = 0
@@ -18,7 +14,7 @@ import ..MadNLPHSL: @kwdef, libhsl
     row_search::Cint = 0
 end
 
-@kwdef mutable struct Info
+@kwdef mutable struct Mc68Info
     flag::Cint = 0
     iostat::Cint = 0
     stat::Cint = 0
@@ -32,21 +28,20 @@ end
 end
 
 function get_mc68_default_control()
-    control = Control(0,0,0,0,0,0,0,0,0,0)
+    control = Mc68Control(0,0,0,0,0,0,0,0,0,0)
     mc68_default_control_i(control)
     return control
 end
 
-mc68_default_control_i(control::Control) = ccall((:mc68_default_control_i,libhsl),
+mc68_default_control_i(control::Mc68Control) = ccall((:mc68_default_control_i,libhsl),
                                                  Nothing,
-                                                 (Ref{Control},),
+                                                 (Ref{Mc68Control},),
                                                  control)
 
 mc68_order_i(ord::Int32,n::Int32,ptr::Array{Int32,1},row::Array{Int32,1},
-             perm::Array{Int32,1},control::Control,info::Info) = ccall(
+             perm::Array{Int32,1},control::Mc68Control,info::Mc68Info) = ccall(
                  (:mc68_order_i,libhsl),
                  Nothing,
-                 (Cint,Cint,Ptr{Cint},Ptr{Cint},Ptr{Cint},Ref{Control},Ref{Info}),
+                 (Cint,Cint,Ptr{Cint},Ptr{Cint},Ptr{Cint},Ref{Mc68Control},Ref{Mc68Info}),
                  ord,n,ptr,row,perm,control,info)
 
-end #module

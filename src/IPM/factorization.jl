@@ -5,32 +5,44 @@ function factorize_wrapper!(ips::InteriorPointSolver)
     ips.cnt.linear_solver_time += @elapsed factorize!(ips.linear_solver)
 end
 
-function solve_refine_wrapper!(ips::InteriorPointSolver, x,b)
+function solve_refine_wrapper!(
+    ips::InteriorPointSolver,
+    x::AbstractKKTVector,
+    b::AbstractKKTVector,
+)
     cnt = ips.cnt
     @trace(ips.logger,"Iterative solution started.")
-    fixed_variable_treatment_vec!(b, ips.ind_fixed)
+    fixed_variable_treatment_vec!(full(b), ips.ind_fixed)
 
-    cnt.linear_solver_time += @elapsed (result = solve_refine!(x, ips.iterator, b))
+    cnt.linear_solver_time += @elapsed begin
+        result = solve_refine!(x, ips.iterator, b)
+    end
+
     if result == :Solved
         solve_status =  true
     else
         if improve!(ips.linear_solver)
             cnt.linear_solver_time += @elapsed begin
                 factorize!(ips.linear_solver)
-                solve_status = (solve_refine!(x, ips.iterator, b) == :Solved ? true : false)
+                ret = solve_refine!(x, ips.iterator, b)
+                solve_status = (ret == :Solved)
             end
         else
             solve_status = false
         end
     end
-    fixed_variable_treatment_vec!(x, ips.ind_fixed)
+    fixed_variable_treatment_vec!(full(x), ips.ind_fixed)
     return solve_status
 end
 
-function solve_refine_wrapper!(ips::InteriorPointSolver{T,<:DenseCondensedKKTSystem}, x, b) where T
+function solve_refine_wrapper!(
+    ips::InteriorPointSolver{<:DenseCondensedKKTSystem},
+    x::AbstractKKTVector,
+    b::AbstractKKTVector,
+)
     cnt = ips.cnt
     @trace(ips.logger,"Iterative solution started.")
-    fixed_variable_treatment_vec!(b, ips.ind_fixed)
+    fixed_variable_treatment_vec!(full(b), ips.ind_fixed)
 
     kkt = ips.kkt
 
@@ -39,26 +51,26 @@ function solve_refine_wrapper!(ips::InteriorPointSolver{T,<:DenseCondensedKKTSys
     n_condensed = n + n_eq
 
     # load buffers
-    b_c = view(ips._w1, 1:n_condensed)
-    x_c = view(ips._w2, 1:n_condensed)
-    jv_x = view(ips._w3, 1:ns) # for jprod
-    jv_t = ips._w4x            # for jtprod
-    v_c = ips._w4l
+    b_c = view(full(ips._w1), 1:n_condensed)
+    x_c = view(full(ips._w2), 1:n_condensed)
+    jv_x = view(full(ips._w3), 1:ns) # for jprod
+    jv_t = primal(ips._w4)             # for jtprod
+    v_c = dual(ips._w4)
 
     Σs = get_slack_regularization(kkt)
     α = get_scaling_inequalities(kkt)
 
     # Decompose right hand side
-    bx = view(b, 1:n)
-    bs = view(b, n+1:n+ns)
-    by = view(b, kkt.ind_eq_shifted)
-    bz = view(b, kkt.ind_ineq_shifted)
+    bx = view(full(b), 1:n)
+    bs = view(full(b), n+1:n+ns)
+    by = view(full(b), kkt.ind_eq_shifted)
+    bz = view(full(b), kkt.ind_ineq_shifted)
 
     # Decompose results
-    xx = view(x, 1:n)
-    xs = view(x, n+1:n+ns)
-    xy = view(x, kkt.ind_eq_shifted)
-    xz = view(x, kkt.ind_ineq_shifted)
+    xx = view(full(x), 1:n)
+    xs = view(full(x), n+1:n+ns)
+    xy = view(full(x), kkt.ind_eq_shifted)
+    xz = view(full(x), kkt.ind_ineq_shifted)
 
     v_c .= 0.0
     v_c[kkt.ind_ineq] .= (Σs .* bz .+ α .* bs) ./ α.^2
@@ -77,7 +89,7 @@ function solve_refine_wrapper!(ips::InteriorPointSolver{T,<:DenseCondensedKKTSys
     xz .= sqrt.(Σs) ./ α .* jv_x .- Σs .* bz ./ α.^2 .- bs ./ α
     xs .= (bs .+ α .* xz) ./ Σs
 
-    fixed_variable_treatment_vec!(x, ips.ind_fixed)
+    fixed_variable_treatment_vec!(full(x), ips.ind_fixed)
     return solve_status
 end
 

@@ -1,19 +1,7 @@
-# MadNLP.jl
-# Created by Sungho Shin (sungho.shin@wisc.edu)
-
-module MadNLPMa57
-
-import ..MadNLPHSL:
-    @kwdef, Logger, @debug, @warn, @error, libhsl,
-    AbstractOptions, set_options!, AbstractLinearSolver, StrideOneVector,
-    SymbolicException,FactorizationException,SolveException,InertiaException,
-    SparseMatrixCSC, introduce, factorize!, solve!, improve!, is_inertia, inertia, findIJ, nnz
-
 const ma57_default_icntl = Int32[0,0,6,1,0,5,1,0,10,0,16,16,10,100,0,0,0,0,0,0]
 const ma57_default_cntl  = Float64[1e-8,1.0e-20,0.5,0.0,0.0]
-const INPUT_MATRIX_TYPE = :csc
 
-@kwdef mutable struct Options <: AbstractOptions
+@kwdef mutable struct Ma57Options <: AbstractOptions
     ma57_pivtol::Float64 = 1e-8
     ma57_pivtolmax::Float64 = 1e-4
     ma57_pre_alloc::Float64 = 1.05
@@ -25,7 +13,7 @@ const INPUT_MATRIX_TYPE = :csc
     ma57_small_pivot_flag::Int = 0
 end
 
-mutable struct Solver <: AbstractLinearSolver
+mutable struct Ma57Solver <: AbstractLinearSolver
     csc::SparseMatrixCSC{Float64,Int32}
     I::Vector{Int32}
     J::Vector{Int32}
@@ -49,12 +37,12 @@ mutable struct Solver <: AbstractLinearSolver
     lwork::Int32
     work::Vector{Float64}
 
-    opt::Options
+    opt::Ma57Options
     logger::Logger
 end
 
 
-ma57ad!(n::Cint,nz::Cint,I::StrideOneVector{Cint},J::StrideOneVector{Cint},lkeep::Cint,
+ma57ad!(n::Cint,nz::Cint,I::Vector{Cint},J::Vector{Cint},lkeep::Cint,
         keep::Vector{Cint},iwork::Vector{Cint},icntl::Vector{Cint},
         info::Vector{Cint},rinfo::Vector{Cdouble}) = ccall(
             (:ma57ad_,libhsl),
@@ -64,7 +52,7 @@ ma57ad!(n::Cint,nz::Cint,I::StrideOneVector{Cint},J::StrideOneVector{Cint},lkeep
              Ptr{Cint},Ptr{Cdouble}),
             n,nz,I,J,lkeep,keep,iwork,icntl,info,rinfo)
 
-ma57bd!(n::Cint,nz::Cint,V::StrideOneVector{Cdouble},fact::Vector{Cdouble},
+ma57bd!(n::Cint,nz::Cint,V::Vector{Cdouble},fact::Vector{Cdouble},
         lfact::Cint,ifact::Vector{Cint},lifact::Cint,lkeep::Cint,
         keep::Vector{Cint},iwork::Vector{Cint},icntl::Vector{Cint},cntl::Vector{Cdouble},
         info::Vector{Cint},rinfo::Vector{Cdouble}) = ccall(
@@ -77,7 +65,7 @@ ma57bd!(n::Cint,nz::Cint,V::StrideOneVector{Cdouble},fact::Vector{Cdouble},
             n,nz,V,fact,lfact,ifact,lifact,lkeep,keep,iwork,icntl,cntl,info,rinfo)
 
 ma57cd!(job::Cint,n::Cint,fact::Vector{Cdouble},lfact::Cint,
-        ifact::Vector{Cint},lifact::Cint,nrhs::Cint,rhs::StrideOneVector{Cdouble},
+        ifact::Vector{Cint},lifact::Cint,nrhs::Cint,rhs::Vector{Cdouble},
         lrhs::Cint,work::Vector{Cdouble},lwork::Cint,iwork::Vector{Cint},
         icntl::Vector{Cint},info::Vector{Cint}) = ccall(
             (:ma57cd_,libhsl),
@@ -88,9 +76,9 @@ ma57cd!(job::Cint,n::Cint,fact::Vector{Cdouble},lfact::Cint,
              Ptr{Cint},Ptr{Cint}),
             job,n,fact,lfact,ifact,lifact,nrhs,rhs,lrhs,work,lwork,iwork,icntl,info)
 
-function Solver(csc::SparseMatrixCSC;
+function Ma57Solver(csc::SparseMatrixCSC;
                 option_dict::Dict{Symbol,Any}=Dict{Symbol,Any}(),
-                opt=Options(),logger=Logger(),kwargs...)
+                opt=Ma57Options(),logger=Logger(),kwargs...)
 
     set_options!(opt,option_dict,kwargs)
 
@@ -129,10 +117,10 @@ function Solver(csc::SparseMatrixCSC;
     lwork= csc.n
     work = Vector{Float64}(undef,lwork)
 
-    return Solver(csc,I,J,icntl,cntl,info,rinfo,lkeep,keep,lfact,fact,lifact,ifact,iwork,lwork,work,opt,logger)
+    return Ma57Solver(csc,I,J,icntl,cntl,info,rinfo,lkeep,keep,lfact,fact,lifact,ifact,iwork,lwork,work,opt,logger)
 end
 
-function factorize!(M::Solver)
+function factorize!(M::Ma57Solver)
     while true
         ma57bd!(Int32(M.csc.n),Int32(nnz(M.csc)),M.csc.nzval,M.fact,
                 M.lfact,M.ifact,M.lifact,M.lkeep,
@@ -155,18 +143,18 @@ function factorize!(M::Solver)
     return M
 end
 
-function solve!(M::Solver,rhs::StrideOneVector{Float64})
+function solve!(M::Ma57Solver,rhs::Vector{Float64})
     ma57cd!(one(Int32),Int32(M.csc.n),M.fact,M.lfact,M.ifact,
             M.lifact,one(Int32),rhs,Int32(M.csc.n),M.work,M.lwork,M.iwork,M.icntl,M.info)
     M.info[1]<0 && throw(SolveException())
     return rhs
 end
 
-is_inertia(::Solver) = true
-function inertia(M::Solver)
+is_inertia(::Ma57Solver) = true
+function inertia(M::Ma57Solver)
     return (M.info[25]-M.info[24],Int32(M.csc.n)-M.info[25],M.info[24])
 end
-function improve!(M::Solver)
+function improve!(M::Ma57Solver)
     if M.cntl[1] == M.opt.ma57_pivtolmax
         @debug(M.logger,"improve quality failed.")
         return false
@@ -176,6 +164,5 @@ function improve!(M::Solver)
     return true
 end
 
-introduce(::Solver)="ma57"
-
-end # module
+introduce(::Ma57Solver)="ma57"
+input_type(::Type{Ma57Solver}) = :csc

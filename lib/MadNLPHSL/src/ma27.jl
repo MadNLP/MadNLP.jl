@@ -1,20 +1,8 @@
-# MadNLP.jl
-# Created by Sungho Shin (sungho.shin@wisc.edu)
-
-module MadNLPMa27
-
-import ..MadNLPHSL:
-    @kwdef, Logger, @debug, @warn, @error, libhsl,
-    AbstractOptions, AbstractLinearSolver, set_options!, SparseMatrixCSC, SubVector, StrideOneVector,
-    SymbolicException,FactorizationException,SolveException,InertiaException,
-    introduce, factorize!, solve!, improve!, is_inertia, inertia, findIJ, nnz
-
-ma27_default_icntl() = Int32[
+const ma27_default_icntl = Int32[
     6,6,0,2139062143,1,32639,32639,32639,32639,14,9,8,8,9,10,32639,32639,32639,32689,24,11,9,8,9,10,0,0,0,0,0]
-ma27_default_cntl(T)  = T[.1,1.0,0.,0.,0.]
-const INPUT_MATRIX_TYPE = :csc
+const ma27_default_cntl  = [.1,1.0,0.,0.,0.]
 
-@kwdef mutable struct Options <: AbstractOptions
+@kwdef mutable struct Ma27Options <: AbstractOptions
     ma27_pivtol::Float64 = 1e-8
     ma27_pivtolmax::Float64 = 1e-4
     ma27_liw_init_factor::Float64 = 5.
@@ -22,7 +10,7 @@ const INPUT_MATRIX_TYPE = :csc
     ma27_meminc_factor::Float64 =2.
 end
 
-mutable struct Solver{T} <: AbstractLinearSolver
+mutable struct Ma27Solver{T} <: AbstractLinearSolver
     csc::SparseMatrixCSC{T,Int32}
     I::Vector{Int32}
     J::Vector{Int32}
@@ -33,7 +21,7 @@ mutable struct Solver{T} <: AbstractLinearSolver
     info::Vector{Int32}
 
     a::Vector{T}
-    a_view::StrideOneVector{T}
+    a_view::Vector{T}
     la::Int32
     ikeep::Vector{Int32}
 
@@ -44,10 +32,9 @@ mutable struct Solver{T} <: AbstractLinearSolver
     w::Vector{T}
     maxfrt::Vector{Int32}
 
-    opt::Options
+    opt::Ma27Options
     logger::Logger
 end
-
 
 for (fa, fb, fc, typ) in [
     (:ma27ad_,:ma27bd_,:ma27cd_,Float64),
@@ -55,7 +42,7 @@ for (fa, fb, fc, typ) in [
     ]
     @eval begin
         ma27a!(
-            n::Cint,nz::Cint,I::StrideOneVector{Cint},J::StrideOneVector{Cint},
+            n::Cint,nz::Cint,I::StrideOneVector{Cint},J::Vector{Cint},
             iw::Vector{Cint},liw::Cint,ikeep::Vector{Cint},iw1::Vector{Cint},
             nsteps::Vector{Cint},iflag::Cint,icntl::Vector{Cint},cntl::Vector{$typ},
             info::Vector{Cint},ops::$typ
@@ -69,13 +56,11 @@ for (fa, fb, fc, typ) in [
             n,nz,I,J,iw,liw,ikeep,iw1,nsteps,iflag,icntl,cntl,info,ops
         )
 
-        ma27b!(
-            n::Cint,nz::Cint,I::StrideOneVector{Cint},J::StrideOneVector{Cint},
-            a::StrideOneVector{$typ},la::Cint,iw::Vector{Cint},liw::Cint,
-            ikeep::Vector{Cint},nsteps::Vector{Cint},maxfrt::Vector{Cint},iw1::Vector{Cint},
-            icntl::Vector{Cint},cntl::Vector{$typ},info::Vector{Cint}
-        ) = ccall(
-            ($(string(fb)),libhsl),
+        ma27bd!(n::Cint,nz::Cint,I::Vector{Cint},J::Vector{Cint},
+                a::Vector{$typ},la::Cint,iw::Vector{Cint},liw::Cint,
+                ikeep::Vector{Cint},nsteps::Vector{Cint},maxfrt::Vector{Cint},iw1::Vector{Cint},
+                icntl::Vector{Cint},cntl::Vector{$typ},info::Vector{Cint}) = ccall(
+            (:ma27bd_,libhsl),
             Nothing,
             (Ref{Cint},Ref{Cint},Ptr{Cint},Ptr{Cint},
              Ptr{$typ},Ref{Cint},Ptr{Cint},Ref{Cint},
@@ -100,9 +85,10 @@ for (fa, fb, fc, typ) in [
     end
 end
 
-function Solver(csc::SparseMatrixCSC{T};
+
+function Ma27Solver(csc::SparseMatrixCSC{T};
                 option_dict::Dict{Symbol,Any}=Dict{Symbol,Any}(),
-                opt=Options(),logger=Logger(),kwargs...) where T
+                opt=Ma27Options(),logger=Logger(),kwargs...)
 
     set_options!(opt,option_dict,kwargs)
 
@@ -127,17 +113,18 @@ function Solver(csc::SparseMatrixCSC{T};
 
     la = ceil(Int32,max(nz,opt.ma27_la_init_factor*info[5]))
     a = Vector{T}(undef,la)
-    a_view = view(a,1:nnz(csc))
+    a_view = _madnlp_unsafe_wrap(a,nnz(csc))
     liw= ceil(Int32,opt.ma27_liw_init_factor*info[6])
     resize!(iw,liw)
     maxfrt=Int32[1]
 
-    return Solver{T}(csc,I,J,icntl,cntl,info,a,a_view,la,ikeep,iw,liw,
-                     iw1,nsteps,Vector{T}(),maxfrt,opt,logger)
+
+    return Ma27Solver{T}(csc,I,J,icntl,cntl,info,a,a_view,la,ikeep,iw,liw,
+                  iw1,nsteps,Vector{Float64}(),maxfrt,opt,logger)
 end
 
 
-function factorize!(M::Solver)
+function factorize!(M::Ma27Solver)
     M.a_view.=M.csc.nzval
     while true
         ma27b!(Int32(M.csc.n),Int32(nnz(M.csc)),M.I,M.J,M.a,M.la,
@@ -160,7 +147,7 @@ function factorize!(M::Solver)
     return M
 end
 
-function solve!(M::Solver{T},rhs::StrideOneVector{T}) where T
+function solve!(M::Ma27Solver{T},rhs::Vector{T}) where T
     length(M.w)<M.maxfrt[1] && resize!(M.w,M.maxfrt[1])
     length(M.iw1)<M.nsteps[1] && resize!(M.iw1,M.nsteps[1])
     ma27c!(Int32(M.csc.n),M.a,M.la,M.iw,M.liw,M.w,M.maxfrt,rhs,
@@ -169,13 +156,13 @@ function solve!(M::Solver{T},rhs::StrideOneVector{T}) where T
     return rhs
 end
 
-is_inertia(::Solver) = true
-function inertia(M::Solver)
+is_inertia(::Ma27Solver) = true
+function inertia(M::Ma27Solver)
     rank = M.info[1]==3 ? M.info[2] : rank = M.csc.n
     return (rank-M.info[15],M.csc.n-rank,M.info[15])
 end
 
-function improve!(M::Solver)
+function improve!(M::Ma27Solver)
     if M.cntl[1] == M.opt.ma27_pivtolmax
         @debug(M.logger,"improve quality failed.")
         return false
@@ -185,6 +172,6 @@ function improve!(M::Solver)
     return true
 end
 
-introduce(::Solver)="ma27"
+introduce(::Ma27Solver)="ma27"
+input_type(::Type{Ma27Solver}) = :csc
 
-end # module

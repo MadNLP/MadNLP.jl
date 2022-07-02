@@ -1,5 +1,5 @@
 const OPTIMIZER = ()->MadNLP.Optimizer(
-    linear_solver=MadNLPLapackCPU,
+    linear_solver=MadNLP.LapackCPUSolver,
     print_level=MadNLP.ERROR
 )
 
