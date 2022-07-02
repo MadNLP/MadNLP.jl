@@ -51,7 +51,7 @@ for (fa,fb,fc,typ) in (
         ma57ad!(n::Cint,nz::Cint,I::Vector{Cint},J::Vector{Cint},lkeep::Cint,
                 keep::Vector{Cint},iwork::Vector{Cint},icntl::Vector{Cint},
                 info::Vector{Cint},rinfo::Vector{$typ}) = ccall(
-                    ($(string(fa)),libhsl),
+                    ($(string(fa)),libma57),
                     Nothing,
                     (Ref{Cint},Ref{Cint},Ptr{Cint},Ptr{Cint},Ref{Cint},
                      Ptr{Cint},Ptr{Cint},Ptr{Cint},
@@ -62,7 +62,7 @@ for (fa,fb,fc,typ) in (
                 lfact::Cint,ifact::Vector{Cint},lifact::Cint,lkeep::Cint,
                 keep::Vector{Cint},iwork::Vector{Cint},icntl::Vector{Cint},cntl::Vector{$typ},
                 info::Vector{Cint},rinfo::Vector{$typ}) = ccall(
-                    ($(string(fb)),libhsl),
+                    ($(string(fb)),libma57),
                     Nothing,
                     (Ref{Cint},Ref{Cint},Ptr{$typ},Ptr{$typ},
                      Ref{Cint},Ptr{Cint},Ref{Cint},Ref{Cint},
@@ -74,7 +74,7 @@ for (fa,fb,fc,typ) in (
                 ifact::Vector{Cint},lifact::Cint,nrhs::Cint,rhs::Vector{$typ},
                 lrhs::Cint,work::Vector{$typ},lwork::Cint,iwork::Vector{Cint},
                 icntl::Vector{Cint},info::Vector{Cint}) = ccall(
-                    ($(string(fc)),libhsl),
+                    ($(string(fc)),libma57),
                     Nothing,
                     (Ref{Cint},Ref{Cint},Ptr{$typ},Ref{Cint},
                      Ptr{Cint},Ref{Cint},Ref{Cint},Ptr{$typ},

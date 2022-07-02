@@ -48,7 +48,7 @@ for (fa, fb, fc, typ) in [
             nsteps::Vector{Cint},iflag::Cint,icntl::Vector{Cint},cntl::Vector{$typ},
             info::Vector{Cint},ops::$typ
         ) = ccall(
-            ($(string(fa)),libhsl),
+            ($(string(fa)),libma27),
             Nothing,
             (Ref{Cint},Ref{Cint},Ptr{Cint},Ptr{Cint},
              Ptr{Cint},Ref{Cint},Ptr{Cint},Ptr{Cint},
@@ -63,7 +63,7 @@ for (fa, fb, fc, typ) in [
             ikeep::Vector{Cint},nsteps::Vector{Cint},maxfrt::Vector{Cint},iw1::Vector{Cint},
             icntl::Vector{Cint},cntl::Vector{$typ},info::Vector{Cint}
         ) = ccall(
-            ($(string(fb)),libhsl),
+            ($(string(fb)),libma27),
             Nothing,
             (Ref{Cint},Ref{Cint},Ptr{Cint},Ptr{Cint},
              Ptr{$typ},Ref{Cint},Ptr{Cint},Ref{Cint},
@@ -78,7 +78,7 @@ for (fa, fb, fc, typ) in [
             iw1::Vector{Cint},nsteps::Vector{Cint},icntl::Vector{Cint},
             info::Vector{Cint}
         ) = ccall(
-            ($(string(fc)),libhsl),
+            ($(string(fc)),libma27),
             Nothing,
             (Ref{Cint},Ptr{$typ},Ref{Cint},Ptr{Cint},
              Ref{Cint},Ptr{$typ},Ptr{Cint},Ptr{$typ},

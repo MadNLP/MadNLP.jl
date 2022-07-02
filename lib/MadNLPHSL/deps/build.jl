@@ -26,12 +26,12 @@ else
 end
 
 const supported_library = [
-    (:libhsl, "MADNLP_COINHSL_LIBRARY_PATH", "MADNLP_COINHSL_PATH")
-    (:libma27, "MADNLP_MA27_LIBRARY_PATH", "MADNLP_MA27_PATH")
-    (:libma57, "MADNLP_MA57_LIBRARY_PATH", "MADNLP_MA57_PATH")
-    (:libma77, "MADNLP_MA77_LIBRARY_PATH", "MADNLP_MA77_PATH")
-    (:libma86, "MADNLP_MA86_LIBRARY_PATH", "MADNLP_MA86_PATH")
-    (:libma97, "MADNLP_MA97_LIBRARY_PATH", "MADNLP_MA97_PATH")
+    (:libhsl, "MADNLP_HSL_LIBRARY_PATH", "MADNLP_HSL_SOURCE_PATH")
+    (:libma27, "MADNLP_MA27_LIBRARY_PATH", "MADNLP_MA27_SOURCE_PATH")
+    (:libma57, "MADNLP_MA57_LIBRARY_PATH", "MADNLP_MA57_SOURCE_PATH")
+    (:libma77, "MADNLP_MA77_LIBRARY_PATH", "MADNLP_MA77_SOURCE_PATH")
+    (:libma86, "MADNLP_MA86_LIBRARY_PATH", "MADNLP_MA86_SOURCE_PATH")
+    (:libma97, "MADNLP_MA97_LIBRARY_PATH", "MADNLP_MA97_SOURCE_PATH")
 ]
 
 const targets_dict = Dict(
@@ -56,40 +56,53 @@ const targets_dict = Dict(
     ],
     :libma27 => [
         [
+            "deps.f",
             "ma27d.f",
             "ma27s.f",
         ],
     ],
     :libma57 => [
         [
-            "sdeps.f", "ddeps.f", 
-        ],
-        [
+            "fakemetis.f",
+            "sdeps.f", "ddeps.f",
             "ma57d.f", "ma57s.f", 
         ],
     ],
     :libma77 => [
         [
-            "sdeps.f", "ddeps.f", 
+            "common.f", "common90.f90",
+            "ddeps90.f90", "sdeps90.f90", 
         ],
         [
-            "ma57d.f", "ma57s.f", 
+            "hsl_ma77d.f90", "hsl_ma77s.f90",
+        ],
+        [
+            "hsl_ma77d_ciface.f90", "hsl_ma77s_ciface.f90",
         ],
     ],
     :libma86 => [
         [
-            "sdeps.f", "ddeps.f", 
+            "common.f", "common90.f90",
+            "sdeps90.f90", "fakemetis.f",
         ],
         [
-            "ma57d.f", "ma57s.f", 
+            "hsl_ma86d.f90", "hsl_ma86s.f90",
+        ],
+        [
+            "hsl_ma86d_ciface.f90", "hsl_ma86s_ciface.f90",
+            "hsl_mc68i_ciface.f90",
         ],
     ],
     :libma97 => [
         [
-            "sdeps.f", "ddeps.f", 
+            "common.f", "common90.f90",
+            "sdeps90.f90", "ddeps90.f90", "fakemetis.f",
         ],
         [
-            "ma97d.f", "ma97s.f", 
+            "hsl_ma97d.f90", "hsl_ma97s.f90",
+        ],
+        [
+            "hsl_ma97d_ciface.f90", "hsl_ma97s_ciface.f90",
         ],
     ]
 )
@@ -100,11 +113,13 @@ isvalid(cmd::Cmd)=(try run(cmd) catch e return false end; return true)
 
 
 # HSL
-products = Product[]
-for (lib, envsrc, envlib) in supported_library
+attempted = Tuple{Symbol,Product}[]
+
+for (lib, envlib, envsrc) in supported_library
     if haskey(ENV,envlib)
-        push!(products, FileProduct(ENV[envlib], lib))
+        push!(attempted, (lib,FileProduct(ENV[envlib], lib)))
     elseif haskey(ENV,envsrc) && isvalid(`$FC --version`)
+        @info "Compiling $lib"
         source_path = ENV[envsrc]
         targets = targets_dict[lib]
         
@@ -137,19 +152,19 @@ for (lib, envsrc, envlib) in supported_library
         
         run(cmd)
         cd("$(@__DIR__)")
-        push!(products, FileProduct(prefix,joinpath(libdir,"$lib.$so"), lib))
+        push!(attempted, (lib,FileProduct(prefix,joinpath(libdir,"$lib.$so"), lib)))
     end
 end
 
 # write deps.jl
-products_succeeded = Product[]
-for product in products
+succeeded = Product[]
+for (lib, product) in attempted
     if satisfied(product)
-        @info "Building HSL succeeded."
-        push!(products_succeded, product)
+        @info "Building $lib succeeded."
+        push!(succeeded, product)
     else
-        @error "Building HSL failed."
+        @error "Building $lib failed."
     end
 end
 
-write_deps_file(joinpath(@__DIR__, "deps.jl"),products_succeded, verbose=verbose)
+write_deps_file(joinpath(@__DIR__, "deps.jl"), succeeded, verbose=verbose)
