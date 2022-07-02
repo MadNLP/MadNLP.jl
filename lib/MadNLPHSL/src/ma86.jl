@@ -47,7 +47,7 @@ end
     usmall::Float64 = 0.
 end
 
-mutable struct Ma86Solver<:AbstractLinearSolver
+mutable struct Ma86Solver{Float64} <: AbstractLinearSolver{Float64}
     csc::SparseMatrixCSC{Float64,Int32}
 
     control::Ma86Control

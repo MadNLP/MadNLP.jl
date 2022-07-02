@@ -230,7 +230,7 @@ elseif version == "5.2.1+4"
     end
 end
 
-mutable struct MumpsSolver{T} <: AbstractLinearSolver
+mutable struct MumpsSolver{T} <: AbstractLinearSolver{T}
     csc::SparseMatrixCSC{T,Int32}
     I::Vector{Int32}
     J::Vector{Int32}

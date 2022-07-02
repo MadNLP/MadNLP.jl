@@ -2,7 +2,7 @@
     lapack_algorithm::LinearFactorization = BUNCHKAUFMAN
 end
 
-mutable struct LapackCPUSolver{T} <: AbstractLinearSolver
+mutable struct LapackCPUSolver{T} <: AbstractLinearSolver{T}
     dense::Matrix{T}
     fact::Matrix{T}
     work::Vector{T}
@@ -71,10 +71,12 @@ for (sytrf,sytrs,getrf,getrs,geqrf,ormqr,trsm,potrf,potrs,typ) in (
     end
 end
 
-function LapackCPUSolver(dense::Matrix{T};
-                option_dict::Dict{Symbol,Any}=Dict{Symbol,Any}(),
-                opt=LapackOptions(),logger=Logger(),
-                kwargs...)
+function LapackCPUSolver(
+    dense::Matrix{T};
+    option_dict::Dict{Symbol,Any}=Dict{Symbol,Any}(),
+    opt=LapackOptions(),
+    logger=Logger(),
+    kwargs...) where T
 
     set_options!(opt,option_dict,kwargs...)
     fact = copy(dense)
@@ -99,7 +101,7 @@ function factorize!(M::LapackCPUSolver)
         error(LOGGER,"Invalid lapack_algorithm")
     end
 end
-function solve!(M::LapackCPUSolver, x::Vector{Float64})
+function solve!(M::LapackCPUSolver{T}, x::Vector{T}) where T
     if M.opt.lapack_algorithm == BUNCHKAUFMAN
         solve_bunchkaufman!(M,x)
     elseif M.opt.lapack_algorithm == LU

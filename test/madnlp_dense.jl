@@ -9,15 +9,18 @@ using Random
 function _compare_dense_with_sparse(kkt_system, n, m, ind_fixed, ind_eq)
 
     for (T,tol,atol) in [(Float32,1e-3,1e-1), (Float64,1e-8,1e-6)]
+        
         sparse_options = Dict{Symbol, Any}(
             :kkt_system=>MadNLP.SPARSE_KKT_SYSTEM,
             :linear_solver=>MadNLP.LapackCPUSolver,
             :print_level=>MadNLP.ERROR,
+            :tol=>tol
         )
         dense_options = Dict{Symbol, Any}(
             :kkt_system=>kkt_system,
             :linear_solver=>MadNLP.LapackCPUSolver,
             :print_level=>MadNLP.ERROR,
+            :tol=>tol
         )
         
         nlp = MadNLPTests.DenseDummyQP{T}(; n=n, m=m, fixed_variables=ind_fixed, equality_cons=ind_eq)

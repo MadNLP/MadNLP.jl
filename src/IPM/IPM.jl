@@ -65,8 +65,8 @@ mutable struct InteriorPointSolver{T,KKTSystem <: AbstractKKTSystem{T}} <: Abstr
     x_trial_lr::SubVector{T}
     x_trial_ur::SubVector{T}
 
-    linear_solver::AbstractLinearSolver
-    iterator::AbstractIterator
+    linear_solver::AbstractLinearSolver{T}
+    iterator::AbstractIterator{T}
 
     obj_scale::Vector{T}
     con_scale::Vector{T}
@@ -90,7 +90,7 @@ mutable struct InteriorPointSolver{T,KKTSystem <: AbstractKKTSystem{T}} <: Abstr
 
     filter::Vector{Tuple{T,T}}
 
-    RR::Union{Nothing,RobustRestorer}
+    RR::Union{Nothing,RobustRestorer{T}}
     status::Status
     output::Dict
 end
@@ -176,18 +176,25 @@ function InteriorPointSolver{T,KKTSystem}(nlp::AbstractNLPModel, opt::Options;
 
     aug_vec_length = is_reduced(kkt) ? n+m : n+m+nlb+nub
 
-    _w1 = is_reduced(kkt) ? ReducedKKTVector(n, m) : UnreducedKKTVector(n, m, nlb, nub)
-    _w2 = is_reduced(kkt) ? ReducedKKTVector(n, m) : UnreducedKKTVector(n, m, nlb, nub)
-    _w3 = is_reduced(kkt) ? ReducedKKTVector(n, m) : UnreducedKKTVector(n, m, nlb, nub)
-    _w4 = is_reduced(kkt) ? ReducedKKTVector(n, m) : UnreducedKKTVector(n, m, nlb, nub)
+    if is_reduced(kkt)
+        _w1 =  ReducedKKTVector(similar(x,n+m), n, m)
+        _w2 =  ReducedKKTVector(similar(x,n+m), n, m)
+        _w3 =  ReducedKKTVector(similar(x,n+m), n, m)
+        _w4 =  ReducedKKTVector(similar(x,n+m), n, m)
+    else
+        _w1 = UnreducedKKTVector(similar(x,n+m+nlb+nub), n, m, nlb, nub)
+        _w2 = UnreducedKKTVector(similar(x,n+m+nlb+nub), n, m, nlb, nub)
+        _w3 = UnreducedKKTVector(similar(x,n+m+nlb+nub), n, m, nlb, nub)
+        _w4 = UnreducedKKTVector(similar(x,n+m+nlb+nub), n, m, nlb, nub)
+    end
 
     jacl = zeros(T,n) # spblas may throw an error if not initialized to zero
 
-    d = UnreducedKKTVector(n, m, nlb, nub)
+    d = UnreducedKKTVector(similar(x,n+m+nlb+nub), n, m, nlb, nub)
     dx_lr = view(d.xp, ind_cons.ind_lb) # TODO
     dx_ur = view(d.xp, ind_cons.ind_ub) # TODO
 
-    p = UnreducedKKTVector(n, m, nlb, nub)
+    p = UnreducedKKTVector(similar(x,n+m+nlb+nub), n, m, nlb, nub)
 
     obj_scale = [1.0]
     con_scale = ones(T,m)

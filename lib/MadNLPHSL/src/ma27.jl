@@ -1,6 +1,6 @@
-const ma27_default_icntl = Int32[
+ma27_default_icntl() = Int32[
     6,6,0,2139062143,1,32639,32639,32639,32639,14,9,8,8,9,10,32639,32639,32639,32689,24,11,9,8,9,10,0,0,0,0,0]
-const ma27_default_cntl  = [.1,1.0,0.,0.,0.]
+ma27_default_cntl(T)  = T[.1,1.0,0.,0.,0.]
 
 @kwdef mutable struct Ma27Options <: AbstractOptions
     ma27_pivtol::Float64 = 1e-8
@@ -10,7 +10,7 @@ const ma27_default_cntl  = [.1,1.0,0.,0.,0.]
     ma27_meminc_factor::Float64 =2.
 end
 
-mutable struct Ma27Solver{T} <: AbstractLinearSolver
+mutable struct Ma27Solver{T} <: AbstractLinearSolver{T}
     csc::SparseMatrixCSC{T,Int32}
     I::Vector{Int32}
     J::Vector{Int32}
@@ -42,7 +42,7 @@ for (fa, fb, fc, typ) in [
     ]
     @eval begin
         ma27a!(
-            n::Cint,nz::Cint,I::StrideOneVector{Cint},J::Vector{Cint},
+            n::Cint,nz::Cint,I::Vector{Cint},J::Vector{Cint},
             iw::Vector{Cint},liw::Cint,ikeep::Vector{Cint},iw1::Vector{Cint},
             nsteps::Vector{Cint},iflag::Cint,icntl::Vector{Cint},cntl::Vector{$typ},
             info::Vector{Cint},ops::$typ
@@ -56,7 +56,7 @@ for (fa, fb, fc, typ) in [
             n,nz,I,J,iw,liw,ikeep,iw1,nsteps,iflag,icntl,cntl,info,ops
         )
 
-        ma27bd!(n::Cint,nz::Cint,I::Vector{Cint},J::Vector{Cint},
+        ma27b!(n::Cint,nz::Cint,I::Vector{Cint},J::Vector{Cint},
                 a::Vector{$typ},la::Cint,iw::Vector{Cint},liw::Cint,
                 ikeep::Vector{Cint},nsteps::Vector{Cint},maxfrt::Vector{Cint},iw1::Vector{Cint},
                 icntl::Vector{Cint},cntl::Vector{$typ},info::Vector{Cint}) = ccall(
@@ -88,7 +88,7 @@ end
 
 function Ma27Solver(csc::SparseMatrixCSC{T};
                 option_dict::Dict{Symbol,Any}=Dict{Symbol,Any}(),
-                opt=Ma27Options(),logger=Logger(),kwargs...)
+                opt=Ma27Options(),logger=Logger(),kwargs...) where T
 
     set_options!(opt,option_dict,kwargs)
 
@@ -120,7 +120,7 @@ function Ma27Solver(csc::SparseMatrixCSC{T};
 
 
     return Ma27Solver{T}(csc,I,J,icntl,cntl,info,a,a_view,la,ikeep,iw,liw,
-                  iw1,nsteps,Vector{Float64}(),maxfrt,opt,logger)
+                  iw1,nsteps,Vector{T}(),maxfrt,opt,logger)
 end
 
 

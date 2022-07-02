@@ -57,7 +57,6 @@ end
 function solve_refine!(x::StridedVector{Float64},
                        is::KrylovIterator,
                        b::AbstractVector{Float64})
->>>>>>> master
     @debug(is.logger,"Iterator initiated")
     is.res.=0
     x.=0

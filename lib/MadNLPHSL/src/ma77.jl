@@ -140,7 +140,7 @@ end
     rspare_5::Cdouble = 0.
 end
 
-mutable struct Ma77Solver <: AbstractLinearSolver
+mutable struct Ma77Solver{Float64} <: AbstractLinearSolver{Float64}
     tril::SparseMatrixCSC{Float64,Int32}
     full::SparseMatrixCSC{Float64,Int32}
     tril_to_full_view::SubVector{Float64}

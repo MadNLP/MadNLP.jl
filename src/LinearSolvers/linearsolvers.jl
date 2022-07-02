@@ -10,7 +10,7 @@
 Abstract type for linear solver targeting
 the resolution of the linear system ``Ax=b``.
 """
-abstract type AbstractLinearSolver end
+abstract type AbstractLinearSolver{T} end
 
 """
     introduce(::AbstractLinearSolver)
@@ -70,7 +70,7 @@ end
 #=
     Iterator's interface
 =#
-abstract type AbstractIterator end
+abstract type AbstractIterator{T} end
 
 """
     solve_refine!(x, ::AbstractIterator, b)

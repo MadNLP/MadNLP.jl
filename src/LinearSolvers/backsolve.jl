@@ -1,7 +1,7 @@
 # MadNLP.jl
 # Created by Sungho Shin (sungho.shin@wisc.edu)
 
-struct RichardsonIterator{T, VT, KKT, LinSolver} <: AbstractIterator
+struct RichardsonIterator{T, VT, KKT, LinSolver <: AbstractLinearSolver{T}} <: AbstractIterator{T}
     linear_solver::LinSolver
     kkt::KKT
     residual::VT
@@ -11,11 +11,11 @@ struct RichardsonIterator{T, VT, KKT, LinSolver} <: AbstractIterator
     logger::Logger
 end
 function RichardsonIterator(
-    linear_solver::AbstractLinearSolver,
+    linear_solver::AbstractLinearSolver{T},
     kkt::AbstractKKTSystem,
     res::AbstractVector;
-    max_iter=10, tol=1e-10, acceptable_tol=1e-5, logger=Logger(),
-)
+    max_iter=10, tol=T(1e-10), acceptable_tol=T(1e-5), logger=Logger(),
+) where T
     return RichardsonIterator(
         linear_solver, kkt, res, max_iter, tol, acceptable_tol, logger,
     )

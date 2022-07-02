@@ -43,7 +43,7 @@ function RobustRestorer(ips::AbstractInteriorPointSolver{T}) where T
     pp_trial = Vector{T}(undef,ips.m)
     nn_trial = Vector{T}(undef,ips.m)
 
-    return RobustRestorer(
+    return RobustRestorer{T}(
         0.,
         primal(ips._w2),
         primal(ips._w1),

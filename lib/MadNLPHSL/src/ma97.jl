@@ -53,7 +53,7 @@ end
     rspare::Vector{Cdouble}
 end
 
-mutable struct Ma97Solver <:AbstractLinearSolver
+mutable struct Ma97Solver{Float64} <:AbstractLinearSolver{Float64}
     n::Int32
 
     csc::SparseMatrixCSC{Float64,Int32}
