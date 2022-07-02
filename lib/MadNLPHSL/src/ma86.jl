@@ -1,6 +1,3 @@
-# MadNLP.jl
-# Created by Sungho Shin (sungho.shin@wisc.edu)
-
 @kwdef mutable struct Ma86Options <: AbstractOptions
     ma86_num_threads::Int = 1
     ma86_print_level::Float64 = -1
@@ -72,16 +69,16 @@ ma86_default_control_d(control::Ma86Control) = ccall(
     Nothing,
     (Ref{Ma86Control},),
     control)
-ma86_analyse_d(n::Cint,colptr::StrideOneVector{Cint},rowval::StrideOneVector{Cint},
-               order::StrideOneVector{Cint},keep::Vector{Ptr{Nothing}},
+ma86_analyse_d(n::Cint,colptr::Vector{Cint},rowval::Vector{Cint},
+               order::Vector{Cint},keep::Vector{Ptr{Nothing}},
                control::Ma86Control,info::Ma86Info) = ccall(
                    (:ma86_analyse_d,libhsl),
                    Nothing,
                    (Cint,Ptr{Cint},Ptr{Cint},Ptr{Cdouble},
                     Ptr{Ptr{Nothing}},Ref{Ma86Control},Ref{Ma86Info}),
                    n,colptr,rowval,order,keep,control,info)
-ma86_factor_d(n::Cint,colptr::StrideOneVector{Cint},rowval::StrideOneVector{Cint},
-              nzval::StrideOneVector{Cdouble},order::StrideOneVector{Cint},
+ma86_factor_d(n::Cint,colptr::Vector{Cint},rowval::Vector{Cint},
+              nzval::Vector{Cdouble},order::Vector{Cint},
               keep::Vector{Ptr{Nothing}},control::Ma86Control,info::Ma86Info,
               scale::Ptr{Nothing}) = ccall(
                   (:ma86_factor_d,libhsl),
@@ -152,7 +149,7 @@ function factorize!(M::Ma86Solver)
     M.info.flag<0 && throw(FactorizationException())
     return M
 end
-function solve!(M::Ma86Solver,rhs::StrideOneVector{Float64})
+function solve!(M::Ma86Solver,rhs::Vector{Float64})
     ma86_solve_d(Int32(0),Int32(1),Int32(M.csc.n),rhs,
                  M.order,M.keep,M.control,M.info,C_NULL)
     M.info.flag<0 && throw(SolveException())

@@ -1,4 +1,3 @@
-
 const umfpack_default_ctrl = copy(UMFPACK.umf_ctrl)
 const umfpack_default_info = copy(UMFPACK.umf_info)
 
@@ -26,8 +25,8 @@ mutable struct UmfpackSolver <: AbstractLinearSolver
     logger::Logger
 end
 
-umfpack_di_numeric(colptr::StrideOneVector{Int32},rowval::StrideOneVector{Int32},
-                   nzval::StrideOneVector{Float64},symbolic::Ptr{Nothing},
+umfpack_di_numeric(colptr::Vector{Int32},rowval::Vector{Int32},
+                   nzval::Vector{Float64},symbolic::Ptr{Nothing},
                    tmp::Vector{Ptr{Nothing}},ctrl::Vector{Float64},
                    info::Vector{Float64}) = ccall(
                        (:umfpack_di_numeric,:libumfpack),
@@ -80,7 +79,7 @@ function factorize!(M::UmfpackSolver)
     M.inner.status = status
     return M
 end
-function solve!(M::UmfpackSolver,rhs::StrideOneVector{Float64})
+function solve!(M::UmfpackSolver,rhs::Vector{Float64})
     status = umfpack_di_solve(1,M.inner.colptr,M.inner.rowval,M.inner.nzval,M.p,rhs,M.inner.numeric,M.ctrl,M.info)
     rhs .= M.p
     return rhs

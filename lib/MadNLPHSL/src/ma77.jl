@@ -1,8 +1,3 @@
-# MadNLP.jl
-# Created by Sungho Shin (sungho.shin@wisc.edu)
-
-
-
 @kwdef mutable struct Ma77Options <: AbstractOptions
     ma77_buffer_lpage::Int = 4096
     ma77_buffer_npage::Int = 1600
@@ -175,14 +170,14 @@ ma77_open_d(n::Cint,fname1::String,fname2::String,fname3::String,fname4::String,
                 (Cint,Ptr{Cchar},Ptr{Cchar},Ptr{Cchar},Ptr{Cchar},
                  Ptr{Ptr{Cvoid}},Ref{Ma77Control},Ref{Ma77Info}),
                 n,fname1,fname2,fname3,fname4,keep,control,info)
-ma77_input_vars_d(idx::Cint,nvar::Cint,list::StrideOneVector{Cint},
+ma77_input_vars_d(idx::Cint,nvar::Cint,list::Vector{Cint},
                   keep::Vector{Ptr{Cvoid}},control::Ma77Control,info::Ma77Info) = ccall(
                       (:ma77_input_vars_d,libhsl),
                       Cvoid,
                       (Cint,Cint,Ptr{Cint},
                        Ptr{Ptr{Cvoid}},Ref{Ma77Control},Ref{Ma77Info}),
                       idx,nvar,list,keep,control,info)
-ma77_input_reals_d(idx::Cint,length::Cint,reals::StrideOneVector{Cdouble},
+ma77_input_reals_d(idx::Cint,length::Cint,reals::Vector{Cdouble},
                    keep::Vector{Ptr{Cvoid}},control::Ma77Control,info::Ma77Info) = ccall(
                        (:ma77_input_reals_d,libhsl),
                        Cvoid,
@@ -271,9 +266,14 @@ function Ma77Solver(csc::SparseMatrixCSC{Float64,Int32};
     info.flag < 0 && throw(SymbolicException())
 
     for i=1:full.n
-        ma77_input_vars_d(Int32(i),full.colptr[i+1]-full.colptr[i],
-                          view(full.rowval,full.colptr[i]:full.colptr[i+1]-1),
-                          keep,control,info);
+        ma77_input_vars_d(
+            Int32(i),full.colptr[i+1]-full.colptr[i],
+            _madnlp_unsafe_wrap(
+                full.rowval,
+                full.colptr[i+1]-full.colptr[i],
+                full.colptr[i]
+            ),
+            keep,control,info);
         info.flag < 0 && throw(LinearSymbolicException())
     end
 
@@ -281,7 +281,7 @@ function Ma77Solver(csc::SparseMatrixCSC{Float64,Int32};
     info.flag<0 && throw(SymbolicException())
 
     M = Ma77Solver(csc,full,tril_to_full_view,
-               control,info,mc68_control,mc68_info,order,keep,opt,logger)
+                   control,info,mc68_control,mc68_info,order,keep,opt,logger)
     finalizer(finalize,M)
     return M
 end
@@ -289,16 +289,22 @@ end
 function factorize!(M::Ma77Solver)
     M.full.nzval.=M.tril_to_full_view
     for i=1:M.full.n
-        ma77_input_reals_d(Int32(i),M.full.colptr[i+1]-M.full.colptr[i],
-                           view(M.full.nzval,M.full.colptr[i]:M.full.colptr[i+1]-1),
-                           M.keep,M.control,M.info)
+        ma77_input_reals_d(
+            Int32(i),M.full.colptr[i+1]-M.full.colptr[i],
+            _madnlp_unsafe_wrap(
+                M.full.nzval,
+                M.full.colptr[i+1]-M.full.colptr[i],
+                M.full.colptr[i]
+            ),
+            M.keep,M.control,M.info
+        )
         M.info.flag < 0 && throw(FactorizationException())
     end
     ma77_factor_d(Int32(0),M.keep,M.control,M.info,C_NULL)
     M.info.flag < 0 && throw(FactorizationException())
     return M
 end
-function solve!(M::Ma77Solver,rhs::StrideOneVector{Float64})
+function solve!(M::Ma77Solver,rhs::Vector{Float64})
     ma77_solve_d(Int32(0),Int32(1),Int32(M.full.n),rhs,M.keep,M.control,M.info,C_NULL);
     M.info.flag < 0 && throw(SolveException())
     return rhs

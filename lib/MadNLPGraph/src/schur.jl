@@ -2,7 +2,7 @@ module MadNLPSchur
 
 import ..MadNLPGraph:
     @kwdef, Logger, @debug, @warn, @error,
-    AbstractOptions, AbstractLinearSolver, EmptyLinearSolver, set_options!, SparseMatrixCSC, SubVector, StrideOneVector,
+    AbstractOptions, AbstractLinearSolver, EmptyLinearSolver, set_options!, SparseMatrixCSC, SubVector, 
     SymbolicException,FactorizationException,SolveException,InertiaException,
     introduce, factorize!, solve!, improve!, is_inertia, inertia,
     default_linear_solver, default_dense_solver, get_csc_view, get_cscsy_view, nnz, mul!,
@@ -92,7 +92,7 @@ function SolverWorker(tsp,V_0,csc::SparseMatrixCSC{Float64},inds::Vector{Int},k,
                       SubproblemSolverModule::Module,logger::Logger,option_dict::Dict{Symbol,Any})
 
     V    = findall(tsp.part.==k)
-    
+
     csc_k,csc_k_view = get_cscsy_view(csc,V,inds=inds)
     compl,compl_view = get_csc_view(csc,V,V_0,inds=inds)
     V_0_nz = findnz(compl.colptr)

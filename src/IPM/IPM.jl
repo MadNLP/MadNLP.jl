@@ -31,8 +31,8 @@ mutable struct InteriorPointSolver{KKTSystem} <: AbstractInteriorPointSolver
 
     jacl::Vector{Float64}
 
-    d::AbstractKKTVector{Float64, Vector{Float64}}
-    p::AbstractKKTVector{Float64, Vector{Float64}}
+    d::UnreducedKKTVector{Float64, Vector{Float64}}
+    p::UnreducedKKTVector{Float64, Vector{Float64}}
 
     _w1::AbstractKKTVector{Float64, Vector{Float64}}
     _w2::AbstractKKTVector{Float64, Vector{Float64}}
@@ -44,7 +44,7 @@ mutable struct InteriorPointSolver{KKTSystem} <: AbstractInteriorPointSolver
     c_trial::Vector{Float64}
     obj_val_trial::Float64
 
-    x_slk::StrideOneVector{Float64}
+    x_slk::Vector{Float64}
     c_slk::SubVector{Float64}
     rhs::Vector{Float64}
 
@@ -102,19 +102,18 @@ function InteriorPointSolver(nlp::AbstractNLPModel;
     set_options!(opt,option_dict,kwargs)
     check_option_sanity(opt)
 
+    VT = Vector{Float64}
     KKTSystem = if opt.kkt_system == SPARSE_KKT_SYSTEM
         MT = (input_type(opt.linear_solver) == :csc) ? SparseMatrixCSC{Float64, Int32} : Matrix{Float64}
-        SparseKKTSystem{Float64, MT}
+        SparseKKTSystem{Float64, VT, MT}
     elseif opt.kkt_system == SPARSE_UNREDUCED_KKT_SYSTEM
         MT = (input_type(opt.linear_solver) == :csc) ? SparseMatrixCSC{Float64, Int32} : Matrix{Float64}
-        SparseUnreducedKKTSystem{Float64, MT}
+        SparseUnreducedKKTSystem{Float64, VT, MT}
     elseif opt.kkt_system == DENSE_KKT_SYSTEM
         MT = Matrix{Float64}
-        VT = Vector{Float64}
         DenseKKTSystem{Float64, VT, MT}
     elseif opt.kkt_system == DENSE_CONDENSED_KKT_SYSTEM
         MT = Matrix{Float64}
-        VT = Vector{Float64}
         DenseCondensedKKTSystem{Float64, VT, MT}
     end
     return InteriorPointSolver{KKTSystem}(nlp, opt; option_linear_solver=option_dict)
@@ -162,7 +161,7 @@ function InteriorPointSolver{KKTSystem}(nlp::AbstractNLPModel, opt::Options;
     x_trial=Vector{Float64}(undef,n)
     c_trial=Vector{Float64}(undef,m)
 
-    x_slk= view(x,get_nvar(nlp)+1:n)
+    x_slk= _madnlp_unsafe_wrap(x,ns, get_nvar(nlp)+1)
     c_slk= view(c,ind_cons.ind_ineq)
     rhs = (get_lcon(nlp).==get_ucon(nlp)).*get_lcon(nlp)
 

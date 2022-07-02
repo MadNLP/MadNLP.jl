@@ -1,8 +1,7 @@
-
 function initialize!(ips::AbstractInteriorPointSolver)
     # initializing slack variables
     @trace(ips.logger,"Initializing slack variables.")
-    cons!(ips.nlp,get_x0(ips.nlp),view(ips.c,1:get_ncon(ips.nlp)))
+    cons!(ips.nlp,get_x0(ips.nlp),_madnlp_unsafe_wrap(ips.c,get_ncon(ips.nlp)))
     ips.cnt.con_cnt += 1
     ips.x_slk.=ips.c_slk
 

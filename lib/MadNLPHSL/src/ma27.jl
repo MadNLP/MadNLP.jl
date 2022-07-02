@@ -1,6 +1,3 @@
-# MadNLP.jl
-# Created by Sungho Shin (sungho.shin@wisc.edu)
-
 const ma27_default_icntl = Int32[
     6,6,0,2139062143,1,32639,32639,32639,32639,14,9,8,8,9,10,32639,32639,32639,32689,24,11,9,8,9,10,0,0,0,0,0]
 const ma27_default_cntl  = [.1,1.0,0.,0.,0.]
@@ -24,7 +21,7 @@ mutable struct Ma27Solver <: AbstractLinearSolver
     info::Vector{Int32}
 
     a::Vector{Float64}
-    a_view::StrideOneVector{Float64}
+    a_view::Vector{Float64}
     la::Int32
     ikeep::Vector{Int32}
 
@@ -39,7 +36,7 @@ mutable struct Ma27Solver <: AbstractLinearSolver
     logger::Logger
 end
 
-ma27ad!(n::Cint,nz::Cint,I::StrideOneVector{Cint},J::StrideOneVector{Cint},
+ma27ad!(n::Cint,nz::Cint,I::Vector{Cint},J::Vector{Cint},
         iw::Vector{Cint},liw::Cint,ikeep::Vector{Cint},iw1::Vector{Cint},
         nsteps::Vector{Cint},iflag::Cint,icntl::Vector{Cint},cntl::Vector{Cdouble},
         info::Vector{Cint},ops::Cdouble) = ccall(
@@ -51,8 +48,8 @@ ma27ad!(n::Cint,nz::Cint,I::StrideOneVector{Cint},J::StrideOneVector{Cint},
              Ptr{Cint},Ref{Cdouble}),
             n,nz,I,J,iw,liw,ikeep,iw1,nsteps,iflag,icntl,cntl,info,ops)
 
-ma27bd!(n::Cint,nz::Cint,I::StrideOneVector{Cint},J::StrideOneVector{Cint},
-        a::StrideOneVector{Cdouble},la::Cint,iw::Vector{Cint},liw::Cint,
+ma27bd!(n::Cint,nz::Cint,I::Vector{Cint},J::Vector{Cint},
+        a::Vector{Cdouble},la::Cint,iw::Vector{Cint},liw::Cint,
         ikeep::Vector{Cint},nsteps::Vector{Cint},maxfrt::Vector{Cint},iw1::Vector{Cint},
         icntl::Vector{Cint},cntl::Vector{Cdouble},info::Vector{Cint}) = ccall(
             (:ma27bd_,libhsl),
@@ -101,7 +98,7 @@ function Ma27Solver(csc::SparseMatrixCSC;
 
     la = ceil(Int32,max(nz,opt.ma27_la_init_factor*info[5]))
     a = Vector{Float64}(undef,la)
-    a_view = view(a,1:nnz(csc))
+    a_view = _madnlp_unsafe_wrap(a,nnz(csc))
     liw= ceil(Int32,opt.ma27_liw_init_factor*info[6])
     resize!(iw,liw)
     maxfrt=Int32[1]
@@ -134,7 +131,7 @@ function factorize!(M::Ma27Solver)
     return M
 end
 
-function solve!(M::Ma27Solver,rhs::StrideOneVector{Float64})
+function solve!(M::Ma27Solver,rhs::Vector{Float64})
     length(M.w)<M.maxfrt[1] && resize!(M.w,M.maxfrt[1])
     length(M.iw1)<M.nsteps[1] && resize!(M.iw1,M.nsteps[1])
     ma27cd!(Int32(M.csc.n),M.a,M.la,M.iw,M.liw,M.w,M.maxfrt,rhs,

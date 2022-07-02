@@ -1,6 +1,3 @@
-# MadNLP.jl
-# Created by Sungho Shin (sungho.shin@wisc.edu)
-
 const ma57_default_icntl = Int32[0,0,6,1,0,5,1,0,10,0,16,16,10,100,0,0,0,0,0,0]
 const ma57_default_cntl  = Float64[1e-8,1.0e-20,0.5,0.0,0.0]
 
@@ -45,7 +42,7 @@ mutable struct Ma57Solver <: AbstractLinearSolver
 end
 
 
-ma57ad!(n::Cint,nz::Cint,I::StrideOneVector{Cint},J::StrideOneVector{Cint},lkeep::Cint,
+ma57ad!(n::Cint,nz::Cint,I::Vector{Cint},J::Vector{Cint},lkeep::Cint,
         keep::Vector{Cint},iwork::Vector{Cint},icntl::Vector{Cint},
         info::Vector{Cint},rinfo::Vector{Cdouble}) = ccall(
             (:ma57ad_,libhsl),
@@ -55,7 +52,7 @@ ma57ad!(n::Cint,nz::Cint,I::StrideOneVector{Cint},J::StrideOneVector{Cint},lkeep
              Ptr{Cint},Ptr{Cdouble}),
             n,nz,I,J,lkeep,keep,iwork,icntl,info,rinfo)
 
-ma57bd!(n::Cint,nz::Cint,V::StrideOneVector{Cdouble},fact::Vector{Cdouble},
+ma57bd!(n::Cint,nz::Cint,V::Vector{Cdouble},fact::Vector{Cdouble},
         lfact::Cint,ifact::Vector{Cint},lifact::Cint,lkeep::Cint,
         keep::Vector{Cint},iwork::Vector{Cint},icntl::Vector{Cint},cntl::Vector{Cdouble},
         info::Vector{Cint},rinfo::Vector{Cdouble}) = ccall(
@@ -68,7 +65,7 @@ ma57bd!(n::Cint,nz::Cint,V::StrideOneVector{Cdouble},fact::Vector{Cdouble},
             n,nz,V,fact,lfact,ifact,lifact,lkeep,keep,iwork,icntl,cntl,info,rinfo)
 
 ma57cd!(job::Cint,n::Cint,fact::Vector{Cdouble},lfact::Cint,
-        ifact::Vector{Cint},lifact::Cint,nrhs::Cint,rhs::StrideOneVector{Cdouble},
+        ifact::Vector{Cint},lifact::Cint,nrhs::Cint,rhs::Vector{Cdouble},
         lrhs::Cint,work::Vector{Cdouble},lwork::Cint,iwork::Vector{Cint},
         icntl::Vector{Cint},info::Vector{Cint}) = ccall(
             (:ma57cd_,libhsl),
@@ -146,7 +143,7 @@ function factorize!(M::Ma57Solver)
     return M
 end
 
-function solve!(M::Ma57Solver,rhs::StrideOneVector{Float64})
+function solve!(M::Ma57Solver,rhs::Vector{Float64})
     ma57cd!(one(Int32),Int32(M.csc.n),M.fact,M.lfact,M.ifact,
             M.lifact,one(Int32),rhs,Int32(M.csc.n),M.work,M.lwork,M.iwork,M.icntl,M.info)
     M.info[1]<0 && throw(SolveException())
