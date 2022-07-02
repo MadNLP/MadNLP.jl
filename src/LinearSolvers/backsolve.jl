@@ -24,18 +24,18 @@ end
 # Solve reduced KKT system. Require only the primal/dual values.
 function solve_refine!(
     x::AbstractKKTVector{T, VT},
-    solver::RichardsonIterator{T, VT, KKT},
+    solver::RichardsonIterator{T, VT, KKT, LinSolver},
     b::AbstractKKTVector{T, VT},
-) where {T, VT, KKT<:AbstractReducedKKTSystem}
+) where {T, VT, KKT<:AbstractReducedKKTSystem, LinSolver}
     solve_refine!(primal_dual(x), solver, primal_dual(b))
 end
 
 # Solve unreduced KKT system. Require UnreducedKKTVector as inputs.
 function solve_refine!(
     x::UnreducedKKTVector{T, VT},
-    solver::RichardsonIterator{T, VT, KKT},
+    solver::RichardsonIterator{T, VT, KKT, LinSolver},
     b::UnreducedKKTVector{T, VT},
-) where {T, VT, KKT<:AbstractUnreducedKKTSystem}
+) where {T, VT, KKT<:AbstractUnreducedKKTSystem, LinSolver}
     solve_refine!(full(x), solver, full(b))
 end
 

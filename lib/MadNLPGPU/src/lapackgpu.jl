@@ -1,9 +1,4 @@
-import .CUSOLVER:
-    libcusolver, cusolverStatus_t, CuPtr, cudaDataType, cublasFillMode_t, cusolverDnHandle_t, dense_handle
-import .CUBLAS: handle, CUBLAS_DIAG_NON_UNIT,
-    CUBLAS_FILL_MODE_LOWER, CUBLAS_FILL_MODE_UPPER, CUBLAS_SIDE_LEFT, CUBLAS_OP_N, CUBLAS_OP_T
-
-mutable struct LapackGPUSolver{T} <: AbstractLinearSolver
+mutable struct LapackGPUSolver{T} <: AbstractLinearSolver{T}
     dense::AbstractMatrix{T}
     fact::CuMatrix{T}
     rhs::CuVector{T}
@@ -18,10 +13,11 @@ mutable struct LapackGPUSolver{T} <: AbstractLinearSolver
 end
 
 
-function LapackGPUSolver(dense::MT;
-                option_dict::Dict{Symbol,Any}=Dict{Symbol,Any}(),
-                opt=LapackOptions(),logger=Logger(),
-                kwargs...) where {T,MT <: AbstractMatrix{T}}
+function LapackGPUSolver(
+    dense::MT;
+    option_dict::Dict{Symbol,Any}=Dict{Symbol,Any}(),
+    opt=LapackOptions(),logger=Logger(),
+    kwargs...) where {T,MT <: AbstractMatrix{T}}
 
     set_options!(opt,option_dict,kwargs...)
     fact = CuMatrix{T}(undef,size(dense))
@@ -204,9 +200,9 @@ for (sytrf,sytrf_buffer,getrf,getrf_buffer,getrs,geqrf,geqrf_buffer,ormqr,ormqr_
     end
 end
 
-is_inertia(M::LapackGPUSolver) = M.opt.lapackgpu_algorithm == CHOLESKY  # TODO: implement inertia(M::Solver) for BUNCHKAUFMAN
+is_inertia(M::LapackGPUSolver) = M.opt.lapack_algorithm == MadNLP.CHOLESKY  # TODO: implement inertia(M::LapackGPUSolver) for BUNCHKAUFMAN
 function inertia(M::LapackGPUSolver)
-    if M.opt.lapackgpu_algorithm == BUNCHKAUFMAN
+    if M.opt.lapack_algorithm == MadNLP.BUNCHKAUFMAN
         inertia(M.etc[:fact_cpu],M.etc[:ipiv_cpu],M.etc[:info_cpu][])
     elseif M.opt.lapack_algorithm == MadNLP.CHOLESKY
         sum(M.info) == 0 ? (size(M.fact,1),0,0) : (0,size(M.fact,1),0)

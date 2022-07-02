@@ -1,5 +1,5 @@
-const ma57_default_icntl = Int32[0,0,6,1,0,5,1,0,10,0,16,16,10,100,0,0,0,0,0,0]
-const ma57_default_cntl  = Float64[1e-8,1.0e-20,0.5,0.0,0.0]
+ma57_default_icntl() = Int32[0,0,6,1,0,5,1,0,10,0,16,16,10,100,0,0,0,0,0,0]
+ma57_default_cntl(T)  = T[1e-8,1.0e-20,0.5,0.0,0.0]
 
 @kwdef mutable struct Ma57Options <: AbstractOptions
     ma57_pivtol::Float64 = 1e-8
@@ -92,8 +92,8 @@ function Ma57Solver(csc::SparseMatrixCSC{T};
 
     I,J=findIJ(csc)
 
-    icntl= copy(ma57_default_icntl)
-    cntl = copy(ma57_default_cntl)
+    icntl= ma57_default_icntl()
+    cntl = ma57_default_cntl(T)
 
     cntl[1]=opt.ma57_pivtol
     icntl[1]=-1

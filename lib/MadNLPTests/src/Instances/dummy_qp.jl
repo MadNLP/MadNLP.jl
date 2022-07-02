@@ -114,5 +114,4 @@ function DenseDummyQP{T}(; n=100, m=10, fixed_variables=Int[], equality_cons=[])
     )
 end
 
-DenseDummyQP(; n=100, m=10, fixed_variables=Int[], equality_cons=[]) =
-    DenseDummyQP{Float64}(; n=n, m=m, fixed_variables=fixed_variables, equality_cons= equality_cons)
+DenseDummyQP(; kwargs...) = DenseDummyQP{Float64}(; kwargs...)
