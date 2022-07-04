@@ -30,7 +30,7 @@ struct VirtualPreconditioner
 end
 ldiv!(Pl::VirtualPreconditioner,x::Vector{Float64}) = Pl.ldiv!(x)
 
-mutable struct KrylovIterator{T} <: AbstractIterator
+mutable struct KrylovIterator{T} <: AbstractIterator{T}
     g::Union{Nothing,GMRESIterable}
     res::Vector{T}
     opt::KrylovOptions
