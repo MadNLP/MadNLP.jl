@@ -38,6 +38,24 @@ factorized previously with [`factorize!`](@ref).
 function solve! end
 
 """
+    is_supported(solver,T)
+
+Return `true` if `solver` supports the Float type `T`.
+
+# Examples
+```julia-repl
+julia> is_supported(UmfpackSolver,Float64)
+true
+
+julia> is_supported(UmfpackSolver,Float32)
+false
+```
+"""
+function is_supported(::Type{LS},::Type{T}) where {LS <: AbstractLinearSolver, T <: AbstractFloat}
+    return false
+end
+
+"""
     is_inertia(::AbstractLinearSolver)
 
 Return `true` if the linear solver supports the
@@ -59,6 +77,7 @@ with
 - ``p``: number of zero eigenvalues
 """
 function inertia end
+
 
 function improve! end
 

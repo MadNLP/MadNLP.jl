@@ -113,4 +113,4 @@ function improve!(M::UmfpackSolver)
     return false
 end
 introduce(::UmfpackSolver)="umfpack"
-
+is_supported(::Type{UmfpackSolver},::Type{Float64}) = true

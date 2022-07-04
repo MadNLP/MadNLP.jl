@@ -174,3 +174,5 @@ end
 
 introduce(::Ma57Solver)="ma57"
 input_type(::Type{Ma57Solver}) = :csc
+is_supported(::Type{Ma57Solver},::Type{Float32}) = true
+is_supported(::Type{Ma57Solver},::Type{Float64}) = true

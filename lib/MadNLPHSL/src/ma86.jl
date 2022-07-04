@@ -195,4 +195,6 @@ function improve!(M::Ma86Solver)
 end
 introduce(::Ma86Solver)="ma86"
 input_type(::Type{Ma86Solver}) = :csc
+is_supported(::Type{Ma86Solver},::Type{Float32}) = true
+is_supported(::Type{Ma86Solver},::Type{Float64}) = true
 

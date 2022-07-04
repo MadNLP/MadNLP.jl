@@ -193,4 +193,5 @@ function improve!(M::Ma97Solver)
 end
 introduce(::Ma97Solver)="ma97"
 input_type(::Type{Ma97Solver}) = :csc
-
+is_supported(::Type{Ma97Solver},::Type{Float32}) = true
+is_supported(::Type{Ma97Solver},::Type{Float64}) = true

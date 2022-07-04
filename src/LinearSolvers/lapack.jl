@@ -233,3 +233,5 @@ function num_neg_ev(n,D,ipiv)
     return numneg
 end
 
+is_supported(::Type{LapackCPUSolver},::Type{Float32}) = true
+is_supported(::Type{LapackCPUSolver},::Type{Float64}) = true

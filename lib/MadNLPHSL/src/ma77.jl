@@ -356,3 +356,5 @@ end
 
 introduce(::Ma77Solver)="ma77"
 input_type(::Type{Ma77Solver}) = :csc
+is_supported(::Type{Ma77Solver},::Type{Float32}) = true
+is_supported(::Type{Ma77Solver},::Type{Float64}) = true

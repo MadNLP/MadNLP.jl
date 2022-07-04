@@ -8,7 +8,7 @@ import MadNLP:
     SparseMatrixCSC, SubVector,
     SymbolicException,FactorizationException,SolveException,InertiaException,
     AbstractOptions, AbstractLinearSolver, set_options!, input_type,
-    introduce, factorize!, solve!, improve!, is_inertia, inertia, findIJ, nnz
+    introduce, factorize!, solve!, improve!, is_inertia, is_supported, inertia, findIJ, nnz
 
 const version = parsefile(joinpath(dirname(pathof(MUMPS_seq_jll)),"..","Project.toml"))["version"]
 
@@ -376,5 +376,7 @@ end
 
 introduce(::MumpsSolver)="mumps"
 input_type(::Type{MumpsSolver}) = :csc
+is_supported(::Type{MumpsSolver},::Type{Float32}) = true
+is_supported(::Type{MumpsSolver},::Type{Float64}) = true
 
 end # module

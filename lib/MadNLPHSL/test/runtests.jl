@@ -40,7 +40,8 @@ testset = [
 
 @testset "MadNLPHSL test" begin
     for hsl_solver in [Ma27Solver, Ma57Solver, Ma77Solver, Ma86Solver, Ma97Solver]
-        MadNLPTests.test_linear_solver(hsl_solver)
+        MadNLPTests.test_linear_solver(hsl_solver,Float32)
+        MadNLPTests.test_linear_solver(hsl_solver,Float64)
     end
     for (name,optimizer_constructor,exclude) in testset
         test_madnlp(name,optimizer_constructor,exclude)

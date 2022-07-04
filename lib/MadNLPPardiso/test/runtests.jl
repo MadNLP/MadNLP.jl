@@ -20,6 +20,11 @@ testset = [
 ]
 
 @testset "MadNLPPardiso test" begin
+
+    MadNLPTests.test_linear_solver(PardisoMKLSolver,Float32)
+    MadNLPTests.test_linear_solver(PardisoMKLSolver,Float64)
+    # MadNLPTests.test_linear_solver(PardisoSolver)
+    
     for (name,optimizer_constructor,exclude) in testset
         test_madnlp(name,optimizer_constructor,exclude)
     end

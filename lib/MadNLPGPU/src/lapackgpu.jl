@@ -212,4 +212,6 @@ function inertia(M::LapackGPUSolver)
 end
 
 input_type(::Type{LapackGPUSolver}) = :dense
+is_supported(::Type{LapackGPUSolver},::Type{Float32}) = true
+is_supported(::Type{LapackGPUSolver},::Type{Float64}) = true
 

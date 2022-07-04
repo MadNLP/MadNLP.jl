@@ -101,6 +101,8 @@ function InteriorPointSolver(nlp::AbstractNLPModel{T};
     opt = Options(linear_solver=default_linear_solver())
     set_options!(opt,option_dict,kwargs)
     check_option_sanity(opt)
+    
+    @assert is_supported(opt.linear_solver,T)
 
     VT = Vector{T}
     KKTSystem = if opt.kkt_system == SPARSE_KKT_SYSTEM

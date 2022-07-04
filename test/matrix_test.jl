@@ -30,14 +30,6 @@ end
 end
 
 
-MadNLPTests.test_linear_solver(MadNLP.LapackCPUSolver)
-MadNLPTests.test_linear_solver(MadNLP.UmfpackSolver)
-# @test_linear_solver ma27
-# @test_linear_solver ma57
-# @test_linear_solver ma77
-# @test_linear_solver ma86
-# @test_linear_solver ma97
-# @test_linear_solver pardiso
-# @test_linear_solver pardisomkl
-# @test_linear_solver umfpack
-# @test_linear_solver mumps
+MadNLPTests.test_linear_solver(UmfpackSolver,Float64)
+MadNLPTests.test_linear_solver(LapackCPUSolver,Float32)
+MadNLPTests.test_linear_solver(LapackCPUSolver,Float64)

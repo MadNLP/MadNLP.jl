@@ -20,23 +20,25 @@ function solcmp(x,sol;atol=1e-4,rtol=1e-4)
     return (aerr < atol || rerr < rtol)
 end
 
-function test_linear_solver(solver)
+function test_linear_solver(solver,T; kwargs...)
+
     m = 2
     n = 2
     row = Int32[1,2,2]
     col = Int32[1,1,2]
-    val = Float64[1.,.1,2.]
-    b = [1.0,3.0]
+    val = T[1.,.1,2.]
+    b = T[1.0,3.0]
     x = similar(b)
 
     @testset "Linear solver $solver" begin
+        
         csc = sparse(row,col,val,m,n)
-        dense = Array(csc)
         sol= [0.8542713567839195, 1.4572864321608041]
         if MadNLP.input_type(solver) == :csc
-            M = solver(csc)
+            M = solver(csc;kwargs...)
         elseif MadNLP.input_type(solver) == :dense
-            M = solver(dense)
+            dense = Array(csc)
+            M = solver(dense;kwargs...)
         end
         MadNLP.introduce(M)
         MadNLP.improve!(M)
