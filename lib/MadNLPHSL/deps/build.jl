@@ -54,7 +54,6 @@ const targets_dict = Dict(
         "ma27s.f",
     ],
     :libma57 => [
-        "fakemetis.f",
         "sdeps.f", "ddeps.f",
         "ma57d.f", "ma57s.f", 
     ],
@@ -66,14 +65,14 @@ const targets_dict = Dict(
     ],
     :libma86 => [
         "common.f", "common90.f90",
-        "sdeps90.f90", "fakemetis.f",
+        "sdeps90.f90",
         "hsl_ma86d.f90", "hsl_ma86s.f90",
         "hsl_ma86d_ciface.f90", "hsl_ma86s_ciface.f90",
         "hsl_mc68i_ciface.f90",
     ],
     :libma97 => [
         "common.f", "common90.f90",
-        "sdeps90.f90", "ddeps90.f90", "fakemetis.f",
+        "sdeps90.f90", "ddeps90.f90",
         "hsl_ma97d.f90", "hsl_ma97s.f90",
         "hsl_ma97d_ciface.f90", "hsl_ma97s_ciface.f90",
     ]
@@ -97,22 +96,30 @@ for (lib, envlib, envsrc) in supported_library
         
         cd(source_path)
 
-        names = []
-        for (root, dirs, files) in walkdir(source_path)
+        list = []
+        for (root, dir, files) in walkdir(source_path)
             for file in files
                 if file in targets
-                    filter!(x->x != file,files)
-                    name = splitext(relpath(joinpath(root,file),source_path))
-                    push!(names, name)
-                    @info "$(name[1])$(name[2]) source code detected."
+                    @info "$file source code detected."
+                    push!(list, (root, dir, file))
                 end
             end
         end
-        succeeded = [isvalid(`$FC -fopenmp -fPIC -c -O3 -o $name.o $name$ext`)
-                     for (name,ext) in names]
+
+        succeeded = []
+        for target in targets
+            for (root, dir, file) in list
+                if file == target
+                    name, ext = splitext(relpath(joinpath(root,file),source_path))
+                    isvalid(`$FC -fopenmp -fPIC -c -O3 -o $name.o $name$ext`)
+                    push!(succeeded, (name, ext))
+                end
+            end
+        end
+        
 
         cmd = `$FC -o$(libdir)/$lib.$so -shared -fPIC -O3 -fopenmp`
-        append!(cmd.exec, ["$name.o" for (name,ext) in names[succeeded]])
+        append!(cmd.exec, ["$name.o" for (name,ext) in succeeded])
         append!(cmd.exec, with_metis.exec)
         append!(cmd.exec, with_blas.exec)
         
