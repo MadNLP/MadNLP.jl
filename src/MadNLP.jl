@@ -19,7 +19,7 @@ const MOI = MathOptInterface
 const MOIU = MathOptInterface.Utilities
 const NLPModelsCounters = _Counters
 
-export madnlp
+export madnlp, UmfpackSolver, LapackCPUSolver
 
 # Version info
 version() = parsefile(joinpath(@__DIR__,"..","Project.toml"))["version"]

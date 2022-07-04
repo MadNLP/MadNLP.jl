@@ -379,4 +379,6 @@ input_type(::Type{MumpsSolver}) = :csc
 is_supported(::Type{MumpsSolver},::Type{Float32}) = true
 is_supported(::Type{MumpsSolver},::Type{Float64}) = true
 
+export MumpsSolver
+
 end # module
