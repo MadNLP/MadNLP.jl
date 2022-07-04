@@ -36,74 +36,46 @@ const supported_library = [
 
 const targets_dict = Dict(
     :libhsl=> [
-        [
-            "deps.f",
-            "deps90.f90",
-        ],
-        [
-            "ma27d.f",
-            "ma57d.f",
-            "hsl_ma77d.f90",
-            "hsl_ma86d.f90",
-            "hsl_ma97d.f90",
-        ],
-        [
-            "hsl_mc68i_ciface.f90",
-            "hsl_ma77d_ciface.f90",
-            "hsl_ma86d_ciface.f90",
-            "hsl_ma97d_ciface.f90",
-        ]
+        "deps.f",
+        "deps90.f90",
+        "ma27d.f",
+        "ma57d.f",
+        "hsl_ma77d.f90",
+        "hsl_ma86d.f90",
+        "hsl_ma97d.f90",
+        "hsl_mc68i_ciface.f90",
+        "hsl_ma77d_ciface.f90",
+        "hsl_ma86d_ciface.f90",
+        "hsl_ma97d_ciface.f90",
     ],
     :libma27 => [
-        [
-            "deps.f",
-            "ma27d.f",
-            "ma27s.f",
-        ],
+        "deps.f",
+        "ma27d.f",
+        "ma27s.f",
     ],
     :libma57 => [
-        [
-            "fakemetis.f",
-            "sdeps.f", "ddeps.f",
-            "ma57d.f", "ma57s.f", 
-        ],
+        "fakemetis.f",
+        "sdeps.f", "ddeps.f",
+        "ma57d.f", "ma57s.f", 
     ],
     :libma77 => [
-        [
-            "common.f", "common90.f90",
-            "ddeps90.f90", "sdeps90.f90", 
-        ],
-        [
-            "hsl_ma77d.f90", "hsl_ma77s.f90",
-        ],
-        [
-            "hsl_ma77d_ciface.f90", "hsl_ma77s_ciface.f90",
-        ],
+        "common.f", "common90.f90",
+        "ddeps90.f90", "sdeps90.f90", 
+        "hsl_ma77d.f90", "hsl_ma77s.f90",
+        "hsl_ma77d_ciface.f90", "hsl_ma77s_ciface.f90",
     ],
     :libma86 => [
-        [
-            "common.f", "common90.f90",
-            "sdeps90.f90", "fakemetis.f",
-        ],
-        [
-            "hsl_ma86d.f90", "hsl_ma86s.f90",
-        ],
-        [
-            "hsl_ma86d_ciface.f90", "hsl_ma86s_ciface.f90",
-            "hsl_mc68i_ciface.f90",
-        ],
+        "common.f", "common90.f90",
+        "sdeps90.f90", "fakemetis.f",
+        "hsl_ma86d.f90", "hsl_ma86s.f90",
+        "hsl_ma86d_ciface.f90", "hsl_ma86s_ciface.f90",
+        "hsl_mc68i_ciface.f90",
     ],
     :libma97 => [
-        [
-            "common.f", "common90.f90",
-            "sdeps90.f90", "ddeps90.f90", "fakemetis.f",
-        ],
-        [
-            "hsl_ma97d.f90", "hsl_ma97s.f90",
-        ],
-        [
-            "hsl_ma97d_ciface.f90", "hsl_ma97s_ciface.f90",
-        ],
+        "common.f", "common90.f90",
+        "sdeps90.f90", "ddeps90.f90", "fakemetis.f",
+        "hsl_ma97d.f90", "hsl_ma97s.f90",
+        "hsl_ma97d_ciface.f90", "hsl_ma97s_ciface.f90",
     ]
 )
 
@@ -123,30 +95,24 @@ for (lib, envlib, envsrc) in supported_library
         source_path = ENV[envsrc]
         targets = targets_dict[lib]
         
-        OC = OutputCollector[]
         cd(source_path)
 
-        names_succeeded = []
-        for target in targets
-            names = []
-            for (root, dirs, files) in walkdir(source_path)
-                for file in files
-                    if file in target
-                        filter!(x->x != file,files)
-                        name = splitext(relpath(joinpath(root,file),source_path))
-                        push!(names, name)
-                        @info "$(name[1])$(name[2]) source code detected."
-                    end
+        names = []
+        for (root, dirs, files) in walkdir(source_path)
+            for file in files
+                if file in targets
+                    filter!(x->x != file,files)
+                    name = splitext(relpath(joinpath(root,file),source_path))
+                    push!(names, name)
+                    @info "$(name[1])$(name[2]) source code detected."
                 end
             end
-            succeeded = wait.(
-                [OutputCollector(`$FC -fopenmp -fPIC -c -O3 -o $name.o $name$ext`,verbose=verbose)
-                 for (name,ext) in names])
-            append!(names_succeeded, names[succeeded])
         end
+        succeeded = [isvalid(`$FC -fopenmp -fPIC -c -O3 -o $name.o $name$ext`)
+                     for (name,ext) in names]
 
         cmd = `$FC -o$(libdir)/$lib.$so -shared -fPIC -O3 -fopenmp`
-        append!(cmd.exec, ["$name.o" for (name,ext) in names_succeeded])
+        append!(cmd.exec, ["$name.o" for (name,ext) in names[succeeded]])
         append!(cmd.exec, with_metis.exec)
         append!(cmd.exec, with_blas.exec)
         
