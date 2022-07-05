@@ -40,7 +40,8 @@ function solve! end
 """
     is_supported(solver,T)
 
-Return `true` if `solver` supports the Float type `T`.
+Return `true` if `solver` supports the floating point
+number type `T`.
 
 # Examples
 ```julia-repl

@@ -95,8 +95,9 @@ struct ReducedKKTVector{T, VT<:AbstractVector{T}} <: AbstractKKTVector{T, VT}
     xl::VT # unsafe view
 end
 
-ReducedKKTVector(n::Int, m::Int, nlb::Int, nub::Int) = ReducedKKTVector(n, m)
-function ReducedKKTVector(x::VT, n::Int, m::Int) where {T, VT <: AbstractVector{T}}
+ReducedKKTVector{T,VT}(n::Int, m::Int, nlb::Int, nub::Int) where {T, VT <: AbstractVector{T}} = ReducedKKTVector{T,VT}(n, m)
+function ReducedKKTVector{T,VT}(n::Int, m::Int) where {T, VT <: AbstractVector{T}}
+    x = VT(undef, n + m)
     fill!(x, 0.0)
     # Wrap directly array x to avoid dealing with views
     xp = _madnlp_unsafe_wrap(x, n)
@@ -132,7 +133,8 @@ struct UnreducedKKTVector{T, VT<:AbstractVector{T}} <: AbstractKKTVector{T, VT}
     xzu::VT # unsafe view
 end
 
-function UnreducedKKTVector(values::VT, n::Int, m::Int, nlb::Int, nub::Int) where {T, VT <: AbstractVector{T}}
+function UnreducedKKTVector{T, VT}(n::Int, m::Int, nlb::Int, nub::Int) where {T, VT <: AbstractVector{T}}
+    values = VT(undef,n+m+nlp+nub)
     fill!(values, 0.0)
     # Wrap directly array x to avoid dealing with views
     x = _madnlp_unsafe_wrap(values, n + m) # Primal-Dual

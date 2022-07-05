@@ -63,7 +63,7 @@ function DenseDummyQP{T}(; n=100, m=10, fixed_variables=Int[], equality_cons=[])
     # Build QP problem 0.5 * x' * P * x + q' * x
     P = randn(T,n , n)
     P += P' # P is symmetric
-    P += 100.0 * I
+    P += T(100.0) * I
 
     q = randn(T,n)
 

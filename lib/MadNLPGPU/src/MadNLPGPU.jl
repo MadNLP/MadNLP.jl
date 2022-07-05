@@ -12,8 +12,9 @@ import .CUBLAS: handle, CUBLAS_DIAG_NON_UNIT,
 import KernelAbstractions: @kernel, @index, wait, Event
 import CUDAKernels: CUDADevice
 
+import MadNLP
 import MadNLP:
-    MadNLP, @kwdef, Logger, @debug, @warn, @error,
+    @kwdef, Logger, @debug, @warn, @error,
     AbstractOptions, AbstractLinearSolver, AbstractNLPModel, set_options!,
     SymbolicException,FactorizationException,SolveException,InertiaException,
     introduce, factorize!, solve!, improve!, is_inertia, inertia, tril_to_full!,

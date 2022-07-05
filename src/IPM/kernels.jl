@@ -311,7 +311,7 @@ function initialize_variables!(x,xl,xu,bound_push,bound_fac)
     end
 end
 
-function adjust_boundary!(x_lr::A,xl_r,x_ur,xu_r,mu) where {T, A <: AbstractArray{T}}
+function adjust_boundary!(x_lr::VT,xl_r,x_ur,xu_r,mu) where {T, VT <: AbstractVector{T}}
     adjusted = 0
     c1 = eps(T)*mu
     c2= eps(T)^(3/4)

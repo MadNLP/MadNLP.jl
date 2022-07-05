@@ -179,26 +179,26 @@ function InteriorPointSolver{T,KKTSystem}(nlp::AbstractNLPModel, opt::Options;
     aug_vec_length = is_reduced(kkt) ? n+m : n+m+nlb+nub
 
     if is_reduced(kkt)
-        _w1 =  ReducedKKTVector(similar(x,n+m), n, m)
-        _w2 =  ReducedKKTVector(similar(x,n+m), n, m)
-        _w3 =  ReducedKKTVector(similar(x,n+m), n, m)
-        _w4 =  ReducedKKTVector(similar(x,n+m), n, m)
+        _w1 =  ReducedKKTVector{T,typeof(x)}(n, m)
+        _w2 =  ReducedKKTVector{T,typeof(x)}(n, m)
+        _w3 =  ReducedKKTVector{T,typeof(x)}(n, m)
+        _w4 =  ReducedKKTVector{T,typeof(x)}(n, m)
     else
-        _w1 = UnreducedKKTVector(similar(x,n+m+nlb+nub), n, m, nlb, nub)
-        _w2 = UnreducedKKTVector(similar(x,n+m+nlb+nub), n, m, nlb, nub)
-        _w3 = UnreducedKKTVector(similar(x,n+m+nlb+nub), n, m, nlb, nub)
-        _w4 = UnreducedKKTVector(similar(x,n+m+nlb+nub), n, m, nlb, nub)
+        _w1 = UnreducedKKTVector{T,typeof(x)}(n, m, nlb, nub)
+        _w2 = UnreducedKKTVector{T,typeof(x)}(n, m, nlb, nub)
+        _w3 = UnreducedKKTVector{T,typeof(x)}(n, m, nlb, nub)
+        _w4 = UnreducedKKTVector{T,typeof(x)}(n, m, nlb, nub)
     end
 
     jacl = zeros(T,n) # spblas may throw an error if not initialized to zero
 
-    d = UnreducedKKTVector(similar(x,n+m+nlb+nub), n, m, nlb, nub)
+    d = UnreducedKKTVector{T,typeof(x)}(n, m, nlb, nub)
     dx_lr = view(d.xp, ind_cons.ind_lb) # TODO
     dx_ur = view(d.xp, ind_cons.ind_ub) # TODO
 
-    p = UnreducedKKTVector(similar(x,n+m+nlb+nub), n, m, nlb, nub)
+    p = UnreducedKKTVector{T,typeof(x)}(n, m, nlb, nub)
 
-    obj_scale = [1.0]
+    obj_scale = T[1.0]
     con_scale = ones(T,m)
     con_jac_scale = ones(T,n_jac)
 
