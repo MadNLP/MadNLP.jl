@@ -33,8 +33,8 @@ has_constraints(ips) = ips.m != 0
 
 # Print functions -----------------------------------------------------------
 function print_init(ips::AbstractInteriorPointSolver)
-    @notice(ips.logger,@sprintf("Number of nonzeros in constraint Jacobian............: %8i",get_nnzj(ips.nlp)))
-    @notice(ips.logger,@sprintf("Number of nonzeros in Lagrangian Hessian.............: %8i\n",get_nnzh(ips.nlp)))
+    @notice(ips.logger,@sprintf("Number of nonzeros in constraint Jacobian............: %8i",get_nnzj(ips.nlp.meta)))
+    @notice(ips.logger,@sprintf("Number of nonzeros in Lagrangian Hessian.............: %8i\n",get_nnzh(ips.nlp.meta)))
 
     num_fixed = length(ips.ind_fixed)
     num_var = get_nvar(ips.nlp) - num_fixed
@@ -119,8 +119,8 @@ function string(ips::AbstractInteriorPointSolver)
 
                 number of variables......................: $(get_nvar(ips.nlp))
                 number of constraints....................: $(get_ncon(ips.nlp))
-                number of nonzeros in lagrangian hessian.: $(get_nnzh(ips.nlp))
-                number of nonzeros in constraint jacobian: $(get_nnzj(ips.nlp))
+                number of nonzeros in lagrangian hessian.: $(get_nnzh(ips.nlp.meta))
+                number of nonzeros in constraint jacobian: $(get_nnzj(ips.nlp.meta))
                 status...................................: $(ips.status)
                 """
 end

@@ -166,12 +166,12 @@ function SparseKKTSystem{T, VT, MT}(nlp::AbstractNLPModel, ind_cons=get_index_co
     n = get_nvar(nlp) + n_slack
     m = get_ncon(nlp)
     # Evaluate sparsity pattern
-    jac_I = Vector{Int32}(undef, get_nnzj(nlp))
-    jac_J = Vector{Int32}(undef, get_nnzj(nlp))
+    jac_I = Vector{Int32}(undef, get_nnzj(nlp.meta))
+    jac_J = Vector{Int32}(undef, get_nnzj(nlp.meta))
     jac_structure!(nlp,jac_I, jac_J)
 
-    hess_I = Vector{Int32}(undef, get_nnzh(nlp))
-    hess_J = Vector{Int32}(undef, get_nnzh(nlp))
+    hess_I = Vector{Int32}(undef, get_nnzh(nlp.meta))
+    hess_J = Vector{Int32}(undef, get_nnzh(nlp.meta))
     hess_structure!(nlp,hess_I,hess_J)
 
     force_lower_triangular!(hess_I,hess_J)
@@ -275,12 +275,12 @@ function SparseUnreducedKKTSystem{T, VT, MT}(nlp::AbstractNLPModel, ind_cons=get
     n = get_nvar(nlp) + n_slack
     m = get_ncon(nlp)
     # Evaluate sparsity pattern
-    jac_I = Vector{Int32}(undef, get_nnzj(nlp))
-    jac_J = Vector{Int32}(undef, get_nnzj(nlp))
+    jac_I = Vector{Int32}(undef, get_nnzj(nlp.meta))
+    jac_J = Vector{Int32}(undef, get_nnzj(nlp.meta))
     jac_structure!(nlp,jac_I, jac_J)
 
-    hess_I = Vector{Int32}(undef, get_nnzh(nlp))
-    hess_J = Vector{Int32}(undef, get_nnzh(nlp))
+    hess_I = Vector{Int32}(undef, get_nnzh(nlp.meta))
+    hess_J = Vector{Int32}(undef, get_nnzh(nlp.meta))
     hess_structure!(nlp,hess_I,hess_J)
 
     force_lower_triangular!(hess_I,hess_J)
