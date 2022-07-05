@@ -35,8 +35,12 @@ testset = [
     ],
 ]
 
-# Test LapackGPU wrapper
-@testset "LapackGPU test" begin
+@testset "MadNLPGPU test" begin
+
+    MadNLPTests.test_linear_solver(LapackGPUSolver,Float32)
+    MadNLPTests.test_linear_solver(LapackGPUSolver,Float64)
+
+    # Test LapackGPU wrapper
     for (name,optimizer_constructor,exclude) in testset
         test_madnlp(name,optimizer_constructor,exclude)
     end
@@ -44,4 +48,3 @@ end
 
 # Test DenseKKTSystem on GPU
 include("densekkt_gpu.jl")
-

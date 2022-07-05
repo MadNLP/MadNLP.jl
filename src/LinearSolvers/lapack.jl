@@ -2,10 +2,10 @@
     lapack_algorithm::LinearFactorization = BUNCHKAUFMAN
 end
 
-mutable struct LapackCPUSolver <: AbstractLinearSolver
-    dense::Matrix{Float64}
-    fact::Matrix{Float64}
-    work::Vector{Float64}
+mutable struct LapackCPUSolver{T} <: AbstractLinearSolver{T}
+    dense::Matrix{T}
+    fact::Matrix{T}
+    work::Vector{T}
     lwork::BlasInt
     info::Ref{BlasInt}
     etc::Dict{Symbol,Any}
@@ -13,65 +13,79 @@ mutable struct LapackCPUSolver <: AbstractLinearSolver
     logger::Logger
 end
 
-sytrf(uplo,n,a,lda,ipiv,work,lwork,info)=ccall(
-    (@blasfunc(dsytrf_),libblas),
-    Cvoid,
-    (Ref{Cchar},Ref{BlasInt},Ptr{Cdouble},Ref{BlasInt},Ptr{BlasInt},Ptr{Cdouble},Ref{BlasInt},Ptr{BlasInt}),
-    uplo,n,a,lda,ipiv,work,lwork,info)
-sytrs(uplo,n,nrhs,a,lda,ipiv,b,ldb,info)=ccall(
-    (@blasfunc(dsytrs_),libblas),
-    Cvoid,
-    (Ref{Cchar},Ref{BlasInt},Ref{BlasInt},Ptr{Cdouble},Ref{BlasInt},Ptr{BlasInt},Ptr{Cdouble},Ref{BlasInt},Ptr{BlasInt}),
-    uplo,n,nrhs,a,lda,ipiv,b,ldb,info)
-getrf(m,n,a,lda,ipiv,info)=ccall(
-    (@blasfunc(dgetrf_),libblas),
-    Cvoid,
-    (Ref{BlasInt},Ref{BlasInt},Ptr{Cdouble},Ref{BlasInt},Ptr{BlasInt},Ptr{BlasInt}),
-    m,n,a,lda,ipiv,info)
-getrs(trans,n,nrhs,a,lda,ipiv,b,ldb,info)=ccall(
-    (@blasfunc(dgetrs_),libblas),
-    Cvoid,
-    (Ref{Cchar},Ref{BlasInt},Ref{BlasInt},Ptr{Cdouble},Ref{BlasInt},Ptr{BlasInt},Ptr{Cdouble},Ref{BlasInt},Ptr{BlasInt}),
-    trans,n,nrhs,a,lda,ipiv,b,ldb,info)
-geqrf(m,n,a,lda,tau,work,lwork,info)=ccall(
-    (@blasfunc(dgeqrf_),libblas),
-    Cvoid,
-    (Ref{BlasInt},Ref{BlasInt},Ptr{Cdouble},Ref{BlasInt},Ptr{Cdouble},Ptr{Cdouble},Ref{BlasInt},Ptr{BlasInt}),
-    m,n,a,lda,tau,work,lwork,info)
-ormqr(side,trans,m,n,k,a,lda,tau,c,ldc,work,lwork,info)=ccall(
-    (@blasfunc(dormqr_),libblas),
-    Cvoid,
-    (Ref{Cchar}, Ref{Cchar}, Ref{BlasInt}, Ref{BlasInt},Ref{BlasInt}, Ptr{Cdouble}, Ref{BlasInt}, Ptr{Cdouble},Ptr{Cdouble}, Ref{BlasInt}, Ptr{Cdouble}, Ref{BlasInt},Ptr{BlasInt}),
-    side,trans,m,n,k,a,lda,tau,c,ldc,work,lwork,info)
-trsm(side,uplo,transa,diag,m,n,alpha,a,lda,b,ldb)=ccall(
-    (@blasfunc(dtrsm_),libblas),
-    Cvoid,
-    (Ref{Cchar},Ref{Cchar},Ref{Cchar},Ref{Cchar},Ref{BlasInt},Ref{BlasInt},Ref{Cdouble},Ptr{Cdouble},Ref{BlasInt},Ptr{Cdouble},Ref{BlasInt}),
-    side,uplo,transa,diag,m,n,alpha,a,lda,b,ldb)
-potrf(uplo,n,a,lda,info)=ccall(
-    (@blasfunc(dpotrf_),libblas),
-    Cvoid,
-    (Ref{Cchar},Ref{BlasInt},Ptr{Cdouble},Ref{BlasInt},Ptr{BlasInt}),
-    uplo,n,a,lda,info)
-potrs(uplo,n,nrhs,a,lda,b,ldb,info)=ccall(
-    (@blasfunc(dpotrs_),libblas),
-    Cvoid,
-    (Ref{Cchar},Ref{BlasInt},Ref{BlasInt},Ptr{Cdouble},Ref{BlasInt},Ptr{Cdouble},Ref{BlasInt},Ptr{BlasInt}),
-    uplo,n,nrhs,a,lda,b,ldb,info)
 
-function LapackCPUSolver(dense::Matrix{Float64};
-                option_dict::Dict{Symbol,Any}=Dict{Symbol,Any}(),
-                opt=LapackOptions(),logger=Logger(),
-                kwargs...)
+for (sytrf,sytrs,getrf,getrs,geqrf,ormqr,trsm,potrf,potrs,typ) in (
+    (@blasfunc(dsytrf_), @blasfunc(dsytrs_), @blasfunc(dgetrf_), @blasfunc(dgetrs_),
+     @blasfunc(dgeqrf_), @blasfunc(dormqr_), @blasfunc(dtrsm_), @blasfunc(dpotrf_), @blasfunc(dpotrs_),
+     Float64),
+    (@blasfunc(ssytrf_), @blasfunc(ssytrs_), @blasfunc(sgetrf_), @blasfunc(sgetrs_),
+     @blasfunc(sgeqrf_), @blasfunc(sormqr_), @blasfunc(strsm_), @blasfunc(spotrf_), @blasfunc(spotrs_),
+     Float32)
+    )
+    @eval begin
+        sytrf(uplo,n,a::Matrix{$typ},lda,ipiv,work,lwork,info)=ccall(
+            ($(string(sytrf)),libblas),
+            Cvoid,
+            (Ref{Cchar},Ref{BlasInt},Ptr{$typ},Ref{BlasInt},Ptr{BlasInt},Ptr{$typ},Ref{BlasInt},Ptr{BlasInt}),
+            uplo,n,a,lda,ipiv,work,lwork,info)
+        sytrs(uplo,n,nrhs,a::Matrix{$typ},lda,ipiv,b,ldb,info)=ccall(
+            ($(string(sytrs)),libblas),
+            Cvoid,
+            (Ref{Cchar},Ref{BlasInt},Ref{BlasInt},Ptr{$typ},Ref{BlasInt},Ptr{BlasInt},Ptr{$typ},Ref{BlasInt},Ptr{BlasInt}),
+            uplo,n,nrhs,a,lda,ipiv,b,ldb,info)
+        getrf(m,n,a::Matrix{$typ},lda,ipiv,info)=ccall(
+            ($(string(getrf)),libblas),
+            Cvoid,
+            (Ref{BlasInt},Ref{BlasInt},Ptr{$typ},Ref{BlasInt},Ptr{BlasInt},Ptr{BlasInt}),
+            m,n,a,lda,ipiv,info)
+        getrs(trans,n,nrhs,a::Matrix{$typ},lda,ipiv,b,ldb,info)=ccall(
+            ($(string(getrs)),libblas),
+            Cvoid,
+            (Ref{Cchar},Ref{BlasInt},Ref{BlasInt},Ptr{$typ},Ref{BlasInt},Ptr{BlasInt},Ptr{$typ},Ref{BlasInt},Ptr{BlasInt}),
+            trans,n,nrhs,a,lda,ipiv,b,ldb,info)
+        geqrf(m,n,a::Matrix{$typ},lda,tau,work,lwork,info)=ccall(
+            ($(string(geqrf)),libblas),
+            Cvoid,
+            (Ref{BlasInt},Ref{BlasInt},Ptr{$typ},Ref{BlasInt},Ptr{$typ},Ptr{$typ},Ref{BlasInt},Ptr{BlasInt}),
+            m,n,a,lda,tau,work,lwork,info)
+        ormqr(side,trans,m,n,k,a::Matrix{$typ},lda,tau,c,ldc,work,lwork,info)=ccall(
+            ($(string(ormqr)),libblas),
+            Cvoid,
+            (Ref{Cchar}, Ref{Cchar}, Ref{BlasInt}, Ref{BlasInt},Ref{BlasInt}, Ptr{$typ}, Ref{BlasInt}, Ptr{$typ},Ptr{$typ}, Ref{BlasInt}, Ptr{$typ}, Ref{BlasInt},Ptr{BlasInt}),
+            side,trans,m,n,k,a,lda,tau,c,ldc,work,lwork,info)
+        trsm(side,uplo,transa,diag,m,n,alpha,a::Matrix{$typ},lda,b,ldb)=ccall(
+            ($(string(trsm)),libblas),
+            Cvoid,
+            (Ref{Cchar},Ref{Cchar},Ref{Cchar},Ref{Cchar},Ref{BlasInt},Ref{BlasInt},Ref{$typ},Ptr{$typ},Ref{BlasInt},Ptr{$typ},Ref{BlasInt}),
+            side,uplo,transa,diag,m,n,alpha,a,lda,b,ldb)
+        potrf(uplo,n,a::Matrix{$typ},lda,info)=ccall(
+            ($(string(potrf)),libblas),
+            Cvoid,
+            (Ref{Cchar},Ref{BlasInt},Ptr{$typ},Ref{BlasInt},Ptr{BlasInt}),
+            uplo,n,a,lda,info)
+        potrs(uplo,n,nrhs,a::Matrix{$typ},lda,b,ldb,info)=ccall(
+            ($(string(potrs)),libblas),
+            Cvoid,
+            (Ref{Cchar},Ref{BlasInt},Ref{BlasInt},Ptr{$typ},Ref{BlasInt},Ptr{$typ},Ref{BlasInt},Ptr{BlasInt}),
+            uplo,n,nrhs,a,lda,b,ldb,info)
+    end
+end
+
+function LapackCPUSolver(
+    dense::Matrix{T};
+    option_dict::Dict{Symbol,Any}=Dict{Symbol,Any}(),
+    opt=LapackOptions(),
+    logger=Logger(),
+    kwargs...) where T
 
     set_options!(opt,option_dict,kwargs...)
     fact = copy(dense)
 
     etc = Dict{Symbol,Any}()
-    work = Vector{Float64}(undef, 1)
+    work = Vector{T}(undef, 1)
     info=0
 
-    return LapackCPUSolver(dense,fact,work,-1,info,etc,opt,logger)
+    return LapackCPUSolver{T}(dense,fact,work,-1,info,etc,opt,logger)
 end
 
 function factorize!(M::LapackCPUSolver)
@@ -87,7 +101,7 @@ function factorize!(M::LapackCPUSolver)
         error(LOGGER,"Invalid lapack_algorithm")
     end
 end
-function solve!(M::LapackCPUSolver, x::Vector{Float64})
+function solve!(M::LapackCPUSolver{T}, x::Vector{T}) where T
     if M.opt.lapack_algorithm == BUNCHKAUFMAN
         solve_bunchkaufman!(M,x)
     elseif M.opt.lapack_algorithm == LU
@@ -133,9 +147,10 @@ function solve_lu!(M::LapackCPUSolver,x)
     return x
 end
 
-function factorize_qr!(M::LapackCPUSolver)
+
+function factorize_qr!(M::LapackCPUSolver{T}) where T
     size(M.fact,1) == 0 && return M
-    haskey(M.etc,:tau) || (M.etc[:tau] = Vector{Float64}(undef,size(M.dense,1)))
+    haskey(M.etc,:tau) || (M.etc[:tau] = Vector{T}(undef,size(M.dense,1)))
     tril_to_full!(M.dense)
     M.lwork = -1
     M.fact .= M.dense
@@ -218,3 +233,5 @@ function num_neg_ev(n,D,ipiv)
     return numneg
 end
 
+is_supported(::Type{LapackCPUSolver},::Type{Float32}) = true
+is_supported(::Type{LapackCPUSolver},::Type{Float64}) = true

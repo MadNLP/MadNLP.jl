@@ -10,7 +10,7 @@
 Abstract type for linear solver targeting
 the resolution of the linear system ``Ax=b``.
 """
-abstract type AbstractLinearSolver end
+abstract type AbstractLinearSolver{T} end
 
 """
     introduce(::AbstractLinearSolver)
@@ -38,6 +38,25 @@ factorized previously with [`factorize!`](@ref).
 function solve! end
 
 """
+    is_supported(solver,T)
+
+Return `true` if `solver` supports the floating point
+number type `T`.
+
+# Examples
+```julia-repl
+julia> is_supported(UmfpackSolver,Float64)
+true
+
+julia> is_supported(UmfpackSolver,Float32)
+false
+```
+"""
+function is_supported(::Type{LS},::Type{T}) where {LS <: AbstractLinearSolver, T <: AbstractFloat}
+    return false
+end
+
+"""
     is_inertia(::AbstractLinearSolver)
 
 Return `true` if the linear solver supports the
@@ -60,6 +79,7 @@ with
 """
 function inertia end
 
+
 function improve! end
 
 # Default function for AbstractKKTVector
@@ -70,7 +90,7 @@ end
 #=
     Iterator's interface
 =#
-abstract type AbstractIterator end
+abstract type AbstractIterator{T} end
 
 """
     solve_refine!(x, ::AbstractIterator, b)

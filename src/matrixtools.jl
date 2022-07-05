@@ -11,7 +11,7 @@ mutable struct SparseMatrixCOO{Tv,Ti<:Integer, VTv<:AbstractVector{Tv}} <: Abstr
     V::VTv
 end
 size(A::SparseMatrixCOO) = (A.m,A.n)
-getindex(A::SparseMatrixCOO{Float64,Ti},i::Int,j::Int) where Ti <: Integer = sum(A.V[(A.I.==i) .* (A.J.==j)])
+getindex(A::SparseMatrixCOO{Tv,Ti},i::Int,j::Int) where {Tv, Ti <: Integer} = sum(A.V[(A.I.==i) .* (A.J.==j)])
 nnz(A::SparseMatrixCOO) = length(A.I)
 
 function findIJ(S::SparseMatrixCSC{Tv,Ti}) where {Tv,Ti}

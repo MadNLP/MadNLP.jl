@@ -1,5 +1,5 @@
-const ma57_default_icntl = Int32[0,0,6,1,0,5,1,0,10,0,16,16,10,100,0,0,0,0,0,0]
-const ma57_default_cntl  = Float64[1e-8,1.0e-20,0.5,0.0,0.0]
+ma57_default_icntl() = Int32[0,0,6,1,0,5,1,0,10,0,16,16,10,100,0,0,0,0,0,0]
+ma57_default_cntl(T)  = T[1e-8,1.0e-20,0.5,0.0,0.0]
 
 @kwdef mutable struct Ma57Options <: AbstractOptions
     ma57_pivtol::Float64 = 1e-8
@@ -13,79 +13,87 @@ const ma57_default_cntl  = Float64[1e-8,1.0e-20,0.5,0.0,0.0]
     ma57_small_pivot_flag::Int = 0
 end
 
-mutable struct Ma57Solver <: AbstractLinearSolver
-    csc::SparseMatrixCSC{Float64,Int32}
+mutable struct Ma57Solver{T} <: AbstractLinearSolver{T}
+    csc::SparseMatrixCSC{T,Int32}
     I::Vector{Int32}
     J::Vector{Int32}
 
     icntl::Vector{Int32}
-    cntl::Vector{Float64}
+    cntl::Vector{T}
 
     info::Vector{Int32}
-    rinfo::Vector{Float64}
+    rinfo::Vector{T}
 
     lkeep::Int32
     keep::Vector{Int32}
 
     lfact::Int32
-    fact::Vector{Float64}
+    fact::Vector{T}
 
     lifact::Int32
     ifact::Vector{Int32}
 
     iwork::Vector{Int32}
     lwork::Int32
-    work::Vector{Float64}
+    work::Vector{T}
 
     opt::Ma57Options
     logger::Logger
 end
 
 
-ma57ad!(n::Cint,nz::Cint,I::Vector{Cint},J::Vector{Cint},lkeep::Cint,
-        keep::Vector{Cint},iwork::Vector{Cint},icntl::Vector{Cint},
-        info::Vector{Cint},rinfo::Vector{Cdouble}) = ccall(
-            (:ma57ad_,libhsl),
-            Nothing,
-            (Ref{Cint},Ref{Cint},Ptr{Cint},Ptr{Cint},Ref{Cint},
-             Ptr{Cint},Ptr{Cint},Ptr{Cint},
-             Ptr{Cint},Ptr{Cdouble}),
-            n,nz,I,J,lkeep,keep,iwork,icntl,info,rinfo)
+for (fa,fb,fc,typ) in (
+    (:ma57ad_, :ma57bd_, :ma57cd_, Float64),
+    (:ma57a_, :ma57b_, :ma57c_, Float32)
+    )
+    @eval begin
+        
+        ma57ad!(n::Cint,nz::Cint,I::Vector{Cint},J::Vector{Cint},lkeep::Cint,
+                keep::Vector{Cint},iwork::Vector{Cint},icntl::Vector{Cint},
+                info::Vector{Cint},rinfo::Vector{$typ}) = ccall(
+                    ($(string(fa)),libma57),
+                    Nothing,
+                    (Ref{Cint},Ref{Cint},Ptr{Cint},Ptr{Cint},Ref{Cint},
+                     Ptr{Cint},Ptr{Cint},Ptr{Cint},
+                     Ptr{Cint},Ptr{$typ}),
+                    n,nz,I,J,lkeep,keep,iwork,icntl,info,rinfo)
 
-ma57bd!(n::Cint,nz::Cint,V::Vector{Cdouble},fact::Vector{Cdouble},
-        lfact::Cint,ifact::Vector{Cint},lifact::Cint,lkeep::Cint,
-        keep::Vector{Cint},iwork::Vector{Cint},icntl::Vector{Cint},cntl::Vector{Cdouble},
-        info::Vector{Cint},rinfo::Vector{Cdouble}) = ccall(
-            (:ma57bd_,libhsl),
-            Nothing,
-            (Ref{Cint},Ref{Cint},Ptr{Cdouble},Ptr{Cdouble},
-             Ref{Cint},Ptr{Cint},Ref{Cint},Ref{Cint},
-             Ptr{Cint},Ptr{Cint},Ptr{Cint},Ptr{Cdouble},
-             Ptr{Cint},Ptr{Cdouble}),
-            n,nz,V,fact,lfact,ifact,lifact,lkeep,keep,iwork,icntl,cntl,info,rinfo)
+        ma57bd!(n::Cint,nz::Cint,V::Vector{$typ},fact::Vector{$typ},
+                lfact::Cint,ifact::Vector{Cint},lifact::Cint,lkeep::Cint,
+                keep::Vector{Cint},iwork::Vector{Cint},icntl::Vector{Cint},cntl::Vector{$typ},
+                info::Vector{Cint},rinfo::Vector{$typ}) = ccall(
+                    ($(string(fb)),libma57),
+                    Nothing,
+                    (Ref{Cint},Ref{Cint},Ptr{$typ},Ptr{$typ},
+                     Ref{Cint},Ptr{Cint},Ref{Cint},Ref{Cint},
+                     Ptr{Cint},Ptr{Cint},Ptr{Cint},Ptr{$typ},
+                     Ptr{Cint},Ptr{$typ}),
+                    n,nz,V,fact,lfact,ifact,lifact,lkeep,keep,iwork,icntl,cntl,info,rinfo)
 
-ma57cd!(job::Cint,n::Cint,fact::Vector{Cdouble},lfact::Cint,
-        ifact::Vector{Cint},lifact::Cint,nrhs::Cint,rhs::Vector{Cdouble},
-        lrhs::Cint,work::Vector{Cdouble},lwork::Cint,iwork::Vector{Cint},
-        icntl::Vector{Cint},info::Vector{Cint}) = ccall(
-            (:ma57cd_,libhsl),
-            Nothing,
-            (Ref{Cint},Ref{Cint},Ptr{Cdouble},Ref{Cint},
-             Ptr{Cint},Ref{Cint},Ref{Cint},Ptr{Cdouble},
-             Ref{Cint},Ptr{Cdouble},Ref{Cint},Ptr{Cint},
-             Ptr{Cint},Ptr{Cint}),
-            job,n,fact,lfact,ifact,lifact,nrhs,rhs,lrhs,work,lwork,iwork,icntl,info)
+        ma57cd!(job::Cint,n::Cint,fact::Vector{$typ},lfact::Cint,
+                ifact::Vector{Cint},lifact::Cint,nrhs::Cint,rhs::Vector{$typ},
+                lrhs::Cint,work::Vector{$typ},lwork::Cint,iwork::Vector{Cint},
+                icntl::Vector{Cint},info::Vector{Cint}) = ccall(
+                    ($(string(fc)),libma57),
+                    Nothing,
+                    (Ref{Cint},Ref{Cint},Ptr{$typ},Ref{Cint},
+                     Ptr{Cint},Ref{Cint},Ref{Cint},Ptr{$typ},
+                     Ref{Cint},Ptr{$typ},Ref{Cint},Ptr{Cint},
+                     Ptr{Cint},Ptr{Cint}),
+                    job,n,fact,lfact,ifact,lifact,nrhs,rhs,lrhs,work,lwork,iwork,icntl,info)
+    end
+end
 
-function Ma57Solver(csc::SparseMatrixCSC;
+function Ma57Solver(csc::SparseMatrixCSC{T};
                 option_dict::Dict{Symbol,Any}=Dict{Symbol,Any}(),
-                opt=Ma57Options(),logger=Logger(),kwargs...)
+                opt=Ma57Options(),logger=Logger(),kwargs...) where T
 
     set_options!(opt,option_dict,kwargs)
 
     I,J=findIJ(csc)
 
-    icntl= copy(ma57_default_icntl)
-    cntl = copy(ma57_default_cntl)
+    icntl= ma57_default_icntl()
+    cntl = ma57_default_cntl(T)
 
     cntl[1]=opt.ma57_pivtol
     icntl[1]=-1
@@ -97,7 +105,7 @@ function Ma57Solver(csc::SparseMatrixCSC;
     icntl[12]=opt.ma57_node_amalgamation
 
     info = Vector{Int32}(undef,40)
-    rinfo= Vector{Float64}(undef,20)
+    rinfo= Vector{T}(undef,20)
 
     lkeep=Int32(5*csc.n+nnz(csc)+max(csc.n,nnz(csc))+42)
     keep=Vector{Int32}(undef,lkeep)
@@ -111,11 +119,11 @@ function Ma57Solver(csc::SparseMatrixCSC;
     lfact = ceil(Int32,opt.ma57_pre_alloc*info[9])
     lifact = ceil(Int32,opt.ma57_pre_alloc*info[10])
 
-    fact = Vector{Float64}(undef,lfact)
+    fact = Vector{T}(undef,lfact)
     ifact= Vector{Int32}(undef,lifact)
     iwork= Vector{Int32}(undef,csc.n)
-    lwork= csc.n
-    work = Vector{Float64}(undef,lwork)
+    lwork= Int32(csc.n)
+    work = Vector{T}(undef,lwork)
 
     return Ma57Solver(csc,I,J,icntl,cntl,info,rinfo,lkeep,keep,lfact,fact,lifact,ifact,iwork,lwork,work,opt,logger)
 end
@@ -143,7 +151,7 @@ function factorize!(M::Ma57Solver)
     return M
 end
 
-function solve!(M::Ma57Solver,rhs::Vector{Float64})
+function solve!(M::Ma57Solver{T},rhs::Vector{T}) where T
     ma57cd!(one(Int32),Int32(M.csc.n),M.fact,M.lfact,M.ifact,
             M.lifact,one(Int32),rhs,Int32(M.csc.n),M.work,M.lwork,M.iwork,M.icntl,M.info)
     M.info[1]<0 && throw(SolveException())
@@ -166,3 +174,5 @@ end
 
 introduce(::Ma57Solver)="ma57"
 input_type(::Type{Ma57Solver}) = :csc
+is_supported(::Type{Ma57Solver},::Type{Float32}) = true
+is_supported(::Type{Ma57Solver},::Type{Float64}) = true

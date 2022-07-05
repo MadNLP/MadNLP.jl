@@ -1,7 +1,7 @@
 # MadNLP.jl
 # Created by Sungho Shin (sungho.shin@wisc.edu)
 
-struct RichardsonIterator{T, VT, KKT, LinSolver} <: AbstractIterator
+struct RichardsonIterator{T, VT, KKT, LinSolver <: AbstractLinearSolver{T}} <: AbstractIterator{T}
     linear_solver::LinSolver
     kkt::KKT
     residual::VT
@@ -11,11 +11,11 @@ struct RichardsonIterator{T, VT, KKT, LinSolver} <: AbstractIterator
     logger::Logger
 end
 function RichardsonIterator(
-    linear_solver::AbstractLinearSolver,
+    linear_solver::AbstractLinearSolver{T},
     kkt::AbstractKKTSystem,
     res::AbstractVector;
-    max_iter=10, tol=1e-10, acceptable_tol=1e-5, logger=Logger(),
-)
+    max_iter=10, tol=T(1e-10), acceptable_tol=T(1e-5), logger=Logger(),
+) where T
     return RichardsonIterator(
         linear_solver, kkt, res, max_iter, tol, acceptable_tol, logger,
     )
@@ -24,18 +24,18 @@ end
 # Solve reduced KKT system. Require only the primal/dual values.
 function solve_refine!(
     x::AbstractKKTVector{T, VT},
-    solver::RichardsonIterator{T, VT, KKT},
+    solver::RichardsonIterator{T, VT, KKT, LinSolver},
     b::AbstractKKTVector{T, VT},
-) where {T, VT, KKT<:AbstractReducedKKTSystem}
+) where {T, VT, KKT<:AbstractReducedKKTSystem, LinSolver}
     solve_refine!(primal_dual(x), solver, primal_dual(b))
 end
 
 # Solve unreduced KKT system. Require UnreducedKKTVector as inputs.
 function solve_refine!(
     x::UnreducedKKTVector{T, VT},
-    solver::RichardsonIterator{T, VT, KKT},
+    solver::RichardsonIterator{T, VT, KKT, LinSolver},
     b::UnreducedKKTVector{T, VT},
-) where {T, VT, KKT<:AbstractUnreducedKKTSystem}
+) where {T, VT, KKT<:AbstractUnreducedKKTSystem, LinSolver}
     solve_refine!(full(x), solver, full(b))
 end
 

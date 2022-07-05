@@ -10,7 +10,7 @@ import MadNLP:
     SymbolicException,FactorizationException,SolveException,InertiaException,
     AbstractOptions, AbstractLinearSolver, set_options!,
     introduce, factorize!, solve!, improve!, is_inertia, inertia, input_type,
-    blas_num_threads
+    blas_num_threads, is_supported
 import MKL_jll: libmkl_rt
 
 @isdefined(libpardiso) && include("pardiso.jl")

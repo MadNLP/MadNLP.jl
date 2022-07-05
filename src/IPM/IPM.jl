@@ -1,11 +1,11 @@
 # MadNLP.jl
 # Created by Sungho Shin (sungho.shin@wisc.edu)
 
-abstract type AbstractInteriorPointSolver end
+abstract type AbstractInteriorPointSolver{T} end
 
 include("restoration.jl")
 
-mutable struct InteriorPointSolver{KKTSystem} <: AbstractInteriorPointSolver
+mutable struct InteriorPointSolver{T,KKTSystem <: AbstractKKTSystem{T}} <: AbstractInteriorPointSolver{T}
     nlp::AbstractNLPModel
     kkt::KKTSystem
 
@@ -18,111 +18,113 @@ mutable struct InteriorPointSolver{KKTSystem} <: AbstractInteriorPointSolver
     nlb::Int
     nub::Int
 
-    x::Vector{Float64} # primal (after reformulation)
-    l::Vector{Float64} # dual
-    zl::Vector{Float64} # dual (after reformulation)
-    zu::Vector{Float64} # dual (after reformulation)
-    xl::Vector{Float64} # primal lower bound (after reformulation)
-    xu::Vector{Float64} # primal upper bound (after reformulation)
+    x::Vector{T} # primal (after reformulation)
+    l::Vector{T} # dual
+    zl::Vector{T} # dual (after reformulation)
+    zu::Vector{T} # dual (after reformulation)
+    xl::Vector{T} # primal lower bound (after reformulation)
+    xu::Vector{T} # primal upper bound (after reformulation)
 
-    obj_val::Float64
-    f::Vector{Float64}
-    c::Vector{Float64}
+    obj_val::T
+    f::Vector{T}
+    c::Vector{T}
 
-    jacl::Vector{Float64}
+    jacl::Vector{T}
 
-    d::UnreducedKKTVector{Float64, Vector{Float64}}
-    p::UnreducedKKTVector{Float64, Vector{Float64}}
+    d::UnreducedKKTVector{T, Vector{T}}
+    p::UnreducedKKTVector{T, Vector{T}}
 
-    _w1::AbstractKKTVector{Float64, Vector{Float64}}
-    _w2::AbstractKKTVector{Float64, Vector{Float64}}
+    _w1::AbstractKKTVector{T, Vector{T}}
+    _w2::AbstractKKTVector{T, Vector{T}}
 
-    _w3::AbstractKKTVector{Float64, Vector{Float64}}
-    _w4::AbstractKKTVector{Float64, Vector{Float64}}
+    _w3::AbstractKKTVector{T, Vector{T}}
+    _w4::AbstractKKTVector{T, Vector{T}}
 
-    x_trial::Vector{Float64}
-    c_trial::Vector{Float64}
-    obj_val_trial::Float64
+    x_trial::Vector{T}
+    c_trial::Vector{T}
+    obj_val_trial::T
 
-    x_slk::Vector{Float64}
-    c_slk::SubVector{Float64}
-    rhs::Vector{Float64}
+    x_slk::Vector{T}
+    c_slk::SubVector{T}
+    rhs::Vector{T}
 
     ind_ineq::Vector{Int}
     ind_fixed::Vector{Int}
     ind_llb::Vector{Int}
     ind_uub::Vector{Int}
 
-    x_lr::SubVector{Float64}
-    x_ur::SubVector{Float64}
-    xl_r::SubVector{Float64}
-    xu_r::SubVector{Float64}
-    zl_r::SubVector{Float64}
-    zu_r::SubVector{Float64}
+    x_lr::SubVector{T}
+    x_ur::SubVector{T}
+    xl_r::SubVector{T}
+    xu_r::SubVector{T}
+    zl_r::SubVector{T}
+    zu_r::SubVector{T}
 
-    dx_lr::SubVector{Float64}
-    dx_ur::SubVector{Float64}
-    x_trial_lr::SubVector{Float64}
-    x_trial_ur::SubVector{Float64}
+    dx_lr::SubVector{T}
+    dx_ur::SubVector{T}
+    x_trial_lr::SubVector{T}
+    x_trial_ur::SubVector{T}
 
-    linear_solver::AbstractLinearSolver
-    iterator::AbstractIterator
+    linear_solver::AbstractLinearSolver{T}
+    iterator::AbstractIterator{T}
 
-    obj_scale::Vector{Float64}
-    con_scale::Vector{Float64}
-    con_jac_scale::Vector{Float64}
-    inf_pr::Float64
-    inf_du::Float64
-    inf_compl::Float64
+    obj_scale::Vector{T}
+    con_scale::Vector{T}
+    con_jac_scale::Vector{T}
+    inf_pr::T
+    inf_du::T
+    inf_compl::T
 
-    theta_min::Float64
-    theta_max::Float64
-    mu::Float64
-    tau::Float64
+    theta_min::T
+    theta_max::T
+    mu::T
+    tau::T
 
-    alpha::Float64
-    alpha_z::Float64
+    alpha::T
+    alpha_z::T
     ftype::String
 
-    del_w::Float64
-    del_c::Float64
-    del_w_last::Float64
+    del_w::T
+    del_c::T
+    del_w_last::T
 
-    filter::Vector{Tuple{Float64,Float64}}
+    filter::Vector{Tuple{T,T}}
 
-    RR::Union{Nothing,RobustRestorer}
+    RR::Union{Nothing,RobustRestorer{T}}
     status::Status
     output::Dict
 end
 
-function InteriorPointSolver(nlp::AbstractNLPModel;
+function InteriorPointSolver(nlp::AbstractNLPModel{T};
     option_dict::Dict{Symbol,Any}=Dict{Symbol,Any}(), kwargs...
-)
+) where T
     opt = Options(linear_solver=default_linear_solver())
     set_options!(opt,option_dict,kwargs)
     check_option_sanity(opt)
+    
+    @assert is_supported(opt.linear_solver,T)
 
-    VT = Vector{Float64}
+    VT = Vector{T}
     KKTSystem = if opt.kkt_system == SPARSE_KKT_SYSTEM
-        MT = (input_type(opt.linear_solver) == :csc) ? SparseMatrixCSC{Float64, Int32} : Matrix{Float64}
-        SparseKKTSystem{Float64, VT, MT}
+        MT = (input_type(opt.linear_solver) == :csc) ? SparseMatrixCSC{T, Int32} : Matrix{T}
+        SparseKKTSystem{T, VT, MT}
     elseif opt.kkt_system == SPARSE_UNREDUCED_KKT_SYSTEM
-        MT = (input_type(opt.linear_solver) == :csc) ? SparseMatrixCSC{Float64, Int32} : Matrix{Float64}
-        SparseUnreducedKKTSystem{Float64, VT, MT}
+        MT = (input_type(opt.linear_solver) == :csc) ? SparseMatrixCSC{T, Int32} : Matrix{T}
+        SparseUnreducedKKTSystem{T, VT, MT}
     elseif opt.kkt_system == DENSE_KKT_SYSTEM
-        MT = Matrix{Float64}
-        DenseKKTSystem{Float64, VT, MT}
+        MT = Matrix{T}
+        DenseKKTSystem{T, VT, MT}
     elseif opt.kkt_system == DENSE_CONDENSED_KKT_SYSTEM
-        MT = Matrix{Float64}
-        DenseCondensedKKTSystem{Float64, VT, MT}
+        MT = Matrix{T}
+        DenseCondensedKKTSystem{T, VT, MT}
     end
-    return InteriorPointSolver{KKTSystem}(nlp, opt; option_linear_solver=option_dict)
+    return InteriorPointSolver{T,KKTSystem}(nlp, opt; option_linear_solver=option_dict)
 end
 
 # Inner constructor
-function InteriorPointSolver{KKTSystem}(nlp::AbstractNLPModel, opt::Options;
+function InteriorPointSolver{T,KKTSystem}(nlp::AbstractNLPModel, opt::Options;
     option_linear_solver::Dict{Symbol,Any}=Dict{Symbol,Any}(),
-) where {KKTSystem<:AbstractKKTSystem}
+) where {T, KKTSystem<:AbstractKKTSystem{T}}
     cnt = Counters(start_time=time())
 
     logger = Logger(print_level=opt.print_level,file_print_level=opt.file_print_level,
@@ -145,21 +147,21 @@ function InteriorPointSolver{KKTSystem}(nlp::AbstractNLPModel, opt::Options;
 
     xl = [get_lvar(nlp);view(get_lcon(nlp),ind_cons.ind_ineq)]
     xu = [get_uvar(nlp);view(get_ucon(nlp),ind_cons.ind_ineq)]
-    x = [get_x0(nlp);zeros(ns)]
+    x = [get_x0(nlp);zeros(T,ns)]
     l = copy(get_y0(nlp))
-    zl= zeros(get_nvar(nlp)+ns)
-    zu= zeros(get_nvar(nlp)+ns)
+    zl= zeros(T,get_nvar(nlp)+ns)
+    zu= zeros(T,get_nvar(nlp)+ns)
 
-    f = zeros(n) # not sure why, but seems necessary to initialize to 0 when used with Plasmo interface
-    c = zeros(m)
+    f = zeros(T,n) # not sure why, but seems necessary to initialize to 0 when used with Plasmo interface
+    c = zeros(T,m)
 
     n_jac = nnz_jacobian(kkt)
 
     nlb = length(ind_cons.ind_lb)
     nub = length(ind_cons.ind_ub)
 
-    x_trial=Vector{Float64}(undef,n)
-    c_trial=Vector{Float64}(undef,m)
+    x_trial=Vector{T}(undef,n)
+    c_trial=Vector{T}(undef,m)
 
     x_slk= _madnlp_unsafe_wrap(x,ns, get_nvar(nlp)+1)
     c_slk= view(c,ind_cons.ind_ineq)
@@ -174,24 +176,29 @@ function InteriorPointSolver{KKTSystem}(nlp::AbstractNLPModel, opt::Options;
     x_trial_lr = view(x_trial, ind_cons.ind_lb)
     x_trial_ur = view(x_trial, ind_cons.ind_ub)
 
-    aug_vec_length = is_reduced(kkt) ? n+m : n+m+nlb+nub
+    if is_reduced(kkt)
+        _w1 =  ReducedKKTVector{T,typeof(x)}(n, m)
+        _w2 =  ReducedKKTVector{T,typeof(x)}(n, m)
+        _w3 =  ReducedKKTVector{T,typeof(x)}(n, m)
+        _w4 =  ReducedKKTVector{T,typeof(x)}(n, m)
+    else
+        _w1 = UnreducedKKTVector{T,typeof(x)}(n, m, nlb, nub)
+        _w2 = UnreducedKKTVector{T,typeof(x)}(n, m, nlb, nub)
+        _w3 = UnreducedKKTVector{T,typeof(x)}(n, m, nlb, nub)
+        _w4 = UnreducedKKTVector{T,typeof(x)}(n, m, nlb, nub)
+    end
 
-    _w1 = is_reduced(kkt) ? ReducedKKTVector(n, m) : UnreducedKKTVector(n, m, nlb, nub)
-    _w2 = is_reduced(kkt) ? ReducedKKTVector(n, m) : UnreducedKKTVector(n, m, nlb, nub)
-    _w3 = is_reduced(kkt) ? ReducedKKTVector(n, m) : UnreducedKKTVector(n, m, nlb, nub)
-    _w4 = is_reduced(kkt) ? ReducedKKTVector(n, m) : UnreducedKKTVector(n, m, nlb, nub)
+    jacl = zeros(T,n) # spblas may throw an error if not initialized to zero
 
-    jacl = zeros(n) # spblas may throw an error if not initialized to zero
-
-    d = UnreducedKKTVector(n, m, nlb, nub)
+    d = UnreducedKKTVector{T,typeof(x)}(n, m, nlb, nub)
     dx_lr = view(d.xp, ind_cons.ind_lb) # TODO
     dx_ur = view(d.xp, ind_cons.ind_ub) # TODO
 
-    p = UnreducedKKTVector(n, m, nlb, nub)
+    p = UnreducedKKTVector{T,typeof(x)}(n, m, nlb, nub)
 
-    obj_scale = [1.0]
-    con_scale = ones(m)
-    con_jac_scale = ones(n_jac)
+    obj_scale = T[1.0]
+    con_scale = ones(T,m)
+    con_jac_scale = ones(T,n_jac)
 
     @trace(logger,"Initializing linear solver.")
     cnt.linear_solver_time =
@@ -210,7 +217,7 @@ function InteriorPointSolver{KKTSystem}(nlp::AbstractNLPModel, opt::Options;
 
     !isempty(option_linear_solver) && print_ignored_options(logger, option_linear_solver)
 
-    return InteriorPointSolver{KKTSystem}(nlp,kkt,opt,cnt,logger,
+    return InteriorPointSolver{T,KKTSystem}(nlp,kkt,opt,cnt,logger,
         n,m,nlb,nub,x,l,zl,zu,xl,xu,0.,f,c,
         jacl,
         d, p,
@@ -221,7 +228,7 @@ function InteriorPointSolver{KKTSystem}(nlp::AbstractNLPModel, opt::Options;
         linear_solver,iterator,
         obj_scale,con_scale,con_jac_scale,
         0.,0.,0.,0.,0.,0.,0.,0.,0.," ",0.,0.,0.,
-        Vector{Float64}[],nothing,INITIAL,Dict(),
+        Vector{T}[],nothing,INITIAL,Dict(),
     )
 end
 

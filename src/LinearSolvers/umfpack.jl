@@ -9,48 +9,61 @@ const umfpack_default_info = copy(UMFPACK.umf_info)
     umfpack_strategy::Float64 = 2.
 end
 
-mutable struct UmfpackSolver <: AbstractLinearSolver
+mutable struct UmfpackSolver{T} <: AbstractLinearSolver{T}
     inner::UMFPACK.UmfpackLU
-    tril::SparseMatrixCSC{Float64}
-    full::SparseMatrixCSC{Float64}
-    tril_to_full_view::SubVector{Float64}
+    tril::SparseMatrixCSC{T}
+    full::SparseMatrixCSC{T}
+    tril_to_full_view::SubVector{T}
 
-    p::Vector{Float64}
+    p::Vector{T}
 
     tmp::Vector{Ptr{Cvoid}}
-    ctrl::Vector{Float64}
-    info::Vector{Float64}
+    ctrl::Vector{T}
+    info::Vector{T}
 
     opt::UmfpackOptions
     logger::Logger
 end
 
-umfpack_di_numeric(colptr::Vector{Int32},rowval::Vector{Int32},
-                   nzval::Vector{Float64},symbolic::Ptr{Nothing},
-                   tmp::Vector{Ptr{Nothing}},ctrl::Vector{Float64},
-                   info::Vector{Float64}) = ccall(
-                       (:umfpack_di_numeric,:libumfpack),
-                       Int32,
-                       (Ptr{Int32},Ptr{Int32},Ptr{Float64},Ptr{Cvoid},Ptr{Cvoid},
-                        Ptr{Float64},Ptr{Float64}),
-                       colptr,rowval,nzval,symbolic,tmp,ctrl,info)
-umfpack_di_solve(typ,colptr,rowval,nzval,x,b,numeric,ctrl,info) = ccall(
-    (:umfpack_di_solve,:libumfpack),
-    Int32,
-    (Int32, Ptr{Int32}, Ptr{Int32}, Ptr{Float64},Ptr{Float64},
-     Ptr{Float64}, Ptr{Cvoid}, Ptr{Float64},Ptr{Float64}),
-    typ,colptr,rowval,nzval,x,b,numeric,ctrl,info)
+
+for (numeric,solve,T) in (
+    (:umfpack_di_numeric, :umfpack_di_solve, Float64),
+    (:umfpack_si_numeric, :umfpack_si_solve, Float32),
+    )
+    @eval begin 
+        umfpack_numeric(
+            colptr::Vector{Int32},rowval::Vector{Int32},
+            nzval::Vector{$T},symbolic::Ptr{Nothing},
+            tmp::Vector{Ptr{Nothing}},ctrl::Vector{$T},
+            info::Vector{$T}) = ccall(
+                ($(string(numeric)),:libumfpack),
+                Int32,
+                (Ptr{Int32},Ptr{Int32},Ptr{$T},Ptr{Cvoid},Ptr{Cvoid},
+                 Ptr{$T},Ptr{$T}),
+                colptr,rowval,nzval,symbolic,tmp,ctrl,info)
+        umfpack_solve(
+            typ,colptr::Vector{Int32},rowval::Vector{Int32},
+            nzval::Vector{$T},x::Vector{$T},b::Vector{$T},
+            numeric,ctrl::Vector{$T},info::Vector{$T}) = ccall(
+                ($(string(solve)),:libumfpack),
+                Int32,
+                (Int32, Ptr{Int32}, Ptr{Int32}, Ptr{$T},Ptr{$T},
+                 Ptr{$T}, Ptr{Cvoid}, Ptr{$T},Ptr{$T}),
+                typ,colptr,rowval,nzval,x,b,numeric,ctrl,info)
+    end
+end
 
 
 
-function UmfpackSolver(csc::SparseMatrixCSC;
+function UmfpackSolver(
+    csc::SparseMatrixCSC{T};
     option_dict::Dict{Symbol,Any}=Dict{Symbol,Any}(),
     opt=UmfpackOptions(),logger=Logger(),
-    kwargs...)
+    kwargs...) where T
 
     set_options!(opt,option_dict,kwargs)
 
-    p = Vector{Float64}(undef,csc.n)
+    p = Vector{T}(undef,csc.n)
     full,tril_to_full_view = get_tril_to_full(csc)
 
     full.colptr.-=1; full.rowval.-=1
@@ -73,14 +86,14 @@ end
 function factorize!(M::UmfpackSolver)
     UMFPACK.umfpack_free_numeric(M.inner)
     M.full.nzval.=M.tril_to_full_view
-    status = umfpack_di_numeric(M.inner.colptr,M.inner.rowval,M.inner.nzval,M.inner.symbolic,M.tmp,M.ctrl,M.info)
+    status = umfpack_numeric(M.inner.colptr,M.inner.rowval,M.inner.nzval,M.inner.symbolic,M.tmp,M.ctrl,M.info)
     M.inner.numeric = M.tmp[]
 
     M.inner.status = status
     return M
 end
-function solve!(M::UmfpackSolver,rhs::Vector{Float64})
-    status = umfpack_di_solve(1,M.inner.colptr,M.inner.rowval,M.inner.nzval,M.p,rhs,M.inner.numeric,M.ctrl,M.info)
+function solve!(M::UmfpackSolver{T},rhs::Vector{T}) where T
+    status = umfpack_solve(1,M.inner.colptr,M.inner.rowval,M.inner.nzval,M.p,rhs,M.inner.numeric,M.ctrl,M.info)
     rhs .= M.p
     return rhs
 end
@@ -100,4 +113,4 @@ function improve!(M::UmfpackSolver)
     return false
 end
 introduce(::UmfpackSolver)="umfpack"
-
+is_supported(::Type{UmfpackSolver},::Type{Float64}) = true

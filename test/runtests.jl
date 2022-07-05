@@ -1,6 +1,5 @@
 using Test, MadNLP, MadNLPTests, MINLPTests
 import MathOptInterface
-# import AmplNLReader: AmplModel
 import SparseArrays: sparse
 
 @testset "MadNLP test" begin
@@ -11,11 +10,6 @@ import SparseArrays: sparse
     @testset "MOI interface" begin
         include("MOI_interface_test.jl")
     end
-
-    # this is temporarily commented out due to the incompatibility between NLPModels v0.17.2 and AmplNLReader v0.11.0
-    # @testset "NLPModels interface" begin
-    #     include("nlpmodels_test.jl")
-    # end
 
     @testset "MadNLP test" begin
         include("madnlp_test.jl")

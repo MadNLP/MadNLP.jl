@@ -8,15 +8,15 @@
     pardiso_log_level::String = ""
 end
 
-mutable struct PardisoSolver <: AbstractLinearSolver
+mutable struct PardisoSolver{T} <: AbstractLinearSolver{T}
     pt::Vector{Int}
     iparm::Vector{Int32}
-    dparm::Vector{Float64}
+    dparm::Vector{T}
     perm::Vector{Int32}
     msglvl::Ref{Int32}
     err::Ref{Int32}
-    csc::SparseMatrixCSC{Float64,Int32}
-    w::Vector{Float64}
+    csc::SparseMatrixCSC{T,Int32}
+    w::Vector{T}
     opt::PardisoOptions
     logger::Logger
 end
@@ -41,18 +41,18 @@ _pardiso(
              Ptr{Cint},Ptr{Cint},Ptr{Cint},Ptr{Cdouble},Ptr{Cdouble},Ptr{Cint},Ptr{Cdouble}),
             pt,maxfct,mnum,mtype,phase,n,a,ia,ja,perm,nrhs,iparm,msglvl,b,x,err,dparm)
 
-function PardisoSolver(csc::SparseMatrixCSC{Float64,Int32};
+function PardisoSolver(csc::SparseMatrixCSC{T,Int32};
                 opt=PardisoOptions(),logger=Logger(),
                 option_dict::Dict{Symbol,Any}=Dict{Symbol,Any}(),
-                kwargs...)
+                kwargs...) where T
     !isempty(kwargs) && (for (key,val) in kwargs; option_dict[key]=val; end)
     set_options!(opt,option_dict)
 
-    w   = Vector{Float64}(undef,csc.n)
+    w   = Vector{T}(undef,csc.n)
 
     pt = Vector{Int}(undef,64)
     iparm = Vector{Int32}(undef,64)
-    dparm = Vector{Float64}(undef,64)
+    dparm = Vector{T}(undef,64)
     perm = Vector{Int32}(undef,csc.n)
     msglvl = Ref{Int32}(0)
     err = Ref{Int32}(0)
@@ -74,41 +74,42 @@ function PardisoSolver(csc::SparseMatrixCSC{Float64,Int32};
     iparm[21]=3 # bunch-kaufman pivotin
     iparm[24]=1 # parallel factorization
     iparm[25]=1 # parallel solv
+    iparm[29]= T == Float64 ? 0 : 1
 
     _pardiso(pt,Ref{Int32}(1),Ref{Int32}(1),Ref{Int32}(-2),Ref{Int32}(11),
              Ref{Int32}(csc.n),csc.nzval,csc.colptr,csc.rowval,perm,
-             Ref{Int32}(1),iparm,msglvl,Float64[],Float64[],err,dparm)
+             Ref{Int32}(1),iparm,msglvl,T[],T[],err,dparm)
     err.x < 0  && throw(SymbolicException())
 
-    M = PardisoSolver(pt,iparm,dparm,perm,msglvl,err,csc,w,opt,logger)
+    M = PardisoSolver{T}(pt,iparm,dparm,perm,msglvl,err,csc,w,opt,logger)
 
     finalizer(finalize,M)
 
     return M
 end
-function factorize!(M::PardisoSolver)
+function factorize!(M::PardisoSolver{T}) where T
     _pardiso(M.pt,Ref{Int32}(1),Ref{Int32}(1),Ref{Int32}(-2),Ref{Int32}(22),
              Ref{Int32}(M.csc.n),M.csc.nzval,M.csc.colptr,M.csc.rowval,M.perm,
-             Ref{Int32}(1),M.iparm,M.msglvl,Float64[],Float64[],M.err,M.dparm)
+             Ref{Int32}(1),M.iparm,M.msglvl,T[],T[],M.err,M.dparm)
     M.err.x < 0  && throw(FactorizationException())
     M.iparm[14] == 0 && return M
     _pardiso(M.pt,Ref{Int32}(1),Ref{Int32}(1),Ref{Int32}(-2),Ref{Int32}(12),
              Ref{Int32}(M.csc.n),M.csc.nzval,M.csc.colptr,M.csc.rowval,M.perm,
-             Ref{Int32}(1),M.iparm,M.msglvl,Float64[],Float64[],M.err,M.dparm)
+             Ref{Int32}(1),M.iparm,M.msglvl,T[],T[],M.err,M.dparm)
     M.err.x < 0  && throw(FactorizationException())
     return M
 end
-function solve!(M::PardisoSolver,rhs::Vector{Float64})
+function solve!(M::PardisoSolver{T},rhs::Vector{T}) where T
     _pardiso(M.pt,Ref{Int32}(1),Ref{Int32}(1),Ref{Int32}(-2),Ref{Int32}(33),
              Ref{Int32}(M.csc.n),M.csc.nzval,M.csc.colptr,M.csc.rowval,M.perm,
              Ref{Int32}(1),M.iparm,M.msglvl,rhs,M.w,M.err,M.dparm)
     M.err.x < 0  && throw(SolveException())
     return rhs
 end
-function finalize(M::PardisoSolver)
+function finalize(M::PardisoSolver{T}) where T
     _pardiso(M.pt,Ref{Int32}(1),Ref{Int32}(1),Ref{Int32}(-2),Ref{Int32}(-1),
              Ref{Int32}(M.csc.n),M.csc.nzval,M.csc.colptr,M.csc.rowval,M.perm,
-             Ref{Int32}(1),M.iparm,M.msglvl,Float64[],M.w,M.err,M.dparm)
+             Ref{Int32}(1),M.iparm,M.msglvl,T[],M.w,M.err,M.dparm)
 end
 is_inertia(::PardisoSolver)=true
 function inertia(M::PardisoSolver)
@@ -123,3 +124,5 @@ end
 
 introduce(::PardisoSolver)="pardiso"
 input_type(::Type{PardisoSolver}) = :csc
+is_supported(::Type{PardisoSolver},::Type{Float32}) = true
+is_supported(::Type{PardisoSolver},::Type{Float64}) = true

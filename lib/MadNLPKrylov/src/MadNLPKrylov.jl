@@ -30,28 +30,28 @@ struct VirtualPreconditioner
 end
 ldiv!(Pl::VirtualPreconditioner,x::Vector{Float64}) = Pl.ldiv!(x)
 
-mutable struct KrylovIterator <: AbstractIterator
+mutable struct KrylovIterator{T} <: AbstractIterator{T}
     g::Union{Nothing,GMRESIterable}
-    res::Vector{Float64}
+    res::Vector{T}
     opt::KrylovOptions
     logger::Logger
 end
 
-function KrylovIterator(res::Vector{Float64},_mul!,_ldiv!;
+function KrylovIterator(res::Vector{T},_mul!,_ldiv!;
                 opt=KrylovOptions(),logger=Logger(),
-                option_dict::Dict{Symbol,Any}=Dict{Symbol,Any}(),kwargs...)
+                option_dict::Dict{Symbol,Any}=Dict{Symbol,Any}(),kwargs...) where T
     !isempty(kwargs) && (for (key,val) in kwargs; option_dict[key]=val; end)
     set_options!(opt,option_dict)
 
     g = GMRESIterable(VirtualPreconditioner(_ldiv!),
-                      Identity(),Float64[],Float64[],res,
-                      ArnoldiDecomp(VirtualMatrix(_mul!,length(res),length(res)),opt.krylov_restart, Float64),
-                      Residual(opt.krylov_restart, Float64),
+                      Identity(),T[],T[],res,
+                      ArnoldiDecomp(VirtualMatrix(_mul!,length(res),length(res)),opt.krylov_restart, T),
+                      Residual(opt.krylov_restart, T),
                       0,opt.krylov_restart,1,
                       opt.krylov_max_iter,opt.krylov_tol,0.,
                       ModifiedGramSchmidt())
 
-    return KrylovIterator(g,res,opt,logger)
+    return KrylovIterator{T}(g,res,opt,logger)
 end
 
 function solve_refine!(x::StridedVector{Float64},

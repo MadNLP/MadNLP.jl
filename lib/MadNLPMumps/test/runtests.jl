@@ -11,7 +11,8 @@ testset = [
 ]
 
 @testset "MadNLPMumps test" begin
-    MadNLPTests.test_linear_solver(MadNLPMumps.MumpsSolver)
+    MadNLPTests.test_linear_solver(MadNLPMumps.MumpsSolver,Float32)
+    MadNLPTests.test_linear_solver(MadNLPMumps.MumpsSolver,Float64)
     for (name,optimizer_constructor,exclude) in testset
         test_madnlp(name,optimizer_constructor,exclude)
     end

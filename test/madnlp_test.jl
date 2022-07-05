@@ -70,6 +70,7 @@ testset = [
     ],
 ]
 
+
 for (name,optimizer_constructor,exclude) in testset
     test_madnlp(name,optimizer_constructor,exclude)
 end
