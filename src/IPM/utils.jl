@@ -9,7 +9,7 @@ struct MadNLPExecutionStats{T} <: AbstractExecutionStats
     multipliers_L::Vector{T}
     multipliers_U::Vector{T}
     iter::Int
-    counters::NLPModelsCounters
+    counters::NLPModels.Counters
     elapsed_time::Real
 end
 
@@ -24,8 +24,11 @@ MadNLPExecutionStats(ips::InteriorPointSolver) =MadNLPExecutionStats(
     ips.l,
     _madnlp_unsafe_wrap(ips.zl, get_nvar(ips.nlp)),
     _madnlp_unsafe_wrap(ips.zu, get_nvar(ips.nlp)),
-    ips.cnt.k, ips.nlp.counters,ips.cnt.total_time
+    ips.cnt.k, get_counters(ips.nlp),ips.cnt.total_time
 )
+
+get_counters(nlp::NLPModels.AbstractNLPModel) = nlp.counters
+get_counters(nlp::NLPModels.AbstractNLSModel) = nlp.counters.counters
 getStatus(result::MadNLPExecutionStats) = STATUS_OUTPUT_DICT[result.status]
 
 # Utilities
