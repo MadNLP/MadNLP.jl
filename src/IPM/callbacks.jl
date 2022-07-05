@@ -52,7 +52,7 @@ function eval_jac_wrapper!(ipp::InteriorPointSolver, kkt::AbstractKKTSystem, x::
     @trace(ipp.logger, "Evaluating constraint Jacobian.")
     jac = get_jacobian(kkt)
     x_nlpmodel = _madnlp_unsafe_wrap(x, get_nvar(nlp))
-    jac_nlpmodel = _madnlp_unsafe_wrap(jac, get_nnzj(nlp))
+    jac_nlpmodel = _madnlp_unsafe_wrap(jac, get_nnzj(nlp.meta))
     cnt.eval_function_time += @elapsed jac_coord!(
         nlp,
         x_nlpmodel, 
@@ -72,7 +72,7 @@ function eval_lag_hess_wrapper!(ipp::InteriorPointSolver, kkt::AbstractKKTSystem
     dual(ipp._w1) .= l.*ipp.con_scale
     hess = get_hessian(kkt)
     x_nlpmodel = _madnlp_unsafe_wrap(x, get_nvar(nlp))
-    hess_nlpmodel = _madnlp_unsafe_wrap(hess, get_nnzh(nlp))
+    hess_nlpmodel = _madnlp_unsafe_wrap(hess, get_nnzh(nlp.meta))
     cnt.eval_function_time += @elapsed hess_coord!(
         nlp,
         x_nlpmodel,

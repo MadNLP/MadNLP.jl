@@ -85,3 +85,14 @@ end
     @test ips.status == MadNLP.SOLVE_SUCCEEDED
 end
 
+
+@testset "NLS problem" begin
+    options = Dict{Symbol, Any}(
+        :print_level=>MadNLP.ERROR,
+    )
+    nlp = MadNLPTests.NLSModel()
+    ips = MadNLP.InteriorPointSolver(nlp; option_dict=options)
+    MadNLP.optimize!(ips)
+    @test ips.status == MadNLP.SOLVE_SUCCEEDED
+end
+
