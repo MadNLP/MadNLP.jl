@@ -176,8 +176,6 @@ function InteriorPointSolver{T,KKTSystem}(nlp::AbstractNLPModel, opt::Options;
     x_trial_lr = view(x_trial, ind_cons.ind_lb)
     x_trial_ur = view(x_trial, ind_cons.ind_ub)
 
-    aug_vec_length = is_reduced(kkt) ? n+m : n+m+nlb+nub
-
     if is_reduced(kkt)
         _w1 =  ReducedKKTVector{T,typeof(x)}(n, m)
         _w2 =  ReducedKKTVector{T,typeof(x)}(n, m)
