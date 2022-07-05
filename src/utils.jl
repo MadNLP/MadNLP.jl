@@ -4,11 +4,11 @@ abstract type AbstractOptions end
 """
 TODO
 """
-default_linear_solver() = MadNLPUmfpack
+default_linear_solver() = UmfpackSolver
 """
 TODO
 """
-default_dense_solver() = MadNLPLapackCPU
+default_dense_solver() = LapackCPUSolver
 
 # Logger
 """

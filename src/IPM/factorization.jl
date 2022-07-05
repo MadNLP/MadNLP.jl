@@ -60,7 +60,7 @@ function solve_refine_wrapper!(
     n_condensed = n + n_eq
 
     # load buffers
-    b_c = unsafe_wrapper(full(ips._w1), 1:n_condensed)
+    b_c = view(full(ips._w1), 1:n_condensed)
     x_c = view(full(ips._w2), 1:n_condensed)
     jv_x = view(full(ips._w3), 1:ns) # for jprod
     jv_t = primal(ips._w4)             # for jtprod
