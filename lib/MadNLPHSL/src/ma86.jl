@@ -1,21 +1,4 @@
-# MadNLP.jl
-# Created by Sungho Shin (sungho.shin@wisc.edu)
-
-module MadNLPMa86
-
-import ..MadNLPHSL:
-    @kwdef, Logger, @debug, @warn, @error, libhsl,
-    SparseMatrixCSC, SubVector, StrideOneVector,
-    SymbolicException,FactorizationException,SolveException,InertiaException,
-    AbstractOptions, AbstractLinearSolver, set_options!,
-    introduce, factorize!, solve!, improve!, is_inertia, inertia
-import ..MadNLPHSL: Mc68
-
-const INPUT_MATRIX_TYPE = :csc
-@enum(Ordering::Int,AMD = 1, METIS = 3)
-@enum(Scaling::Int,SCALING_NONE = 0, MC64 = 1, MC77 = 2)
-
-@kwdef mutable struct Options <: AbstractOptions
+@kwdef mutable struct Ma86Options <: AbstractOptions
     ma86_num_threads::Int = 1
     ma86_print_level::Float64 = -1
     ma86_nemin::Int = 32
@@ -27,7 +10,7 @@ const INPUT_MATRIX_TYPE = :csc
     ma86_umax::Float64 = 1e-4
 end
 
-@kwdef mutable struct Control
+@kwdef mutable struct Ma86Control{T}
     f_arrays::Int32 = 0
     diagnostics_level::Int32 = 0
     unit_diagnostics::Int32 = 0
@@ -38,15 +21,15 @@ end
     action::Int32 = 0
     nbi::Int32 = 0
     pool_size::Int32 = 0
-    small::Float64 = 0.
-    static::Float64 = 0.
-    u::Float64 = 0.
-    umin::Float64 = 0.
+    small::T = 0.
+    static::T = 0.
+    u::T = 0.
+    umin::T = 0.
     scaling::Int32 = 0
 end
 
-@kwdef mutable struct Info
-    detlog::Float64 = 0.
+@kwdef mutable struct Ma86Info{T}
+    detlog::T = 0.
     detsign::Int32 = 0
     flag::Int32 = 0
     matrix_rank::Int32 = 0
@@ -61,71 +44,95 @@ end
     num_two::Int32 = 0
     pool_size::Int32 = 0
     stat::Int32 = 0
-    usmall::Float64 = 0.
+    usmall::T = 0.
 end
 
-mutable struct Solver<:AbstractLinearSolver
-    csc::SparseMatrixCSC{Float64,Int32}
+mutable struct Ma86Solver{T} <: AbstractLinearSolver{T}
+    csc::SparseMatrixCSC{T,Int32}
 
-    control::Control
-    info::Info
+    control::Ma86Control{T}
+    info::Ma86Info{T}
 
-    mc68_control::Mc68.Control
-    mc68_info::Mc68.Info
+    mc68_control::Mc68Control
+    mc68_info::Mc68Info
 
     order::Vector{Int32}
     keep::Vector{Ptr{Nothing}}
 
-    opt::Options
+    opt::Ma86Options
     logger::Logger
 end
 
 
-ma86_default_control_d(control::Control) = ccall(
-    (:ma86_default_control_d,libhsl),
-    Nothing,
-    (Ref{Control},),
-    control)
-ma86_analyse_d(n::Cint,colptr::StrideOneVector{Cint},rowval::StrideOneVector{Cint},
-               order::StrideOneVector{Cint},keep::Vector{Ptr{Nothing}},
-               control::Control,info::Info) = ccall(
-                   (:ma86_analyse_d,libhsl),
-                   Nothing,
-                   (Cint,Ptr{Cint},Ptr{Cint},Ptr{Cdouble},
-                    Ptr{Ptr{Nothing}},Ref{Control},Ref{Info}),
-                   n,colptr,rowval,order,keep,control,info)
-ma86_factor_d(n::Cint,colptr::StrideOneVector{Cint},rowval::StrideOneVector{Cint},
-              nzval::StrideOneVector{Cdouble},order::StrideOneVector{Cint},
-              keep::Vector{Ptr{Nothing}},control::Control,info::Info,
-              scale::Ptr{Nothing}) = ccall(
-                  (:ma86_factor_d,libhsl),
-                  Nothing,
-                  (Cint,Ptr{Cint},Ptr{Cint},Ptr{Cdouble},Ptr{Cint},
-                   Ptr{Ptr{Nothing}},Ref{Control},Ref{Info},Ptr{Nothing}),
-                  n,colptr,rowval,nzval,order,keep,control,info,scale)
-ma86_solve_d(job::Cint,nrhs::Cint,n::Cint,rhs::Vector{Cdouble},
-             order::Vector{Cint},keep::Vector{Ptr{Nothing}},
-             control::Control,info::Info,scale::Ptr{Nothing}) = ccall(
-                 (:ma86_solve_d,libhsl),
-                 Nothing,
-                 (Cint,Cint,Cint,Ptr{Cdouble},Ptr{Cint},Ptr{Ptr{Nothing}},
-                  Ref{Control},Ref{Info},Ptr{Nothing}),
-                 job,nrhs,n,rhs,order,keep,control,info,scale)
-ma86_finalize_d(keep::Vector{Ptr{Nothing}},control::Control)=ccall(
-    (:ma86_finalise_d,libhsl),
-    Nothing,
-    (Ptr{Ptr{Nothing}},Ref{Control}),
-    keep,control)
-
-ma86_set_num_threads(n) = ccall((:omp_set_num_threads_,libhsl),
+for (fdefault, fanalyse, ffactor, fsolve, ffinalise, typ) in [
+    (:ma86_default_control_d, :ma86_analyse_d, 
+     :ma86_factor_d, :ma86_solve_d, :ma86_finalise_d, Float64), 
+    (:ma86_default_control_s, :ma86_analyse_s, 
+     :ma86_factor_s, :ma86_solve_s, :ma86_finalise_s, Float32)
+     ]
+    @eval begin
+        ma86_default_control(
+            control::Ma86Control{$typ}
+        ) = ccall(
+            ($(string(fdefault)),libma86),
+            Nothing,
+            (Ref{Ma86Control{$typ}},),
+            control
+        )
+        ma86_analyse(
+            n::Cint,colptr::Vector{Cint},rowval::Vector{Cint},
+            order::Vector{Cint},keep::Vector{Ptr{Nothing}},
+            control::Ma86Control{$typ},info::Ma86Info{$typ}
+        ) = ccall(
+            ($(string(fanalyse)),libma86),
+            Nothing,
+            (Cint,Ptr{Cint},Ptr{Cint},Ptr{$typ},
+             Ptr{Ptr{Nothing}},Ref{Ma86Control{$typ}},Ref{Ma86Info{$typ}}),
+            n,colptr,rowval,order,keep,control,info
+        )
+        ma86_factor(
+            n::Cint,colptr::Vector{Cint},rowval::Vector{Cint},
+            nzval::Vector{$typ},order::Vector{Cint},
+            keep::Vector{Ptr{Nothing}},control::Ma86Control,info::Ma86Info,
+            scale::Ptr{Nothing}
+        ) = ccall(
+            ($(string(ffactor)),libma86),
+            Nothing,
+            (Cint,Ptr{Cint},Ptr{Cint},Ptr{$typ},Ptr{Cint},
+             Ptr{Ptr{Nothing}},Ref{Ma86Control},Ref{Ma86Info},Ptr{Nothing}),
+            n,colptr,rowval,nzval,order,keep,control,info,scale
+        )
+        ma86_solve(
+            job::Cint,nrhs::Cint,n::Cint,rhs::Vector{$typ},
+            order::Vector{Cint},keep::Vector{Ptr{Nothing}},
+            control::Ma86Control,info::Ma86Info,scale::Ptr{Nothing}
+        ) = ccall(
+            ($(string(fsolve)),libma86),
+            Nothing,
+            (Cint,Cint,Cint,Ptr{$typ},Ptr{Cint},Ptr{Ptr{Nothing}},
+             Ref{Ma86Control},Ref{Ma86Info},Ptr{Nothing}),
+            job,nrhs,n,rhs,order,keep,control,info,scale
+        )
+        ma86_finalize(
+            keep::Vector{Ptr{Nothing}},control::Ma86Control{$typ}
+        ) = ccall(
+            ($(string(ffinalise)),libma86),
+            Nothing,
+            (Ptr{Ptr{Nothing}},Ref{Ma86Control{$typ}}),
+            keep,control
+        )
+    end
+end
+ma86_set_num_threads(n) = ccall((:omp_set_num_threads_,libma86),
                                 Cvoid,
                                 (Ref{Int32},),
                                 Int32(n))
 
-function Solver(csc::SparseMatrixCSC{Float64,Int32};
-                option_dict::Dict{Symbol,Any}=Dict{Symbol,Any}(),
-                opt=Options(),logger=Logger(),
-                kwargs...)
+function Ma86Solver(
+    csc::SparseMatrixCSC{T,Int32};
+    option_dict::Dict{Symbol,Any}=Dict{Symbol,Any}(),
+    opt=Ma86Options(),logger=Logger(),
+    kwargs...) where T
 
     set_options!(opt,option_dict,kwargs)
 
@@ -133,18 +140,18 @@ function Solver(csc::SparseMatrixCSC{Float64,Int32};
 
     order = Vector{Int32}(undef,csc.n)
 
-    info=Info()
-    control=Control()
-    mc68_info = Mc68.Info()
-    mc68_control = Mc68.get_mc68_default_control()
+    info=Ma86Info{T}()
+    control=Ma86Control{T}()
+    mc68_info = Mc68Info()
+    mc68_control = get_mc68_default_control()
 
     keep = [C_NULL]
 
     mc68_control.f_array_in=1
     mc68_control.f_array_out=1
-    Mc68.mc68_order_i(Int32(opt.ma86_order),Int32(csc.n),csc.colptr,csc.rowval,order,mc68_control,mc68_info)
+    mc68_order_i(Int32(opt.ma86_order),Int32(csc.n),csc.colptr,csc.rowval,order,mc68_control,mc68_info)
 
-    ma86_default_control_d(control)
+    ma86_default_control(control)
     control.diagnostics_level = Int32(opt.ma86_print_level)
     control.f_arrays = 1
     control.nemin = opt.ma86_nemin
@@ -152,32 +159,32 @@ function Solver(csc::SparseMatrixCSC{Float64,Int32};
     control.u = opt.ma86_u
     control.scaling = Int32(opt.ma86_scaling)
 
-    ma86_analyse_d(Int32(csc.n),csc.colptr,csc.rowval,order,keep,control,info)
+    ma86_analyse(Int32(csc.n),csc.colptr,csc.rowval,order,keep,control,info)
     info.flag<0 && throw(SymbolicException())
 
-    M = Solver(csc,control,info,mc68_control,mc68_info,order,keep,opt,logger)
+    M = Ma86Solver{T}(csc,control,info,mc68_control,mc68_info,order,keep,opt,logger)
     finalizer(finalize,M)
 
     return M
 end
-function factorize!(M::Solver)
-    ma86_factor_d(Int32(M.csc.n),M.csc.colptr,M.csc.rowval,M.csc.nzval,
+function factorize!(M::Ma86Solver)
+    ma86_factor(Int32(M.csc.n),M.csc.colptr,M.csc.rowval,M.csc.nzval,
                   M.order,M.keep,M.control,M.info,C_NULL)
     M.info.flag<0 && throw(FactorizationException())
     return M
 end
-function solve!(M::Solver,rhs::StrideOneVector{Float64})
-    ma86_solve_d(Int32(0),Int32(1),Int32(M.csc.n),rhs,
-                 M.order,M.keep,M.control,M.info,C_NULL)
+function solve!(M::Ma86Solver{T},rhs::Vector{T}) where T
+    ma86_solve(Int32(0),Int32(1),Int32(M.csc.n),rhs,
+               M.order,M.keep,M.control,M.info,C_NULL)
     M.info.flag<0 && throw(SolveException())
     return rhs
 end
-is_inertia(::Solver)=true
-function inertia(M::Solver)
+is_inertia(::Ma86Solver)=true
+function inertia(M::Ma86Solver)
     return (M.info.matrix_rank-M.info.num_neg,M.csc.n-M.info.matrix_rank,M.info.num_neg)
 end
-finalize(M::Solver) = ma86_finalize_d(M.keep,M.control)
-function improve!(M::Solver)
+finalize(M::Ma86Solver) = ma86_finalize(M.keep,M.control)
+function improve!(M::Ma86Solver)
     if M.control.u == M.opt.ma86_umax
         @debug(M.logger,"improve quality failed.")
         return false
@@ -186,5 +193,8 @@ function improve!(M::Solver)
     @debug(M.logger,"improved quality: pivtol = $(M.control.u)")
     return true
 end
-introduce(::Solver)="ma86"
-end # module
+introduce(::Ma86Solver)="ma86"
+input_type(::Type{Ma86Solver}) = :csc
+is_supported(::Type{Ma86Solver},::Type{Float32}) = true
+is_supported(::Type{Ma86Solver},::Type{Float64}) = true
+

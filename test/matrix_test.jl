@@ -20,7 +20,7 @@ end
 
 @testset "LAPACK" begin
     sol= [0.8542713567839195, 1.4572864321608041]
-    M = MadNLPLapackCPU.Solver(dense)
+    M = MadNLP.LapackCPUSolver(dense)
     MadNLP.introduce(M)
     MadNLP.improve!(M)
     MadNLP.factorize!(M)
@@ -29,30 +29,7 @@ end
     @test solcmp(x,sol)
 end
 
-macro test_linear_solver(name)
-    str=string(name)
-    quote
-        if isdefined(MadNLP,Symbol($str))
-            @testset $str begin
-                sol= [0.8542713567839195, 1.4572864321608041]
-                M = MadNLP.$name.Solver(csc)
-                MadNLP.introduce(M)
-                MadNLP.improve!(M)
-                MadNLP.factorize!(M)
-                MadNLP.is_inertia(M) && (MadNLP.inertia(M) = (2,0,0))
-                x = MadNLP.solve!(M,copy(b))
-                @test solcmp(x,sol)
-            end
-        end
-    end
-end
 
-@test_linear_solver ma27
-@test_linear_solver ma57
-@test_linear_solver ma77
-@test_linear_solver ma86
-@test_linear_solver ma97
-@test_linear_solver pardiso
-@test_linear_solver pardisomkl
-@test_linear_solver umfpack
-@test_linear_solver mumps
+MadNLPTests.test_linear_solver(UmfpackSolver,Float64)
+MadNLPTests.test_linear_solver(LapackCPUSolver,Float32)
+MadNLPTests.test_linear_solver(LapackCPUSolver,Float64)

@@ -2,39 +2,39 @@ testset = [
     [
         "Umfpack",
         ()->MadNLP.Optimizer(
-            linear_solver=MadNLPUmfpack,
+            linear_solver=MadNLP.UmfpackSolver,
             print_level=MadNLP.ERROR),
         []
     ],
     [
         "LapackCPU-BUNCHKAUFMAN",
         ()->MadNLP.Optimizer(
-            linear_solver=MadNLPLapackCPU,
-            lapackcpu_algorithm=MadNLPLapackCPU.BUNCHKAUFMAN,
+            linear_solver=MadNLP.LapackCPUSolver,
+            lapackcpu_algorithm=MadNLP.BUNCHKAUFMAN,
             print_level=MadNLP.ERROR),
         []
     ],
     [
         "LapackCPU-LU",
         ()->MadNLP.Optimizer(
-            linear_solver=MadNLPLapackCPU,
-            lapackcpu_algorithm=MadNLPLapackCPU.LU,
+            linear_solver=MadNLP.LapackCPUSolver,
+            lapackcpu_algorithm=MadNLP.LU,
             print_level=MadNLP.ERROR),
         []
     ],
     [
         "LapackCPU-QR",
         ()->MadNLP.Optimizer(
-            linear_solver=MadNLPLapackCPU,
-            lapackcpu_algorithm=MadNLPLapackCPU.QR,
+            linear_solver=MadNLP.LapackCPUSolver,
+            lapackcpu_algorithm=MadNLP.QR,
             print_level=MadNLP.ERROR),
         []
     ],
     [
         "LapackCPU-CHOLESKY",
         ()->MadNLP.Optimizer(
-            linear_solver=MadNLPLapackCPU,
-            lapackcpu_algorithm=MadNLPLapackCPU.CHOLESKY,
+            linear_solver=MadNLP.LapackCPUSolver,
+            lapackcpu_algorithm=MadNLP.CHOLESKY,
             print_level=MadNLP.ERROR),
         ["infeasible", "lootsma", "eigmina"]
     ],
@@ -70,6 +70,18 @@ testset = [
     ],
 ]
 
+
 for (name,optimizer_constructor,exclude) in testset
     test_madnlp(name,optimizer_constructor,exclude)
 end
+
+@testset "HS15 problem" begin
+    options = Dict{Symbol, Any}(
+        :print_level=>MadNLP.ERROR,
+    )
+    nlp = MadNLPTests.HS15Model()
+    ips = MadNLP.InteriorPointSolver(nlp; option_dict=options)
+    MadNLP.optimize!(ips)
+    @test ips.status == MadNLP.SOLVE_SUCCEEDED
+end
+

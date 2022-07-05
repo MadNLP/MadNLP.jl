@@ -1,21 +1,7 @@
-# MadNLP.jl
-# Created by Sungho Shin (sungho.shin@wisc.edu)
-
-module MadNLPUmfpack
-
-import ..MadNLP:
-    @kwdef, Logger, @debug, @warn, @error,
-    SubVector, StrideOneVector, SparseMatrixCSC, get_tril_to_full,
-    SymbolicException,FactorizationException,SolveException,InertiaException,
-    AbstractOptions, AbstractLinearSolver, set_options!, UMFPACK,
-    introduce, factorize!, solve!, mul!, improve!, is_inertia, inertia
-
-const INPUT_MATRIX_TYPE = :csc
-
 const umfpack_default_ctrl = copy(UMFPACK.umf_ctrl)
 const umfpack_default_info = copy(UMFPACK.umf_info)
 
-@kwdef mutable struct Options <: AbstractOptions
+@kwdef mutable struct UmfpackOptions <: AbstractOptions
     umfpack_pivtol::Float64 = 1e-4
     umfpack_pivtolmax::Float64 = 1e-1
     umfpack_sym_pivtol::Float64 = 1e-3
@@ -23,48 +9,61 @@ const umfpack_default_info = copy(UMFPACK.umf_info)
     umfpack_strategy::Float64 = 2.
 end
 
-mutable struct Solver <: AbstractLinearSolver
+mutable struct UmfpackSolver{T} <: AbstractLinearSolver{T}
     inner::UMFPACK.UmfpackLU
-    tril::SparseMatrixCSC{Float64}
-    full::SparseMatrixCSC{Float64}
-    tril_to_full_view::SubVector{Float64}
+    tril::SparseMatrixCSC{T}
+    full::SparseMatrixCSC{T}
+    tril_to_full_view::SubVector{T}
 
-    p::Vector{Float64}
+    p::Vector{T}
 
     tmp::Vector{Ptr{Cvoid}}
-    ctrl::Vector{Float64}
-    info::Vector{Float64}
+    ctrl::Vector{T}
+    info::Vector{T}
 
-    opt::Options
+    opt::UmfpackOptions
     logger::Logger
 end
 
-umfpack_di_numeric(colptr::StrideOneVector{Int32},rowval::StrideOneVector{Int32},
-                   nzval::StrideOneVector{Float64},symbolic::Ptr{Nothing},
-                   tmp::Vector{Ptr{Nothing}},ctrl::Vector{Float64},
-                   info::Vector{Float64}) = ccall(
-                       (:umfpack_di_numeric,:libumfpack),
-                       Int32,
-                       (Ptr{Int32},Ptr{Int32},Ptr{Float64},Ptr{Cvoid},Ptr{Cvoid},
-                        Ptr{Float64},Ptr{Float64}),
-                       colptr,rowval,nzval,symbolic,tmp,ctrl,info)
-umfpack_di_solve(typ,colptr,rowval,nzval,x,b,numeric,ctrl,info) = ccall(
-    (:umfpack_di_solve,:libumfpack),
-    Int32,
-    (Int32, Ptr{Int32}, Ptr{Int32}, Ptr{Float64},Ptr{Float64},
-     Ptr{Float64}, Ptr{Cvoid}, Ptr{Float64},Ptr{Float64}),
-    typ,colptr,rowval,nzval,x,b,numeric,ctrl,info)
+
+for (numeric,solve,T) in (
+    (:umfpack_di_numeric, :umfpack_di_solve, Float64),
+    (:umfpack_si_numeric, :umfpack_si_solve, Float32),
+    )
+    @eval begin 
+        umfpack_numeric(
+            colptr::Vector{Int32},rowval::Vector{Int32},
+            nzval::Vector{$T},symbolic::Ptr{Nothing},
+            tmp::Vector{Ptr{Nothing}},ctrl::Vector{$T},
+            info::Vector{$T}) = ccall(
+                ($(string(numeric)),:libumfpack),
+                Int32,
+                (Ptr{Int32},Ptr{Int32},Ptr{$T},Ptr{Cvoid},Ptr{Cvoid},
+                 Ptr{$T},Ptr{$T}),
+                colptr,rowval,nzval,symbolic,tmp,ctrl,info)
+        umfpack_solve(
+            typ,colptr::Vector{Int32},rowval::Vector{Int32},
+            nzval::Vector{$T},x::Vector{$T},b::Vector{$T},
+            numeric,ctrl::Vector{$T},info::Vector{$T}) = ccall(
+                ($(string(solve)),:libumfpack),
+                Int32,
+                (Int32, Ptr{Int32}, Ptr{Int32}, Ptr{$T},Ptr{$T},
+                 Ptr{$T}, Ptr{Cvoid}, Ptr{$T},Ptr{$T}),
+                typ,colptr,rowval,nzval,x,b,numeric,ctrl,info)
+    end
+end
 
 
 
-function Solver(csc::SparseMatrixCSC;
-                option_dict::Dict{Symbol,Any}=Dict{Symbol,Any}(),
-                opt=Options(),logger=Logger(),
-                kwargs...)
+function UmfpackSolver(
+    csc::SparseMatrixCSC{T};
+    option_dict::Dict{Symbol,Any}=Dict{Symbol,Any}(),
+    opt=UmfpackOptions(),logger=Logger(),
+    kwargs...) where T
 
     set_options!(opt,option_dict,kwargs)
 
-    p = Vector{Float64}(undef,csc.n)
+    p = Vector{T}(undef,csc.n)
     full,tril_to_full_view = get_tril_to_full(csc)
 
     full.colptr.-=1; full.rowval.-=1
@@ -78,30 +77,31 @@ function Solver(csc::SparseMatrixCSC;
     ctrl[12]=opt.umfpack_sym_pivtol
     ctrl[5]=opt.umfpack_block_size
     ctrl[6]=opt.umfpack_strategy
-    
+
     tmp = Vector{Ptr{Cvoid}}(undef, 1)
 
-    return Solver(inner,csc,full,tril_to_full_view,p,tmp,ctrl,info,opt,logger)
+    return UmfpackSolver(inner,csc,full,tril_to_full_view,p,tmp,ctrl,info,opt,logger)
 end
 
-function factorize!(M::Solver)
+function factorize!(M::UmfpackSolver)
     UMFPACK.umfpack_free_numeric(M.inner)
     M.full.nzval.=M.tril_to_full_view
-    status = umfpack_di_numeric(M.inner.colptr,M.inner.rowval,M.inner.nzval,M.inner.symbolic,M.tmp,M.ctrl,M.info)
+    status = umfpack_numeric(M.inner.colptr,M.inner.rowval,M.inner.nzval,M.inner.symbolic,M.tmp,M.ctrl,M.info)
     M.inner.numeric = M.tmp[]
 
     M.inner.status = status
     return M
 end
-function solve!(M::Solver,rhs::StrideOneVector{Float64})
-    status = umfpack_di_solve(1,M.inner.colptr,M.inner.rowval,M.inner.nzval,M.p,rhs,M.inner.numeric,M.ctrl,M.info)
+function solve!(M::UmfpackSolver{T},rhs::Vector{T}) where T
+    status = umfpack_solve(1,M.inner.colptr,M.inner.rowval,M.inner.nzval,M.p,rhs,M.inner.numeric,M.ctrl,M.info)
     rhs .= M.p
     return rhs
 end
-is_inertia(::Solver) = false
-inertia(M::Solver) = throw(InertiaException())
+is_inertia(::UmfpackSolver) = false
+inertia(M::UmfpackSolver) = throw(InertiaException())
+input_type(::Type{UmfpackSolver}) = :csc
 
-function improve!(M::Solver)
+function improve!(M::UmfpackSolver)
     if M.ctrl[4] == M.opt.umfpack_pivtolmax
         @debug(M.logger,"improve quality failed.")
         return false
@@ -112,6 +112,5 @@ function improve!(M::Solver)
 
     return false
 end
-introduce(::Solver)="umfpack"
-
-end # module
+introduce(::UmfpackSolver)="umfpack"
+is_supported(::Type{UmfpackSolver},::Type{Float64}) = true

@@ -45,10 +45,10 @@ end
 TODO
 """
 function solve_refine_wrapper!(
-    ips::InteriorPointSolver{<:DenseCondensedKKTSystem},
+    ips::InteriorPointSolver{T,<:DenseCondensedKKTSystem},
     x::AbstractKKTVector,
     b::AbstractKKTVector,
-)
+) where T
     cnt = ips.cnt
     @trace(ips.logger,"Iterative solution started.")
     fixed_variable_treatment_vec!(full(b), ips.ind_fixed)

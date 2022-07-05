@@ -19,7 +19,7 @@ const MOI = MathOptInterface
 const MOIU = MathOptInterface.Utilities
 const NLPModelsCounters = _Counters
 
-export MadNLPUmfpack, MadNLPLapackCPU, MadNLPPardisoMKL, madnlp
+export madnlp, UmfpackSolver, LapackCPUSolver
 
 # Version info
 version() = parsefile(joinpath(@__DIR__,"..","Project.toml"))["version"]
@@ -27,11 +27,11 @@ introduce() = "MadNLP version v$(version())"
 
 include("enums.jl")
 include("utils.jl")
-include("options.jl")
 include("matrixtools.jl")
 include("nlpmodels.jl")
 include(joinpath("KKT", "KKTsystem.jl"))
 include(joinpath("LinearSolvers","linearsolvers.jl"))
+include("options.jl")
 include(joinpath("IPM", "IPM.jl"))
 include(joinpath("Interfaces","interfaces.jl"))
 

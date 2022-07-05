@@ -95,16 +95,14 @@ struct ReducedKKTVector{T, VT<:AbstractVector{T}} <: AbstractKKTVector{T, VT}
     xl::VT # unsafe view
 end
 
-ReducedKKTVector(n::Int, m::Int, nlb::Int, nub::Int) = ReducedKKTVector(n, m)
-function ReducedKKTVector(n::Int, m::Int)
-    x = Vector{Float64}(undef, n + m)
+ReducedKKTVector{T,VT}(n::Int, m::Int, nlb::Int, nub::Int) where {T, VT <: AbstractVector{T}} = ReducedKKTVector{T,VT}(n, m)
+function ReducedKKTVector{T,VT}(n::Int, m::Int) where {T, VT <: AbstractVector{T}}
+    x = VT(undef, n + m)
     fill!(x, 0.0)
     # Wrap directly array x to avoid dealing with views
-    pp = pointer(x)
-    xp = unsafe_wrap(Vector{Float64}, pp, n)
-    pd = pointer(x, n + 1)
-    xl = unsafe_wrap(Vector{Float64}, pd, m)
-    return ReducedKKTVector{Float64, Vector{Float64}}(x, xp, xl)
+    xp = _madnlp_unsafe_wrap(x, n)
+    xl = _madnlp_unsafe_wrap(x, m, n+1)
+    return ReducedKKTVector{T, VT}(x, xp, xl)
 end
 function ReducedKKTVector(rhs::AbstractKKTVector)
     return ReducedKKTVector(number_primal(rhs), number_dual(rhs))
@@ -135,20 +133,16 @@ struct UnreducedKKTVector{T, VT<:AbstractVector{T}} <: AbstractKKTVector{T, VT}
     xzu::VT # unsafe view
 end
 
-function UnreducedKKTVector(n::Int, m::Int, nlb::Int, nub::Int)
-    values = Vector{Float64}(undef, n + m + nlb + nub)
+function UnreducedKKTVector{T, VT}(n::Int, m::Int, nlb::Int, nub::Int) where {T, VT <: AbstractVector{T}}
+    values = VT(undef,n+m+nlb+nub)
     fill!(values, 0.0)
     # Wrap directly array x to avoid dealing with views
-    pp = pointer(values)
-    x = unsafe_wrap(Vector{Float64}, pp, n + m) # Primal-Dual
-    xp = unsafe_wrap(Vector{Float64}, pp, n) # Primal
-    pd = pointer(values, n + 1)
-    xl = unsafe_wrap(Vector{Float64}, pd, m) # Dual
-    pzl = pointer(values, n + m + 1)
-    xzl = unsafe_wrap(Vector{Float64}, pzl, nlb) # Lower bound
-    pzu = pointer(values, n + m + nlb + 1)
-    xzu = unsafe_wrap(Vector{Float64}, pzu, nub) # Upper bound
-    return UnreducedKKTVector{Float64, Vector{Float64}}(values, x, xp, xl, xzl, xzu)
+    x = _madnlp_unsafe_wrap(values, n + m) # Primal-Dual
+    xp = _madnlp_unsafe_wrap(values, n) # Primal
+    xl = _madnlp_unsafe_wrap(values, m, n+1) # Dual
+    xzl = _madnlp_unsafe_wrap(values, nlb, n + m + 1) # Lower bound
+    xzu = _madnlp_unsafe_wrap(values, nub, n + m + nlb + 1) # Upper bound
+    return UnreducedKKTVector{T, VT}(values, x, xp, xl, xzl, xzu)
 end
 
 full(rhs::UnreducedKKTVector) = rhs.values

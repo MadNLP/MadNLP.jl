@@ -1,55 +1,55 @@
 """
 TODO
 """
-mutable struct RobustRestorer
-    obj_val_R::Float64
-    f_R::Vector{Float64}
-    x_ref::Vector{Float64}
+mutable struct RobustRestorer{T} 
+    obj_val_R::T
+    f_R::Vector{T}
+    x_ref::Vector{T}
 
-    theta_ref::Float64
-    D_R::Vector{Float64}
-    obj_val_R_trial::Float64
+    theta_ref::T
+    D_R::Vector{T}
+    obj_val_R_trial::T
 
-    pp::Vector{Float64}
-    nn::Vector{Float64}
-    zp::Vector{Float64}
-    zn::Vector{Float64}
+    pp::Vector{T}
+    nn::Vector{T}
+    zp::Vector{T}
+    zn::Vector{T}
 
-    dpp::Vector{Float64}
-    dnn::Vector{Float64}
-    dzp::Vector{Float64}
-    dzn::Vector{Float64}
+    dpp::Vector{T}
+    dnn::Vector{T}
+    dzp::Vector{T}
+    dzn::Vector{T}
 
-    pp_trial::Vector{Float64}
-    nn_trial::Vector{Float64}
+    pp_trial::Vector{T}
+    nn_trial::Vector{T}
 
-    inf_pr_R::Float64
-    inf_du_R::Float64
-    inf_compl_R::Float64
+    inf_pr_R::T
+    inf_du_R::T
+    inf_compl_R::T
 
-    mu_R::Float64
-    tau_R::Float64
-    zeta::Float64
+    mu_R::T
+    tau_R::T
+    zeta::T
 
-    filter::Vector{Tuple{Float64,Float64}}
+    filter::Vector{Tuple{T,T}}
 end
 
 """
 TODO
 """
-function RobustRestorer(ips::AbstractInteriorPointSolver)
+function RobustRestorer(ips::AbstractInteriorPointSolver{T}) where T
 
-    nn = Vector{Float64}(undef,ips.m)
-    zp = Vector{Float64}(undef,ips.m)
-    zn = Vector{Float64}(undef,ips.m)
-    dpp= Vector{Float64}(undef,ips.m)
-    dnn= Vector{Float64}(undef,ips.m)
-    dzp= Vector{Float64}(undef,ips.m)
-    dzn= Vector{Float64}(undef,ips.m)
-    pp_trial = Vector{Float64}(undef,ips.m)
-    nn_trial = Vector{Float64}(undef,ips.m)
+    nn = Vector{T}(undef,ips.m)
+    zp = Vector{T}(undef,ips.m)
+    zn = Vector{T}(undef,ips.m)
+    dpp= Vector{T}(undef,ips.m)
+    dnn= Vector{T}(undef,ips.m)
+    dzp= Vector{T}(undef,ips.m)
+    dzn= Vector{T}(undef,ips.m)
+    pp_trial = Vector{T}(undef,ips.m)
+    nn_trial = Vector{T}(undef,ips.m)
 
-    return RobustRestorer(
+    return RobustRestorer{T}(
         0.,
         primal(ips._w2),
         primal(ips._w1),
@@ -63,7 +63,7 @@ function RobustRestorer(ips::AbstractInteriorPointSolver)
         dual(ips._w2),
         dual(ips._w1),
         0.,0.,0.,0.,0.,0.,
-        Tuple{Float64,Float64}[],
+        Tuple{T,T}[],
     )
 end
 

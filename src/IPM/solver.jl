@@ -4,7 +4,7 @@ TODO
 function initialize!(ips::AbstractInteriorPointSolver)
     # initializing slack variables
     @trace(ips.logger,"Initializing slack variables.")
-    cons!(ips.nlp,get_x0(ips.nlp),view(ips.c,1:get_ncon(ips.nlp)))
+    cons!(ips.nlp,get_x0(ips.nlp),_madnlp_unsafe_wrap(ips.c,get_ncon(ips.nlp)))
     ips.cnt.con_cnt += 1
     ips.x_slk.=ips.c_slk
 
@@ -225,7 +225,7 @@ function regular!(ips::AbstractInteriorPointSolver)
         ips.alpha = alpha_max
         varphi_trial= 0.
             theta_trial = 0.
-            small_search_norm = get_rel_search_norm(ips.x, primal(ips.d)) < 10*eps(Float64)
+            small_search_norm = get_rel_search_norm(ips.x, primal(ips.d)) < 10*eps(eltype(ips.x))
         switching_condition = is_switching(varphi_d,ips.alpha,ips.opt.s_phi,ips.opt.delta,2.,ips.opt.s_theta)
         armijo_condition = false
         while true
@@ -259,7 +259,7 @@ function regular!(ips::AbstractInteriorPointSolver)
                 return RESTORE
             else
                 @trace(ips.logger,"Step rejected; proceed with the next trial step.")
-                ips.alpha * norm(primal(ips.d)) < eps(Float64)*10 &&
+                ips.alpha * norm(primal(ips.d)) < eps(eltype(ips.x))*10 &&
                     return ips.cnt.acceptable_cnt >0 ?
                     SOLVED_TO_ACCEPTABLE_LEVEL : SEARCH_DIRECTION_BECOMES_TOO_SMALL
             end
@@ -452,7 +452,7 @@ function robust!(ips::InteriorPointSolver)
         ips.cnt.l = 1
         theta_R_trial = 0.
         varphi_R_trial = 0.
-        small_search_norm = get_rel_search_norm(ips.x, primal(ips.d)) < 10*eps(Float64)
+        small_search_norm = get_rel_search_norm(ips.x, primal(ips.d)) < 10*eps(eltype(ips.x))
         switching_condition = is_switching(varphi_d_R,ips.alpha,ips.opt.s_phi,ips.opt.delta,theta_R,ips.opt.s_theta)
         armijo_condition = false
 
@@ -488,7 +488,7 @@ function robust!(ips::InteriorPointSolver)
                 return RESTORATION_FAILED
             else
                 @trace(ips.logger,"Step rejected; proceed with the next trial step.")
-                ips.alpha < eps(Float64)*10 && return ips.cnt.acceptable_cnt >0 ?
+                ips.alpha < eps(eltype(ips.x))*10 && return ips.cnt.acceptable_cnt >0 ?
                     SOLVED_TO_ACCEPTABLE_LEVEL : SEARCH_DIRECTION_BECOMES_TOO_SMALL
             end
         end
@@ -650,8 +650,8 @@ end
 
 curv_test(t,n,g,wx,inertia_free_tol) = dot(wx,t) + max(dot(wx,n)-dot(g,n),0) - inertia_free_tol*dot(t,t) >=0
 
-function second_order_correction(ips::AbstractInteriorPointSolver,alpha_max::Float64,theta::Float64,varphi::Float64,
-                                 theta_trial::Float64,varphi_d::Float64,switching_condition::Bool)
+function second_order_correction(ips::AbstractInteriorPointSolver,alpha_max,theta,varphi,
+                                 theta_trial,varphi_d,switching_condition::Bool)
     @trace(ips.logger,"Second-order correction started.")
 
     dual(ips._w1) .= alpha_max .* ips.c .+ ips.c_trial

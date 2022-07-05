@@ -1,22 +1,4 @@
-# MadNLP.jl
-# Created by Sungho Shin (sungho.shin@wisc.edu)
-
-module MadNLPMa77
-
-import ..MadNLPHSL:
-    @kwdef, Logger, @debug, @warn, @error, libhsl,
-    SparseMatrixCSC, SparseMatrixCSC, SubVector, StrideOneVector,
-    get_tril_to_full, transfer!,
-    AbstractOptions, AbstractLinearSolver, set_options!,
-    SymbolicException,FactorizationException,SolveException,InertiaException,
-    introduce, factorize!, solve!, improve!, is_inertia, inertia
-import ..MadNLPHSL: Mc68
-
-const INPUT_MATRIX_TYPE = :csc
-
-@enum(Ordering::Int,AMD = 1, METIS = 3)
-
-@kwdef mutable struct Options <: AbstractOptions
+@kwdef mutable struct Ma77Options <: AbstractOptions
     ma77_buffer_lpage::Int = 4096
     ma77_buffer_npage::Int = 1600
     ma77_file_size::Int = 2097152
@@ -30,7 +12,7 @@ const INPUT_MATRIX_TYPE = :csc
     ma77_umax::Float64 = 1e-4
 end
 
-@kwdef mutable struct Control
+@kwdef mutable struct Ma77Control{T}
     f_arrays::Cint = 0
     print_level::Cint = 0
     unit_diagnostics::Cint = 0
@@ -53,18 +35,18 @@ end
     nemin::Cint = 0
     maxit::Cint = 0
     infnorm::Cint = 0
-    thresh::Cdouble = 0.
+    thresh::T = 0.
     nb54::Cint = 0
     action::Cint = 0
-    multiplier::Cdouble = 0.
+    multiplier::T = 0.
     nb64::Cint = 0
     nbi::Cint = 0
-    small::Cdouble = 0.
-    static_::Cdouble = 0.
+    small::T = 0.
+    static_::T = 0.
     storage_indef::Clong = 0
-    u::Cdouble = 0.
-    umin::Cdouble = 0.
-    consist_tol::Cdouble = 0.
+    u::T = 0.
+    umin::T = 0.
+    consist_tol::T = 0.
 
     ispare_1::Cint = 0
     ispare_2::Cint = 0
@@ -78,15 +60,15 @@ end
     lspare_4::Clong = 0
     lspare_5::Clong = 0
 
-    rspare_1::Cdouble = 0.
-    rspare_2::Cdouble = 0.
-    rspare_3::Cdouble = 0.
-    rspare_4::Cdouble = 0.
-    rspare_5::Cdouble = 0.
+    rspare_1::T = 0.
+    rspare_2::T = 0.
+    rspare_3::T = 0.
+    rspare_4::T = 0.
+    rspare_5::T = 0.
 end
 
-@kwdef mutable struct Info
-    detlog::Cdouble = 0.
+@kwdef mutable struct Ma77Info{T}
+    detlog::T = 0.
     detsign::Cint = 0
     flag::Cint = 0
     iostat::Cint = 0
@@ -136,7 +118,7 @@ end
     tree_nodes::Cint = 0
     unit_restart::Cint = 0
     unused::Cint = 0
-    usmall::Cdouble = 0.
+    usmall::T = 0.
 
 
     ispare_1::Cint = 0
@@ -151,112 +133,139 @@ end
     lspare_4::Clong = 0
     lspare_5::Clong = 0
 
-    rspare_1::Cdouble = 0.
-    rspare_2::Cdouble = 0.
-    rspare_3::Cdouble = 0.
-    rspare_4::Cdouble = 0.
-    rspare_5::Cdouble = 0.
+    rspare_1::T = 0.
+    rspare_2::T = 0.
+    rspare_3::T = 0.
+    rspare_4::T = 0.
+    rspare_5::T = 0.
 end
 
-mutable struct Solver <: AbstractLinearSolver
-    tril::SparseMatrixCSC{Float64,Int32}
-    full::SparseMatrixCSC{Float64,Int32}
-    tril_to_full_view::SubVector{Float64}
+mutable struct Ma77Solver{T} <: AbstractLinearSolver{T}
+    tril::SparseMatrixCSC{T,Int32}
+    full::SparseMatrixCSC{T,Int32}
+    tril_to_full_view::SubVector{T}
 
-    control::Control
-    info::Info
+    control::Ma77Control{T}
+    info::Ma77Info{T}
 
-    mc68_control::Mc68.Control
-    mc68_info::Mc68.Info
+    mc68_control::Mc68Control
+    mc68_info::Mc68Info
 
     order::Vector{Int32}
     keep::Vector{Ptr{Nothing}}
 
-    opt::Options
+    opt::Ma77Options
     logger::Logger
 end
 
-ma77_default_control_d(control::Control) = ccall(
-    (:ma77_default_control_d,libhsl),
-    Cvoid,
-    (Ref{Control},),
-    control)
-ma77_open_d(n::Cint,fname1::String,fname2::String,fname3::String,fname4::String,
-            keep::Vector{Ptr{Cvoid}},control::Control,info::Info) = ccall(
-                (:ma77_open_d,libhsl),
-                Cvoid,
-                (Cint,Ptr{Cchar},Ptr{Cchar},Ptr{Cchar},Ptr{Cchar},
-                 Ptr{Ptr{Cvoid}},Ref{Control},Ref{Info}),
-                n,fname1,fname2,fname3,fname4,keep,control,info)
-ma77_input_vars_d(idx::Cint,nvar::Cint,list::StrideOneVector{Cint},
-                  keep::Vector{Ptr{Cvoid}},control::Control,info::Info) = ccall(
-                      (:ma77_input_vars_d,libhsl),
-                      Cvoid,
-                      (Cint,Cint,Ptr{Cint},
-                       Ptr{Ptr{Cvoid}},Ref{Control},Ref{Info}),
-                      idx,nvar,list,keep,control,info)
-ma77_input_reals_d(idx::Cint,length::Cint,reals::StrideOneVector{Cdouble},
-                   keep::Vector{Ptr{Cvoid}},control::Control,info::Info) = ccall(
-                       (:ma77_input_reals_d,libhsl),
-                       Cvoid,
-                       (Cint,Cint,Ptr{Cdouble},
-                        Ptr{Ptr{Cvoid}},Ref{Control},Ref{Info}),
-                       idx,length,reals,keep,control,info)
-ma77_analyse_d(order::Vector{Cint},
-               keep::Vector{Ptr{Cvoid}},control::Control,info::Info) = ccall(
-                   (:ma77_analyse_d,libhsl),
-                   Cvoid,
-                   (Ptr{Cint},Ptr{Ptr{Cvoid}},Ref{Control},Ref{Info}),
-                   order,keep,control,info)
-ma77_factor_d(posdef::Cint,keep::Vector{Ptr{Cvoid}},control::Control,info::Info,
-              scale::Ptr{Nothing}) = ccall(
-                  (:ma77_factor_d,libhsl),
-                  Cvoid,
-                  (Cint,Ptr{Ptr{Cvoid}},Ref{Control},Ref{Info},Ptr{Nothing}),
-                  posdef,keep,control,info,scale)
-ma77_factor_solve_d(posdef::Cint,keep::Vector{Ptr{Cvoid}},control::Control,info::Info,
-                    scale::Vector{Cdouble},nrhs::Cint,lx::Cint,rhs::Vector{Cdouble}) = ccall(
-                        (:ma77_factor_solve_d,libhsl),
-                        Cvoid,
-                        (Cint,Ptr{Ptr{Cvoid}},Ref{Control},Ref{Info},
-                         Ptr{Cdouble},Cint,Cint,Ptr{Cdouble}),
-                        posdef,keep,control,info,scale,nrhs,lx,rhs);
-ma77_solve_d(job::Cint,nrhs::Cint,lx::Cint,x::Vector{Cdouble},
-             keep::Vector{Ptr{Cvoid}},control::Control,info::Info,
-             scale::Ptr{Nothing})=ccall(
-                 (:ma77_solve_d,libhsl),
-                 Cvoid,
-                 (Cint,Cint,Cint,Ptr{Float64},
-                  Ptr{Ptr{Cvoid}},Ref{Control},Ref{Info},Ptr{Nothing}),
-                 job,nrhs,lx,x,keep,control,info,scale);
-ma77_finalize_d(keep::Vector{Ptr{Cvoid}},control::Control,info::Info) = ccall(
-    (:ma77_finalise_d,libhsl),
-    Cvoid,
-    (Ptr{Ptr{Cvoid}},Ref{Control},Ref{Info}),
-    keep,control,info)
+for (fdefault, fanalyse, ffactor, fsolve, ffinalise, fopen, finputv, finputr, typ) in [
+    (:ma77_default_control_d, :ma77_analyse_d, 
+     :ma77_factor_d, :ma77_solve_d, :ma77_finalise_d,
+     :ma77_open_d, :ma77_input_vars_d, :ma77_input_reals_d, Float64), 
+    (:ma77_default_control_s, :ma77_analyse_s, 
+     :ma77_factor_s, :ma77_solve_s, :ma77_finalise_s,
+     :ma77_open_s, :ma77_input_vars_s, :ma77_input_reals_s, Float32), 
+    ]
+    @eval begin
+        ma77_default_control(control::Ma77Control{$typ}) = ccall(
+            ($(string(fdefault)),libma77),
+            Cvoid,
+            (Ref{Ma77Control{$typ}},),
+            control
+        )
+        ma77_open(
+            n::Cint,fname1::String,fname2::String,fname3::String,fname4::String,
+            keep::Vector{Ptr{Cvoid}},control::Ma77Control{$typ},info::Ma77Info{$typ}
+        ) = ccall(
+            ($(string(fopen)),libma77),
+            Cvoid,
+            (Cint,Ptr{Cchar},Ptr{Cchar},Ptr{Cchar},Ptr{Cchar},
+             Ptr{Ptr{Cvoid}},Ref{Ma77Control{$typ}},Ref{Ma77Info{$typ}}),
+            n,fname1,fname2,fname3,fname4,keep,control,info
+        )
+        ma77_input_vars(
+            idx::Cint,nvar::Cint,list::Vector{Cint},
+            keep::Vector{Ptr{Cvoid}},control::Ma77Control{$typ},info::Ma77Info{$typ}
+        ) = ccall(
+            ($(string(finputv)),libma77),
+            Cvoid,
+            (Cint,Cint,Ptr{Cint},
+             Ptr{Ptr{Cvoid}},Ref{Ma77Control{$typ}},Ref{Ma77Info{$typ}}
+             ),
+                              idx,nvar,list,keep,control,info)
+        ma77_input_reals(
+            idx::Cint,length::Cint,reals::Vector{$typ},
+            keep::Vector{Ptr{Cvoid}},control::Ma77Control{$typ},info::Ma77Info{$typ}
+        ) = ccall(
+            ($(string(finputr)),libma77),
+            Cvoid,
+            (Cint,Cint,Ptr{$typ},
+             Ptr{Ptr{Cvoid}},Ref{Ma77Control{$typ}},Ref{Ma77Info{$typ}}),
+            idx,length,reals,keep,control,info
+        )
+        ma77_analyse(
+            order::Vector{Cint},
+            keep::Vector{Ptr{Cvoid}},control::Ma77Control{$typ},info::Ma77Info{$typ}
+        ) = ccall(
+            ($(string(fanalyse)),libma77),
+            Cvoid,
+            (Ptr{Cint},Ptr{Ptr{Cvoid}},Ref{Ma77Control{$typ}},Ref{Ma77Info{$typ}}),
+            order,keep,control,info
+        )
+        ma77_factor(
+            posdef::Cint,keep::Vector{Ptr{Cvoid}},control::Ma77Control{$typ},info::Ma77Info{$typ},
+            scale::Ptr{Nothing}
+        ) = ccall(
+            ($(string(ffactor)),libma77),
+            Cvoid,
+            (Cint,Ptr{Ptr{Cvoid}},Ref{Ma77Control{$typ}},Ref{Ma77Info{$typ}},Ptr{Nothing}),
+            posdef,keep,control,info,scale
+        )
+        ma77_solve(
+            job::Cint,nrhs::Cint,lx::Cint,x::Vector{$typ},
+            keep::Vector{Ptr{Cvoid}},control::Ma77Control{$typ},info::Ma77Info{$typ},
+            scale::Ptr{Nothing}
+        ) = ccall(
+            ($(string(fsolve)),libma77),
+            Cvoid,
+            (Cint,Cint,Cint,Ptr{$typ},
+             Ptr{Ptr{Cvoid}},Ref{Ma77Control{$typ}},Ref{Ma77Info{$typ}},Ptr{Nothing}),
+            job,nrhs,lx,x,keep,control,info,scale
+        );
+        ma77_finalize(
+            keep::Vector{Ptr{Cvoid}},control::Ma77Control{$typ},info::Ma77Info{$typ}
+        ) = ccall(
+            ($(string(ffinalise)),libma77),
+            Cvoid,
+            (Ptr{Ptr{Cvoid}},Ref{Ma77Control{$typ}},Ref{Ma77Info{$typ}}),
+            keep,control,info
+        )
+    end
+end
 
-function Solver(csc::SparseMatrixCSC{Float64,Int32};
-                option_dict::Dict{Symbol,Any}=Dict{Symbol,Any}(),
-                opt=Options(),logger=Logger(),
-                kwargs...)
+function Ma77Solver(
+    csc::SparseMatrixCSC{T,Int32};
+    option_dict::Dict{Symbol,Any}=Dict{Symbol,Any}(),
+    opt=Ma77Options(),logger=Logger(),
+    kwargs...) where T
 
     set_options!(opt,option_dict,kwargs)
 
     full,tril_to_full_view = get_tril_to_full(csc)
     order = Vector{Int32}(undef,csc.n)
 
-    mc68_info = Mc68.Info()
-    mc68_control = Mc68.get_mc68_default_control()
+    mc68_info = Mc68Info()
+    mc68_control = get_mc68_default_control()
 
     keep = [C_NULL]
 
     mc68_control.f_array_in=1
     mc68_control.f_array_out=1
-    Mc68.mc68_order_i(Int32(opt.ma77_order),Int32(csc.n),csc.colptr,csc.rowval,order,mc68_control,mc68_info)
+    mc68_order_i(Int32(opt.ma77_order),Int32(csc.n),csc.colptr,csc.rowval,order,mc68_control,mc68_info)
 
-    info=Info()
-    control=Control()
-    ma77_default_control_d(control)
+    info=Ma77Info{T}()
+    control=Ma77Control{T}()
+    ma77_default_control(control)
     control.f_arrays = 1
     control.bits = 32
     control.file_size = opt.ma77_file_size
@@ -278,53 +287,64 @@ function Solver(csc::SparseMatrixCSC{Float64,Int32};
     isfile(".ma77_work")  && rm(".ma77_work")
     isfile(".ma77_delay") && rm(".ma77_delay")
 
-    ma77_open_d(Int32(full.n),".ma77_int", ".ma77_real", ".ma77_work", ".ma77_delay",
+    ma77_open(Int32(full.n),".ma77_int", ".ma77_real", ".ma77_work", ".ma77_delay",
                 keep,control,info)
 
     info.flag < 0 && throw(SymbolicException())
 
     for i=1:full.n
-        ma77_input_vars_d(Int32(i),full.colptr[i+1]-full.colptr[i],
-                          view(full.rowval,full.colptr[i]:full.colptr[i+1]-1),
-                          keep,control,info);
+        ma77_input_vars(
+            Int32(i),full.colptr[i+1]-full.colptr[i],
+            _madnlp_unsafe_wrap(
+                full.rowval,
+                full.colptr[i+1]-full.colptr[i],
+                full.colptr[i]
+            ),
+            keep,control,info);
         info.flag < 0 && throw(LinearSymbolicException())
     end
 
-    ma77_analyse_d(order,keep,control,info)
+    ma77_analyse(order,keep,control,info)
     info.flag<0 && throw(SymbolicException())
 
-    M = Solver(csc,full,tril_to_full_view,
-               control,info,mc68_control,mc68_info,order,keep,opt,logger)
+    M = Ma77Solver{T}(csc,full,tril_to_full_view,
+                   control,info,mc68_control,mc68_info,order,keep,opt,logger)
     finalizer(finalize,M)
     return M
 end
 
-function factorize!(M::Solver)
+function factorize!(M::Ma77Solver)
     M.full.nzval.=M.tril_to_full_view
     for i=1:M.full.n
-        ma77_input_reals_d(Int32(i),M.full.colptr[i+1]-M.full.colptr[i],
-                           view(M.full.nzval,M.full.colptr[i]:M.full.colptr[i+1]-1),
-                           M.keep,M.control,M.info)
+        ma77_input_reals(
+            Int32(i),M.full.colptr[i+1]-M.full.colptr[i],
+            _madnlp_unsafe_wrap(
+                M.full.nzval,
+                M.full.colptr[i+1]-M.full.colptr[i],
+                M.full.colptr[i]
+            ),
+            M.keep,M.control,M.info
+        )
         M.info.flag < 0 && throw(FactorizationException())
     end
-    ma77_factor_d(Int32(0),M.keep,M.control,M.info,C_NULL)
+    ma77_factor(Int32(0),M.keep,M.control,M.info,C_NULL)
     M.info.flag < 0 && throw(FactorizationException())
     return M
 end
-function solve!(M::Solver,rhs::StrideOneVector{Float64})
-    ma77_solve_d(Int32(0),Int32(1),Int32(M.full.n),rhs,M.keep,M.control,M.info,C_NULL);
+function solve!(M::Ma77Solver{T},rhs::Vector{T}) where T
+    ma77_solve(Int32(0),Int32(1),Int32(M.full.n),rhs,M.keep,M.control,M.info,C_NULL);
     M.info.flag < 0 && throw(SolveException())
     return rhs
 end
 
-is_inertia(::Solver) = true
-function inertia(M::Solver)
+is_inertia(::Ma77Solver) = true
+function inertia(M::Ma77Solver)
     return (M.info.matrix_rank-M.info.num_neg,M.full.n-M.info.matrix_rank,M.info.num_neg)
 end
 
-finalize(M::Solver) = ma77_finalize_d(M.keep,M.control,M.info)
+finalize(M::Ma77Solver{T}) where T = ma77_finalize(M.keep,M.control,M.info)
 
-function improve!(M::Solver)
+function improve!(M::Ma77Solver)
     if M.control.u == M.opt.ma77_umax
         @debug(M.logger,"improve quality failed.")
         return false
@@ -334,6 +354,7 @@ function improve!(M::Solver)
     return true
 end
 
-introduce(::Solver)="ma77"
-
-end
+introduce(::Ma77Solver)="ma77"
+input_type(::Type{Ma77Solver}) = :csc
+is_supported(::Type{Ma77Solver},::Type{Float32}) = true
+is_supported(::Type{Ma77Solver},::Type{Float64}) = true

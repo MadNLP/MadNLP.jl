@@ -3,13 +3,14 @@ module MadNLPKrylov
 import MadNLP:
     @kwdef, Logger, @debug, @warn, @error,
     AbstractOptions, AbstractIterator, set_options!, @sprintf,
-    solve_refine!, mul!, ldiv!, size, StrideOneVector
+    solve_refine!, mul!, ldiv!, size
 import IterativeSolvers:
     FastHessenberg, ArnoldiDecomp, Residual, init!, init_residual!, expand!, Identity,
     orthogonalize_and_normalize!, update_residual!, gmres_iterable!, GMRESIterable, converged,
     ModifiedGramSchmidt
 
-@kwdef mutable struct Options <: AbstractOptions
+
+@kwdef mutable struct KrylovOptions <: AbstractOptions
     krylov_restart::Int = 5
     krylov_max_iter::Int = 10
     krylov_tol::Float64 = 1e-10
@@ -27,34 +28,34 @@ size(A::VirtualMatrix,i) = (A.m,A.n)[i]
 struct VirtualPreconditioner
     ldiv!::Function
 end
-ldiv!(Pl::VirtualPreconditioner,x::StrideOneVector{Float64}) = Pl.ldiv!(x)
+ldiv!(Pl::VirtualPreconditioner,x::Vector{Float64}) = Pl.ldiv!(x)
 
-mutable struct Solver <: AbstractIterator
+mutable struct KrylovIterator{T} <: AbstractIterator{T}
     g::Union{Nothing,GMRESIterable}
-    res::Vector{Float64}
-    opt::Options
+    res::Vector{T}
+    opt::KrylovOptions
     logger::Logger
 end
 
-function Solver(res::Vector{Float64},_mul!,_ldiv!;
-                opt=Options(),logger=Logger(),
-                option_dict::Dict{Symbol,Any}=Dict{Symbol,Any}(),kwargs...)
+function KrylovIterator(res::Vector{T},_mul!,_ldiv!;
+                opt=KrylovOptions(),logger=Logger(),
+                option_dict::Dict{Symbol,Any}=Dict{Symbol,Any}(),kwargs...) where T
     !isempty(kwargs) && (for (key,val) in kwargs; option_dict[key]=val; end)
     set_options!(opt,option_dict)
 
     g = GMRESIterable(VirtualPreconditioner(_ldiv!),
-                      Identity(),Float64[],Float64[],res,
-                      ArnoldiDecomp(VirtualMatrix(_mul!,length(res),length(res)),opt.krylov_restart, Float64),
-                      Residual(opt.krylov_restart, Float64),
+                      Identity(),T[],T[],res,
+                      ArnoldiDecomp(VirtualMatrix(_mul!,length(res),length(res)),opt.krylov_restart, T),
+                      Residual(opt.krylov_restart, T),
                       0,opt.krylov_restart,1,
                       opt.krylov_max_iter,opt.krylov_tol,0.,
                       ModifiedGramSchmidt())
 
-    return Solver(g,res,opt,logger)
+    return KrylovIterator{T}(g,res,opt,logger)
 end
 
 function solve_refine!(x::StridedVector{Float64},
-                       is::Solver,
+                       is::KrylovIterator,
                        b::AbstractVector{Float64})
     @debug(is.logger,"Iterator initiated")
     is.res.=0
