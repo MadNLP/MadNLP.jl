@@ -12,7 +12,7 @@ struct MadNLPExecutionStats{T} <: AbstractExecutionStats
     multipliers_L::Vector{T}
     multipliers_U::Vector{T}
     iter::Int
-    counters::NLPModelsCounters
+    counters::NLPModels.Counters
     elapsed_time::Real
 end
 
@@ -27,8 +27,11 @@ MadNLPExecutionStats(ips::InteriorPointSolver) =MadNLPExecutionStats(
     ips.l,
     _madnlp_unsafe_wrap(ips.zl, get_nvar(ips.nlp)),
     _madnlp_unsafe_wrap(ips.zu, get_nvar(ips.nlp)),
-    ips.cnt.k, ips.nlp.counters,ips.cnt.total_time
+    ips.cnt.k, get_counters(ips.nlp),ips.cnt.total_time
 )
+
+get_counters(nlp::NLPModels.AbstractNLPModel) = nlp.counters
+get_counters(nlp::NLPModels.AbstractNLSModel) = nlp.counters.counters
 getStatus(result::MadNLPExecutionStats) = STATUS_OUTPUT_DICT[result.status]
 
 # Utilities
@@ -36,8 +39,8 @@ has_constraints(ips) = ips.m != 0
 
 # Print functions -----------------------------------------------------------
 function print_init(ips::AbstractInteriorPointSolver)
-    @notice(ips.logger,@sprintf("Number of nonzeros in constraint Jacobian............: %8i",get_nnzj(ips.nlp)))
-    @notice(ips.logger,@sprintf("Number of nonzeros in Lagrangian Hessian.............: %8i\n",get_nnzh(ips.nlp)))
+    @notice(ips.logger,@sprintf("Number of nonzeros in constraint Jacobian............: %8i",get_nnzj(ips.nlp.meta)))
+    @notice(ips.logger,@sprintf("Number of nonzeros in Lagrangian Hessian.............: %8i\n",get_nnzh(ips.nlp.meta)))
 
     num_fixed = length(ips.ind_fixed)
     num_var = get_nvar(ips.nlp) - num_fixed
@@ -122,8 +125,8 @@ function string(ips::AbstractInteriorPointSolver)
 
                 number of variables......................: $(get_nvar(ips.nlp))
                 number of constraints....................: $(get_ncon(ips.nlp))
-                number of nonzeros in lagrangian hessian.: $(get_nnzh(ips.nlp))
-                number of nonzeros in constraint jacobian: $(get_nnzj(ips.nlp))
+                number of nonzeros in lagrangian hessian.: $(get_nnzh(ips.nlp.meta))
+                number of nonzeros in constraint jacobian: $(get_nnzj(ips.nlp.meta))
                 status...................................: $(ips.status)
                 """
 end
