@@ -233,5 +233,6 @@ end
 
 include("Instances/dummy_qp.jl")
 include("Instances/hs15.jl")
+include("Instances/nls.jl")
 
 end # module
