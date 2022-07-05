@@ -134,7 +134,7 @@ struct UnreducedKKTVector{T, VT<:AbstractVector{T}} <: AbstractKKTVector{T, VT}
 end
 
 function UnreducedKKTVector{T, VT}(n::Int, m::Int, nlb::Int, nub::Int) where {T, VT <: AbstractVector{T}}
-    values = VT(undef,n+m+nlp+nub)
+    values = VT(undef,n+m+nlb+nub)
     fill!(values, 0.0)
     # Wrap directly array x to avoid dealing with views
     x = _madnlp_unsafe_wrap(values, n + m) # Primal-Dual
