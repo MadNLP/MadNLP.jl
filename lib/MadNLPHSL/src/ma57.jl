@@ -47,7 +47,7 @@ for (fa,fb,fc,typ) in (
     (:ma57a_, :ma57b_, :ma57c_, Float32)
     )
     @eval begin
-        
+
         ma57ad!(n::Cint,nz::Cint,I::Vector{Cint},J::Vector{Cint},lkeep::Cint,
                 keep::Vector{Cint},iwork::Vector{Cint},icntl::Vector{Cint},
                 info::Vector{Cint},rinfo::Vector{$typ}) = ccall(
@@ -174,5 +174,6 @@ end
 
 introduce(::Ma57Solver)="ma57"
 input_type(::Type{Ma57Solver}) = :csc
+default_options(::Type{Ma57Solver}) = Ma57Options()
 is_supported(::Type{Ma57Solver},::Type{Float32}) = true
 is_supported(::Type{Ma57Solver},::Type{Float64}) = true

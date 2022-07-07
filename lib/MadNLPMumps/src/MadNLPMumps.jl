@@ -7,7 +7,7 @@ import MadNLP:
     @kwdef, Logger, @debug, @warn, @error,
     SparseMatrixCSC, SubVector,
     SymbolicException,FactorizationException,SolveException,InertiaException,
-    AbstractOptions, AbstractLinearSolver, set_options!, input_type,
+    AbstractOptions, AbstractLinearSolver, set_options!, input_type, default_options,
     introduce, factorize!, solve!, improve!, is_inertia, is_supported, inertia, findIJ, nnz
 
 const version = parsefile(joinpath(dirname(pathof(MUMPS_seq_jll)),"..","Project.toml"))["version"]
@@ -112,7 +112,7 @@ if version == "5.3.5+0"
         schur::Ptr{T} = C_NULL ##
 
         instance_number::Cint = 0
-        wk_user::Ptr{T} = C_NULL 
+        wk_user::Ptr{T} = C_NULL
 
         version_number::SVector{32,Cchar} = zeros(32)
 
@@ -213,7 +213,7 @@ elseif version == "5.2.1+4"
         schur::Ptr{T} = C_NULL ##
 
         instance_number::Cint = 0
-        wk_user::Ptr{T} = C_NULL 
+        wk_user::Ptr{T} = C_NULL
 
         version_number::SVector{32,Cchar} = zeros(32)
 
@@ -376,6 +376,7 @@ end
 
 introduce(::MumpsSolver)="mumps"
 input_type(::Type{MumpsSolver}) = :csc
+default_options(::Type{MumpsSolver}) = MumpsOptions()
 is_supported(::Type{MumpsSolver},::Type{Float32}) = true
 is_supported(::Type{MumpsSolver},::Type{Float64}) = true
 

@@ -175,5 +175,6 @@ end
 
 introduce(::Ma27Solver)="ma27"
 input_type(::Type{Ma27Solver}) = :csc
+default_options(::Type{Ma27Solver}) = Ma27Options()
 is_supported(::Type{Ma27Solver},::Type{Float32}) = true
 is_supported(::Type{Ma27Solver},::Type{Float64}) = true

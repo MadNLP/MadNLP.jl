@@ -159,12 +159,12 @@ mutable struct Ma77Solver{T} <: AbstractLinearSolver{T}
 end
 
 for (fdefault, fanalyse, ffactor, fsolve, ffinalise, fopen, finputv, finputr, typ) in [
-    (:ma77_default_control_d, :ma77_analyse_d, 
+    (:ma77_default_control_d, :ma77_analyse_d,
      :ma77_factor_d, :ma77_solve_d, :ma77_finalise_d,
-     :ma77_open_d, :ma77_input_vars_d, :ma77_input_reals_d, Float64), 
-    (:ma77_default_control_s, :ma77_analyse_s, 
+     :ma77_open_d, :ma77_input_vars_d, :ma77_input_reals_d, Float64),
+    (:ma77_default_control_s, :ma77_analyse_s,
      :ma77_factor_s, :ma77_solve_s, :ma77_finalise_s,
-     :ma77_open_s, :ma77_input_vars_s, :ma77_input_reals_s, Float32), 
+     :ma77_open_s, :ma77_input_vars_s, :ma77_input_reals_s, Float32),
     ]
     @eval begin
         ma77_default_control(control::Ma77Control{$typ}) = ccall(
@@ -356,5 +356,6 @@ end
 
 introduce(::Ma77Solver)="ma77"
 input_type(::Type{Ma77Solver}) = :csc
+default_options(::Type{Ma77Solver}) = May77Options()
 is_supported(::Type{Ma77Solver},::Type{Float32}) = true
 is_supported(::Type{Ma77Solver},::Type{Float64}) = true

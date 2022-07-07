@@ -2,21 +2,21 @@
 
 parse_option(::Type{Module},str::String) = eval(Symbol(str))
 
-function set_options!(opt::AbstractOptions,option_dict::Dict{Symbol,Any})
-    for (key,val) in option_dict
-        hasproperty(opt,key) || continue
-        T = fieldtype(typeof(opt),key)
-        val isa T ? setproperty!(opt,key,val) :
-            setproperty!(opt,key,parse_option(T,val))
-        pop!(option_dict,key)
+function set_options!(opt::AbstractOptions, options)
+    other_options = Dict{Symbol, Any}()
+    for (key, val) in options
+        if hasproperty(opt, key)
+            T = fieldtype(typeof(opt), key)
+            val isa T ? setproperty!(opt,key,val) :
+                setproperty!(opt,key,parse_option(T,val))
+        else
+            other_options[key] = val
+        end
     end
-end
-function set_options!(opt::AbstractOptions,option_dict::Dict{Symbol,Any},kwargs)
-    !isempty(kwargs) && (for (key,val) in kwargs; option_dict[key]=val; end)
-    set_options!(opt,option_dict)
+    return other_options
 end
 
-@kwdef mutable struct Options <: AbstractOptions
+@kwdef mutable struct IPMOptions <: AbstractOptions
     # General options
     rethrow_error::Bool = true
     disable_garbage_collector::Bool = false
@@ -97,6 +97,13 @@ function check_option_sanity(options)
     if input_type(options.linear_solver) == :csc && options.kkt_system == DENSE_KKT_SYSTEM
         error("[options] Sparse Linear solver is not supported in dense mode.\n"*
               "Please use a dense linear solver or change `kkt_system` ")
+    end
+end
+
+function print_ignored_options(logger,option_dict)
+    @warn(logger,"The following options are ignored: ")
+    for (key,val) in option_dict
+        @warn(logger," - "*string(key))
     end
 end
 

@@ -9,7 +9,7 @@ mutable struct InteriorPointSolver{T,KKTSystem <: AbstractKKTSystem{T}} <: Abstr
     nlp::AbstractNLPModel
     kkt::KKTSystem
 
-    opt::Options
+    opt::IPMOptions
     cnt::Counters
     logger::Logger
 
@@ -95,14 +95,29 @@ mutable struct InteriorPointSolver{T,KKTSystem <: AbstractKKTSystem{T}} <: Abstr
     output::Dict
 end
 
-function InteriorPointSolver(nlp::AbstractNLPModel{T};
-    option_dict::Dict{Symbol,Any}=Dict{Symbol,Any}(), kwargs...
-) where T
-    opt = Options(linear_solver=default_linear_solver())
-    set_options!(opt,option_dict,kwargs)
+function InteriorPointSolver(nlp::AbstractNLPModel{T}; kwargs...) where T
+    # Initiate interior-point options
+    opt = IPMOptions(linear_solver=default_linear_solver())
+    linear_solver_options = set_options!(opt, kwargs)
     check_option_sanity(opt)
-    
-    @assert is_supported(opt.linear_solver,T)
+
+    # Initiate linear-solver options
+    @assert is_supported(opt.linear_solver, T)
+    opt_linear_solver = default_options(opt.linear_solver)
+    remaining_options = set_options!(opt_linear_solver, linear_solver_options)
+
+    # Initiate logger
+    logger = Logger(
+        print_level=opt.print_level,
+        file_print_level=opt.file_print_level,
+        file = opt.output_file == "" ? nothing : open(opt.output_file,"w+"),
+    )
+    @trace(logger,"Logger is initialized.")
+
+    # Print remaning options (unsupported)
+    if !isempty(remaining_options)
+        print_ignored_options(logger, remaining_options)
+    end
 
     VT = Vector{T}
     KKTSystem = if opt.kkt_system == SPARSE_KKT_SYSTEM
@@ -118,18 +133,17 @@ function InteriorPointSolver(nlp::AbstractNLPModel{T};
         MT = Matrix{T}
         DenseCondensedKKTSystem{T, VT, MT}
     end
-    return InteriorPointSolver{T,KKTSystem}(nlp, opt; option_linear_solver=option_dict)
+    return InteriorPointSolver{T,KKTSystem}(nlp, opt, opt_linear_solver; logger=logger)
 end
 
 # Inner constructor
-function InteriorPointSolver{T,KKTSystem}(nlp::AbstractNLPModel, opt::Options;
-    option_linear_solver::Dict{Symbol,Any}=Dict{Symbol,Any}(),
+function InteriorPointSolver{T,KKTSystem}(
+    nlp::AbstractNLPModel,
+    opt::IPMOptions,
+    opt_linear_solver::AbstractOptions;
+    logger=Logger(),
 ) where {T, KKTSystem<:AbstractKKTSystem{T}}
     cnt = Counters(start_time=time())
-
-    logger = Logger(print_level=opt.print_level,file_print_level=opt.file_print_level,
-                    file = opt.output_file == "" ? nothing : open(opt.output_file,"w+"))
-    @trace(logger,"Logger is initialized.")
 
     # generic options
     opt.disable_garbage_collector &&
@@ -202,7 +216,7 @@ function InteriorPointSolver{T,KKTSystem}(nlp::AbstractNLPModel, opt::Options;
 
     @trace(logger,"Initializing linear solver.")
     cnt.linear_solver_time =
-        @elapsed linear_solver = opt.linear_solver(get_kkt(kkt) ; option_dict=option_linear_solver,logger=logger)
+        @elapsed linear_solver = opt.linear_solver(get_kkt(kkt) ; opt=opt_linear_solver, logger=logger)
 
     n_kkt = size(kkt, 1)
     buffer_vec = similar(full(d), n_kkt)
@@ -215,7 +229,6 @@ function InteriorPointSolver{T,KKTSystem}(nlp::AbstractNLPModel, opt::Options;
         opt.inertia_correction_method = is_inertia(linear_solver) ? INERTIA_BASED : INERTIA_FREE
     end
 
-    !isempty(option_linear_solver) && print_ignored_options(logger, option_linear_solver)
 
     return InteriorPointSolver{T,KKTSystem}(nlp,kkt,opt,cnt,logger,
         n,m,nlb,nub,x,l,zl,zu,xl,xu,0.,f,c,

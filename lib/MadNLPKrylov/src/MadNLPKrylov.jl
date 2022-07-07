@@ -3,7 +3,7 @@ module MadNLPKrylov
 import MadNLP:
     @kwdef, Logger, @debug, @warn, @error,
     AbstractOptions, AbstractIterator, set_options!, @sprintf,
-    solve_refine!, mul!, ldiv!, size
+    solve_refine!, mul!, ldiv!, size, default_options
 import IterativeSolvers:
     FastHessenberg, ArnoldiDecomp, Residual, init!, init_residual!, expand!, Identity,
     orthogonalize_and_normalize!, update_residual!, gmres_iterable!, GMRESIterable, converged,
@@ -95,5 +95,7 @@ function gmres_iterable_update!(g,x,b)
     g.k=1
     g.β=g.residual.current
 end
+
+default_options(::Type{KrylovIterator}) = KrylovOptions()
 
 end # module

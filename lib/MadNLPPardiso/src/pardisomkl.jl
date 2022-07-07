@@ -144,5 +144,6 @@ end
 introduce(::PardisoMKLSolver)="pardiso-mkl"
 
 input_type(::Type{PardisoMKLSolver}) = :csc
+default_options(::Type{PardisoMKLSolver}) = PardisoMKLOptions()
 is_supported(::Type{PardisoMKLSolver},::Type{Float32}) = true
 is_supported(::Type{PardisoMKLSolver},::Type{Float64}) = true
