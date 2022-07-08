@@ -7,6 +7,10 @@ import SparseArrays: sparse
         include("matrix_test.jl")
     end
 
+    @testset "KKTSystem" begin
+        include("kkt_test.jl")
+    end
+
     @testset "MOI interface" begin
         include("MOI_interface_test.jl")
     end

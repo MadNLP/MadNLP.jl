@@ -6,23 +6,28 @@ using MadNLPTests
 using SparseArrays
 using Random
 
-function _compare_dense_with_sparse(kkt_system, n, m, ind_fixed, ind_eq)
+function _compare_dense_with_sparse(
+    kkt_system, n, m, ind_fixed, ind_eq;
+    inertia=MadNLP.INERTIA_BASED,
+)
 
     for (T,tol,atol) in [(Float32,1e-3,1e-1), (Float64,1e-8,1e-6)]
-        
+
         sparse_options = Dict{Symbol, Any}(
             :kkt_system=>MadNLP.SPARSE_KKT_SYSTEM,
+            :inertia_correction_method=>inertia,
             :linear_solver=>MadNLP.LapackCPUSolver,
             :print_level=>MadNLP.ERROR,
             :tol=>tol
         )
         dense_options = Dict{Symbol, Any}(
             :kkt_system=>kkt_system,
+            :inertia_correction_method=>inertia,
             :linear_solver=>MadNLP.LapackCPUSolver,
             :print_level=>MadNLP.ERROR,
             :tol=>tol
         )
-        
+
         nlp = MadNLPTests.DenseDummyQP{T}(; n=n, m=m, fixed_variables=ind_fixed, equality_cons=ind_eq)
 
         ips = MadNLP.InteriorPointSolver(nlp, option_dict=sparse_options)
@@ -32,6 +37,7 @@ function _compare_dense_with_sparse(kkt_system, n, m, ind_fixed, ind_eq)
         MadNLP.optimize!(ipd)
 
         # Check that dense formulation matches exactly sparse formulation
+        @test ipd.status == MadNLP.SOLVE_SUCCEEDED
         @test ips.cnt.k == ipd.cnt.k
         @test ips.obj_val ≈ ipd.obj_val atol=atol
         @test ips.x ≈ ipd.x atol=atol
@@ -101,14 +107,18 @@ end
 @testset "MadNLP: option kkt_system=$(kkt_system)" for kkt_system in [MadNLP.DENSE_KKT_SYSTEM, MadNLP.DENSE_CONDENSED_KKT_SYSTEM]
     @testset "Size: ($n, $m)" for (n, m) in [(10, 0), (10, 5), (50, 10)]
         _compare_dense_with_sparse(kkt_system, n, m, Int[], Int[])
+        _compare_dense_with_sparse(kkt_system, n, m, Int[], Int[]; inertia=MadNLP.INERTIA_FREE)
     end
+    # Test with non-trivial equality constraints.
     @testset "Equality constraints" begin
         n, m = 20, 15
-        _compare_dense_with_sparse(kkt_system, n, m, Int[], Int[1, 8]) # test with non-trivial equality constraints
+        _compare_dense_with_sparse(kkt_system, n, m, Int[], Int[1, 8])
+        _compare_dense_with_sparse(kkt_system, n, m, Int[], Int[1, 8]; inertia=MadNLP.INERTIA_FREE)
     end
     @testset "Fixed variables" begin
         n, m = 10, 5
         _compare_dense_with_sparse(kkt_system, n, m, Int[1, 2], Int[])
+        _compare_dense_with_sparse(kkt_system, n, m, Int[1, 2], Int[]; inertia=MadNLP.INERTIA_FREE)
     end
 end
 
