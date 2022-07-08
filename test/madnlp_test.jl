@@ -10,7 +10,7 @@ testset = [
         "LapackCPU-BUNCHKAUFMAN",
         ()->MadNLP.Optimizer(
             linear_solver=MadNLP.LapackCPUSolver,
-            lapackcpu_algorithm=MadNLP.BUNCHKAUFMAN,
+            lapack_algorithm=MadNLP.BUNCHKAUFMAN,
             print_level=MadNLP.ERROR),
         []
     ],
@@ -18,7 +18,7 @@ testset = [
         "LapackCPU-LU",
         ()->MadNLP.Optimizer(
             linear_solver=MadNLP.LapackCPUSolver,
-            lapackcpu_algorithm=MadNLP.LU,
+            lapack_algorithm=MadNLP.LU,
             print_level=MadNLP.ERROR),
         []
     ],
@@ -26,7 +26,7 @@ testset = [
         "LapackCPU-QR",
         ()->MadNLP.Optimizer(
             linear_solver=MadNLP.LapackCPUSolver,
-            lapackcpu_algorithm=MadNLP.QR,
+            lapack_algorithm=MadNLP.QR,
             print_level=MadNLP.ERROR),
         []
     ],
@@ -34,7 +34,7 @@ testset = [
         "LapackCPU-CHOLESKY",
         ()->MadNLP.Optimizer(
             linear_solver=MadNLP.LapackCPUSolver,
-            lapackcpu_algorithm=MadNLP.CHOLESKY,
+            lapack_algorithm=MadNLP.CHOLESKY,
             print_level=MadNLP.ERROR),
         ["infeasible", "lootsma", "eigmina"]
     ],
