@@ -85,11 +85,8 @@ for (fa,fb,fc,typ) in (
 end
 
 function Ma57Solver(csc::SparseMatrixCSC{T};
-                option_dict::Dict{Symbol,Any}=Dict{Symbol,Any}(),
-                opt=Ma57Options(),logger=Logger(),kwargs...) where T
-
-    set_options!(opt,option_dict,kwargs)
-
+    opt=Ma57Options(),logger=Logger()
+) where T
     I,J=findIJ(csc)
 
     icntl= ma57_default_icntl()

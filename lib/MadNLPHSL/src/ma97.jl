@@ -135,11 +135,8 @@ ma97_set_num_threads(n) = ccall((:omp_set_num_threads_,libma97),
 
 function Ma97Solver(
     csc::SparseMatrixCSC{T,Int32};
-    option_dict::Dict{Symbol,Any}=Dict{Symbol,Any}(),
     opt=Ma97Options(),logger=Logger(),
-    kwargs...) where T
-
-    set_options!(opt,option_dict,kwargs)
+) where T
 
     ma97_set_num_threads(opt.ma97_num_threads)
 
@@ -193,6 +190,6 @@ function improve!(M::Ma97Solver)
 end
 introduce(::Ma97Solver)="ma97"
 input_type(::Type{Ma97Solver}) = :csc
-default_options(::Type{Ma97Solver}) = May97Options()
+default_options(::Type{Ma97Solver}) = Ma97Options()
 is_supported(::Type{Ma97Solver},::Type{Float32}) = true
 is_supported(::Type{Ma97Solver},::Type{Float64}) = true

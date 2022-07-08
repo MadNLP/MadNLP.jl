@@ -245,12 +245,8 @@ end
 
 function Ma77Solver(
     csc::SparseMatrixCSC{T,Int32};
-    option_dict::Dict{Symbol,Any}=Dict{Symbol,Any}(),
     opt=Ma77Options(),logger=Logger(),
-    kwargs...) where T
-
-    set_options!(opt,option_dict,kwargs)
-
+) where T
     full,tril_to_full_view = get_tril_to_full(csc)
     order = Vector{Int32}(undef,csc.n)
 
@@ -356,6 +352,6 @@ end
 
 introduce(::Ma77Solver)="ma77"
 input_type(::Type{Ma77Solver}) = :csc
-default_options(::Type{Ma77Solver}) = May77Options()
+default_options(::Type{Ma77Solver}) = Ma77Options()
 is_supported(::Type{Ma77Solver},::Type{Float32}) = true
 is_supported(::Type{Ma77Solver},::Type{Float64}) = true

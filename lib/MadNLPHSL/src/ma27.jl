@@ -89,11 +89,8 @@ for (fa, fb, fc, typ) in [
 end
 
 function Ma27Solver(csc::SparseMatrixCSC{T};
-                option_dict::Dict{Symbol,Any}=Dict{Symbol,Any}(),
-                opt=Ma27Options(),logger=Logger(),kwargs...) where T
-
-    set_options!(opt,option_dict,kwargs)
-
+    opt=Ma27Options(),logger=Logger(),
+) where T
     I,J = findIJ(csc)
     nz=Int32(nnz(csc))
 

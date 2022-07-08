@@ -51,11 +51,8 @@ end
 
 
 function PardisoMKLSolver(csc::SparseMatrixCSC{T};
-                opt=PardisoMKLOptions(),logger=Logger(),
-                option_dict::Dict{Symbol,Any}=Dict{Symbol,Any}(),
-                kwargs...) where T
-    !isempty(kwargs) && (for (key,val) in kwargs; option_dict[key]=val; end)
-    set_options!(opt,option_dict)
+    opt=PardisoMKLOptions(),logger=Logger(),
+) where T
 
     w   = Vector{T}(undef,csc.n)
 

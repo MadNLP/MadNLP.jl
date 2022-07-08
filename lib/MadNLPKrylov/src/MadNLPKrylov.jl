@@ -38,10 +38,9 @@ mutable struct KrylovIterator{T} <: AbstractIterator{T}
 end
 
 function KrylovIterator(res::Vector{T},_mul!,_ldiv!;
-                opt=KrylovOptions(),logger=Logger(),
-                option_dict::Dict{Symbol,Any}=Dict{Symbol,Any}(),kwargs...) where T
+    opt=KrylovOptions(),logger=Logger(),
+) where T
     !isempty(kwargs) && (for (key,val) in kwargs; option_dict[key]=val; end)
-    set_options!(opt,option_dict)
 
     g = GMRESIterable(VirtualPreconditioner(_ldiv!),
                       Identity(),T[],T[],res,

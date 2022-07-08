@@ -265,11 +265,8 @@ end
 # ---------------------------------------------------------------------------------------
 
 function MumpsSolver(csc::SparseMatrixCSC{T,Int32};
-                option_dict::Dict{Symbol,Any}=Dict{Symbol,Any}(),
-                opt=MumpsOptions(),logger=Logger(),
-                kwargs...) where T
-
-    set_options!(opt,option_dict,kwargs)
+    opt=MumpsOptions(), logger=Logger(),
+) where T
 
     I,J = findIJ(csc)
     sym_perm = zeros(Int32,csc.n)
