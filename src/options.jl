@@ -16,7 +16,7 @@ function set_options!(opt::AbstractOptions,option_dict::Dict{Symbol,Any},kwargs)
     set_options!(opt,option_dict)
 end
 
-@kwdef mutable struct Options <: AbstractOptions
+@kwdef mutable struct MadNLPOptions <: AbstractOptions
     # General options
     rethrow_error::Bool = true
     disable_garbage_collector::Bool = false

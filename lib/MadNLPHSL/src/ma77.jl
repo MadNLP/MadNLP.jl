@@ -155,7 +155,7 @@ mutable struct Ma77Solver{T} <: AbstractLinearSolver{T}
     keep::Vector{Ptr{Nothing}}
 
     opt::Ma77Options
-    logger::Logger
+    logger::MadNLPLogger
 end
 
 for (fdefault, fanalyse, ffactor, fsolve, ffinalise, fopen, finputv, finputr, typ) in [
@@ -246,7 +246,7 @@ end
 function Ma77Solver(
     csc::SparseMatrixCSC{T,Int32};
     option_dict::Dict{Symbol,Any}=Dict{Symbol,Any}(),
-    opt=Ma77Options(),logger=Logger(),
+    opt=Ma77Options(),logger=MadNLPLogger(),
     kwargs...) where T
 
     set_options!(opt,option_dict,kwargs)

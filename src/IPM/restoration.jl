@@ -31,66 +31,66 @@ mutable struct RobustRestorer{T}
     filter::Vector{Tuple{T,T}}
 end
 
-function RobustRestorer(ips::AbstractInteriorPointSolver{T}) where T
+function RobustRestorer(solver::AbstractMadNLPSolver{T}) where T
 
-    nn = Vector{T}(undef,ips.m)
-    zp = Vector{T}(undef,ips.m)
-    zn = Vector{T}(undef,ips.m)
-    dpp= Vector{T}(undef,ips.m)
-    dnn= Vector{T}(undef,ips.m)
-    dzp= Vector{T}(undef,ips.m)
-    dzn= Vector{T}(undef,ips.m)
-    pp_trial = Vector{T}(undef,ips.m)
-    nn_trial = Vector{T}(undef,ips.m)
+    nn = Vector{T}(undef,solver.m)
+    zp = Vector{T}(undef,solver.m)
+    zn = Vector{T}(undef,solver.m)
+    dpp= Vector{T}(undef,solver.m)
+    dnn= Vector{T}(undef,solver.m)
+    dzp= Vector{T}(undef,solver.m)
+    dzn= Vector{T}(undef,solver.m)
+    pp_trial = Vector{T}(undef,solver.m)
+    nn_trial = Vector{T}(undef,solver.m)
 
     return RobustRestorer{T}(
         0.,
-        primal(ips._w2),
-        primal(ips._w1),
+        primal(solver._w2),
+        primal(solver._w1),
         0.,
-        primal(ips._w3),
+        primal(solver._w3),
         0.,
-        dual(ips._w3),
-        dual(ips._w4),
+        dual(solver._w3),
+        dual(solver._w4),
         zp, zn,
         dpp, dnn, dzp, dzn,
-        dual(ips._w2),
-        dual(ips._w1),
+        dual(solver._w2),
+        dual(solver._w1),
         0.,0.,0.,0.,0.,0.,
         Tuple{T,T}[],
     )
 end
 
-function initialize_robust_restorer!(ips::AbstractInteriorPointSolver)
-    @trace(ips.logger,"Initializing restoration phase variables.")
-    ips.RR == nothing && (ips.RR = RobustRestorer(ips))
-    RR = ips.RR
+function initialize_robust_restorer!(solver::AbstractMadNLPSolver)
+    @trace(solver.logger,"Initializing restoration phase variables.")
+    solver.RR == nothing && (solver.RR = RobustRestorer(solver))
+    RR = solver.RR
 
-    RR.x_ref .= ips.x
-    RR.theta_ref = get_theta(ips.c)
+    RR.x_ref .= solver.x
+    RR.theta_ref = get_theta(solver.c)
     RR.D_R   .= min.(1,1 ./abs.(RR.x_ref))
 
-    RR.mu_R = max(ips.mu,norm(ips.c,Inf))
-    RR.tau_R= max(ips.opt.tau_min,1-RR.mu_R)
+    RR.mu_R = max(solver.mu,norm(solver.c,Inf))
+    RR.tau_R= max(solver.opt.tau_min,1-RR.mu_R)
     RR.zeta = sqrt(RR.mu_R)
 
-    RR.nn .= (RR.mu_R.-ips.opt.rho.*ips.c)./2 ./ips.opt.rho .+
-        sqrt.(((RR.mu_R.-ips.opt.rho.*ips.c)./2 ./ips.opt.rho).^2 .+ RR.mu_R.*ips.c./2 ./ips.opt.rho)
-    RR.pp .= ips.c .+ RR.nn
+    RR.nn .= (RR.mu_R.-solver.opt.rho.*solver.c)./2 ./solver.opt.rho .+
+        sqrt.(((RR.mu_R.-solver.opt.rho.*solver.c)./2 ./solver.opt.rho).^2 .+ RR.mu_R.*solver.c./2 ./solver.opt.rho)
+    RR.pp .= solver.c .+ RR.nn
     RR.zp .= RR.mu_R./RR.pp
     RR.zn .= RR.mu_R./RR.nn
 
-    RR.obj_val_R = get_obj_val_R(RR.pp,RR.nn,RR.D_R,ips.x,RR.x_ref,ips.opt.rho,RR.zeta)
+    RR.obj_val_R = get_obj_val_R(RR.pp,RR.nn,RR.D_R,solver.x,RR.x_ref,solver.opt.rho,RR.zeta)
     RR.f_R.=0
     empty!(RR.filter)
-    push!(RR.filter,(ips.theta_max,-Inf))
+    push!(RR.filter,(solver.theta_max,-Inf))
 
-    ips.l .= 0.
-    ips.zl_r .= min.(ips.opt.rho,ips.zl_r)
-    ips.zu_r .= min.(ips.opt.rho,ips.zu_r)
-    ips.cnt.t = 0
+    solver.y .= 0.
+    solver.zl_r .= min.(solver.opt.rho,solver.zl_r)
+    solver.zu_r .= min.(solver.opt.rho,solver.zu_r)
+    solver.cnt.t = 0
 
     # misc
-    ips.del_w = 0
+    solver.del_w = 0
 end
 

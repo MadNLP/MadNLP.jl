@@ -18,7 +18,7 @@ mutable struct PardisoSolver{T} <: AbstractLinearSolver{T}
     csc::SparseMatrixCSC{T,Int32}
     w::Vector{T}
     opt::PardisoOptions
-    logger::Logger
+    logger::MadNLPLogger
 end
 
 _pardisoinit(
@@ -42,7 +42,7 @@ _pardiso(
             pt,maxfct,mnum,mtype,phase,n,a,ia,ja,perm,nrhs,iparm,msglvl,b,x,err,dparm)
 
 function PardisoSolver(csc::SparseMatrixCSC{T,Int32};
-                opt=PardisoOptions(),logger=Logger(),
+                opt=PardisoOptions(),logger=MadNLPLogger(),
                 option_dict::Dict{Symbol,Any}=Dict{Symbol,Any}(),
                 kwargs...) where T
     !isempty(kwargs) && (for (key,val) in kwargs; option_dict[key]=val; end)

@@ -101,7 +101,7 @@ function get_hessian end
     initialize!(kkt::AbstractKKTSystem)
 
 Initialize KKT system with default values.
-Called when we initialize the `InteriorPointSolver` storing the current KKT system `kkt`.
+Called when we initialize the `MadNLPSolver` storing the current KKT system `kkt`.
 """
 function initialize! end
 

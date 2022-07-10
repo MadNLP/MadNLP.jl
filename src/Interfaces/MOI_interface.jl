@@ -20,7 +20,7 @@ end
 ConstraintInfo(func, set) = ConstraintInfo(func, set, nothing)
 
 mutable struct Optimizer <: MOI.AbstractOptimizer
-    ips::Union{Nothing,InteriorPointSolver}
+    solver::Union{Nothing,MadNLPSolver}
     nlp::Union{Nothing,AbstractNLPModel}
     result::Union{Nothing,MadNLPExecutionStats{Float64}}
 
@@ -116,7 +116,7 @@ MOI.get(model::Optimizer,::MOI.NumberOfConstraints{MOI.VariableIndex,MOI.EqualTo
 MOI.get(model::Optimizer,::MOI.NumberOfConstraints{MOI.VariableIndex,MOI.GreaterThan{Float64}})=count(e->e.has_lower_bound,model.variable_info)
 MOI.get(model::Optimizer,::MOI.ObjectiveFunction) = model.objective
 MOI.get(model::Optimizer,::MOI.ListOfVariableIndices) = [MOI.VariableIndex(i) for i in 1:length(model.variable_info)]
-MOI.get(model::Optimizer,::MOI.BarrierIterations) = model.ips.cnt.k
+MOI.get(model::Optimizer,::MOI.BarrierIterations) = model.solver.cnt.k
 
 macro define_get_con_attr(attr,function_type, set_type, prefix, attrfield)
     array_name = Symbol(string(prefix) * "_constraints")
@@ -286,7 +286,7 @@ MOI.get(model::Optimizer, p::MOI.RawOptimizerAttribute) = haskey(model.option_di
     (return model.option_dict[Symbol(p.name)]) : error("RawOptimizerAttribute with name $(p.name) is not set.")
 
 # solve time
-MOI.get(model::Optimizer, ::MOI.SolveTimeSec) = model.ips.cnt.total_time
+MOI.get(model::Optimizer, ::MOI.SolveTimeSec) = model.solver.cnt.total_time
 
 function MOI.empty!(model::Optimizer)
     # empty!(model.option_dict)
@@ -301,7 +301,7 @@ function MOI.empty!(model::Optimizer)
     empty!(model.quadratic_ge_constraints)
     empty!(model.quadratic_eq_constraints)
     model.nlp_dual_start = nothing
-    model.ips = nothing
+    model.solver = nothing
     model.nlp = nothing
     model.result = nothing
 end
@@ -876,7 +876,7 @@ const status_dual_dict = Dict(
     INFEASIBLE_PROBLEM_DETECTED => MOI.INFEASIBLE_POINT)
 
 termination_status(result::MadNLPExecutionStats) = haskey(status_moi_dict,result.status) ? status_moi_dict[result.status] : MOI.UNKNOWN_RESULT_STATUS
-termination_status(ips::InteriorPointSolver) = haskey(status_moi_dict,ips.status) ? status_moi_dict[ips.status] : MOI.UNKNOWN_RESULT_STATUS
+termination_status(solver::MadNLPSolver) = haskey(status_moi_dict,solver.status) ? status_moi_dict[solver.status] : MOI.UNKNOWN_RESULT_STATUS
 primal_status(result::MadNLPExecutionStats) = haskey(status_primal_dict,result.status) ?
     status_primal_dict[result.status] : MOI.UNKNOWN_RESULT_STATUS
 dual_status(result::MadNLPExecutionStats) = haskey(status_dual_dict,result.status) ?
@@ -1102,7 +1102,7 @@ num_variables(model::Optimizer) = length(model.variable_info)
 struct MOIModel{T} <: AbstractNLPModel{T,Vector{T}}
     meta::NLPModelMeta{T, Vector{T}}
     model::Optimizer
-    counters::NLPModelsCounters
+    counters::NLPModels.Counters
 end
 
 obj(nlp::MOIModel,x::Vector{Float64}) = eval_objective(nlp.model,x)
@@ -1158,15 +1158,15 @@ function MOIModel(model::Optimizer)
             nnzh = nnzh,
             minimize = model.sense == MOI.MIN_SENSE
         ),
-        model,NLPModelsCounters())
+        model,NLPModels.Counters())
 end
 
 function MOI.optimize!(model::Optimizer)
 
     model.nlp = MOIModel(model)
-    model.ips = InteriorPointSolver(model.nlp;option_dict=copy(model.option_dict))
-    model.result = optimize!(model.ips)
-    model.solve_time = model.ips.cnt.total_time
+    model.solver = MadNLPSolver(model.nlp;option_dict=copy(model.option_dict))
+    model.result = solve!(model.solver)
+    model.solve_time = model.solver.cnt.total_time
 
     return
 end

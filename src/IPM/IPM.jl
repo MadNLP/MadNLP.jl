@@ -1,17 +1,17 @@
 # MadNLP.jl
 # Created by Sungho Shin (sungho.shin@wisc.edu)
 
-abstract type AbstractInteriorPointSolver{T} end
+abstract type AbstractMadNLPSolver{T} end
 
 include("restoration.jl")
 
-mutable struct InteriorPointSolver{T,KKTSystem <: AbstractKKTSystem{T}} <: AbstractInteriorPointSolver{T}
+mutable struct MadNLPSolver{T,KKTSystem <: AbstractKKTSystem{T}} <: AbstractMadNLPSolver{T}
     nlp::AbstractNLPModel
     kkt::KKTSystem
 
-    opt::Options
-    cnt::Counters
-    logger::Logger
+    opt::MadNLPOptions
+    cnt::MadNLPCounters
+    logger::MadNLPLogger
 
     n::Int # number of variables (after reformulation)
     m::Int # number of cons
@@ -19,7 +19,7 @@ mutable struct InteriorPointSolver{T,KKTSystem <: AbstractKKTSystem{T}} <: Abstr
     nub::Int
 
     x::Vector{T} # primal (after reformulation)
-    l::Vector{T} # dual
+    y::Vector{T} # dual
     zl::Vector{T} # dual (after reformulation)
     zu::Vector{T} # dual (after reformulation)
     xl::Vector{T} # primal lower bound (after reformulation)
@@ -95,10 +95,10 @@ mutable struct InteriorPointSolver{T,KKTSystem <: AbstractKKTSystem{T}} <: Abstr
     output::Dict
 end
 
-function InteriorPointSolver(nlp::AbstractNLPModel{T};
+function MadNLPSolver(nlp::AbstractNLPModel{T};
     option_dict::Dict{Symbol,Any}=Dict{Symbol,Any}(), kwargs...
 ) where T
-    opt = Options(linear_solver=default_linear_solver())
+    opt = MadNLPOptions(linear_solver=default_linear_solver())
     set_options!(opt,option_dict,kwargs)
     check_option_sanity(opt)
     
@@ -118,18 +118,18 @@ function InteriorPointSolver(nlp::AbstractNLPModel{T};
         MT = Matrix{T}
         DenseCondensedKKTSystem{T, VT, MT}
     end
-    return InteriorPointSolver{T,KKTSystem}(nlp, opt; option_linear_solver=option_dict)
+    return MadNLPSolver{T,KKTSystem}(nlp, opt; option_linear_solver=option_dict)
 end
 
 # Inner constructor
-function InteriorPointSolver{T,KKTSystem}(nlp::AbstractNLPModel, opt::Options;
+function MadNLPSolver{T,KKTSystem}(nlp::AbstractNLPModel, opt::MadNLPOptions;
     option_linear_solver::Dict{Symbol,Any}=Dict{Symbol,Any}(),
 ) where {T, KKTSystem<:AbstractKKTSystem{T}}
-    cnt = Counters(start_time=time())
+    cnt = MadNLPCounters(start_time=time())
 
-    logger = Logger(print_level=opt.print_level,file_print_level=opt.file_print_level,
+    logger = MadNLPLogger(print_level=opt.print_level,file_print_level=opt.file_print_level,
                     file = opt.output_file == "" ? nothing : open(opt.output_file,"w+"))
-    @trace(logger,"Logger is initialized.")
+    @trace(logger,"MadNLPLogger is initialized.")
 
     # generic options
     opt.disable_garbage_collector &&
@@ -148,7 +148,7 @@ function InteriorPointSolver{T,KKTSystem}(nlp::AbstractNLPModel, opt::Options;
     xl = [get_lvar(nlp);view(get_lcon(nlp),ind_cons.ind_ineq)]
     xu = [get_uvar(nlp);view(get_ucon(nlp),ind_cons.ind_ineq)]
     x = [get_x0(nlp);zeros(T,ns)]
-    l = copy(get_y0(nlp))
+    y = copy(get_y0(nlp))
     zl= zeros(T,get_nvar(nlp)+ns)
     zu= zeros(T,get_nvar(nlp)+ns)
 
@@ -202,7 +202,7 @@ function InteriorPointSolver{T,KKTSystem}(nlp::AbstractNLPModel, opt::Options;
 
     @trace(logger,"Initializing linear solver.")
     cnt.linear_solver_time =
-        @elapsed linear_solver = opt.linear_solver(get_kkt(kkt) ; option_dict=option_linear_solver,logger=logger)
+        @elapsed linear_solver = opt.linear_solver(get_kkt(kkt) ; option_dict=option_linear_solver, logger=logger)
 
     n_kkt = size(kkt, 1)
     buffer_vec = similar(full(d), n_kkt)
@@ -217,8 +217,8 @@ function InteriorPointSolver{T,KKTSystem}(nlp::AbstractNLPModel, opt::Options;
 
     !isempty(option_linear_solver) && print_ignored_options(logger, option_linear_solver)
 
-    return InteriorPointSolver{T,KKTSystem}(nlp,kkt,opt,cnt,logger,
-        n,m,nlb,nub,x,l,zl,zu,xl,xu,0.,f,c,
+    return MadNLPSolver{T,KKTSystem}(nlp,kkt,opt,cnt,logger,
+        n,m,nlb,nub,x,y,zl,zu,xl,xu,0.,f,c,
         jacl,
         d, p,
         _w1, _w2, _w3, _w4,

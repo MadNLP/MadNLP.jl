@@ -33,7 +33,7 @@ mutable struct Ma27Solver{T} <: AbstractLinearSolver{T}
     maxfrt::Vector{Int32}
 
     opt::Ma27Options
-    logger::Logger
+    logger::MadNLPLogger
 end
 
 
@@ -90,7 +90,7 @@ end
 
 function Ma27Solver(csc::SparseMatrixCSC{T};
                 option_dict::Dict{Symbol,Any}=Dict{Symbol,Any}(),
-                opt=Ma27Options(),logger=Logger(),kwargs...) where T
+                opt=Ma27Options(),logger=MadNLPLogger(),kwargs...) where T
 
     set_options!(opt,option_dict,kwargs)
 

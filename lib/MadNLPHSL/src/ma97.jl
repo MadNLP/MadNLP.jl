@@ -65,7 +65,7 @@ mutable struct Ma97Solver{T} <:AbstractLinearSolver{T}
     fkeep::Vector{Ptr{Nothing}}
 
     opt::Ma97Options
-    logger::Logger
+    logger::MadNLPLogger
 end
 
 for (fdefault, fanalyse, ffactor, fsolve, ffinalise, typ) in [
@@ -136,7 +136,7 @@ ma97_set_num_threads(n) = ccall((:omp_set_num_threads_,libma97),
 function Ma97Solver(
     csc::SparseMatrixCSC{T,Int32};
     option_dict::Dict{Symbol,Any}=Dict{Symbol,Any}(),
-    opt=Ma97Options(),logger=Logger(),
+    opt=Ma97Options(),logger=MadNLPLogger(),
     kwargs...) where T
 
     set_options!(opt,option_dict,kwargs)

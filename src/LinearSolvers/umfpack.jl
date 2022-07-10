@@ -22,7 +22,7 @@ mutable struct UmfpackSolver{T} <: AbstractLinearSolver{T}
     info::Vector{T}
 
     opt::UmfpackOptions
-    logger::Logger
+    logger::MadNLPLogger
 end
 
 
@@ -58,7 +58,7 @@ end
 function UmfpackSolver(
     csc::SparseMatrixCSC{T};
     option_dict::Dict{Symbol,Any}=Dict{Symbol,Any}(),
-    opt=UmfpackOptions(),logger=Logger(),
+    opt=UmfpackOptions(),logger=MadNLPLogger(),
     kwargs...) where T
 
     set_options!(opt,option_dict,kwargs)

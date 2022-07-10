@@ -14,7 +14,7 @@ import CUDAKernels: CUDADevice
 
 import MadNLP
 import MadNLP:
-    @kwdef, Logger, @debug, @warn, @error,
+    @kwdef, MadNLPLogger, @debug, @warn, @error,
     AbstractOptions, AbstractLinearSolver, AbstractNLPModel, set_options!,
     SymbolicException,FactorizationException,SolveException,InertiaException,
     introduce, factorize!, solve!, improve!, is_inertia, inertia, tril_to_full!,

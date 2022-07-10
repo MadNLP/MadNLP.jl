@@ -18,9 +18,8 @@ import SolverCore: AbstractExecutionStats, getStatus
 
 const MOI = MathOptInterface
 const MOIU = MathOptInterface.Utilities
-const NLPModelsCounters = _Counters
 
-export madnlp, UmfpackSolver, LapackCPUSolver
+export MadNLPSolver, MadNLPOptions, UmfpackSolver, LapackCPUSolver, madnlp, solve!
 
 # Version info
 version() = parsefile(joinpath(@__DIR__,"..","Project.toml"))["version"]
@@ -38,14 +37,7 @@ include(joinpath("Interfaces","interfaces.jl"))
 
 # Initialize
 function __init__()
-    # check_deps()
-    try
-        @isdefined(libpardiso) && dlopen(libpardiso,RTLD_DEEPBIND)
-    catch e
-        println("Pardiso shared library cannot be loaded")
-    end
     set_blas_num_threads(Threads.nthreads(); permanent=true)
 end
 
 end # end module
-
