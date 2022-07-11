@@ -80,9 +80,9 @@ end
         :print_level=>MadNLP.ERROR,
     )
     nlp = MadNLPTests.HS15Model()
-    ips = MadNLP.InteriorPointSolver(nlp; option_dict=options)
-    MadNLP.optimize!(ips)
-    @test ips.status == MadNLP.SOLVE_SUCCEEDED
+    solver = MadNLP.MadNLPSolver(nlp; option_dict=options)
+    MadNLP.solve!(solver)
+    @test solver.status == MadNLP.SOLVE_SUCCEEDED
 end
 
 
@@ -91,8 +91,8 @@ end
         :print_level=>MadNLP.ERROR,
     )
     nlp = MadNLPTests.NLSModel()
-    ips = MadNLP.InteriorPointSolver(nlp; option_dict=options)
-    MadNLP.optimize!(ips)
-    @test ips.status == MadNLP.SOLVE_SUCCEEDED
+    solver = MadNLP.MadNLPSolver(nlp; option_dict=options)
+    MadNLP.solve!(solver)
+    @test solver.status == MadNLP.SOLVE_SUCCEEDED
 end
 
