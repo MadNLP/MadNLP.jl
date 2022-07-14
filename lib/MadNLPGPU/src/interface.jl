@@ -1,6 +1,6 @@
 
 function CuInteriorPointSolver(nlp::AbstractNLPModel{T}; kwargs...) where T
-    opt_ipm, opt_linear_solver, logger = load_options(; linear_solver=LapackGPUSolver, kwargs...)
+    opt_ipm, opt_linear_solver, logger = MadNLP.load_options(; linear_solver=LapackGPUSolver, kwargs...)
 
     @assert is_supported(opt_ipm.linear_solver, T)
     KKTSystem = if (opt_ipm.kkt_system == MadNLP.SPARSE_KKT_SYSTEM) || (opt_ipm.kkt_system == MadNLP.SPARSE_UNREDUCED_KKT_SYSTEM)
