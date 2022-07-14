@@ -96,44 +96,24 @@ mutable struct InteriorPointSolver{T,KKTSystem <: AbstractKKTSystem{T}} <: Abstr
 end
 
 function InteriorPointSolver(nlp::AbstractNLPModel{T}; kwargs...) where T
-    # Initiate interior-point options
-    opt = IPMOptions(linear_solver=default_linear_solver())
-    linear_solver_options = set_options!(opt, kwargs)
-    check_option_sanity(opt)
-
-    # Initiate linear-solver options
-    @assert is_supported(opt.linear_solver, T)
-    opt_linear_solver = default_options(opt.linear_solver)
-    remaining_options = set_options!(opt_linear_solver, linear_solver_options)
-
-    # Initiate logger
-    logger = Logger(
-        print_level=opt.print_level,
-        file_print_level=opt.file_print_level,
-        file = opt.output_file == "" ? nothing : open(opt.output_file,"w+"),
-    )
-    @trace(logger,"Logger is initialized.")
-
-    # Print remaning options (unsupported)
-    if !isempty(remaining_options)
-        print_ignored_options(logger, remaining_options)
-    end
+    opt_ipm, opt_linear_solver, logger = load_options(; kwargs...)
+    @assert is_supported(opt_ipm.linear_solver, T)
 
     VT = Vector{T}
-    KKTSystem = if opt.kkt_system == SPARSE_KKT_SYSTEM
-        MT = (input_type(opt.linear_solver) == :csc) ? SparseMatrixCSC{T, Int32} : Matrix{T}
+    KKTSystem = if opt_ipm.kkt_system == SPARSE_KKT_SYSTEM
+        MT = (input_type(opt_ipm.linear_solver) == :csc) ? SparseMatrixCSC{T, Int32} : Matrix{T}
         SparseKKTSystem{T, VT, MT}
-    elseif opt.kkt_system == SPARSE_UNREDUCED_KKT_SYSTEM
-        MT = (input_type(opt.linear_solver) == :csc) ? SparseMatrixCSC{T, Int32} : Matrix{T}
+    elseif opt_ipm.kkt_system == SPARSE_UNREDUCED_KKT_SYSTEM
+        MT = (input_type(opt_ipm.linear_solver) == :csc) ? SparseMatrixCSC{T, Int32} : Matrix{T}
         SparseUnreducedKKTSystem{T, VT, MT}
-    elseif opt.kkt_system == DENSE_KKT_SYSTEM
+    elseif opt_ipm.kkt_system == DENSE_KKT_SYSTEM
         MT = Matrix{T}
         DenseKKTSystem{T, VT, MT}
-    elseif opt.kkt_system == DENSE_CONDENSED_KKT_SYSTEM
+    elseif opt_ipm.kkt_system == DENSE_CONDENSED_KKT_SYSTEM
         MT = Matrix{T}
         DenseCondensedKKTSystem{T, VT, MT}
     end
-    return InteriorPointSolver{T,KKTSystem}(nlp, opt, opt_linear_solver; logger=logger)
+    return InteriorPointSolver{T,KKTSystem}(nlp, opt_ipm, opt_linear_solver; logger=logger)
 end
 
 # Inner constructor

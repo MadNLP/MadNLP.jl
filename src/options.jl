@@ -107,3 +107,27 @@ function print_ignored_options(logger,option_dict)
     end
 end
 
+function load_options(; linear_solver=default_linear_solver(), options...)
+    # Initiate interior-point options
+    opt_ipm = IPMOptions(linear_solver=linear_solver)
+    linear_solver_options = set_options!(opt_ipm, options)
+    check_option_sanity(opt_ipm)
+    # Initiate linear-solver options
+    opt_linear_solver = default_options(opt_ipm.linear_solver)
+    remaining_options = set_options!(opt_linear_solver, linear_solver_options)
+
+    # Initiate logger
+    logger = Logger(
+        print_level=opt_ipm.print_level,
+        file_print_level=opt_ipm.file_print_level,
+        file = opt_ipm.output_file == "" ? nothing : open(opt_ipm.output_file,"w+"),
+    )
+    @trace(logger,"Logger is initialized.")
+
+    # Print remaning options (unsupported)
+    if !isempty(remaining_options)
+        print_ignored_options(logger, remaining_options)
+    end
+    return opt_ipm, opt_linear_solver, logger
+end
+
