@@ -109,21 +109,18 @@ for (lib, envlib, envsrc) in supported_library
             end
         end
 
-        OC = OutputCollector[]
         succeeded = []
+        
         for target in targets
             for (root, dir, file) in list
                 if file == target
                     name, ext = splitext(relpath(joinpath(root,file),copied_path))
-                    push!(
-                        OC,
-                        OutputCollector(`$FC -fopenmp -fPIC -c -O3 -o $name.o $name$ext`)
-                    )
+                    isvalid(`$FC -fopenmp -fPIC -c -O3 -o $name.o $name$ext`)
                     push!(succeeded, (name, ext))
                 end
             end
         end
-        wait.(OC)
+        
 
         cmd = `$FC -o$(libdir)/$lib.$so -shared -fPIC -O3 -fopenmp`
         append!(cmd.exec, ["$name.o" for (name,ext) in succeeded])
