@@ -94,10 +94,13 @@ for (lib, envlib, envsrc) in supported_library
         source_path = ENV[envsrc]
         targets = targets_dict[lib]
         
-        cd(source_path)
+        copied_path = joinpath(@__DIR__, "src", string(lib))
+        mkpath(joinpath(@__DIR__,"src"))
+        cp(source_path, copied_path; force = true)
+        cd(copied_path)
 
         list = []
-        for (root, dir, files) in walkdir(source_path)
+        for (root, dir, files) in walkdir(copied_path)
             for file in files
                 if file in targets
                     @info "$file source code detected."
@@ -106,17 +109,21 @@ for (lib, envlib, envsrc) in supported_library
             end
         end
 
+        OC = OutputCollector[]
         succeeded = []
         for target in targets
             for (root, dir, file) in list
                 if file == target
-                    name, ext = splitext(relpath(joinpath(root,file),source_path))
-                    isvalid(`$FC -fopenmp -fPIC -c -O3 -o $name.o $name$ext`)
+                    name, ext = splitext(relpath(joinpath(root,file),copied_path))
+                    push!(
+                        OC,
+                        OutputCollector(`$FC -fopenmp -fPIC -c -O3 -o $name.o $name$ext`)
+                    )
                     push!(succeeded, (name, ext))
                 end
             end
         end
-        
+        wait.(OC)
 
         cmd = `$FC -o$(libdir)/$lib.$so -shared -fPIC -O3 -fopenmp`
         append!(cmd.exec, ["$name.o" for (name,ext) in succeeded])
