@@ -96,3 +96,15 @@ end
     @test ips.status == MadNLP.SOLVE_SUCCEEDED
 end
 
+@testset "MadNLP timings" begin
+    nlp = MadNLPTests.HS15Model()
+    ips = MadNLP.InteriorPointSolver(nlp)
+    time_callbacks = MadNLP.timing_callbacks(ips)
+    @test isa(time_callbacks, Array)
+    time_linear_solver = MadNLP.timing_linear_solver(ips)
+    @test isa(time_linear_solver, Array)
+    time_madnlp = MadNLP.timing_madnlp(ips)
+    @test isa(time_madnlp.time_linear_solver, Array)
+    @test isa(time_madnlp.time_callbacks, Array)
+end
+

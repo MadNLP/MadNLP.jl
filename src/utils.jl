@@ -84,3 +84,74 @@ const SubVector{Tv} = SubArray{Tv, 1, Vector{Tv}, Tuple{Vector{Int}}, false}
 
     acceptable_cnt::Int = 0
 end
+
+"""
+    timing_callbacks(ips::InteriorPointSolver; ntrials=10)
+
+Return the average timings spent in each callback for `ntrials` different trials.
+Results are returned inside a 5-element array, ordered as
+```
+results = [
+    time_eval_objective,
+    time_eval_constraints,
+    time_eval_gradient_objective,
+    time_eval_jacobian_constraints,
+    time_eval_hessian_lagrangian,
+]
+
+```
+"""
+function timing_callbacks(ips; ntrials=10)
+    time_callbacks = zeros(Float64, 5)
+    for _ in 1:ntrials
+        time_callbacks[1] += @elapsed eval_f_wrapper(ips, ips.x)
+        time_callbacks[2] += @elapsed eval_cons_wrapper!(ips, ips.c, ips.x)
+        time_callbacks[3] += @elapsed eval_grad_f_wrapper!(ips, ips.f,ips.x)
+        time_callbacks[4] += @elapsed eval_jac_wrapper!(ips, ips.kkt, ips.x)
+        time_callbacks[5] += @elapsed eval_lag_hess_wrapper!(ips, ips.kkt, ips.x, ips.l)
+    end
+    time_callbacks ./= ntrials
+    return time_callbacks
+end
+
+"""
+    timing_linear_solver(ips::InteriorPointSolver; ntrials=10)
+
+Return the average timings spent in the linear solver for `ntrials` different trials.
+Results are returned inside a 3-element array, ordered as
+```
+results = [
+    time_build_kkt,
+    time_factorization,
+    time_triangular_solve,
+]
+
+```
+"""
+function timing_linear_solver(ips; ntrials=10)
+    time_linear_solver = zeros(Float64, 3)
+    for _ in 1:ntrials
+        time_linear_solver[1] += @elapsed build_kkt!(ips.kkt)
+        time_linear_solver[2] += @elapsed factorize!(ips.linear_solver)
+        time_linear_solver[3] += @elapsed solve_refine_wrapper!(ips,ips.d,ips.p)
+    end
+    time_linear_solver ./= ntrials
+    return time_linear_solver
+end
+
+"""
+    timing_madnlp(ips::InteriorPointSolver; ntrials=10)
+
+Return the average time spent in the callbacks and in the linear solver,
+for `ntrials` different trials.
+
+Results are returned as a named-tuple.
+
+"""
+function timing_madnlp(ips; ntrials=10)
+    return (
+        time_linear_solver=timing_linear_solver(ips; ntrials=ntrials),
+        time_callbacks=timing_callbacks(ips; ntrials=ntrials),
+    )
+end
+
