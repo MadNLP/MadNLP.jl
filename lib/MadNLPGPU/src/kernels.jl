@@ -133,7 +133,7 @@ function LinearAlgebra.mul!(y::AbstractVector, kkt::MadNLP.DenseKKTSystem{T, VT,
 
     # x and y can be host arrays. Copy them on the device to avoid side effect.
     copyto!(d_x, x)
-    LinearAlgebra.mul!(d_y, Symmetric(kkt.aug_com, :L), d_x)
+    LinearAlgebra.mul!(d_y, LinearAlgebra.Symmetric(kkt.aug_com, :L), d_x)
     copyto!(y, d_y)
 end
 function LinearAlgebra.mul!(y::MadNLP.ReducedKKTVector, kkt::MadNLP.DenseKKTSystem{T, VT, MT}, x::MadNLP.ReducedKKTVector) where {T, VT<:CuVector{T}, MT<:CuMatrix{T}}
@@ -266,7 +266,7 @@ function LinearAlgebra.mul!(y::AbstractVector, kkt::MadNLP.DenseCondensedKKTSyst
 
         # Call parent() as CUDA does not dispatch on proper copyto! when passed a view
         copyto!(d_x, 1, parent(x), 1, length(x))
-        LinearAlgebra.mul!(d_y, Symmetric(kkt.aug_com, :L), d_x)
+        LinearAlgebra.mul!(d_y, LinearAlgebra.Symmetric(kkt.aug_com, :L), d_x)
         copyto!(y, d_y)
     else
         # Load buffers
