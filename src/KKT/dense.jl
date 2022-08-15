@@ -354,7 +354,7 @@ function _mul_expanded!(y::AbstractVector, kkt::DenseCondensedKKTSystem, x::Abst
 
     # / x (variable)
     yx .= Σx .* xx
-    mul!(yx, kkt.hess, xx, 1.0, 1.0)
+    mul!(yx, Symmetric(kkt.hess, :L), xx, 1.0, 1.0)
     mul!(yx, kkt.jac', xy, 1.0, 1.0)
 
     # / s (slack)
