@@ -89,54 +89,46 @@ end
     timing_callbacks(ips::InteriorPointSolver; ntrials=10)
 
 Return the average timings spent in each callback for `ntrials` different trials.
-Results are returned inside a 5-element array, ordered as
-```
-results = [
-    time_eval_objective,
-    time_eval_constraints,
-    time_eval_gradient_objective,
-    time_eval_jacobian_constraints,
-    time_eval_hessian_lagrangian,
-]
+Results are returned inside a named-tuple.
 
-```
 """
 function timing_callbacks(ips; ntrials=10)
-    time_callbacks = zeros(Float64, 5)
+    t_f, t_c, t_g, t_j, t_h = (0.0, 0.0, 0.0, 0.0, 0.0)
     for _ in 1:ntrials
-        time_callbacks[1] += @elapsed eval_f_wrapper(ips, ips.x)
-        time_callbacks[2] += @elapsed eval_cons_wrapper!(ips, ips.c, ips.x)
-        time_callbacks[3] += @elapsed eval_grad_f_wrapper!(ips, ips.f,ips.x)
-        time_callbacks[4] += @elapsed eval_jac_wrapper!(ips, ips.kkt, ips.x)
-        time_callbacks[5] += @elapsed eval_lag_hess_wrapper!(ips, ips.kkt, ips.x, ips.l)
+        t_f += @elapsed eval_f_wrapper(ips, ips.x)
+        t_c += @elapsed eval_cons_wrapper!(ips, ips.c, ips.x)
+        t_g += @elapsed eval_grad_f_wrapper!(ips, ips.f,ips.x)
+        t_j += @elapsed eval_jac_wrapper!(ips, ips.kkt, ips.x)
+        t_h += @elapsed eval_lag_hess_wrapper!(ips, ips.kkt, ips.x, ips.l)
     end
-    time_callbacks ./= ntrials
-    return time_callbacks
+    return (
+        time_eval_objective   = t_f / ntrials,
+        time_eval_constraints = t_c / ntrials,
+        time_eval_gradient    = t_g / ntrials,
+        time_eval_jacobian    = t_j / ntrials,
+        time_eval_hessian     = t_h / ntrials,
+    )
 end
 
 """
     timing_linear_solver(ips::InteriorPointSolver; ntrials=10)
 
 Return the average timings spent in the linear solver for `ntrials` different trials.
-Results are returned inside a 3-element array, ordered as
-```
-results = [
-    time_build_kkt,
-    time_factorization,
-    time_triangular_solve,
-]
+Results are returned inside a named-tuple.
 
-```
 """
 function timing_linear_solver(ips; ntrials=10)
-    time_linear_solver = zeros(Float64, 3)
+    t_build, t_factorize, t_backsolve = (0.0, 0.0, 0.0)
     for _ in 1:ntrials
-        time_linear_solver[1] += @elapsed build_kkt!(ips.kkt)
-        time_linear_solver[2] += @elapsed factorize!(ips.linear_solver)
-        time_linear_solver[3] += @elapsed solve_refine_wrapper!(ips,ips.d,ips.p)
+        t_build     += @elapsed build_kkt!(ips.kkt)
+        t_factorize += @elapsed factorize!(ips.linear_solver)
+        t_backsolve += @elapsed solve_refine_wrapper!(ips,ips.d,ips.p)
     end
-    time_linear_solver ./= ntrials
-    return time_linear_solver
+    return (
+        time_build_kkt = t_build / ntrials,
+        time_factorization = t_factorize / ntrials,
+        time_backsolve = t_backsolve / ntrials,
+    )
 end
 
 """
