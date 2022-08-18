@@ -35,9 +35,4 @@ include("options.jl")
 include(joinpath("IPM", "IPM.jl"))
 include(joinpath("Interfaces","interfaces.jl"))
 
-# Initialize
-function __init__()
-    set_blas_num_threads(Threads.nthreads(); permanent=true)
-end
-
 end # end module

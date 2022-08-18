@@ -137,7 +137,7 @@ is_reduced(::DenseKKTSystem) = true
 num_variables(kkt::DenseKKTSystem) = length(kkt.pr_diag)
 
 function mul!(y::AbstractVector, kkt::DenseKKTSystem, x::AbstractVector)
-    mul!(y, kkt.aug_com, x)
+    mul!(y, Symmetric(kkt.aug_com, :L), x)
 end
 function mul!(y::ReducedKKTVector, kkt::DenseKKTSystem, x::ReducedKKTVector)
     mul!(full(y), kkt.aug_com, full(x))
@@ -371,7 +371,7 @@ end
 function mul!(y::AbstractVector, kkt::DenseCondensedKKTSystem, x::AbstractVector)
     # TODO: implement properly with AbstractKKTRHS
     if length(y) == length(x) == size(kkt.aug_com, 1)
-        mul!(y, kkt.aug_com, x)
+        mul!(y, Symmetric(kkt.aug_com, :L), x)
     else
         _mul_expanded!(y, kkt, x)
     end

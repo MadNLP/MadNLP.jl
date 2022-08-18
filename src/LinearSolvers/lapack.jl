@@ -73,17 +73,14 @@ end
 
 function LapackCPUSolver(
     dense::Matrix{T};
-    option_dict::Dict{Symbol,Any}=Dict{Symbol,Any}(),
     opt=LapackOptions(),
     logger=MadNLPLogger(),
-    kwargs...) where T
-
-    set_options!(opt,option_dict,kwargs...)
+) where T
     fact = copy(dense)
 
     etc = Dict{Symbol,Any}()
     work = Vector{T}(undef, 1)
-    info=0
+    info = 0
 
     return LapackCPUSolver{T}(dense,fact,work,-1,info,etc,opt,logger)
 end
@@ -209,6 +206,7 @@ improve!(M::LapackCPUSolver) = false
 introduce(M::LapackCPUSolver) = "Lapack-CPU ($(M.opt.lapack_algorithm))"
 
 input_type(::Type{LapackCPUSolver}) = :dense
+default_options(::Type{LapackCPUSolver}) = LapackOptions()
 
 function num_neg_ev(n,D,ipiv)
     numneg = 0

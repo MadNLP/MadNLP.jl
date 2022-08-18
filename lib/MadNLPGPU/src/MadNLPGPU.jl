@@ -18,7 +18,7 @@ import MadNLP:
     AbstractOptions, AbstractLinearSolver, AbstractNLPModel, set_options!,
     SymbolicException,FactorizationException,SolveException,InertiaException,
     introduce, factorize!, solve!, improve!, is_inertia, inertia, tril_to_full!,
-    LapackOptions, input_type, is_supported
+    LapackOptions, input_type, is_supported, default_options
 
 
 

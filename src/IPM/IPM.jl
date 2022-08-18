@@ -95,41 +95,35 @@ mutable struct MadNLPSolver{T,KKTSystem <: AbstractKKTSystem{T}} <: AbstractMadN
     output::Dict
 end
 
-function MadNLPSolver(nlp::AbstractNLPModel{T};
-    option_dict::Dict{Symbol,Any}=Dict{Symbol,Any}(), kwargs...
-) where T
-    opt = MadNLPOptions(linear_solver=default_linear_solver())
-    set_options!(opt,option_dict,kwargs)
-    check_option_sanity(opt)
-    
-    @assert is_supported(opt.linear_solver,T)
+function MadNLPSolver(nlp::AbstractNLPModel{T}; kwargs...) where T
+    opt_ipm, opt_linear_solver, logger = load_options(; kwargs...)
+    @assert is_supported(opt_ipm.linear_solver, T)
 
     VT = Vector{T}
-    KKTSystem = if opt.kkt_system == SPARSE_KKT_SYSTEM
-        MT = (input_type(opt.linear_solver) == :csc) ? SparseMatrixCSC{T, Int32} : Matrix{T}
+    KKTSystem = if opt_ipm.kkt_system == SPARSE_KKT_SYSTEM
+        MT = (input_type(opt_ipm.linear_solver) == :csc) ? SparseMatrixCSC{T, Int32} : Matrix{T}
         SparseKKTSystem{T, VT, MT}
-    elseif opt.kkt_system == SPARSE_UNREDUCED_KKT_SYSTEM
-        MT = (input_type(opt.linear_solver) == :csc) ? SparseMatrixCSC{T, Int32} : Matrix{T}
+    elseif opt_ipm.kkt_system == SPARSE_UNREDUCED_KKT_SYSTEM
+        MT = (input_type(opt_ipm.linear_solver) == :csc) ? SparseMatrixCSC{T, Int32} : Matrix{T}
         SparseUnreducedKKTSystem{T, VT, MT}
-    elseif opt.kkt_system == DENSE_KKT_SYSTEM
+    elseif opt_ipm.kkt_system == DENSE_KKT_SYSTEM
         MT = Matrix{T}
         DenseKKTSystem{T, VT, MT}
-    elseif opt.kkt_system == DENSE_CONDENSED_KKT_SYSTEM
+    elseif opt_ipm.kkt_system == DENSE_CONDENSED_KKT_SYSTEM
         MT = Matrix{T}
         DenseCondensedKKTSystem{T, VT, MT}
     end
-    return MadNLPSolver{T,KKTSystem}(nlp, opt; option_linear_solver=option_dict)
+    return MadNLPSolverSolver{T,KKTSystem}(nlp, opt_ipm, opt_linear_solver; logger=logger)
 end
 
 # Inner constructor
-function MadNLPSolver{T,KKTSystem}(nlp::AbstractNLPModel, opt::MadNLPOptions;
-    option_linear_solver::Dict{Symbol,Any}=Dict{Symbol,Any}(),
+function MadNLPSolverSolver{T,KKTSystem}(
+    nlp::AbstractNLPModel,
+    opt::IPMOptions,
+    opt_linear_solver::AbstractOptions;
+    logger=MadNLPLogger(),
 ) where {T, KKTSystem<:AbstractKKTSystem{T}}
     cnt = MadNLPCounters(start_time=time())
-
-    logger = MadNLPLogger(print_level=opt.print_level,file_print_level=opt.file_print_level,
-                    file = opt.output_file == "" ? nothing : open(opt.output_file,"w+"))
-    @trace(logger,"MadNLPLogger is initialized.")
 
     # generic options
     opt.disable_garbage_collector &&
@@ -201,8 +195,7 @@ function MadNLPSolver{T,KKTSystem}(nlp::AbstractNLPModel, opt::MadNLPOptions;
     con_jac_scale = ones(T,n_jac)
 
     @trace(logger,"Initializing linear solver.")
-    cnt.linear_solver_time =
-        @elapsed linear_solver = opt.linear_solver(get_kkt(kkt) ; option_dict=option_linear_solver, logger=logger)
+    cnt.linear_solver_time = @elapsed linear_solver = opt.linear_solver(get_kkt(kkt) ; opt=opt_linear_solver, logger=logger)
 
     n_kkt = size(kkt, 1)
     buffer_vec = similar(full(d), n_kkt)
@@ -215,7 +208,6 @@ function MadNLPSolver{T,KKTSystem}(nlp::AbstractNLPModel, opt::MadNLPOptions;
         opt.inertia_correction_method = is_inertia(linear_solver) ? INERTIA_BASED : INERTIA_FREE
     end
 
-    !isempty(option_linear_solver) && print_ignored_options(logger, option_linear_solver)
 
     return MadNLPSolver{T,KKTSystem}(nlp,kkt,opt,cnt,logger,
         n,m,nlb,nub,x,y,zl,zu,xl,xu,0.,f,c,

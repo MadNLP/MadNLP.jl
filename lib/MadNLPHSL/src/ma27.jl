@@ -89,11 +89,8 @@ for (fa, fb, fc, typ) in [
 end
 
 function Ma27Solver(csc::SparseMatrixCSC{T};
-                option_dict::Dict{Symbol,Any}=Dict{Symbol,Any}(),
-                opt=Ma27Options(),logger=MadNLPLogger(),kwargs...) where T
-
-    set_options!(opt,option_dict,kwargs)
-
+    opt=Ma27Options(),logger=MadNLPLogger(),
+) where T
     I,J = findIJ(csc)
     nz=Int32(nnz(csc))
 
@@ -175,5 +172,6 @@ end
 
 introduce(::Ma27Solver)="ma27"
 input_type(::Type{Ma27Solver}) = :csc
+default_options(::Type{Ma27Solver}) = Ma27Options()
 is_supported(::Type{Ma27Solver},::Type{Float32}) = true
 is_supported(::Type{Ma27Solver},::Type{Float64}) = true

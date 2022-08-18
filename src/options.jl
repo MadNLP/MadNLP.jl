@@ -2,18 +2,18 @@
 
 parse_option(::Type{Module},str::String) = eval(Symbol(str))
 
-function set_options!(opt::AbstractOptions,option_dict::Dict{Symbol,Any})
-    for (key,val) in option_dict
-        hasproperty(opt,key) || continue
-        T = fieldtype(typeof(opt),key)
-        val isa T ? setproperty!(opt,key,val) :
-            setproperty!(opt,key,parse_option(T,val))
-        pop!(option_dict,key)
+function set_options!(opt::AbstractOptions, options)
+    other_options = Dict{Symbol, Any}()
+    for (key, val) in options
+        if hasproperty(opt, key)
+            T = fieldtype(typeof(opt), key)
+            val isa T ? setproperty!(opt,key,val) :
+                setproperty!(opt,key,parse_option(T,val))
+        else
+            other_options[key] = val
+        end
     end
-end
-function set_options!(opt::AbstractOptions,option_dict::Dict{Symbol,Any},kwargs)
-    !isempty(kwargs) && (for (key,val) in kwargs; option_dict[key]=val; end)
-    set_options!(opt,option_dict)
+    return other_options
 end
 
 @kwdef mutable struct MadNLPOptions <: AbstractOptions
@@ -98,5 +98,36 @@ function check_option_sanity(options)
         error("[options] Sparse Linear solver is not supported in dense mode.\n"*
               "Please use a dense linear solver or change `kkt_system` ")
     end
+end
+
+function print_ignored_options(logger,option_dict)
+    @warn(logger,"The following options are ignored: ")
+    for (key,val) in option_dict
+        @warn(logger," - "*string(key))
+    end
+end
+
+function load_options(; linear_solver=default_linear_solver(), options...)
+    # Initiate interior-point options
+    opt_ipm = IPMOptions(linear_solver=linear_solver)
+    linear_solver_options = set_options!(opt_ipm, options)
+    check_option_sanity(opt_ipm)
+    # Initiate linear-solver options
+    opt_linear_solver = default_options(opt_ipm.linear_solver)
+    remaining_options = set_options!(opt_linear_solver, linear_solver_options)
+
+    # Initiate logger
+    logger = Logger(
+        print_level=opt_ipm.print_level,
+        file_print_level=opt_ipm.file_print_level,
+        file = opt_ipm.output_file == "" ? nothing : open(opt_ipm.output_file,"w+"),
+    )
+    @trace(logger,"Logger is initialized.")
+
+    # Print remaning options (unsupported)
+    if !isempty(remaining_options)
+        print_ignored_options(logger, remaining_options)
+    end
+    return opt_ipm, opt_linear_solver, logger
 end
 

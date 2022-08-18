@@ -30,7 +30,7 @@ for (numeric,solve,T) in (
     (:umfpack_di_numeric, :umfpack_di_solve, Float64),
     (:umfpack_si_numeric, :umfpack_si_solve, Float32),
     )
-    @eval begin 
+    @eval begin
         umfpack_numeric(
             colptr::Vector{Int32},rowval::Vector{Int32},
             nzval::Vector{$T},symbolic::Ptr{Nothing},
@@ -57,12 +57,8 @@ end
 
 function UmfpackSolver(
     csc::SparseMatrixCSC{T};
-    option_dict::Dict{Symbol,Any}=Dict{Symbol,Any}(),
-    opt=UmfpackOptions(),logger=MadNLPLogger(),
-    kwargs...) where T
-
-    set_options!(opt,option_dict,kwargs)
-
+    opt=UmfpackOptions(), logger=MadNLPLogger(),
+) where T
     p = Vector{T}(undef,csc.n)
     full,tril_to_full_view = get_tril_to_full(csc)
 
@@ -100,6 +96,7 @@ end
 is_inertia(::UmfpackSolver) = false
 inertia(M::UmfpackSolver) = throw(InertiaException())
 input_type(::Type{UmfpackSolver}) = :csc
+default_options(::Type{UmfpackSolver}) = UmfpackOptions()
 
 function improve!(M::UmfpackSolver)
     if M.ctrl[4] == M.opt.umfpack_pivtolmax

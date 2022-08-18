@@ -30,8 +30,8 @@ function _compare_dense_with_sparse(
 
         nlp = MadNLPTests.DenseDummyQP{T}(; n=n, m=m, fixed_variables=ind_fixed, equality_cons=ind_eq)
 
-        solver = MadNLP.MadNLPSolver(nlp, option_dict=sparse_options)
-        solverd = MadNLP.MadNLPSolver(nlp, option_dict=dense_options)
+        solver = MadNLP.MadNLPSolver(nlp; sparse_options...)
+        solverd = MadNLP.MadNLPSolver(nlp; dense_options...)
 
         MadNLP.solve!(solver)
         MadNLP.solve!(solverd)
@@ -62,7 +62,7 @@ end
         )
         m = 0
         nlp = MadNLPTests.DenseDummyQP(; n=n, m=m)
-        solverd = MadNLP.MadNLPSolver(nlp, option_dict=dense_options)
+        solverd = MadNLP.MadNLPSolver(nlp; dense_options...)
 
         kkt = solverd.kkt
         @test isa(kkt, kkt_type)
@@ -81,7 +81,7 @@ end
             :kkt_system=>kkt_options,
             :linear_solver=>MadNLP.UmfpackSolver,
         )
-        @test_throws Exception MadNLP.MadNLPSolver(nlp, dense_options_error)
+        @test_throws Exception MadNLP.MadNLPSolver(nlp; dense_options_error...)
     end
     @testset "Constrained" begin
         dense_options = Dict{Symbol, Any}(
@@ -90,7 +90,7 @@ end
         )
         m = 5
         nlp = MadNLPTests.DenseDummyQP(; n=n, m=m)
-        solverd = MadNLP.MadNLPSolver(nlp, option_dict=dense_options)
+        solverd = MadNLP.MadNLPSolver(nlp; dense_options...)
         ns = length(solverd.ind_ineq)
 
         kkt = solverd.kkt
@@ -130,8 +130,9 @@ end
         :linear_solver=>MadNLP.LapackCPUSolver,
         :print_level=>MadNLP.ERROR,
     )
-    solver = MadNLP.MadNLPSolver(nlp, option_dict=sparse_options)
-    MadNLP.solve!(solver)
+
+    solver = MadNLP.MadNLPSolver(nlp; sparse_options...)
+    MadNLP.optimize!(solver)
     # Restart (should hit MadNLP.reinitialize function)
     res = MadNLP.solve!(solver)
     @test solver.status == MadNLP.SOLVE_SUCCEEDED

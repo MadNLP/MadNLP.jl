@@ -110,12 +110,7 @@ function print_summary_2(solver::AbstractMadNLPSolver)
                                 solver.cnt.total_time))
 end
 
-function print_ignored_options(logger,option_dict)
-    @warn(logger,"The following options are ignored: ")
-    for (key,val) in option_dict
-        @warn(logger," - "*string(key))
-    end
-end
+
 function string(solver::AbstractMadNLPSolver)
     """
                 Interior point solver

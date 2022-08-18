@@ -124,5 +124,6 @@ end
 
 introduce(::PardisoSolver)="pardiso"
 input_type(::Type{PardisoSolver}) = :csc
+default_options(::Type{PardisoSolver}) = PardisoOptions()
 is_supported(::Type{PardisoSolver},::Type{Float32}) = true
 is_supported(::Type{PardisoSolver},::Type{Float64}) = true

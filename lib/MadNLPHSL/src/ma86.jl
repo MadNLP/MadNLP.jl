@@ -65,9 +65,9 @@ end
 
 
 for (fdefault, fanalyse, ffactor, fsolve, ffinalise, typ) in [
-    (:ma86_default_control_d, :ma86_analyse_d, 
-     :ma86_factor_d, :ma86_solve_d, :ma86_finalise_d, Float64), 
-    (:ma86_default_control_s, :ma86_analyse_s, 
+    (:ma86_default_control_d, :ma86_analyse_d,
+     :ma86_factor_d, :ma86_solve_d, :ma86_finalise_d, Float64),
+    (:ma86_default_control_s, :ma86_analyse_s,
      :ma86_factor_s, :ma86_solve_s, :ma86_finalise_s, Float32)
      ]
     @eval begin
@@ -130,12 +130,8 @@ ma86_set_num_threads(n) = ccall((:omp_set_num_threads_,libma86),
 
 function Ma86Solver(
     csc::SparseMatrixCSC{T,Int32};
-    option_dict::Dict{Symbol,Any}=Dict{Symbol,Any}(),
     opt=Ma86Options(),logger=MadNLPLogger(),
-    kwargs...) where T
-
-    set_options!(opt,option_dict,kwargs)
-
+) where T
     ma86_set_num_threads(opt.ma86_num_threads)
 
     order = Vector{Int32}(undef,csc.n)
@@ -195,6 +191,7 @@ function improve!(M::Ma86Solver)
 end
 introduce(::Ma86Solver)="ma86"
 input_type(::Type{Ma86Solver}) = :csc
+default_options(::Type{Ma86Solver}) = Ma86Options()
 is_supported(::Type{Ma86Solver},::Type{Float32}) = true
 is_supported(::Type{Ma86Solver},::Type{Float64}) = true
 

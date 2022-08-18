@@ -175,10 +175,11 @@ function solve!(
     return MadNLPExecutionStats(solver)
 end
 
+
 function unscale!(solver::AbstractMadNLPSolver)
     solver.obj_val/=solver.obj_scale[]
     solver.c ./= solver.con_scale
-    solver.c .-= solver.rhs
+    solver.c .+= solver.rhs
     solver.c_slk .+= solver.x_slk
 end
 

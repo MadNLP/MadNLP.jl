@@ -69,9 +69,9 @@ mutable struct Ma97Solver{T} <:AbstractLinearSolver{T}
 end
 
 for (fdefault, fanalyse, ffactor, fsolve, ffinalise, typ) in [
-    (:ma97_default_control_d, :ma97_analyse_d, 
-     :ma97_factor_d, :ma97_solve_d, :ma97_finalise_d, Float64), 
-    (:ma97_default_control_s, :ma97_analyse_s, 
+    (:ma97_default_control_d, :ma97_analyse_d,
+     :ma97_factor_d, :ma97_solve_d, :ma97_finalise_d, Float64),
+    (:ma97_default_control_s, :ma97_analyse_s,
      :ma97_factor_s, :ma97_solve_s, :ma97_finalise_s, Float32)
      ]
     @eval begin
@@ -135,11 +135,8 @@ ma97_set_num_threads(n) = ccall((:omp_set_num_threads_,libma97),
 
 function Ma97Solver(
     csc::SparseMatrixCSC{T,Int32};
-    option_dict::Dict{Symbol,Any}=Dict{Symbol,Any}(),
     opt=Ma97Options(),logger=MadNLPLogger(),
-    kwargs...) where T
-
-    set_options!(opt,option_dict,kwargs)
+) where T
 
     ma97_set_num_threads(opt.ma97_num_threads)
 
@@ -193,5 +190,6 @@ function improve!(M::Ma97Solver)
 end
 introduce(::Ma97Solver)="ma97"
 input_type(::Type{Ma97Solver}) = :csc
+default_options(::Type{Ma97Solver}) = Ma97Options()
 is_supported(::Type{Ma97Solver},::Type{Float32}) = true
 is_supported(::Type{Ma97Solver},::Type{Float64}) = true
