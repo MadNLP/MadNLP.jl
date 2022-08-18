@@ -74,7 +74,7 @@ MadNLP is interfaced with non-Julia sparse/dense linear solvers:
 - [Mumps](http://mumps.enseeiht.fr/)  (requires extension)
 - [cuSOLVER](https://docs.nvidia.com/cuda/cusolver/index.html) (requires extension)
 
-Each linear solver in MadNLP is a Julia module, and the `linear_solver` option should be specified by the actual module. Note that the linear solver modules are always exported to `Main`.
+Each linear solver in MadNLP is a Julia type, and the `linear_solver` option should be specified by the actual typ. Note that the linear solvers are always exported to `Main`.
 
 #### Built-in Solvers: Umfpack, PardisoMKL, LapackCPU
 ```julia
