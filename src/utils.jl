@@ -42,8 +42,11 @@ for (name,level,color) in [(:trace,TRACE,7),(:debug,DEBUG,6),(:info,INFO,256),(:
 end
 
 # BLAS
+# CUBLAS currently does not import symv!,
+# so using symv! is not dispatched to CUBLAS.symv!
+# symul! wraps symv! and dispatch based on the data type
+symul!(y, A, x::AbstractVector{T}, α = 1, β = 0) where T = BLAS.symv!('L', T(α), A, x, T(β), y) 
 
-symul!(y, A, x::AbstractVector{T}, α = 1, β = 0) where T = BLAS.symv!('L', T(α), A, x, T(β), y)
 const blas_num_threads = Ref{Int}(1)
 function set_blas_num_threads(n::Integer;permanent::Bool=false)
     permanent && (blas_num_threads[]=n)
