@@ -129,7 +129,7 @@ end
 function unscale!(ips::AbstractInteriorPointSolver)
     ips.obj_val/=ips.obj_scale[]
     ips.c ./= ips.con_scale
-    ips.c .-= ips.rhs
+    ips.c .+= ips.rhs
     ips.c_slk .+= ips.x_slk
 end
 
