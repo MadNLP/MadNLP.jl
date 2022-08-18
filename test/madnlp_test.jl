@@ -76,23 +76,29 @@ for (name,optimizer_constructor,exclude) in testset
 end
 
 @testset "HS15 problem" begin
-    options = Dict{Symbol, Any}(
-        :print_level=>MadNLP.ERROR,
-    )
     nlp = MadNLPTests.HS15Model()
-    ips = MadNLP.InteriorPointSolver(nlp; option_dict=options)
+    ips = MadNLP.InteriorPointSolver(nlp; print_level=MadNLP.ERROR)
     MadNLP.optimize!(ips)
     @test ips.status == MadNLP.SOLVE_SUCCEEDED
 end
 
 
-@testset "NLS problem" begin
-    options = Dict{Symbol, Any}(
-        :print_level=>MadNLP.ERROR,
-    )
-    nlp = MadNLPTests.NLSModel()
-    ips = MadNLP.InteriorPointSolver(nlp; option_dict=options)
-    MadNLP.optimize!(ips)
-    @test ips.status == MadNLP.SOLVE_SUCCEEDED
+# @testset "NLS problem" begin
+#     nlp = MadNLPTests.NLSModel()
+#     ips = MadNLP.InteriorPointSolver(nlp; print_level=MadNLP.ERROR)
+#     MadNLP.optimize!(ips)
+#     @test ips.status == MadNLP.SOLVE_SUCCEEDED
+# end
+
+@testset "MadNLP timings" begin
+    nlp = MadNLPTests.HS15Model()
+    ips = MadNLP.InteriorPointSolver(nlp)
+    time_callbacks = MadNLP.timing_callbacks(ips)
+    @test isa(time_callbacks, NamedTuple)
+    time_linear_solver = MadNLP.timing_linear_solver(ips)
+    @test isa(time_linear_solver, NamedTuple)
+    time_madnlp = MadNLP.timing_madnlp(ips)
+    @test isa(time_madnlp.time_linear_solver, NamedTuple)
+    @test isa(time_madnlp.time_callbacks, NamedTuple)
 end
 

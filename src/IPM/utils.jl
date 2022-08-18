@@ -110,12 +110,6 @@ function print_summary_2(ips::AbstractInteriorPointSolver)
                                 ips.cnt.total_time))
 end
 
-function print_ignored_options(logger,option_dict)
-    @warn(logger,"The following options are ignored: ")
-    for (key,val) in option_dict
-        @warn(logger," - "*string(key))
-    end
-end
 function string(ips::AbstractInteriorPointSolver)
     """
                 Interior point solver

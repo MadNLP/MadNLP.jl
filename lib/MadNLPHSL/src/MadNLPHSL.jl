@@ -6,7 +6,7 @@ import MadNLP: @kwdef, Logger, @debug, @warn, @error,
     SymbolicException,FactorizationException,SolveException,InertiaException,
     introduce, factorize!, solve!, improve!, is_inertia, inertia, findIJ, nnz,
     get_tril_to_full, transfer!, input_type, _madnlp_unsafe_wrap,
-    is_supported
+    is_supported, default_options
 
 include(joinpath("..","deps","deps.jl"))
 
