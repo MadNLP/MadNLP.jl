@@ -5,7 +5,7 @@ include(joinpath("..","deps","deps.jl"))
 
 import Libdl: dlopen, RTLD_DEEPBIND
 import MadNLP:
-    MadNLP, @kwdef, Logger, @debug, @warn, @error,
+    MadNLP, @kwdef, MadNLPLogger, @debug, @warn, @error,
     SubVector, SparseMatrixCSC,
     SymbolicException,FactorizationException,SolveException,InertiaException,
     AbstractOptions, AbstractLinearSolver, set_options!,

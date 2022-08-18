@@ -1,5 +1,4 @@
-
-function CuInteriorPointSolver(nlp::AbstractNLPModel{T}; kwargs...) where T
+function CuMadNLPSolver(nlp::AbstractNLPModel{T}; kwargs...) where T
     opt_ipm, opt_linear_solver, logger = MadNLP.load_options(; linear_solver=LapackGPUSolver, kwargs...)
 
     @assert is_supported(opt_ipm.linear_solver, T)
@@ -15,5 +14,5 @@ function CuInteriorPointSolver(nlp::AbstractNLPModel{T}; kwargs...) where T
         VT = CuVector{T}
         MadNLP.DenseCondensedKKTSystem{T, VT, MT}
     end
-    return MadNLP.InteriorPointSolver{T,KKTSystem}(nlp, opt_ipm, opt_linear_solver; logger=logger)
+    return MadNLP.MadNLPSolver{T,KKTSystem}(nlp, opt_ipm, opt_linear_solver; logger=logger)
 end

@@ -38,7 +38,7 @@ mutable struct Ma57Solver{T} <: AbstractLinearSolver{T}
     work::Vector{T}
 
     opt::Ma57Options
-    logger::Logger
+    logger::MadNLPLogger
 end
 
 
@@ -85,7 +85,7 @@ for (fa,fb,fc,typ) in (
 end
 
 function Ma57Solver(csc::SparseMatrixCSC{T};
-    opt=Ma57Options(),logger=Logger()
+    opt=Ma57Options(),logger=MadNLPLogger()
 ) where T
     I,J=findIJ(csc)
 

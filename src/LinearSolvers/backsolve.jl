@@ -8,13 +8,13 @@ struct RichardsonIterator{T, VT, KKT, LinSolver <: AbstractLinearSolver{T}} <: A
     max_iter::Int
     tol::T
     acceptable_tol::T
-    logger::Logger
+    logger::MadNLPLogger
 end
 function RichardsonIterator(
     linear_solver::AbstractLinearSolver{T},
     kkt::AbstractKKTSystem,
     res::AbstractVector;
-    max_iter=10, tol=T(1e-10), acceptable_tol=T(1e-5), logger=Logger(),
+    max_iter=10, tol=T(1e-10), acceptable_tol=T(1e-5), logger=MadNLPLogger(),
 ) where T
     return RichardsonIterator(
         linear_solver, kkt, res, max_iter, tol, acceptable_tol, logger,

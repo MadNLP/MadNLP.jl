@@ -30,21 +30,21 @@ function _compare_dense_with_sparse(
 
         nlp = MadNLPTests.DenseDummyQP{T}(; n=n, m=m, fixed_variables=ind_fixed, equality_cons=ind_eq)
 
-        ips = MadNLP.InteriorPointSolver(nlp; sparse_options...)
-        ipd = MadNLP.InteriorPointSolver(nlp; dense_options...)
+        solver = MadNLPSolver(nlp; sparse_options...)
+        solverd = MadNLPSolver(nlp; dense_options...)
 
-        MadNLP.optimize!(ips)
-        MadNLP.optimize!(ipd)
+        MadNLP.solve!(solver)
+        MadNLP.solve!(solverd)
 
         # Check that dense formulation matches exactly sparse formulation
-        @test ipd.status == MadNLP.SOLVE_SUCCEEDED
-        @test ips.cnt.k == ipd.cnt.k
-        @test ips.obj_val ≈ ipd.obj_val atol=atol
-        @test ips.x ≈ ipd.x atol=atol
-        @test ips.l ≈ ipd.l atol=atol
-        @test ips.kkt.jac_com[:, 1:n] == ipd.kkt.jac
-        if isa(ipd.kkt, MadNLP.AbstractReducedKKTSystem)
-            @test Symmetric(ips.kkt.aug_com, :L) ≈ ipd.kkt.aug_com atol=atol
+        @test solverd.status == MadNLP.SOLVE_SUCCEEDED
+        @test solver.cnt.k == solverd.cnt.k
+        @test solver.obj_val ≈ solverd.obj_val atol=atol
+        @test solver.x ≈ solverd.x atol=atol
+        @test solver.y ≈ solverd.y atol=atol
+        @test solver.kkt.jac_com[:, 1:n] == solverd.kkt.jac
+        if isa(solverd.kkt, MadNLP.AbstractReducedKKTSystem)
+            @test Symmetric(solver.kkt.aug_com, :L) ≈ solverd.kkt.aug_com atol=atol
         end
     end
 end
@@ -62,16 +62,16 @@ end
         )
         m = 0
         nlp = MadNLPTests.DenseDummyQP(; n=n, m=m)
-        ipd = MadNLP.InteriorPointSolver(nlp; dense_options...)
+        solverd = MadNLPSolver(nlp; dense_options...)
 
-        kkt = ipd.kkt
+        kkt = solverd.kkt
         @test isa(kkt, kkt_type)
         @test isempty(kkt.jac)
         # Special test for DenseKKTSystem
         if kkt_type <: MadNLP.DenseKKTSystem
             @test kkt.hess === kkt.aug_com
         end
-        @test ipd.linear_solver.dense === kkt.aug_com
+        @test solverd.linear_solver.dense === kkt.aug_com
         @test size(kkt.hess) == (n, n)
         @test length(kkt.pr_diag) == n
         @test length(kkt.du_diag) == m
@@ -81,7 +81,7 @@ end
             :kkt_system=>kkt_options,
             :linear_solver=>MadNLP.UmfpackSolver,
         )
-        @test_throws Exception MadNLP.InteriorPointSolver(nlp; dense_options_error...)
+        @test_throws Exception MadNLPSolver(nlp; dense_options_error...)
     end
     @testset "Constrained" begin
         dense_options = Dict{Symbol, Any}(
@@ -90,13 +90,13 @@ end
         )
         m = 5
         nlp = MadNLPTests.DenseDummyQP(; n=n, m=m)
-        ipd = MadNLP.InteriorPointSolver(nlp; dense_options...)
-        ns = length(ipd.ind_ineq)
+        solverd = MadNLPSolver(nlp; dense_options...)
+        ns = length(solverd.ind_ineq)
 
-        kkt = ipd.kkt
+        kkt = solverd.kkt
         @test isa(kkt, MadNLP.DenseKKTSystem)
         @test size(kkt.jac) == (m, n)
-        @test ipd.linear_solver.dense === kkt.aug_com
+        @test solverd.linear_solver.dense === kkt.aug_com
         @test size(kkt.hess) == (n, n)
         @test length(kkt.pr_diag) == n + ns
         @test length(kkt.du_diag) == m
@@ -130,9 +130,11 @@ end
         :linear_solver=>MadNLP.LapackCPUSolver,
         :print_level=>MadNLP.ERROR,
     )
-    ips = MadNLP.InteriorPointSolver(nlp; sparse_options...)
-    MadNLP.optimize!(ips)
+
+    solver = MadNLPSolver(nlp; sparse_options...)
+    MadNLP.solve!(solver)
+    
     # Restart (should hit MadNLP.reinitialize function)
-    res = MadNLP.optimize!(ips)
-    @test ips.status == MadNLP.SOLVE_SUCCEEDED
+    res = MadNLP.solve!(solver)
+    @test solver.status == MadNLP.SOLVE_SUCCEEDED
 end

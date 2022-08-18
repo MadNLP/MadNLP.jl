@@ -16,7 +16,7 @@ function set_options!(opt::AbstractOptions, options)
     return other_options
 end
 
-@kwdef mutable struct IPMOptions <: AbstractOptions
+@kwdef mutable struct MadNLPOptions <: AbstractOptions
     # General options
     rethrow_error::Bool = true
     disable_garbage_collector::Bool = false
@@ -109,7 +109,7 @@ end
 
 function load_options(; linear_solver=default_linear_solver(), options...)
     # Initiate interior-point options
-    opt_ipm = IPMOptions(linear_solver=linear_solver)
+    opt_ipm = MadNLPOptions(linear_solver=linear_solver)
     linear_solver_options = set_options!(opt_ipm, options)
     check_option_sanity(opt_ipm)
     # Initiate linear-solver options
@@ -117,7 +117,7 @@ function load_options(; linear_solver=default_linear_solver(), options...)
     remaining_options = set_options!(opt_linear_solver, linear_solver_options)
 
     # Initiate logger
-    logger = Logger(
+    logger = MadNLPLogger(
         print_level=opt_ipm.print_level,
         file_print_level=opt_ipm.file_print_level,
         file = opt_ipm.output_file == "" ? nothing : open(opt_ipm.output_file,"w+"),

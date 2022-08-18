@@ -4,17 +4,17 @@ abstract type AbstractOptions end
 default_linear_solver() = UmfpackSolver
 default_dense_solver() = LapackCPUSolver
 
-# Logger
-@kwdef mutable struct Logger
+# MadNLPLogger
+@kwdef mutable struct MadNLPLogger
     print_level::LogLevels = INFO
     file_print_level::LogLevels = INFO
     file::Union{IOStream,Nothing} = nothing
 end
 
-get_level(logger::Logger) = logger.print_level
-get_file_level(logger::Logger) = logger.file_print_level
-get_file(logger::Logger) = logger.file
-finalize(logger::Logger) = logger.file != nothing && close(logger.file)
+get_level(logger::MadNLPLogger) = logger.print_level
+get_file_level(logger::MadNLPLogger) = logger.file_print_level
+get_file(logger::MadNLPLogger) = logger.file
+finalize(logger::MadNLPLogger) = logger.file != nothing && close(logger.file)
 
 for (name,level,color) in [(:trace,TRACE,7),(:debug,DEBUG,6),(:info,INFO,256),(:notice,NOTICE,256),(:warn,WARN,5),(:error,ERROR,9)]
     @eval begin
@@ -64,7 +64,7 @@ end
 # Type definitions for noncontiguous views
 const SubVector{Tv} = SubArray{Tv, 1, Vector{Tv}, Tuple{Vector{Int}}, false}
 
-@kwdef mutable struct Counters
+@kwdef mutable struct MadNLPCounters
     k::Int = 0 # total iteration counter
     l::Int = 0 # backtracking line search counter
     t::Int = 0 # restoration phase counter
@@ -99,7 +99,7 @@ function timing_callbacks(ips; ntrials=10)
         t_c += @elapsed eval_cons_wrapper!(ips, ips.c, ips.x)
         t_g += @elapsed eval_grad_f_wrapper!(ips, ips.f,ips.x)
         t_j += @elapsed eval_jac_wrapper!(ips, ips.kkt, ips.x)
-        t_h += @elapsed eval_lag_hess_wrapper!(ips, ips.kkt, ips.x, ips.l)
+        t_h += @elapsed eval_lag_hess_wrapper!(ips, ips.kkt, ips.x, ips.y)
     end
     return (
         time_eval_objective   = t_f / ntrials,

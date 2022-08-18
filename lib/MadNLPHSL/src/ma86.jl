@@ -60,7 +60,7 @@ mutable struct Ma86Solver{T} <: AbstractLinearSolver{T}
     keep::Vector{Ptr{Nothing}}
 
     opt::Ma86Options
-    logger::Logger
+    logger::MadNLPLogger
 end
 
 
@@ -130,7 +130,7 @@ ma86_set_num_threads(n) = ccall((:omp_set_num_threads_,libma86),
 
 function Ma86Solver(
     csc::SparseMatrixCSC{T,Int32};
-    opt=Ma86Options(),logger=Logger(),
+    opt=Ma86Options(),logger=MadNLPLogger(),
 ) where T
     ma86_set_num_threads(opt.ma86_num_threads)
 

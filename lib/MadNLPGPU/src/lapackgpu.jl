@@ -9,14 +9,14 @@ mutable struct LapackGPUSolver{T} <: AbstractLinearSolver{T}
     info::CuVector{Int32}
     etc::Dict{Symbol,Any} # throw some algorithm-specific things here
     opt::LapackOptions
-    logger::Logger
+    logger::MadNLPLogger
 end
 
 
 function LapackGPUSolver(
     dense::MT;
     option_dict::Dict{Symbol,Any}=Dict{Symbol,Any}(),
-    opt=LapackOptions(),logger=Logger(),
+    opt=LapackOptions(),logger=MadNLPLogger(),
     kwargs...) where {T,MT <: AbstractMatrix{T}}
 
     set_options!(opt,option_dict,kwargs...)

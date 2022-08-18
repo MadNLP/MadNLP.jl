@@ -1,17 +1,17 @@
 # MadNLP.jl
 # Created by Sungho Shin (sungho.shin@wisc.edu)
 
-abstract type AbstractInteriorPointSolver{T} end
+abstract type AbstractMadNLPSolver{T} end
 
 include("restoration.jl")
 
-mutable struct InteriorPointSolver{T,KKTSystem <: AbstractKKTSystem{T}} <: AbstractInteriorPointSolver{T}
+mutable struct MadNLPSolver{T,KKTSystem <: AbstractKKTSystem{T}} <: AbstractMadNLPSolver{T}
     nlp::AbstractNLPModel
     kkt::KKTSystem
 
-    opt::IPMOptions
-    cnt::Counters
-    logger::Logger
+    opt::MadNLPOptions
+    cnt::MadNLPCounters
+    logger::MadNLPLogger
 
     n::Int # number of variables (after reformulation)
     m::Int # number of cons
@@ -19,7 +19,7 @@ mutable struct InteriorPointSolver{T,KKTSystem <: AbstractKKTSystem{T}} <: Abstr
     nub::Int
 
     x::Vector{T} # primal (after reformulation)
-    l::Vector{T} # dual
+    y::Vector{T} # dual
     zl::Vector{T} # dual (after reformulation)
     zu::Vector{T} # dual (after reformulation)
     xl::Vector{T} # primal lower bound (after reformulation)
@@ -95,7 +95,7 @@ mutable struct InteriorPointSolver{T,KKTSystem <: AbstractKKTSystem{T}} <: Abstr
     output::Dict
 end
 
-function InteriorPointSolver(nlp::AbstractNLPModel{T}; kwargs...) where T
+function MadNLPSolver(nlp::AbstractNLPModel{T}; kwargs...) where T
     opt_ipm, opt_linear_solver, logger = load_options(; kwargs...)
     @assert is_supported(opt_ipm.linear_solver, T)
 
@@ -113,17 +113,17 @@ function InteriorPointSolver(nlp::AbstractNLPModel{T}; kwargs...) where T
         MT = Matrix{T}
         DenseCondensedKKTSystem{T, VT, MT}
     end
-    return InteriorPointSolver{T,KKTSystem}(nlp, opt_ipm, opt_linear_solver; logger=logger)
+    return MadNLPSolver{T,KKTSystem}(nlp, opt_ipm, opt_linear_solver; logger=logger)
 end
 
 # Inner constructor
-function InteriorPointSolver{T,KKTSystem}(
+function MadNLPSolver{T,KKTSystem}(
     nlp::AbstractNLPModel,
-    opt::IPMOptions,
+    opt::MadNLPOptions,
     opt_linear_solver::AbstractOptions;
-    logger=Logger(),
+    logger=MadNLPLogger(),
 ) where {T, KKTSystem<:AbstractKKTSystem{T}}
-    cnt = Counters(start_time=time())
+    cnt = MadNLPCounters(start_time=time())
 
     # generic options
     opt.disable_garbage_collector &&
@@ -142,7 +142,7 @@ function InteriorPointSolver{T,KKTSystem}(
     xl = [get_lvar(nlp);view(get_lcon(nlp),ind_cons.ind_ineq)]
     xu = [get_uvar(nlp);view(get_ucon(nlp),ind_cons.ind_ineq)]
     x = [get_x0(nlp);zeros(T,ns)]
-    l = copy(get_y0(nlp))
+    y = copy(get_y0(nlp))
     zl= zeros(T,get_nvar(nlp)+ns)
     zu= zeros(T,get_nvar(nlp)+ns)
 
@@ -210,8 +210,8 @@ function InteriorPointSolver{T,KKTSystem}(
     end
 
 
-    return InteriorPointSolver{T,KKTSystem}(nlp,kkt,opt,cnt,logger,
-        n,m,nlb,nub,x,l,zl,zu,xl,xu,0.,f,c,
+    return MadNLPSolver{T,KKTSystem}(nlp,kkt,opt,cnt,logger,
+        n,m,nlb,nub,x,y,zl,zu,xl,xu,0.,f,c,
         jacl,
         d, p,
         _w1, _w2, _w3, _w4,

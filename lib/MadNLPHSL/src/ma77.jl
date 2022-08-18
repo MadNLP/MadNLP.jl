@@ -155,7 +155,7 @@ mutable struct Ma77Solver{T} <: AbstractLinearSolver{T}
     keep::Vector{Ptr{Nothing}}
 
     opt::Ma77Options
-    logger::Logger
+    logger::MadNLPLogger
 end
 
 for (fdefault, fanalyse, ffactor, fsolve, ffinalise, fopen, finputv, finputr, typ) in [
@@ -245,7 +245,7 @@ end
 
 function Ma77Solver(
     csc::SparseMatrixCSC{T,Int32};
-    opt=Ma77Options(),logger=Logger(),
+    opt=Ma77Options(),logger=MadNLPLogger(),
 ) where T
     full,tril_to_full_view = get_tril_to_full(csc)
     order = Vector{Int32}(undef,csc.n)

@@ -77,27 +77,27 @@ end
 
 @testset "HS15 problem" begin
     nlp = MadNLPTests.HS15Model()
-    ips = MadNLP.InteriorPointSolver(nlp; print_level=MadNLP.ERROR)
-    MadNLP.optimize!(ips)
-    @test ips.status == MadNLP.SOLVE_SUCCEEDED
+    solver = MadNLP.MadNLPSolver(nlp; print_level=MadNLP.ERROR)
+    MadNLP.solve!(solver)
+    @test solver.status == MadNLP.SOLVE_SUCCEEDED
 end
 
 
-# @testset "NLS problem" begin
-#     nlp = MadNLPTests.NLSModel()
-#     ips = MadNLP.InteriorPointSolver(nlp; print_level=MadNLP.ERROR)
-#     MadNLP.optimize!(ips)
-#     @test ips.status == MadNLP.SOLVE_SUCCEEDED
-# end
+@testset "NLS problem" begin
+    nlp = MadNLPTests.NLSModel()
+    solver = MadNLPSolver(nlp; print_level=MadNLP.ERROR)
+    MadNLP.solve!(solver)
+    @test solver.status == MadNLP.SOLVE_SUCCEEDED
+end
 
 @testset "MadNLP timings" begin
     nlp = MadNLPTests.HS15Model()
-    ips = MadNLP.InteriorPointSolver(nlp)
-    time_callbacks = MadNLP.timing_callbacks(ips)
+    solver = MadNLPSolver(nlp)
+    time_callbacks = MadNLP.timing_callbacks(solver)
     @test isa(time_callbacks, NamedTuple)
-    time_linear_solver = MadNLP.timing_linear_solver(ips)
+    time_linear_solver = MadNLP.timing_linear_solver(solver)
     @test isa(time_linear_solver, NamedTuple)
-    time_madnlp = MadNLP.timing_madnlp(ips)
+    time_madnlp = MadNLP.timing_madnlp(solver)
     @test isa(time_madnlp.time_linear_solver, NamedTuple)
     @test isa(time_madnlp.time_callbacks, NamedTuple)
 end

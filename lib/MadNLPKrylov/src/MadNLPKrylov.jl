@@ -1,7 +1,7 @@
 module MadNLPKrylov
 
 import MadNLP:
-    @kwdef, Logger, @debug, @warn, @error,
+    @kwdef, MadNLPLogger, @debug, @warn, @error,
     AbstractOptions, AbstractIterator, set_options!, @sprintf,
     solve_refine!, mul!, ldiv!, size, default_options
 import IterativeSolvers:
@@ -34,11 +34,11 @@ mutable struct KrylovIterator{T} <: AbstractIterator{T}
     g::Union{Nothing,GMRESIterable}
     res::Vector{T}
     opt::KrylovOptions
-    logger::Logger
+    logger::MadNLPLogger
 end
 
 function KrylovIterator(res::Vector{T},_mul!,_ldiv!;
-    opt=KrylovOptions(),logger=Logger(),
+    opt=KrylovOptions(),logger=MadNLPLogger(),
 ) where T
     !isempty(kwargs) && (for (key,val) in kwargs; option_dict[key]=val; end)
 

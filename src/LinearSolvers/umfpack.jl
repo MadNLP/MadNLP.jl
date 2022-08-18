@@ -22,7 +22,7 @@ mutable struct UmfpackSolver{T} <: AbstractLinearSolver{T}
     info::Vector{T}
 
     opt::UmfpackOptions
-    logger::Logger
+    logger::MadNLPLogger
 end
 
 
@@ -57,7 +57,7 @@ end
 
 function UmfpackSolver(
     csc::SparseMatrixCSC{T};
-    opt=UmfpackOptions(), logger=Logger(),
+    opt=UmfpackOptions(), logger=MadNLPLogger(),
 ) where T
     p = Vector{T}(undef,csc.n)
     full,tril_to_full_view = get_tril_to_full(csc)

@@ -10,7 +10,7 @@ mutable struct LapackCPUSolver{T} <: AbstractLinearSolver{T}
     info::Ref{BlasInt}
     etc::Dict{Symbol,Any}
     opt::LapackOptions
-    logger::Logger
+    logger::MadNLPLogger
 end
 
 
@@ -74,7 +74,7 @@ end
 function LapackCPUSolver(
     dense::Matrix{T};
     opt=LapackOptions(),
-    logger=Logger(),
+    logger=MadNLPLogger(),
 ) where T
     fact = copy(dense)
 

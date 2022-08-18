@@ -33,7 +33,7 @@ mutable struct Ma27Solver{T} <: AbstractLinearSolver{T}
     maxfrt::Vector{Int32}
 
     opt::Ma27Options
-    logger::Logger
+    logger::MadNLPLogger
 end
 
 
@@ -89,7 +89,7 @@ for (fa, fb, fc, typ) in [
 end
 
 function Ma27Solver(csc::SparseMatrixCSC{T};
-    opt=Ma27Options(),logger=Logger(),
+    opt=Ma27Options(),logger=MadNLPLogger(),
 ) where T
     I,J = findIJ(csc)
     nz=Int32(nnz(csc))

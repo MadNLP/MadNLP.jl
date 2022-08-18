@@ -4,7 +4,7 @@ import StaticArrays: SVector, setindex
 import MUMPS_seq_jll
 import MadNLP:
     parsefile, dlopen,
-    @kwdef, Logger, @debug, @warn, @error,
+    @kwdef, MadNLPLogger, @debug, @warn, @error,
     SparseMatrixCSC, SubVector,
     SymbolicException,FactorizationException,SolveException,InertiaException,
     AbstractOptions, AbstractLinearSolver, set_options!, input_type, default_options,
@@ -239,7 +239,7 @@ mutable struct MumpsSolver{T} <: AbstractLinearSolver{T}
     mumps_struc::Struc
     is_singular::Bool
     opt::MumpsOptions
-    logger::Logger
+    logger::MadNLPLogger
 end
 
 for (lib,fname,typ) in [(MUMPS_seq_jll.libdmumps,:dmumps_c,Float64), (MUMPS_seq_jll.libsmumps, :smumps_c,Float32)]
@@ -265,7 +265,7 @@ end
 # ---------------------------------------------------------------------------------------
 
 function MumpsSolver(csc::SparseMatrixCSC{T,Int32};
-    opt=MumpsOptions(), logger=Logger(),
+    opt=MumpsOptions(), logger=MadNLPLogger(),
 ) where T
 
     I,J = findIJ(csc)
