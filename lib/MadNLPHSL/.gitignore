@@ -1,4 +1,5 @@
 deps/deps.jl
 deps/build.log
 deps/lib/
+deps/src/
 test/Project.toml
