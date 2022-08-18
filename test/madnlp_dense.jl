@@ -30,8 +30,8 @@ function _compare_dense_with_sparse(
 
         nlp = MadNLPTests.DenseDummyQP{T}(; n=n, m=m, fixed_variables=ind_fixed, equality_cons=ind_eq)
 
-        ips = MadNLP.InteriorPointSolver(nlp, option_dict=sparse_options)
-        ipd = MadNLP.InteriorPointSolver(nlp, option_dict=dense_options)
+        ips = MadNLP.InteriorPointSolver(nlp; sparse_options...)
+        ipd = MadNLP.InteriorPointSolver(nlp; dense_options...)
 
         MadNLP.optimize!(ips)
         MadNLP.optimize!(ipd)
@@ -62,7 +62,7 @@ end
         )
         m = 0
         nlp = MadNLPTests.DenseDummyQP(; n=n, m=m)
-        ipd = MadNLP.InteriorPointSolver(nlp, option_dict=dense_options)
+        ipd = MadNLP.InteriorPointSolver(nlp; dense_options...)
 
         kkt = ipd.kkt
         @test isa(kkt, kkt_type)
@@ -81,7 +81,7 @@ end
             :kkt_system=>kkt_options,
             :linear_solver=>MadNLP.UmfpackSolver,
         )
-        @test_throws Exception MadNLP.InteriorPointSolver(nlp, dense_options_error)
+        @test_throws Exception MadNLP.InteriorPointSolver(nlp; dense_options_error...)
     end
     @testset "Constrained" begin
         dense_options = Dict{Symbol, Any}(
@@ -90,7 +90,7 @@ end
         )
         m = 5
         nlp = MadNLPTests.DenseDummyQP(; n=n, m=m)
-        ipd = MadNLP.InteriorPointSolver(nlp, option_dict=dense_options)
+        ipd = MadNLP.InteriorPointSolver(nlp; dense_options...)
         ns = length(ipd.ind_ineq)
 
         kkt = ipd.kkt
@@ -130,7 +130,7 @@ end
         :linear_solver=>MadNLP.LapackCPUSolver,
         :print_level=>MadNLP.ERROR,
     )
-    ips = MadNLP.InteriorPointSolver(nlp, option_dict=sparse_options)
+    ips = MadNLP.InteriorPointSolver(nlp; sparse_options...)
     MadNLP.optimize!(ips)
     # Restart (should hit MadNLP.reinitialize function)
     res = MadNLP.optimize!(ips)

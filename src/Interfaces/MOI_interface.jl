@@ -1164,7 +1164,7 @@ end
 function MOI.optimize!(model::Optimizer)
 
     model.nlp = MOIModel(model)
-    model.ips = InteriorPointSolver(model.nlp;option_dict=copy(model.option_dict))
+    model.ips = InteriorPointSolver(model.nlp; model.option_dict...)
     model.result = optimize!(model.ips)
     model.solve_time = model.ips.cnt.total_time
 

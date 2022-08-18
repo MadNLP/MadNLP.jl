@@ -51,11 +51,8 @@ end
 
 
 function PardisoMKLSolver(csc::SparseMatrixCSC{T};
-                opt=PardisoMKLOptions(),logger=Logger(),
-                option_dict::Dict{Symbol,Any}=Dict{Symbol,Any}(),
-                kwargs...) where T
-    !isempty(kwargs) && (for (key,val) in kwargs; option_dict[key]=val; end)
-    set_options!(opt,option_dict)
+    opt=PardisoMKLOptions(),logger=Logger(),
+) where T
 
     w   = Vector{T}(undef,csc.n)
 
@@ -144,5 +141,6 @@ end
 introduce(::PardisoMKLSolver)="pardiso-mkl"
 
 input_type(::Type{PardisoMKLSolver}) = :csc
+default_options(::Type{PardisoMKLSolver}) = PardisoMKLOptions()
 is_supported(::Type{PardisoMKLSolver},::Type{Float32}) = true
 is_supported(::Type{PardisoMKLSolver},::Type{Float64}) = true

@@ -32,14 +32,16 @@ function test_linear_solver(solver,T; kwargs...)
     x = similar(b)
 
     @testset "Linear solver $solver" begin
-        
+
         csc = sparse(row,col,val,m,n)
         sol= [0.8542713567839195, 1.4572864321608041]
         if MadNLP.input_type(solver) == :csc
-            M = solver(csc;kwargs...)
+            opt = MadNLP.default_options(solver)
+            M = solver(csc; opt=opt)
         elseif MadNLP.input_type(solver) == :dense
             dense = Array(csc)
-            M = solver(dense;kwargs...)
+            opt = MadNLP.default_options(solver)
+            M = solver(dense; opt=opt)
         end
         MadNLP.introduce(M)
         MadNLP.improve!(M)
