@@ -113,13 +113,13 @@ function MadNLPSolver(nlp::AbstractNLPModel{T}; kwargs...) where T
         MT = Matrix{T}
         DenseCondensedKKTSystem{T, VT, MT}
     end
-    return MadNLPSolverSolver{T,KKTSystem}(nlp, opt_ipm, opt_linear_solver; logger=logger)
+    return MadNLPSolver{T,KKTSystem}(nlp, opt_ipm, opt_linear_solver; logger=logger)
 end
 
 # Inner constructor
-function MadNLPSolverSolver{T,KKTSystem}(
+function MadNLPSolver{T,KKTSystem}(
     nlp::AbstractNLPModel,
-    opt::IPMOptions,
+    opt::MadNLPOptions,
     opt_linear_solver::AbstractOptions;
     logger=MadNLPLogger(),
 ) where {T, KKTSystem<:AbstractKKTSystem{T}}
@@ -195,7 +195,8 @@ function MadNLPSolverSolver{T,KKTSystem}(
     con_jac_scale = ones(T,n_jac)
 
     @trace(logger,"Initializing linear solver.")
-    cnt.linear_solver_time = @elapsed linear_solver = opt.linear_solver(get_kkt(kkt) ; opt=opt_linear_solver, logger=logger)
+    cnt.linear_solver_time =
+        @elapsed linear_solver = opt.linear_solver(get_kkt(kkt) ; opt=opt_linear_solver, logger=logger)
 
     n_kkt = size(kkt, 1)
     buffer_vec = similar(full(d), n_kkt)

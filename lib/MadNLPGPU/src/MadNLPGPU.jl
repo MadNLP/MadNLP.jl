@@ -28,6 +28,8 @@ if has_cuda()
     include("lapackgpu.jl")
     export LapackGPUSolver
 end
+export CuMadNLPSolver
+
 include("interface.jl")
 
 end # module

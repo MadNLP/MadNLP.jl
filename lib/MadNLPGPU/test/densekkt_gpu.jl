@@ -21,12 +21,12 @@ function _compare_gpu_with_cpu(KKTSystem, n, m, ind_fixed)
         nlp = MadNLPTests.DenseDummyQP{T}(; n=n, m=m, fixed_variables=ind_fixed)
 
         # Solve on CPU
-        h_ips = MadNLP.MadNLPSolver(nlp; madnlp_options...)
-        MadNLP.optimize!(h_ips)
+        h_solver = MadNLP.MadNLPSolver(nlp; madnlp_options...)
+        MadNLP.solve!(h_solver)
 
         # Solve on GPU
-        d_ips = MadNLPGPU.CuMadNLPSolver(nlp; madnlp_options...)
-        MadNLP.optimize!(d_ips)
+        d_solver = MadNLPGPU.CuMadNLPSolver(nlp; madnlp_options...)
+        MadNLP.solve!(d_solver)
 
         @test isa(d_solver.kkt, KKTSystem{T, CuVector{T}, CuMatrix{T}})
         # # Check that both results match exactly

@@ -1164,9 +1164,9 @@ end
 function MOI.optimize!(model::Optimizer)
 
     model.nlp = MOIModel(model)
-    model.solver = ipsSolver(model.nlp; model.option_dict...)
-    model.result = optimize!(model.ips)
-    model.solve_time = model.ips.cnt.total_time
+    model.solver = MadNLPSolver(model.nlp; model.option_dict...)
+    model.result = solve!(model.solver)
+    model.solve_time = model.solver.cnt.total_time
 
     return
 end

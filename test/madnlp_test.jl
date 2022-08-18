@@ -78,17 +78,17 @@ end
 @testset "HS15 problem" begin
     nlp = MadNLPTests.HS15Model()
     solver = MadNLP.MadNLPSolver(nlp; print_level=MadNLP.ERROR)
-    MadNLP.optimize!(solver)
+    MadNLP.solve!(solver)
     @test solver.status == MadNLP.SOLVE_SUCCEEDED
 end
 
 
-# @testset "NLS problem" begin
-#     nlp = MadNLPTests.NLSModel()
-#     solver = MadNLPSolver(nlp; print_level=MadNLP.ERROR)
-#     MadNLP.optimize!(solver)
-#     @test solver.status == MadNLP.SOLVE_SUCCEEDED
-# end
+@testset "NLS problem" begin
+    nlp = MadNLPTests.NLSModel()
+    solver = MadNLPSolver(nlp; print_level=MadNLP.ERROR)
+    MadNLP.solve!(solver)
+    @test solver.status == MadNLP.SOLVE_SUCCEEDED
+end
 
 @testset "MadNLP timings" begin
     nlp = MadNLPTests.HS15Model()
@@ -100,6 +100,5 @@ end
     time_madnlp = MadNLP.timing_madnlp(solver)
     @test isa(time_madnlp.time_linear_solver, NamedTuple)
     @test isa(time_madnlp.time_callbacks, NamedTuple)
->>>>>>> master
 end
 

@@ -1,4 +1,3 @@
-
 function CuMadNLPSolver(nlp::AbstractNLPModel{T}; kwargs...) where T
     opt_ipm, opt_linear_solver, logger = MadNLP.load_options(; linear_solver=LapackGPUSolver, kwargs...)
 

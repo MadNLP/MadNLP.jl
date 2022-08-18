@@ -99,7 +99,7 @@ function timing_callbacks(ips; ntrials=10)
         t_c += @elapsed eval_cons_wrapper!(ips, ips.c, ips.x)
         t_g += @elapsed eval_grad_f_wrapper!(ips, ips.f,ips.x)
         t_j += @elapsed eval_jac_wrapper!(ips, ips.kkt, ips.x)
-        t_h += @elapsed eval_lag_hess_wrapper!(ips, ips.kkt, ips.x, ips.l)
+        t_h += @elapsed eval_lag_hess_wrapper!(ips, ips.kkt, ips.x, ips.y)
     end
     return (
         time_eval_objective   = t_f / ntrials,
