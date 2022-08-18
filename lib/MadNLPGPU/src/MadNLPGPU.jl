@@ -18,8 +18,9 @@ import MadNLP:
     AbstractOptions, AbstractLinearSolver, AbstractNLPModel, set_options!,
     SymbolicException,FactorizationException,SolveException,InertiaException,
     introduce, factorize!, solve!, improve!, is_inertia, inertia, tril_to_full!,
-    LapackOptions, input_type, is_supported, default_options
+    LapackOptions, input_type, is_supported, default_options, symul!
 
+symul!(y, A, x::CuVector{T}, α = 1., β = 0.) where T = CUBLAS.symv!('L', T(α), A, x, T(β), y)
 
 
 include("kernels.jl")
