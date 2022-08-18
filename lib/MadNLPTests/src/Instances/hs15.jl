@@ -48,6 +48,7 @@ function NLPModels.jac_coord!(nlp::HS15Model, x::AbstractVector, J::AbstractVect
     J[2] = x[1]    # (1, 2)
     J[3] = 1.0     # (2, 1)
     J[4] = 2*x[2]  # (2, 2)
+    return J
 end
 
 function NLPModels.hess_structure!(nlp::HS15Model, I::AbstractVector{T}, J::AbstractVector{T}) where T
@@ -64,5 +65,6 @@ function NLPModels.hess_coord!(nlp::HS15Model, x, y, H::AbstractVector; obj_weig
     H[2] += y[1] * 1.0
     # Second constraint
     H[3] += y[2] * 2.0
+    return H
 end
 

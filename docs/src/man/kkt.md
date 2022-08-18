@@ -1,13 +1,20 @@
 ```@meta
 CurrentModule = MadNLP
 ```
+```@setup kkt_example
+using SparseArrays
+using NLPModels
+using MadNLP
+using MadNLPTests
+nlp = MadNLPTests.HS15Model()
+
+```
 
 # KKT systems
 
 KKT systems are linear system with a special KKT structure.
-MadNLP uses a special structure [`AbstractKKTSystem`](@ref) to represent such
-KKT system internally. The [`AbstractKKTSystem`](@ref) fulfills two
-goals:
+MadNLP uses a special structure [`AbstractKKTSystem`](@ref) to represent internally
+the KKT system. The [`AbstractKKTSystem`](@ref) fulfills two goals:
 
 1. Store the values of the Hessian of the Lagrangian and of the Jacobian.
 2. Assemble the corresponding KKT matrix $$K$$.
@@ -97,38 +104,40 @@ by using the KKT system used by default inside MadNLP: [`SparseKKTSystem`](@ref)
 ### Initializing a KKT system
 
 The size of the KKT system depends directly on the problem's characteristics
-(number of variables, number of inequality constraints, ...).
+(number of variables, number of of equality and inequality constraints).
 A [`SparseKKTSystem`](@ref) stores the Hessian and the Jacobian in sparse
 (COO) format. Depending on how we parameterize the system,
 it can output either a sparse matrix or a dense matrix (according to the linear solver
 we are employing under the hood).
 
-For instance,
-```julia
+For instance, we can parameterize a sparse KKT system as
+```@example kkt_example
 T = Float64
+VT = Vector{T}
 MT = SparseMatrixCSC{T, Int}
-kkt = MadNLP.SparseKKTSystem{T, MT}(nlp)
+kkt = MadNLP.SparseKKTSystem{T, VT, MT}(nlp)
+kkt.aug_com
 
 ```
-parameterizes `kkt` to output a `SparseMatrixCSC`, whereas
-```julia
+and a dense KKT system as
+```@example kkt_example
 T = Float64
+VT = Vector{T}
 MT = Matrix{T}
-kkt = MadNLP.SparseKKTSystem{T, MT}(nlp)
+kkt = MadNLP.SparseKKTSystem{T, VT, MT}(nlp)
+kkt.aug_com
 
 ```
-output a dense matrix `Matrix{Float64}`.
 
-Once the KKT system built, one has to initialize it:
-```julia
-MadNLP.initialize!(kkt)
+Once the KKT system built, one has to initialize it
+to use it inside the interior-point algorithm:
+```@example kkt_example
+MadNLP.initialize!(kkt);
 
 ```
-Now, the KKT system `kkt` is ready for use inside the
-interior-point algorithm.
 
-The user can query the KKT matrix inside `kkt` by
-```julia
+The user can query the KKT matrix inside `kkt`, simply as
+```@example kkt_example
 kkt_matrix = MadNLP.get_kkt(kkt)
 ```
 This returns a reference to the KKT matrix stores internally
@@ -141,56 +150,56 @@ We suppose now we want to refresh the values stored in the KKT system.
 
 
 #### Updating the values of the Hessian
-The Hessian values can be queried as
-```julia
+The Hessian part of the KKT system can be queried as
+```@example kkt_example
 hess_values = MadNLP.get_hessian(kkt)
 
 ```
 For a `SparseKKTSystem`, `hess_values` is a `Vector{Float64}` storing
 the nonzero values of the Hessian.
-Then, using `NLPModels` one can update the values directly as
-```julia
-NLPModels.hess_coord!(nlp, x, l, hess)
+Then, one can update the vector `hess_values` by using NLPModels.jl:
+```@example kkt_example
+n = NLPModels.get_nvar(nlp)
+m = NLPModels.get_ncon(nlp)
+x = NLPModels.get_x0(nlp)
+l = zeros(m)
+
+NLPModels.hess_coord!(nlp, x, l, hess_values)
 
 ```
-with `x` and `l` the current primal and dual iterates.
-A post-processing step is then applied:
-```julia
+Eventually, a post-processing step can be applied to refresh all the values internally:
+```@example kkt_example
 MadNLP.compress_hessian!(kkt)
 
 ```
 !!! note
-    The post-processing should be applied only on the
-    values `hess_values`.
     By default, the function [`compress_hessian!`](@ref) does nothing.
     But it can be required for very specific use-case, for instance building internally a
     Schur complement matrix.
 
 
 #### Updating the values of the Jacobian
-Updating the values of the Jacobian proceeds in a similar way.
-One queries the values of the Jacobian to update as
-```julia
+We proceed exaclty the same way to update the values in the Jacobian.
+One queries the Jacobian values in the KKT system as
+```@example kkt_example
 jac_values = MadNLP.get_jacobian(kkt)
 
 ```
-Updates them with NLPModels as
-```julia
+We can refresh the values with NLPModels as
+```@example kkt_example
 NLPModels.jac_coord!(nlp, x, jac_values)
 
 ```
 And then applies a post-processing step as
-```julia
+```@example kkt_example
 MadNLP.compress_jacobian!(kkt)
 
 ```
 
 !!! note
-    The post-processing should be applied only on the
-    values `jac_values`.
     On the contrary to `compress_hessian!`, `compress_jacobian!` is not
-    empty by default. Instead, the post-processing step scales the values
-    of the Jacobian row by row, following the scaling of the constraints
+    doing nothing by default. Instead, the post-processing step scales the values
+    of the Jacobian row by row, applying the scaling of the constraints
     as computed initially by MadNLP.
 
 #### Updating the values of the diagonal matrices
@@ -198,7 +207,10 @@ Once the Hessian and the Jacobian updated, it remains
 to udpate the values of the diagonal matrix $$\Sigma_x = X^{-1} V$$
 and $$\Sigma_s = S^{-1} W$$. In the KKT's interface, this amounts
 to call the [`regularize_diagonal!`](@ref) function:
-```julia
+```@example kkt_example
+pr_values = ones(n + m)
+du_values = zeros(m)
+
 MadNLP.regularize_diagonal!(kkt, pr_values, du_values)
 
 ```
@@ -210,13 +222,14 @@ feasibility restoration).
 ### Assembling the KKT matrix
 Once the values updated, one can assemble the resulting KKT matrix.
 This translates to
-```julia
+```@example kkt_example
 MadNLP.build_kkt!(kkt)
+kkt_matrix
 ```
 By doing so, the values stored inside `kkt` will be transferred
-to the communicating matrix (as returned by the function [`get_kkt`](@ref)).
+to the KKT matrix `kkt_matrix` (as returned by the function [`get_kkt`](@ref)).
 
-In detail, a [`SparseKKTSystem`](@ref) stores internally the KKT system's values using
+In details, a [`SparseKKTSystem`](@ref) stores internally the KKT system's values using
 a sparse COO format. When [`build_kkt!`](@ref) is called, the sparse COO matrix
 is transferred to `SparseMatrixCSC` (if `MT = SparseMatrixCSC`) or a `Matrix`
 (if `MT = Matrix`), or any format suitable for factorizing the KKT system
