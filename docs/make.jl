@@ -1,5 +1,9 @@
 using Documenter
+using Pkg
 using MadNLP
+
+Pkg.develop(PackageSpec(path=joinpath(dirname(@__FILE__), "../lib/MadNLPTests/")))
+Pkg.instantiate()
 
 makedocs(
     sitename = "MadNLP.jl",
