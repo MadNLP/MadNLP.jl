@@ -1,6 +1,33 @@
 ```@meta
 CurrentModule = MadNLP
 ```
+```@setup linear_solver_example
+using SparseArrays
+using NLPModels
+using MadNLP
+using MadNLPTests
+# Build nonlinear model
+nlp = MadNLPTests.HS15Model()
+# Build KKT
+T = Float64
+VT = Vector{T}
+MT = Matrix{T}
+kkt = MadNLP.SparseKKTSystem{T, VT, MT}(nlp)
+
+n = NLPModels.get_nvar(nlp)
+m = NLPModels.get_ncon(nlp)
+x = NLPModels.get_x0(nlp)
+l = zeros(m)
+hess_values = MadNLP.get_hessian(kkt)
+NLPModels.hess_coord!(nlp, x, l, hess_values)
+
+jac_values = MadNLP.get_jacobian(kkt)
+NLPModels.jac_coord!(nlp, x, jac_values)
+MadNLP.compress_jacobian!(kkt)
+
+MadNLP.build_kkt!(kkt)
+
+```
 # Linear solvers
 
 We suppose that the KKT system has been assembled previously
@@ -53,32 +80,35 @@ of the matrix directly as a result of the factorization.
 We suppose available a [`AbstractKKTSystem`](@ref) `kkt`, properly assembled
 following the procedure presented [previously](kkt.md).
 We can query the assembled matrix $$K$$ as
-```julia
+```@example linear_solver_example
 K = MadNLP.get_kkt(kkt)
 
 ```
-Then, we can create a new linear solver instance as
-```julia
-linear_solver = MadNLPUmfpack.Solver(K)
+Then, if we want to pass the KKT matrix `K` to Lapack, this
+translates to
+```@example linear_solver_example
+linear_solver = LapackCPUSolver(K)
 
 ```
 The instance `linear_solver` does not copy the matrix $$K$$ and
 instead keep a reference to it.
-```julia
-linear_solver.tril === K
+```@example linear_solver_example
+linear_solver.dense === K
 ```
 That way every time we re-assemble the matrix $$K$$ in `kkt`,
-the values are directly updated in `linear_solver`.
+the values are directly updated inside `linear_solver`.
 
-Then, to recompute the factorization inside `linear_solver`,
+To compute the factorization inside `linear_solver`,
 one simply as to call:
-```julia
+```@example linear_solver_example
 MadNLP.factorize!(linear_solver)
 
 ```
 Once the factorization computed, computing the backsolve
-for a right-hand-side `b` simply amounts to
-```julia
+for a right-hand-side `b` amounts to
+```@example linear_solver_example
+nk = size(kkt, 1)
+b = rand(nk)
 MadNLP.solve!(linear_solver, b)
 ```
 The values of `b` being modified inplace to store the solution $$x$$ of the linear
