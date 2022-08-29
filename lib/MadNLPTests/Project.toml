@@ -1,7 +1,7 @@
 name = "MadNLPTests"
 uuid = "b52a2a03-04ab-4a5f-9698-6a2deff93217"
 authors = ["Sungho Shin <sungho.shin.ss@gmail.com>"]
-version = "0.2.1"
+version = "0.3.0"
 
 [deps]
 ADNLPModels = "54578032-b7ea-4c30-94aa-7cbd1cce6c9a"
