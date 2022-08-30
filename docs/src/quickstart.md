@@ -181,8 +181,8 @@ a new MadNLP instance and solve it:
 ```julia
 x0 = zeros(2) # initial position
 nlp = HS15Model(x0)
-ips = MadNLP.InteriorPointSolver(nlp)
-MadNLP.optimize!(ips)
+ips = MadNLP.MadNLPSolver(nlp)
+MadNLP.solve!(ips)
 
 ```
 
