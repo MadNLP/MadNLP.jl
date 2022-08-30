@@ -1,5 +1,11 @@
 # Quickstart
 
+```@setup quickstart
+using NLPModels
+
+```
+
+
 This page presents a quickstart guide to solve
 a nonlinear problem with MadNLP.
 
@@ -31,7 +37,7 @@ the computation of the first- and second-order derivatives being
 handled automatically.
 
 Using JuMP's syntax, the HS15 problem translates to
-```julia
+```@example quickstart
 using JuMP
 model = Model()
 @variable(model, x1 <= 0.5)
@@ -44,7 +50,8 @@ model = Model()
 ```
 
 Then, solving HS15 with MadNLP directly translates to
-```julia
+```@example quickstart
+using MadNLP
 JuMP.set_optimizer(model, MadNLP.Optimizer)
 JuMP.optimize!(model)
 
@@ -65,8 +72,7 @@ This second option, although more complicated, gives
 us more flexibility and comes without boilerplate.
 
 We define a new `NLPModel` structure simply as:
-```julia
-
+```@example quickstart
 struct HS15Model <: NLPModels.AbstractNLPModel{Float64,Vector{Float64}}
     meta::NLPModels.NLPModelMeta{Float64, Vector{Float64}}
     counters::NLPModels.Counters
@@ -99,31 +105,32 @@ storing the number of time each callbacks is being called.
 
 The objective function takes as input a `HS15Model` instance
 and a vector with dimension 2 storing the current values for $$x_1$$ and $$x_2$$:
-```julia
+```@example quickstart
 function NLPModels.obj(nlp::HS15Model, x::AbstractVector)
     return 100.0 * (x[2] - x[1]^2)^2 + (1.0 - x[1])^2
 end
 ```
 The corresponding gradient writes (note that we update the values of the gradient
 `g` inplace):
-```julia
+```@example quickstart
 function NLPModels.grad!(nlp::HS15Model, x::AbstractVector, g::AbstractVector)
     z = x[2] - x[1]^2
     g[1] = -400.0 * z * x[1] - 2.0 * (1.0 - x[1])
     g[2] = 200.0 * z
-    return
+    return g
 end
 ```
 
-We define similarly the constraints
-```julia
+Similarly, we define the constraints
+```@example quickstart
 function NLPModels.cons!(nlp::HS15Model, x::AbstractVector, c::AbstractVector)
     c[1] = x[1] * x[2]
     c[2] = x[1] + x[2]^2
+    return c
 end
 ```
 and the associated Jacobian
-```julia
+```@example quickstart
 function NLPModels.jac_structure!(nlp::HS15Model, I::AbstractVector{T}, J::AbstractVector{T}) where T
     copyto!(I, [1, 1, 2, 2])
     copyto!(J, [1, 2, 1, 2])
@@ -134,6 +141,7 @@ function NLPModels.jac_coord!(nlp::HS15Model, x::AbstractVector, J::AbstractVect
     J[2] = x[1]    # (1, 2)
     J[3] = 1.0     # (2, 1)
     J[4] = 2*x[2]  # (2, 2)
+    return J
 end
 ```
 
@@ -153,7 +161,7 @@ We first have to define the sparsity structure of the Hessian, which is
 assumed to be sparse. The Hessian is a symmetric matrix, and by convention
 we pass only the lower-triangular part of the matrix to the solver. Hence,
 we define the sparsity structure as
-```julia
+```@example quickstart
 function NLPModels.hess_structure!(nlp::HS15Model, I::AbstractVector{T}, J::AbstractVector{T}) where T
     copyto!(I, [1, 2, 2])
     copyto!(J, [1, 1, 2])
@@ -162,7 +170,7 @@ end
 
 Now that the sparsity structure is defined, the associated Hessian
 writes down:
-```julia
+```@example quickstart
 function NLPModels.hess_coord!(nlp::HS15Model, x, y, H::AbstractVector; obj_weight=1.0)
     # Objective
     H[1] = obj_weight * (-400.0 * x[2] + 1200.0 * x[1]^2 + 2.0)
@@ -172,26 +180,26 @@ function NLPModels.hess_coord!(nlp::HS15Model, x, y, H::AbstractVector; obj_weig
     H[2] += y[1] * 1.0
     # Second constraint
     H[3] += y[2] * 2.0
+    return H
 end
 
 ```
 
 Once the problem specified in NLPModels's syntax, we can create
 a new MadNLP instance and solve it:
-```julia
+```@example quickstart
 x0 = zeros(2) # initial position
 nlp = HS15Model(x0)
-ips = MadNLP.MadNLPSolver(nlp)
+ips = MadNLP.MadNLPSolver(nlp; print_level=MadNLP.INFO)
 MadNLP.solve!(ips)
-
 ```
 
 MadNLP converges in 19 iterations to a (local) optimal solution.
 We can query the primal and the dual solutions respectively by
-```julia
+```@example quickstart
 ips.x
 ```
 and
-```
-ips.l
+```@example quickstart
+ips.y
 ```
