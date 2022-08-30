@@ -182,7 +182,7 @@ a new MadNLP instance and solve it:
 x0 = zeros(2) # initial position
 nlp = HS15Model(x0)
 ips = MadNLP.MadNLPSolver(nlp)
-MadNLP.optimize!(ips)
+MadNLP.solve!(ips)
 
 ```
 
