@@ -83,8 +83,8 @@ function get_index_constraints(nlp::AbstractNLPModel; fixed_variable_treatment=M
         ind_ub = findall(xu .!= Inf)
     end
 
-    ind_llb = findall((get_lvar(nlp) .== -Inf).*(get_uvar(nlp) .!= Inf))
-    ind_uub = findall((get_lvar(nlp) .!= -Inf).*(get_uvar(nlp) .== Inf))
+    ind_llb = findall((get_lvar(nlp) .!= -Inf).*(get_uvar(nlp) .== Inf))
+    ind_uub = findall((get_lvar(nlp) .== -Inf).*(get_uvar(nlp) .!= Inf))
 
     # Return named tuple
     return (
