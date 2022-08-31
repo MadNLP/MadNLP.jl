@@ -15,7 +15,7 @@ function solve!(
     kwargs...)
 
     @assert solver.nlp == nlp
-    
+
     solve!(
         solver;
         x = x, y = y,
@@ -113,13 +113,14 @@ function solve!(
     solver::AbstractMadNLPSolver;
     x = nothing, y = nothing,
     zl = nothing, zu = nothing,
-    kwargs...)
+    kwargs...
+)
 
     if x != nothing
         solver.x[1:get_nvar(solver.nlp)] .= x
     end
     if y != nothing
-        solver.y[1:get_con(solver.nlp)] .= y
+        solver.y[1:get_ncon(solver.nlp)] .= y
     end
     if zl != nothing
         solver.zl[1:get_nvar(solver.nlp)] .= zl
@@ -130,9 +131,9 @@ function solve!(
 
     if !isempty(kwargs)
         @warn(solver.logger,"The options set during resolve may not have an effect")
-        set_options!(solver.opt,Dict{Symbol,Any}(),kwargs)
+        set_options!(solver.opt, kwargs)
     end
-    
+
     try
         if solver.status == INITIAL
             @notice(solver.logger,"This is $(introduce()), running with $(introduce(solver.linear_solver))\n")
