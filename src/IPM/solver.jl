@@ -8,8 +8,8 @@ function solve!(
     model::AbstractNLPModel,
     solver::MadNLPSolver,
     nlp::AbstractNLPModel;
-    x = nlp.meta.x,
-    y = nlp.meta.y,
+    x = get_x0(nlp),
+    y = get_y0(nlp),
     zl= nothing,
     zu= nothing,
     kwargs...)
