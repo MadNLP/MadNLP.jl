@@ -119,7 +119,7 @@ function solve!(
         solver.x[1:get_nvar(solver.nlp)] .= x
     end
     if y != nothing
-        solver.y[1:get_nvar(solver.nlp)] .= y
+        solver.y[1:get_con(solver.nlp)] .= y
     end
     if zl != nothing
         solver.zl[1:get_nvar(solver.nlp)] .= zl
