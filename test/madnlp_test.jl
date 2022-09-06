@@ -77,8 +77,36 @@ end
 
 @testset "HS15 problem" begin
     nlp = MadNLPTests.HS15Model()
+    n, m = NLPModels.get_nvar(nlp), NLPModels.get_ncon(nlp)
+    x0 = NLPModels.get_x0(nlp)
+    y0 = NLPModels.get_y0(nlp)
+
+    # Test all combinations between x0 and y0
+    for xini in [nothing, x0], yini in [nothing, y0]
+        solver = MadNLP.MadNLPSolver(nlp; print_level=MadNLP.ERROR)
+        MadNLP.solve!(solver; x=xini, y=yini)
+        @test solver.status == MadNLP.SOLVE_SUCCEEDED
+    end
+
+    # Test all arguments at the same time
+    zl = zeros(n)
+    zu = zeros(n)
     solver = MadNLP.MadNLPSolver(nlp; print_level=MadNLP.ERROR)
-    MadNLP.solve!(solver)
+    MadNLP.solve!(solver; x=x0, y=y0, zl=zl, zu=zu)
+    @test solver.status == MadNLP.SOLVE_SUCCEEDED
+end
+
+@testset "MadNLP warmstart" begin
+    nlp = MadNLPTests.HS15Model()
+    x0 = NLPModels.get_x0(nlp)
+    y0 = NLPModels.get_y0(nlp)
+
+    solver = MadNLP.MadNLPSolver(nlp; print_level=MadNLP.ERROR)
+    @test solver.status == MadNLP.INITIAL
+    MadNLP.solve!(solver; x=x0, y=y0)
+    @test solver.status == MadNLP.SOLVE_SUCCEEDED
+    # Update barrier term and solve again
+    MadNLP.solve!(solver; x=x0, y=y0, mu_init=1e-5)
     @test solver.status == MadNLP.SOLVE_SUCCEEDED
 end
 
