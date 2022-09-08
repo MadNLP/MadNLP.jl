@@ -5,8 +5,8 @@ abstract type AbstractMadNLPSolver{T} end
 
 include("restoration.jl")
 
-mutable struct MadNLPSolver{T,KKTSystem <: AbstractKKTSystem{T}} <: AbstractMadNLPSolver{T}
-    nlp::AbstractNLPModel
+mutable struct MadNLPSolver{T,KKTSystem <: AbstractKKTSystem{T}, Model <: AbstractNLPModel} <: AbstractMadNLPSolver{T}
+    nlp::Model
     kkt::KKTSystem
 
     opt::MadNLPOptions
@@ -210,7 +210,7 @@ function MadNLPSolver{T,KKTSystem}(
     end
 
 
-    return MadNLPSolver{T,KKTSystem}(nlp,kkt,opt,cnt,logger,
+    return MadNLPSolver{T,KKTSystem,typeof(nlp)}(nlp,kkt,opt,cnt,logger,
         n,m,nlb,nub,x,y,zl,zu,xl,xu,0.,f,c,
         jacl,
         d, p,
