@@ -106,7 +106,13 @@ function eval_jac_wrapper!(solver::MadNLPSolver, kkt::AbstractDenseKKTSystem, x:
     return jac
 end
 
-function eval_lag_hess_wrapper!(solver::MadNLPSolver, kkt::AbstractDenseKKTSystem, x::Vector{T},l::Vector{T};is_resto=false) where T
+function eval_lag_hess_wrapper!(
+    solver::MadNLPSolver,
+    kkt::AbstractDenseKKTSystem{T, VT, MT, QN},
+    x::Vector{T},
+    l::Vector{T};
+    is_resto=false,
+) where {T, VT, MT, QN<:ExactHessian}
     nlp = solver.nlp
     cnt = solver.cnt
     @trace(solver.logger,"Evaluating Lagrangian Hessian.")
@@ -128,51 +134,47 @@ end
 
 function eval_lag_hess_wrapper!(
     solver::MadNLPSolver,
-    kkt::BFGSKKTSystem,
+    kkt::AbstractDenseKKTSystem{T, VT, MT, QN},
     x::Vector{T},
     l::Vector{T};
     is_resto=false,
-) where T
+) where {T, VT, MT, QN<:AbstractQuasiNewton}
     nlp = solver.nlp
     cnt = solver.cnt
     @trace(solver.logger, "Update BFGS matrices.")
+    qn = kkt.qn
     Bk = kkt.hess
-    sk, yk = kkt.sk, kkt.yk
+    sk, yk = qn.sk, qn.yk
     n, p = size(Bk)
     m = size(kkt.jac, 1)
 
     if cnt.obj_grad_cnt >= 2
         # Build sk = x+ - x
         copyto!(sk, 1, solver.x, 1, n)
-        axpy!(-one(T), kkt.last_x, sk)
+        axpy!(-one(T), qn.last_x, sk)
 
         # Build yk = ∇L+ - ∇L
         copyto!(yk, 1, solver.f, 1, n)
         mul!(yk, kkt.jac', l, one(T), one(T))
-        axpy!(-one(T), kkt.last_grad, yk)
-        mul!(yk, kkt.jac_prev', l, -one(T), one(T))
+        axpy!(-one(T), qn.last_g, yk)
+        NLPModels.jtprod!(nlp, qn.last_x, l, qn.last_jv)
+        axpy!(-one(T), qn.last_jv, yk)
+
+        # mul!(yk, kkt.jac_prev', l, -one(T), one(T))
 
         # Initial update (Nocedal & Wright, p.143)
         if cnt.obj_grad_cnt == 2
             yksk = dot(yk, sk)
             sksk = dot(sk, sk)
             Bk[diagind(Bk)] .= yksk ./ sksk
-        elseif m == 0
-            # NB: in unconstrained case, we have kkt.hess === kkt.aug_com.
-            #     As a result Bk has also values coming from pr_diag in
-            #     the diagonal terms, values we have to remove before
-            #     performing the BFGS update.
-            Bk[diagind(Bk)] .= kkt.diag_hess
         end
 
-        update!(kkt.Bk, Bk, sk, yk)
+        update!(kkt.qn, Bk, sk, yk)
     end
 
     # Backup data for next step
-    copyto!(kkt.last_x, 1, solver.x, 1, n)
-    copyto!(kkt.last_grad, 1, solver.f, 1, n)
-    # TODO: Do we have to store dense Jacobian twice?
-    copyto!(kkt.jac_prev, solver.kkt.jac)
+    copyto!(qn.last_x, 1, solver.x, 1, n)
+    copyto!(qn.last_g, 1, solver.f, 1, n)
 
     compress_hessian!(kkt)
     return get_hessian(kkt)

@@ -67,10 +67,6 @@ end
         kkt = solverd.kkt
         @test isa(kkt, kkt_type)
         @test isempty(kkt.jac)
-        # Special test for DenseKKTSystem
-        if kkt_type <: MadNLP.DenseKKTSystem
-            @test kkt.hess === kkt.aug_com
-        end
         @test solverd.linear_solver.dense === kkt.aug_com
         @test size(kkt.hess) == (n, n)
         @test length(kkt.pr_diag) == n
@@ -147,7 +143,13 @@ end
     @test solver.status == MadNLP.SOLVE_SUCCEEDED
 end
 
-@testset "MadNLP: quasi-Newton" begin
+@testset "MadNLP: $QN + $KKT" for QN in [
+    MadNLP.DENSE_BFGS,
+    MadNLP.DENSE_DAMPED_BFGS,
+], KKT in [
+    MadNLP.DENSE_KKT_SYSTEM,
+    MadNLP.DENSE_CONDENSED_KKT_SYSTEM,
+]
     @testset "Size: ($n, $m)" for (n, m) in [(10, 0), (10, 5), (50, 10)]
         nlp = MadNLPTests.DenseDummyQP{Float64}(; n=n, m=m)
         solver_exact = MadNLP.MadNLPSolver(
@@ -161,15 +163,16 @@ end
         solver_qn = MadNLP.MadNLPSolver(
             nlp;
             print_level=MadNLP.ERROR,
-            kkt_system=MadNLP.BFGS_DENSE_KKT_SYSTEM,
+            kkt_system=KKT,
+            hessian_approximation=QN,
             linear_solver=LapackCPUSolver,
         )
         MadNLP.solve!(solver_qn)
 
         @test solver_qn.status == MadNLP.SOLVE_SUCCEEDED
-        @test solver_exact.obj_val ≈ solver_qn.obj_val atol=1e-8
-        @test solver_exact.x ≈ solver_qn.x rtol=1e-5
-        @test solver_exact.y ≈ solver_qn.y rtol=1e-5
+        @test solver_exact.obj_val ≈ solver_qn.obj_val atol=1e-6
+        @test solver_exact.x ≈ solver_qn.x atol=1e-6
+        @test solver_exact.y ≈ solver_qn.y atol=1e-5
     end
 end
 

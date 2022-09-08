@@ -51,6 +51,18 @@ function NLPModels.jac_coord!(nlp::HS15Model, x::AbstractVector, J::AbstractVect
     return J
 end
 
+function NLPModels.jprod!(nlp::HS15Model, x::AbstractVector, v::AbstractVector, jv::AbstractVector)
+    jv[1] = x[2] * v[1] + x[1] * v[2]
+    jv[2] = v[1] + 2 * x[2] * v[2]
+    return jv
+end
+
+function NLPModels.jtprod!(nlp::HS15Model, x::AbstractVector, v::AbstractVector, jv::AbstractVector)
+    jv[1] = x[2] * v[1] + v[2]
+    jv[2] = x[1] * v[1] + 2 * x[2] * v[2]
+    return jv
+end
+
 function MadNLP.jac_dense!(nlp::HS15Model, x::AbstractVector, J::AbstractMatrix)
     J[1, 1] = x[2]    # (1, 1)
     J[1, 2] = x[1]    # (1, 2)

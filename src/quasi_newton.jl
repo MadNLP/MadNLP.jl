@@ -1,19 +1,19 @@
 
-@enum(BFGSInitStrategy::Int,
-    SCALAR1  = 1,
-    SCALAR2  = 2,
-    SCALAR3  = 3,
-    SCALAR4  = 4,
-    CONSTANT = 5,
-)
+"""
+    AbstractHessian{T, VT}
+
+Abstract type for representation of second-order information.
 
 """
-    AbstractQuasiNewton
-
-Abstract type for quasi-Newton algorithm.
+abstract type AbstractHessian{T, VT} end
 
 """
-abstract type AbstractQuasiNewton end
+    AbstractQuasiNewton{T, VT} <: AbstractHessian{T, VT}
+
+Abstract type for quasi-Newton approximation.
+
+"""
+abstract type AbstractQuasiNewton{T, VT} <: AbstractHessian{T, VT} end
 
 """
     update!(
@@ -30,8 +30,12 @@ Return `true` if the update succeeded, `false` otherwise.
 """
 function update! end
 
+
+struct ExactHessian{T, VT} <: AbstractHessian{T, VT} end
+ExactHessian{T, VT}(n::Int) where {T, VT} = ExactHessian{T, VT}()
+
 """
-    BFGS{T, VT, MT} <: AbstractQuasiNewton
+    BFGS{T, VT} <: AbstractQuasiNewton
 
 BFGS quasi-Newton method. Update the direct Hessian approximation using
 ```math
@@ -42,15 +46,28 @@ B_{k+1} = B_k - \frac{(B_k s_k)(B_k s_k)^⊤}{s_k^⊤ B_k s_k} + \frac{y_k y_k^�
 The matrix is not updated if ``s_k^⊤ y_k < 10^{-8}``.
 
 """
-struct BFGS{T, VT, MT} <: AbstractQuasiNewton
+struct BFGS{T, VT} <: AbstractQuasiNewton{T, VT}
     init_strategy::BFGSInitStrategy
+    sk::VT
+    yk::VT
     bsk::VT
+    last_g::VT
+    last_x::VT
+    last_jv::VT
 end
-function BFGS(n::Int; init_strategy=SCALAR1)
-    return BFGS{Float64, Vector{Float64}, Matrix{Float64}}(init_strategy, zeros(n))
+function BFGS{T, VT}(n::Int; init_strategy=SCALAR1) where {T, VT}
+    return BFGS{T, VT}(
+        init_strategy,
+        zeros(n),
+        zeros(n),
+        zeros(n),
+        zeros(n),
+        zeros(n),
+        zeros(n),
+    )
 end
 
-function update!(qn::BFGS{T, VT, MT}, Bk::AbstractMatrix, sk::AbstractVector, yk::AbstractVector) where {T, VT, MT}
+function update!(qn::BFGS{T, VT}, Bk::AbstractMatrix, sk::AbstractVector, yk::AbstractVector) where {T, VT}
     if dot(sk, yk) < T(1e-8)
         return false
     end
@@ -62,18 +79,32 @@ function update!(qn::BFGS{T, VT, MT}, Bk::AbstractMatrix, sk::AbstractVector, yk
     return true
 end
 
-struct DampedBFGS{T, VT, MT} <: AbstractQuasiNewton
+struct DampedBFGS{T, VT} <: AbstractQuasiNewton{T, VT}
     init_strategy::BFGSInitStrategy
+    sk::VT
+    yk::VT
     bsk::VT
     rk::VT
+    last_g::VT
+    last_x::VT
+    last_jv::VT
 end
-function DampedBFGS(n::Int; init_strategy=SCALAR1)
-    return DampedBFGS{Float64, Vector{Float64}, Matrix{Float64}}(init_strategy, zeros(n), zeros(n))
+function DampedBFGS{T, VT}(n::Int; init_strategy=SCALAR1) where {T, VT}
+    return DampedBFGS{T, VT}(
+        init_strategy,
+        zeros(n),
+        zeros(n),
+        zeros(n),
+        zeros(n),
+        zeros(n),
+        zeros(n),
+        zeros(n),
+    )
 end
 
-function update!(qn::DampedBFGS{T, VT, MT}, Bk::AbstractMatrix, sk::AbstractVector, yk::AbstractVector) where {T, VT, MT}
+function update!(qn::DampedBFGS{T, VT}, Bk::AbstractMatrix, sk::AbstractVector, yk::AbstractVector) where {T, VT}
     mul!(qn.bsk, Bk, sk)
-    sBs = dot(sk, qn.Bsk)
+    sBs = dot(sk, qn.bsk)
 
     # Procedure 18.2 (Nocedal & Wright, page 537)
     theta = if dot(sk, yk) < T(0.2) * sBs

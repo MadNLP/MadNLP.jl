@@ -100,21 +100,27 @@ function MadNLPSolver(nlp::AbstractNLPModel{T}; kwargs...) where T
     @assert is_supported(opt_ipm.linear_solver, T)
 
     VT = Vector{T}
+    # Determine Hessian approximation
+    QN = if opt_ipm.hessian_approximation == DENSE_BFGS
+        BFGS{T, VT}
+    elseif opt_ipm.hessian_approximation == DENSE_DAMPED_BFGS
+        DampedBFGS{T, VT}
+    else
+        ExactHessian{T, VT}
+    end
+    # Determine KKT system
     KKTSystem = if opt_ipm.kkt_system == SPARSE_KKT_SYSTEM
         MT = (input_type(opt_ipm.linear_solver) == :csc) ? SparseMatrixCSC{T, Int32} : Matrix{T}
-        SparseKKTSystem{T, VT, MT}
+        SparseKKTSystem{T, VT, MT, QN}
     elseif opt_ipm.kkt_system == SPARSE_UNREDUCED_KKT_SYSTEM
         MT = (input_type(opt_ipm.linear_solver) == :csc) ? SparseMatrixCSC{T, Int32} : Matrix{T}
-        SparseUnreducedKKTSystem{T, VT, MT}
+        SparseUnreducedKKTSystem{T, VT, MT, QN}
     elseif opt_ipm.kkt_system == DENSE_KKT_SYSTEM
         MT = Matrix{T}
-        DenseKKTSystem{T, VT, MT}
+        DenseKKTSystem{T, VT, MT, QN}
     elseif opt_ipm.kkt_system == DENSE_CONDENSED_KKT_SYSTEM
         MT = Matrix{T}
-        DenseCondensedKKTSystem{T, VT, MT}
-    elseif opt_ipm.kkt_system == BFGS_DENSE_KKT_SYSTEM
-        MT = Matrix{T}
-        BFGSKKTSystem{T, VT, MT}
+        DenseCondensedKKTSystem{T, VT, MT, QN}
     end
     return MadNLPSolver{T,KKTSystem}(nlp, opt_ipm, opt_linear_solver; logger=logger)
 end
