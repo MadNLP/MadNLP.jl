@@ -146,3 +146,30 @@ end
     res = MadNLP.solve!(solver)
     @test solver.status == MadNLP.SOLVE_SUCCEEDED
 end
+
+@testset "MadNLP: quasi-Newton" begin
+    @testset "Size: ($n, $m)" for (n, m) in [(10, 0), (10, 5), (50, 10)]
+        nlp = MadNLPTests.DenseDummyQP{Float64}(; n=n, m=m)
+        solver_exact = MadNLP.MadNLPSolver(
+            nlp;
+            print_level=MadNLP.ERROR,
+            kkt_system=MadNLP.DENSE_KKT_SYSTEM,
+            linear_solver=LapackCPUSolver,
+        )
+        MadNLP.solve!(solver_exact)
+
+        solver_qn = MadNLP.MadNLPSolver(
+            nlp;
+            print_level=MadNLP.ERROR,
+            kkt_system=MadNLP.BFGS_DENSE_KKT_SYSTEM,
+            linear_solver=LapackCPUSolver,
+        )
+        MadNLP.solve!(solver_qn)
+
+        @test solver_qn.status == MadNLP.SOLVE_SUCCEEDED
+        @test solver_exact.obj_val ≈ solver_qn.obj_val atol=1e-8
+        @test solver_exact.x ≈ solver_qn.x rtol=1e-5
+        @test solver_exact.y ≈ solver_qn.y rtol=1e-5
+    end
+end
+

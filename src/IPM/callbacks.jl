@@ -129,42 +129,49 @@ end
 function eval_lag_hess_wrapper!(
     solver::MadNLPSolver,
     kkt::BFGSKKTSystem,
-    x::Vector{Float64},
-    l::Vector{Float64};
+    x::Vector{T},
+    l::Vector{T};
     is_resto=false,
-)
+) where T
     nlp = solver.nlp
     cnt = solver.cnt
     @trace(solver.logger, "Update BFGS matrices.")
     Bk = kkt.hess
+    sk, yk = kkt.sk, kkt.yk
     n, p = size(Bk)
+    m = size(kkt.jac, 1)
 
-    # Make sure we have evaluated the gradient before.
-    if cnt.obj_grad_cnt > 1
-        sk = kkt.sk
+    if cnt.obj_grad_cnt >= 2
         # Build sk = x+ - x
         copyto!(sk, 1, solver.x, 1, n)
-        axpy!(-1.0, kkt.last_x, sk)
+        axpy!(-one(T), kkt.last_x, sk)
 
         # Build yk = ∇L+ - ∇L
-        yk = kkt.yk
         copyto!(yk, 1, solver.f, 1, n)
-        mul!(yk, kkt.jac', l, 1.0, 1.0)
-        axpy!(-1.0, kkt.last_grad, yk)
-        mul!(yk, kkt.jac_prev', l, -1.0, 1.0)
+        mul!(yk, kkt.jac', l, one(T), one(T))
+        axpy!(-one(T), kkt.last_grad, yk)
+        mul!(yk, kkt.jac_prev', l, -one(T), one(T))
 
         # Initial update (Nocedal & Wright, p.143)
         if cnt.obj_grad_cnt == 2
             yksk = dot(yk, sk)
             sksk = dot(sk, sk)
             Bk[diagind(Bk)] .= yksk ./ sksk
+        elseif m == 0
+            # NB: in unconstrained case, we have kkt.hess === kkt.aug_com.
+            #     As a result Bk has also values coming from pr_diag in
+            #     the diagonal terms, values we have to remove before
+            #     performing the BFGS update.
+            Bk[diagind(Bk)] .= kkt.diag_hess
         end
 
         update!(kkt.Bk, Bk, sk, yk)
     end
 
+    # Backup data for next step
     copyto!(kkt.last_x, 1, solver.x, 1, n)
     copyto!(kkt.last_grad, 1, solver.f, 1, n)
+    # TODO: Do we have to store dense Jacobian twice?
     copyto!(kkt.jac_prev, solver.kkt.jac)
 
     compress_hessian!(kkt)

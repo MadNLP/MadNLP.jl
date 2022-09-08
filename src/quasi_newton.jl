@@ -50,15 +50,15 @@ function BFGS(n::Int; init_strategy=SCALAR1)
     return BFGS{Float64, Vector{Float64}, Matrix{Float64}}(init_strategy, zeros(n))
 end
 
-function update!(B::BFGS, Bk::AbstractMatrix, sk::AbstractVector, yk::AbstractVector)
-    if dot(sk, yk) < 1e-8
+function update!(qn::BFGS{T, VT, MT}, Bk::AbstractMatrix, sk::AbstractVector, yk::AbstractVector) where {T, VT, MT}
+    if dot(sk, yk) < T(1e-8)
         return false
     end
-    mul!(B.bsk, Bk, sk)
-    alpha1 = 1.0 / dot(sk, B.bsk)
-    alpha2 = 1.0 / dot(yk, sk)
-    BLAS.ger!(-alpha1, B.bsk, B.bsk, Bk)  # Bk = Bk - alpha1 * bsk * bsk'
-    BLAS.ger!(alpha2, yk, yk, Bk)         # Bk = Bk + alpha2 * yk * yk'
+    mul!(qn.bsk, Bk, sk)
+    alpha1 = one(T) / dot(sk, qn.bsk)
+    alpha2 = one(T) / dot(yk, sk)
+    BLAS.ger!(-alpha1, qn.bsk, qn.bsk, Bk)  # Bk = Bk - alpha1 * bsk * bsk'
+    BLAS.ger!(alpha2, yk, yk, Bk)           # Bk = Bk + alpha2 * yk * yk'
     return true
 end
 
@@ -67,27 +67,30 @@ struct DampedBFGS{T, VT, MT} <: AbstractQuasiNewton
     bsk::VT
     rk::VT
 end
+function DampedBFGS(n::Int; init_strategy=SCALAR1)
+    return DampedBFGS{Float64, Vector{Float64}, Matrix{Float64}}(init_strategy, zeros(n), zeros(n))
+end
 
-function update!(B::DampedBFGS, Bk::AbstractMatrix, sk::AbstractVector, yk::AbstractVector)
-    mul!(B.bsk, Bk, sk)
-    sBs = dot(sk, B.Bsk)
+function update!(qn::DampedBFGS{T, VT, MT}, Bk::AbstractMatrix, sk::AbstractVector, yk::AbstractVector) where {T, VT, MT}
+    mul!(qn.bsk, Bk, sk)
+    sBs = dot(sk, qn.Bsk)
 
     # Procedure 18.2 (Nocedal & Wright, page 537)
-    theta = if dot(sk, yk) < 0.2 * sBs
-        0.8 * sBs / (sBs - dot(sk, yk))
+    theta = if dot(sk, yk) < T(0.2) * sBs
+        T(0.8) * sBs / (sBs - dot(sk, yk))
     else
-        1.0
+        one(T)
     end
 
-    fill!(rk, 0.0)
-    axpy!(theta, yk, rk)
-    axpy!(1.0 - theta, B.bsk, rk)
+    fill!(qn.rk, zero(T))
+    axpy!(theta, yk, qn.rk)
+    axpy!(one(T) - theta, qn.bsk, qn.rk)
 
-    alpha1 = 1.0 / sBs
-    alpha2 = 1.0 / dot(rk, sk)
+    alpha1 = one(T) / sBs
+    alpha2 = one(T) / dot(qn.rk, qn.sk)
 
-    BLAS.ger!(-alpha1, B.bsk, B.bsk, Bk)
-    BLAS.ger!(alpha2, rk, rk, Bk)
+    BLAS.ger!(-alpha1, qn.bsk, qn.bsk, Bk)
+    BLAS.ger!(alpha2, qn.rk, qn.rk, Bk)
     return true
 end
 
