@@ -160,8 +160,6 @@ function eval_lag_hess_wrapper!(
         NLPModels.jtprod!(nlp, qn.last_x, l, qn.last_jv)
         axpy!(-one(T), qn.last_jv, yk)
 
-        # mul!(yk, kkt.jac_prev', l, -one(T), one(T))
-
         # Initial update (Nocedal & Wright, p.143)
         if cnt.obj_grad_cnt == 2
             yksk = dot(yk, sk)

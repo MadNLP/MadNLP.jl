@@ -170,9 +170,10 @@ end
         MadNLP.solve!(solver_qn)
 
         @test solver_qn.status == MadNLP.SOLVE_SUCCEEDED
+        @test solver_qn.cnt.lag_hess_cnt == 0
         @test solver_exact.obj_val ≈ solver_qn.obj_val atol=1e-6
         @test solver_exact.x ≈ solver_qn.x atol=1e-6
-        @test solver_exact.y ≈ solver_qn.y atol=1e-5
+        @test solver_exact.y ≈ solver_qn.y atol=1e-4
     end
 end
 
