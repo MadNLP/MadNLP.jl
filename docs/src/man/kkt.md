@@ -115,7 +115,8 @@ For instance, we can parameterize a sparse KKT system as
 T = Float64
 VT = Vector{T}
 MT = SparseMatrixCSC{T, Int}
-kkt = MadNLP.SparseKKTSystem{T, VT, MT}(nlp)
+QN = MadNLP.ExactHessian{T, VT}
+kkt = MadNLP.SparseKKTSystem{T, VT, MT, QN}(nlp)
 kkt.aug_com
 
 ```
@@ -124,7 +125,8 @@ and a dense KKT system as
 T = Float64
 VT = Vector{T}
 MT = Matrix{T}
-kkt = MadNLP.SparseKKTSystem{T, VT, MT}(nlp)
+QN = MadNLP.ExactHessian{T, VT}
+kkt = MadNLP.SparseKKTSystem{T, VT, MT, QN}(nlp)
 kkt.aug_com
 
 ```

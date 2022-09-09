@@ -4,7 +4,7 @@
 
 Abstract type for KKT system.
 """
-abstract type AbstractKKTSystem{T, VT, MT<:AbstractMatrix{T}, QN<:AbstractHessian{T}} end
+abstract type AbstractKKTSystem{T, VT, MT<:AbstractMatrix{T}, QN<:AbstractHessian{T, VT}} end
 
 """
     AbstractUnreducedKKTSystem{T, VT, MT, QN} <: AbstractKKTSystem{T, VT, MT, QN}
