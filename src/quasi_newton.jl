@@ -58,12 +58,12 @@ end
 function BFGS{T, VT}(n::Int; init_strategy=SCALAR1) where {T, VT}
     return BFGS{T, VT}(
         init_strategy,
-        zeros(n),
-        zeros(n),
-        zeros(n),
-        zeros(n),
-        zeros(n),
-        zeros(n),
+        VT(undef, n),
+        VT(undef, n),
+        VT(undef, n),
+        VT(undef, n),
+        VT(undef, n),
+        VT(undef, n),
     )
 end
 
@@ -74,8 +74,8 @@ function update!(qn::BFGS{T, VT}, Bk::AbstractMatrix, sk::AbstractVector, yk::Ab
     mul!(qn.bsk, Bk, sk)
     alpha1 = one(T) / dot(sk, qn.bsk)
     alpha2 = one(T) / dot(yk, sk)
-    BLAS.ger!(-alpha1, qn.bsk, qn.bsk, Bk)  # Bk = Bk - alpha1 * bsk * bsk'
-    BLAS.ger!(alpha2, yk, yk, Bk)           # Bk = Bk + alpha2 * yk * yk'
+    _ger!(-alpha1, qn.bsk, qn.bsk, Bk)  # Bk = Bk - alpha1 * bsk * bsk'
+    _ger!(alpha2, yk, yk, Bk)           # Bk = Bk + alpha2 * yk * yk'
     return true
 end
 
@@ -92,13 +92,13 @@ end
 function DampedBFGS{T, VT}(n::Int; init_strategy=SCALAR1) where {T, VT}
     return DampedBFGS{T, VT}(
         init_strategy,
-        zeros(n),
-        zeros(n),
-        zeros(n),
-        zeros(n),
-        zeros(n),
-        zeros(n),
-        zeros(n),
+        VT(undef, n),
+        VT(undef, n),
+        VT(undef, n),
+        VT(undef, n),
+        VT(undef, n),
+        VT(undef, n),
+        VT(undef, n),
     )
 end
 
@@ -120,8 +120,8 @@ function update!(qn::DampedBFGS{T, VT}, Bk::AbstractMatrix, sk::AbstractVector, 
     alpha1 = one(T) / sBs
     alpha2 = one(T) / dot(qn.rk, qn.sk)
 
-    BLAS.ger!(-alpha1, qn.bsk, qn.bsk, Bk)
-    BLAS.ger!(alpha2, qn.rk, qn.rk, Bk)
+    _ger!(-alpha1, qn.bsk, qn.bsk, Bk)
+    _ger!(alpha2, qn.rk, qn.rk, Bk)
     return true
 end
 

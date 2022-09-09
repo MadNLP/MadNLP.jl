@@ -7,8 +7,9 @@ import Pkg.TOML: parsefile
 import MathOptInterface
 import Libdl: dlopen, dlext, RTLD_DEEPBIND, RTLD_GLOBAL
 import Printf: @sprintf
+<<<<<<< HEAD
 import LinearAlgebra: BLAS, Adjoint, Symmetric, mul!, ldiv!, norm, dot, diagind, normInf
-import LinearAlgebra.BLAS: axpy!, symv!, libblas, liblapack, BlasInt, @blasfunc
+import LinearAlgebra.BLAS: axpy!, symv!, ger! libblas, liblapack, BlasInt, @blasfunc
 import SparseArrays: AbstractSparseMatrix, SparseMatrixCSC, sparse, getcolptr, rowvals, nnz
 import Base: string, show, print, size, getindex, copyto!, @kwdef
 import SuiteSparse: UMFPACK

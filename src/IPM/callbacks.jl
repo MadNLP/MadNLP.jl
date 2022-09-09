@@ -148,6 +148,23 @@ function eval_lag_hess_wrapper!(
     n, p = size(Bk)
     m = size(kkt.jac, 1)
 
+    # Code for GPU support
+    if VT != Vector{T}
+        haskey(kkt.etc, :l_g) || (kkt.etc[:l_g] = VT(undef, m))
+        l_g = kkt.etc[:l_g]
+        copyto!(l_g, l)
+        haskey(kkt.etc, :x_g) || (kkt.etc[:x_g] = zeros(n))
+        x_g = kkt.etc[:x_g]
+        copyto!(x_g, qn.last_x)
+        haskey(kkt.etc, :j_g) || (kkt.etc[:j_g] = zeros(n))
+        j_g = kkt.etc[:j_g]
+        fill!(j_g, zero(T))
+    else
+        l_g = l
+        x_g = qn.last_x
+        j_g = qn.last_jv
+    end
+
     if cnt.obj_grad_cnt >= 2
         # Build sk = x+ - x
         copyto!(sk, 1, solver.x, 1, n)
@@ -155,10 +172,13 @@ function eval_lag_hess_wrapper!(
 
         # Build yk = ∇L+ - ∇L
         copyto!(yk, 1, solver.f, 1, n)
-        mul!(yk, kkt.jac', l, one(T), one(T))
         axpy!(-one(T), qn.last_g, yk)
-        NLPModels.jtprod!(nlp, qn.last_x, l, qn.last_jv)
-        axpy!(-one(T), qn.last_jv, yk)
+        if m > 0
+            mul!(yk, kkt.jac', l_g, one(T), one(T))
+            NLPModels.jtprod!(nlp, x_g, l, j_g)
+            copyto!(qn.last_jv, j_g)
+            axpy!(-one(T), qn.last_jv, yk)
+        end
 
         # Initial update (Nocedal & Wright, p.143)
         if cnt.obj_grad_cnt == 2

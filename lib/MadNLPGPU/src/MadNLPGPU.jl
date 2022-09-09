@@ -21,6 +21,7 @@ import MadNLP:
     LapackOptions, input_type, is_supported, default_options, symul!
 
 symul!(y, A, x::CuVector{T}, α = 1., β = 0.) where T = CUBLAS.symv!('L', T(α), A, x, T(β), y)
+MadNLP._ger!(alpha::Number, x::CuVector{T}, y::CuVector{T}, A::CuMatrix{T}) where T = CUBLAS.ger!(alpha, x, y, A)
 
 
 include("kernels.jl")

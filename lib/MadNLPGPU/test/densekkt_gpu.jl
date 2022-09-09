@@ -49,3 +49,37 @@ end
         _compare_gpu_with_cpu(kkt_system, n, m, Int[1, 2])
     end
 end
+
+@testset "MadNLP: $QN + $KKT" for QN in [
+    MadNLP.DENSE_BFGS,
+    MadNLP.DENSE_DAMPED_BFGS,
+], KKT in [
+    MadNLP.DENSE_KKT_SYSTEM,
+    MadNLP.DENSE_CONDENSED_KKT_SYSTEM,
+]
+    @testset "Size: ($n, $m)" for (n, m) in [(10, 0), (10, 5), (50, 10)]
+        nlp = MadNLPTests.DenseDummyQP{Float64}(; n=n, m=m)
+        solver_exact = MadNLP.MadNLPSolver(
+            nlp;
+            print_level=MadNLP.ERROR,
+            kkt_system=KKT,
+            linear_solver=LapackGPUSolver,
+        )
+        MadNLP.solve!(solver_exact)
+
+        solver_qn = MadNLPGPU.CuMadNLPSolver(
+            nlp;
+            print_level=MadNLP.ERROR,
+            kkt_system=KKT,
+            hessian_approximation=QN,
+            linear_solver=LapackGPUSolver,
+        )
+        MadNLP.solve!(solver_qn)
+
+        @test solver_qn.status == MadNLP.SOLVE_SUCCEEDED
+        @test solver_qn.cnt.lag_hess_cnt == 0
+        @test solver_exact.obj_val ≈ solver_qn.obj_val atol=1e-6
+        @test solver_exact.x ≈ solver_qn.x atol=1e-6
+    end
+end
+

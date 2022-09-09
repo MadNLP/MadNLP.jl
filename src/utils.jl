@@ -51,6 +51,8 @@ symul!(y, A, x::AbstractVector{T}, α = 1, β = 0) where T = BLAS.symv!('L', T(�
 function _scal!(a::T, x::AbstractVector{T}) where T
     return BLAS.scal!(length(x), a, x, 1)
 end
+# Similarly, _ger! wraps ger! to dispatch on the data type.
+_ger!(alpha::Number, x::AbstractVector{T}, y::AbstractVector{T}, A::AbstractMatrix{T}) where T = BLAS.ger!(alpha, x, y, A)
 
 const blas_num_threads = Ref{Int}(1)
 function set_blas_num_threads(n::Integer;permanent::Bool=false)
