@@ -150,14 +150,13 @@ function eval_lag_hess_wrapper!(
 
     # Code for GPU support
     if VT != Vector{T}
-        haskey(kkt.etc, :l_g) || (kkt.etc[:l_g] = VT(undef, m))
-        l_g = kkt.etc[:l_g]
+        # Load the buffers to transfer data between the host and the device.
+        l_g = get!(kkt.etc, :l_g, VT(undef, m))
+        x_g = get!(kkt.etc, :x_g, zeros(n))
+        j_g = get!(kkt.etc, :j_g, zeros(n))
+        # Init buffers.
         copyto!(l_g, l)
-        haskey(kkt.etc, :x_g) || (kkt.etc[:x_g] = zeros(n))
-        x_g = kkt.etc[:x_g]
         copyto!(x_g, qn.last_x)
-        haskey(kkt.etc, :j_g) || (kkt.etc[:j_g] = zeros(n))
-        j_g = kkt.etc[:j_g]
         fill!(j_g, zero(T))
     else
         l_g = l
