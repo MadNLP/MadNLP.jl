@@ -120,8 +120,8 @@ end
 
 function LinearAlgebra.mul!(y::AbstractVector, kkt::MadNLP.DenseKKTSystem{T, VT, MT}, x::AbstractVector) where {T, VT<:CuVector{T}, MT<:CuMatrix{T}}
     # Load buffers
-    d_x = get!(kkt.etc, :hess_w1, CuVector{T}(undef, size(kkt.aug_com, 1))
-    d_y = get!(kkt.etc, :hess_w2, CuVector{T}(undef, size(kkt.aug_com, 1))
+    d_x = get!(kkt.etc, :hess_w1, CuVector{T}(undef, size(kkt.aug_com, 1)))
+    d_y = get!(kkt.etc, :hess_w2, CuVector{T}(undef, size(kkt.aug_com, 1)))
 
     # x and y can be host arrays. Copy them on the device to avoid side effect.
     copyto!(d_x, x)
