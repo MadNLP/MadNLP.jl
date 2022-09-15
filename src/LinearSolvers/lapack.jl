@@ -114,13 +114,13 @@ end
 
 function factorize_bunchkaufman!(M::LapackCPUSolver)
     size(M.fact,1) == 0 && return M
-    haskey(M.etc,:ipiv) || (M.etc[:ipiv] = Vector{BlasInt}(undef,size(M.dense,1)))
+    pivots = get!(M.etc, :ipiv, Vector{BlasInt}(undef,size(M.dense,1)))
     M.lwork = -1
     M.fact .= M.dense
-    sytrf('L',size(M.fact,1),M.fact,size(M.fact,2),M.etc[:ipiv],M.work,M.lwork,M.info)
+    sytrf('L',size(M.fact,1),M.fact,size(M.fact,2),pivots,M.work,M.lwork,M.info)
     M.lwork = BlasInt(real(M.work[1]))
     length(M.work) < M.lwork && resize!(M.work,M.lwork)
-    sytrf('L',size(M.fact,1),M.fact,size(M.fact,2),M.etc[:ipiv],M.work,M.lwork,M.info)
+    sytrf('L',size(M.fact,1),M.fact,size(M.fact,2),pivots,M.work,M.lwork,M.info)
     return M
 end
 function solve_bunchkaufman!(M::LapackCPUSolver,x)
@@ -131,10 +131,10 @@ end
 
 function factorize_lu!(M::LapackCPUSolver)
     size(M.fact,1) == 0 && return M
-    haskey(M.etc,:ipiv) || (M.etc[:ipiv] = Vector{BlasInt}(undef,size(M.dense,1)))
+    pivots = get!(M.etc, :ipiv, Vector{BlasInt}(undef,size(M.dense,1)))
     tril_to_full!(M.dense)
     M.fact .= M.dense
-    getrf(size(M.fact,1),size(M.fact,2),M.fact,size(M.fact,2),M.etc[:ipiv],M.info)
+    getrf(size(M.fact,1),size(M.fact,2),M.fact,size(M.fact,2),pivots,M.info)
     return M
 end
 function solve_lu!(M::LapackCPUSolver,x)
@@ -147,14 +147,14 @@ end
 
 function factorize_qr!(M::LapackCPUSolver{T}) where T
     size(M.fact,1) == 0 && return M
-    haskey(M.etc,:tau) || (M.etc[:tau] = Vector{T}(undef,size(M.dense,1)))
+    tau = get!(M.etc, :tau, Vector{T}(undef,size(M.dense,1)))
     tril_to_full!(M.dense)
     M.lwork = -1
     M.fact .= M.dense
-    geqrf(size(M.fact,1),size(M.fact,2),M.fact,size(M.fact,2),M.etc[:tau],M.work,M.lwork,M.info)
+    geqrf(size(M.fact,1),size(M.fact,2),M.fact,size(M.fact,2),tau,M.work,M.lwork,M.info)
     M.lwork = BlasInt(real(M.work[1]))
     length(M.work) < M.lwork && resize!(M.work,M.lwork)
-    geqrf(size(M.fact,1),size(M.fact,2),M.fact,size(M.fact,2),M.etc[:tau],M.work,M.lwork,M.info)
+    geqrf(size(M.fact,1),size(M.fact,2),M.fact,size(M.fact,2),tau,M.work,M.lwork,M.info)
     return M
 end
 

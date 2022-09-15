@@ -88,13 +88,9 @@ function MadNLP.jtprod!(y::AbstractVector, kkt::MadNLP.AbstractDenseKKTSystem{T,
     m = size(kkt.jac, 1)
     nx = size(kkt.jac, 2)
     ns = length(kkt.ind_ineq)
-    haskey(kkt.etc, :jac_w1) || (kkt.etc[:jac_w1] = CuVector{T}(undef, m))
-    haskey(kkt.etc, :jac_w2) || (kkt.etc[:jac_w2] = CuVector{T}(undef, nx))
-    haskey(kkt.etc, :jac_w3) || (kkt.etc[:jac_w3] = CuVector{T}(undef, ns))
-
-    d_x = kkt.etc[:jac_w1]::VT
-    d_yx = kkt.etc[:jac_w2]::VT
-    d_ys = kkt.etc[:jac_w3]::VT
+    d_x = get!(kkt.etc, :jac_w1, CuVector{T}(undef, m))
+    d_yx = get!(kkt.etc, :jac_w2, CuVector{T}(undef, nx))
+    d_ys = get!(kkt.etc, :jac_w3, CuVector{T}(undef, ns))
 
     # x and y can be host arrays. Copy them on the device to avoid side effect.
     _copyto!(d_x, x)
@@ -110,8 +106,7 @@ function MadNLP.jtprod!(y::AbstractVector, kkt::MadNLP.AbstractDenseKKTSystem{T,
 end
 
 function MadNLP.set_aug_diagonal!(kkt::MadNLP.AbstractDenseKKTSystem{T, VT, MT}, solver::MadNLP.MadNLPSolver) where {T, VT<:CuVector{T}, MT<:CuMatrix{T}}
-    haskey(kkt.etc, :pr_diag_host) || (kkt.etc[:pr_diag_host] = Vector{T}(undef, length(kkt.pr_diag)))
-    pr_diag_h = kkt.etc[:pr_diag_host]::Vector{T}
+    pr_diag_h = get!(kkt.etc, :pr_diag_host, Vector{T}(undef, length(kkt.pr_diag)))
     # Broadcast is not working as MadNLP array are allocated on the CPU,
     # whereas pr_diag is allocated on the GPU
     pr_diag_h .= solver.zl./(solver.x.-solver.xl) .+ solver.zu./(solver.xu.-solver.x)
@@ -125,11 +120,8 @@ end
 
 function LinearAlgebra.mul!(y::AbstractVector, kkt::MadNLP.DenseKKTSystem{T, VT, MT}, x::AbstractVector) where {T, VT<:CuVector{T}, MT<:CuMatrix{T}}
     # Load buffers
-    haskey(kkt.etc, :hess_w1) || (kkt.etc[:hess_w1] = CuVector{T}(undef, size(kkt.aug_com, 1)))
-    haskey(kkt.etc, :hess_w2) || (kkt.etc[:hess_w2] = CuVector{T}(undef, size(kkt.aug_com, 1)))
-
-    d_x = kkt.etc[:hess_w1]::VT
-    d_y = kkt.etc[:hess_w2]::VT
+    d_x = get!(kkt.etc, :hess_w1, CuVector{T}(undef, size(kkt.aug_com, 1))
+    d_y = get!(kkt.etc, :hess_w2, CuVector{T}(undef, size(kkt.aug_com, 1))
 
     # x and y can be host arrays. Copy them on the device to avoid side effect.
     copyto!(d_x, x)
@@ -258,11 +250,8 @@ end
 function LinearAlgebra.mul!(y::AbstractVector, kkt::MadNLP.DenseCondensedKKTSystem{T, VT, MT}, x::AbstractVector) where {T, VT<:CuVector{T}, MT<:CuMatrix{T}}
     if length(y) == length(x) == size(kkt.aug_com, 1)
         # Load buffers
-        haskey(kkt.etc, :hess_w1) || (kkt.etc[:hess_w1] = CuVector{T}(undef, size(kkt.aug_com, 1)))
-        haskey(kkt.etc, :hess_w2) || (kkt.etc[:hess_w2] = CuVector{T}(undef, size(kkt.aug_com, 1)))
-
-        d_x = kkt.etc[:hess_w1]::VT
-        d_y = kkt.etc[:hess_w2]::VT
+        d_x = get!(kkt.etc, :hess_w1, CuVector{T}(undef, size(kkt.aug_com, 1)))
+        d_y = get!(kkt.etc, :hess_w2, CuVector{T}(undef, size(kkt.aug_com, 1)))
 
         # Call parent() as CUDA does not dispatch on proper copyto! when passed a view
         copyto!(d_x, 1, parent(x), 1, length(x))
@@ -270,11 +259,8 @@ function LinearAlgebra.mul!(y::AbstractVector, kkt::MadNLP.DenseCondensedKKTSyst
         copyto!(y, d_y)
     else
         # Load buffers
-        haskey(kkt.etc, :hess_w3) || (kkt.etc[:hess_w3] = CuVector{T}(undef, length(x)))
-        haskey(kkt.etc, :hess_w4) || (kkt.etc[:hess_w4] = CuVector{T}(undef, length(y)))
-
-        d_x = kkt.etc[:hess_w3]::VT
-        d_y = kkt.etc[:hess_w4]::VT
+        d_x = get!(kkt.etc, :hess_w3, CuVector{T}(undef, length(x)))
+        d_y = get!(kkt.etc, :hess_w4, CuVector{T}(undef, length(y)))
 
         # Call parent() as CUDA does not dispatch on proper copyto! when passed a view
         copyto!(d_x, 1, parent(x), 1, length(x))
@@ -288,11 +274,8 @@ end
 
 function MadNLP.jprod_ineq!(y::AbstractVector, kkt::MadNLP.DenseCondensedKKTSystem{T, VT, MT}, x::AbstractVector) where {T, VT<:CuVector{T}, MT<:CuMatrix{T}}
     # Create buffers
-    haskey(kkt.etc, :jac_ineq_w1) || (kkt.etc[:jac_ineq_w1] = CuVector{T}(undef, kkt.n_ineq))
-    haskey(kkt.etc, :jac_ineq_w2) || (kkt.etc[:jac_ineq_w2] = CuVector{T}(undef, size(kkt.jac_ineq, 2)))
-
-    y_d = kkt.etc[:jac_ineq_w1]::VT
-    x_d = kkt.etc[:jac_ineq_w2]::VT
+    y_d = get!(kkt.etc, :jac_ineq_w1, CuVector{T}(undef, kkt.n_ineq))
+    x_d = get!(kkt.etc, :jac_ineq_w2, CuVector{T}(undef, size(kkt.jac_ineq, 2)))
 
     # Call parent() as CUDA does not dispatch on proper copyto! when passed a view
     copyto!(x_d, 1, parent(x), 1, length(x))

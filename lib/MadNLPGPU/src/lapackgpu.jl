@@ -87,8 +87,8 @@ for (sytrf,sytrf_buffer,getrf,getrf_buffer,getrs,geqrf,geqrf_buffer,ormqr,ormqr_
     )
     @eval begin
         function factorize_bunchkaufman!(M::LapackGPUSolver{$typ})
-            haskey(M.etc,:ipiv) || (M.etc[:ipiv] = CuVector{Int32}(undef,size(M.dense,1)))
-            haskey(M.etc,:ipiv64) || (M.etc[:ipiv64] = CuVector{Int64}(undef,length(M.etc[:ipiv])))
+            pivots = get!(M.etc, :ipiv, CuVector{Int32}(undef, size(M.dense, 1)))
+            get!(M.etc, :ipiv64, CuVector{Int64}(undef, size(M.dense, 1)))
 
             copyto!(M.fact,M.dense)
             CUSOLVER.$sytrf_buffer(
@@ -97,7 +97,7 @@ for (sytrf,sytrf_buffer,getrf,getrf_buffer,getrs,geqrf,geqrf_buffer,ormqr,ormqr_
             CUSOLVER.$sytrf(
                 dense_handle(),CUBLAS_FILL_MODE_LOWER,
                 Int32(size(M.fact,1)),M.fact,Int32(size(M.fact,2)),
-                M.etc[:ipiv],M.work,M.lwork[],M.info)
+                pivots,M.work,M.lwork[],M.info)
             return M
         end
 
@@ -128,7 +128,7 @@ for (sytrf,sytrf_buffer,getrf,getrf_buffer,getrs,geqrf,geqrf_buffer,ormqr,ormqr_
         end
 
         function factorize_lu!(M::LapackGPUSolver{$typ})
-            haskey(M.etc,:ipiv) || (M.etc[:ipiv] = CuVector{Int32}(undef,size(M.dense,1)))
+            pivots = get!(M.etc, :ipiv, CuVector{Int32}(undef, size(M.dense, 1)))
             tril_to_full!(M.dense)
             copyto!(M.fact,M.dense)
             CUSOLVER.$getrf_buffer(
@@ -137,7 +137,7 @@ for (sytrf,sytrf_buffer,getrf,getrf_buffer,getrs,geqrf,geqrf_buffer,ormqr,ormqr_
             length(M.work) < M.lwork[] && resize!(M.work,Int(M.lwork[]))
             CUSOLVER.$getrf(
                 dense_handle(),Int32(size(M.fact,1)),Int32(size(M.fact,2)),
-                M.fact,Int32(size(M.fact,2)),M.work,M.etc[:ipiv],M.info)
+                M.fact,Int32(size(M.fact,2)),M.work,pivots,M.info)
             return M
         end
 
@@ -152,13 +152,13 @@ for (sytrf,sytrf_buffer,getrf,getrf_buffer,getrs,geqrf,geqrf_buffer,ormqr,ormqr_
         end
 
         function factorize_qr!(M::LapackGPUSolver{$typ})
-            haskey(M.etc,:tau) || (M.etc[:tau] = CuVector{$typ}(undef,size(M.dense,1)))
-            haskey(M.etc,:one) || (M.etc[:one] = ones($typ,1))
+            tau = get!(M.etc, :tau, CuVector{$typ}(undef, size(M.dense, 1)))
+            one = get!(M.etc, :one, ones($typ, 1))
             tril_to_full!(M.dense)
             copyto!(M.fact,M.dense)
             CUSOLVER.$geqrf_buffer(dense_handle(),Int32(size(M.fact,1)),Int32(size(M.fact,2)),M.fact,Int32(size(M.fact,2)),M.lwork)
             length(M.work) < M.lwork[] && resize!(M.work,Int(M.lwork[]))
-            CUSOLVER.$geqrf(dense_handle(),Int32(size(M.fact,1)),Int32(size(M.fact,2)),M.fact,Int32(size(M.fact,2)),M.etc[:tau],M.work,M.lwork[],M.info)
+            CUSOLVER.$geqrf(dense_handle(),Int32(size(M.fact,1)),Int32(size(M.fact,2)),M.fact,Int32(size(M.fact,2)),tau,M.work,M.lwork[],M.info)
             return M
         end
 
