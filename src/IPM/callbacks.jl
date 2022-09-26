@@ -5,7 +5,7 @@ function eval_f_wrapper(solver::MadNLPSolver, x::Vector{T}) where T
     x_nlpmodel = _madnlp_unsafe_wrap(x, get_nvar(nlp))
     cnt.eval_function_time += @elapsed obj_val = (get_minimize(nlp) ? 1. : -1.) * obj(nlp,x_nlpmodel)
     cnt.obj_cnt+=1
-    cnt.obj_cnt==1 && (is_valid(obj_val) || throw(InvalidNumberException()))
+    cnt.obj_cnt==1 && (is_valid(obj_val) || throw(InvalidNumberException(:obj)))
     return obj_val*solver.obj_scale[]
 end
 
@@ -22,7 +22,7 @@ function eval_grad_f_wrapper!(solver::MadNLPSolver, f::Vector{T},x::Vector{T}) w
     )
     f.*=solver.obj_scale[] * (get_minimize(nlp) ? 1. : -1.)
     cnt.obj_grad_cnt+=1
-    cnt.obj_grad_cnt==1 && (is_valid(f)  || throw(InvalidNumberException()))
+    cnt.obj_grad_cnt==1 && (is_valid(f)  || throw(InvalidNumberException(:grad)))
     return f
 end
 
@@ -41,7 +41,7 @@ function eval_cons_wrapper!(solver::MadNLPSolver, c::Vector{T},x::Vector{T}) whe
     c.-=solver.rhs
     c.*=solver.con_scale
     cnt.con_cnt+=1
-    cnt.con_cnt==2 && (is_valid(c) || throw(InvalidNumberException()))
+    cnt.con_cnt==2 && (is_valid(c) || throw(InvalidNumberException(:cons)))
     return c
 end
 
@@ -55,12 +55,12 @@ function eval_jac_wrapper!(solver::MadNLPSolver, kkt::AbstractKKTSystem, x::Vect
     jac_nlpmodel = _madnlp_unsafe_wrap(jac, get_nnzj(nlp.meta))
     cnt.eval_function_time += @elapsed jac_coord!(
         nlp,
-        x_nlpmodel, 
+        x_nlpmodel,
         jac_nlpmodel
     )
     compress_jacobian!(kkt)
     cnt.con_jac_cnt+=1
-    cnt.con_jac_cnt==1 && (is_valid(jac) || throw(InvalidNumberException()))
+    cnt.con_jac_cnt==1 && (is_valid(jac) || throw(InvalidNumberException(:jac)))
     @trace(solver.logger,"Constraint jacobian evaluation started.")
     return jac
 end
@@ -82,7 +82,7 @@ function eval_lag_hess_wrapper!(solver::MadNLPSolver, kkt::AbstractKKTSystem, x:
     )
     compress_hessian!(kkt)
     cnt.lag_hess_cnt+=1
-    cnt.lag_hess_cnt==1 && (is_valid(hess) || throw(InvalidNumberException()))
+    cnt.lag_hess_cnt==1 && (is_valid(hess) || throw(InvalidNumberException(:hess)))
     return hess
 end
 
@@ -100,7 +100,7 @@ function eval_jac_wrapper!(solver::MadNLPSolver, kkt::AbstractDenseKKTSystem, x:
     )
     compress_jacobian!(kkt)
     cnt.con_jac_cnt+=1
-    cnt.con_jac_cnt==1 && (is_valid(jac) || throw(InvalidNumberException()))
+    cnt.con_jac_cnt==1 && (is_valid(jac) || throw(InvalidNumberException(:jac)))
     @trace(solver.logger,"Constraint jacobian evaluation started.")
     return jac
 end
@@ -121,6 +121,6 @@ function eval_lag_hess_wrapper!(solver::MadNLPSolver, kkt::AbstractDenseKKTSyste
     )
     compress_hessian!(kkt)
     cnt.lag_hess_cnt+=1
-    cnt.lag_hess_cnt==1 && (is_valid(hess) || throw(InvalidNumberException()))
+    cnt.lag_hess_cnt==1 && (is_valid(hess) || throw(InvalidNumberException(:hess)))
     return hess
 end
