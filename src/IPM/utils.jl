@@ -13,7 +13,9 @@ struct MadNLPExecutionStats{T} <: AbstractExecutionStats
     elapsed_time::Real
 end
 
-struct InvalidNumberException <: Exception end
+struct InvalidNumberException <: Exception
+    callback::Symbol
+end
 struct NotEnoughDegreesOfFreedomException <: Exception end
 
 MadNLPExecutionStats(solver::MadNLPSolver) =MadNLPExecutionStats(

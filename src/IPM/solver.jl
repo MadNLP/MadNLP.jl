@@ -150,7 +150,19 @@ function solve!(
         end
     catch e
         if e isa InvalidNumberException
-            solver.status=INVALID_NUMBER_DETECTED
+            if e.callback == :obj
+                solver.status=INVALID_NUMBER_OBJECTIVE
+            elseif e.callback == :grad
+                solver.status=INVALID_NUMBER_GRADIENT
+            elseif e.callback == :cons
+                solver.status=INVALID_NUMBER_CONSTRAINTS
+            elseif e.callback == :jac
+                solver.status=INVALID_NUMBER_JACOBIAN
+            elseif e.callback == :hess
+                solver.status=INVALID_NUMBER_HESSIAN_LAGRANGIAN
+            else
+                solver.status=INVALID_NUMBER_DETECTED
+            end
         elseif e isa NotEnoughDegreesOfFreedomException
             solver.status=NOT_ENOUGH_DEGREES_OF_FREEDOM
         elseif e isa LinearSolverException

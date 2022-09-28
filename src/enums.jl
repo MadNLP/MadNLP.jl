@@ -43,7 +43,13 @@
       ERROR_IN_STEP_COMPUTATION = -3,
       NOT_ENOUGH_DEGREES_OF_FREEDOM = -4,
       USER_REQUESTED_STOP = -5,
-      INTERNAL_ERROR = -6)
+      INTERNAL_ERROR = -6,
+      INVALID_NUMBER_OBJECTIVE = -7,
+      INVALID_NUMBER_GRADIENT = -8,
+      INVALID_NUMBER_CONSTRAINTS = -9,
+      INVALID_NUMBER_JACOBIAN = -10,
+      INVALID_NUMBER_HESSIAN_LAGRANGIAN = -11,
+)
 
 const STATUS_OUTPUT_DICT = Dict(
     SOLVE_SUCCEEDED => "Optimal Solution Found.",
@@ -58,4 +64,10 @@ const STATUS_OUTPUT_DICT = Dict(
     ERROR_IN_STEP_COMPUTATION => "Error in step computation.",
     NOT_ENOUGH_DEGREES_OF_FREEDOM => "Problem has too few degrees of freedom.",
     USER_REQUESTED_STOP => "Stopping optimization at current point as requested by user.",
-    INTERNAL_ERROR => "Internal Error.")
+    INTERNAL_ERROR => "Internal Error.",
+    INVALID_NUMBER_OBJECTIVE => "Invalid number in NLP objective function detected.",
+    INVALID_NUMBER_GRADIENT => "Invalid number in NLP objective gradient detected.",
+    INVALID_NUMBER_CONSTRAINTS => "Invalid number in NLP constraint function detected.",
+    INVALID_NUMBER_JACOBIAN => "Invalid number in NLP constraint Jacobian detected.",
+    INVALID_NUMBER_HESSIAN_LAGRANGIAN => "Invalid number in NLP Hessian Lagrangian detected.",
+)
