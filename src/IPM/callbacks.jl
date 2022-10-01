@@ -13,6 +13,7 @@ function eval_grad_f_wrapper!(solver::MadNLPSolver, f::Vector{T},x::Vector{T}) w
     nlp = solver.nlp
     cnt = solver.cnt
     @trace(solver.logger,"Evaluating objective gradient.")
+    obj_scaling = solver.obj_scale[] * (get_minimize(nlp) ? one(T) : -one(T))
     x_nlpmodel = _madnlp_unsafe_wrap(x, get_nvar(nlp))
     f_nlpmodel = _madnlp_unsafe_wrap(f, get_nvar(nlp))
     cnt.eval_function_time += @elapsed grad!(
@@ -20,7 +21,7 @@ function eval_grad_f_wrapper!(solver::MadNLPSolver, f::Vector{T},x::Vector{T}) w
         x_nlpmodel,
         f_nlpmodel
     )
-    f.*=solver.obj_scale[] * (get_minimize(nlp) ? 1. : -1.)
+    scal!(obj_scaling, f)
     cnt.obj_grad_cnt+=1
     cnt.obj_grad_cnt==1 && (is_valid(f)  || throw(InvalidNumberException(:grad)))
     return f
@@ -38,8 +39,8 @@ function eval_cons_wrapper!(solver::MadNLPSolver, c::Vector{T},x::Vector{T}) whe
         c_nlpmodel
     )
     view(c,solver.ind_ineq).-=view(x,get_nvar(nlp)+1:solver.n)
-    c.-=solver.rhs
-    c.*=solver.con_scale
+    c .-= solver.rhs
+    c .*= solver.con_scale
     cnt.con_cnt+=1
     cnt.con_cnt==2 && (is_valid(c) || throw(InvalidNumberException(:cons)))
     return c
@@ -124,3 +125,4 @@ function eval_lag_hess_wrapper!(solver::MadNLPSolver, kkt::AbstractDenseKKTSyste
     cnt.lag_hess_cnt==1 && (is_valid(hess) || throw(InvalidNumberException(:hess)))
     return hess
 end
+

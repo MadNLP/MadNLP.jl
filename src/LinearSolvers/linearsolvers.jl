@@ -114,12 +114,11 @@ struct SolveException <: Exception end
 struct InertiaException <: Exception end
 LinearSolverException=Union{SymbolicException,FactorizationException,SolveException,InertiaException}
 
-@enum(
-    LinearFactorization::Int,
+@enum(LinearFactorization::Int,
     BUNCHKAUFMAN = 1,
     LU = 2,
-    QR =3,
-    CHOLESKY=4,
+    QR = 3,
+    CHOLESKY = 4,
 )
 
 # iterative solvers

@@ -24,7 +24,7 @@ function solve!(
     )
 end
 
-function initialize!(solver::AbstractMadNLPSolver)
+function initialize!(solver::AbstractMadNLPSolver{T}) where T
     # initializing slack variables
     @trace(solver.logger,"Initializing slack variables.")
     cons!(solver.nlp,get_x0(solver.nlp),_madnlp_unsafe_wrap(solver.c,get_ncon(solver.nlp)))
@@ -33,10 +33,10 @@ function initialize!(solver::AbstractMadNLPSolver)
 
     # Initialization
     @trace(solver.logger,"Initializing primal and bound duals.")
-    solver.zl_r.=1.0
-    solver.zu_r.=1.0
-    solver.xl_r.-= max.(1,abs.(solver.xl_r)).*solver.opt.tol
-    solver.xu_r.+= max.(1,abs.(solver.xu_r)).*solver.opt.tol
+    fill!(solver.zl_r, one(T))
+    fill!(solver.zu_r, one(T))
+    solver.xl_r .-= max.(1,abs.(solver.xl_r)).*solver.opt.tol
+    solver.xu_r .+= max.(1,abs.(solver.xu_r)).*solver.opt.tol
     initialize_variables!(solver.x,solver.xl,solver.xu,solver.opt.bound_push,solver.opt.bound_fac)
 
     # Automatic scaling (constraints)
@@ -47,7 +47,7 @@ function initialize!(solver::AbstractMadNLPSolver)
         jac = get_raw_jacobian(solver.kkt)
         scale_constraints!(solver.nlp, solver.con_scale, jac; max_gradient=solver.opt.nlp_scaling_max_gradient)
         set_jacobian_scaling!(solver.kkt, solver.con_scale)
-        solver.y./=solver.con_scale
+        solver.y ./= solver.con_scale
     end
     compress_jacobian!(solver.kkt)
 
@@ -56,7 +56,7 @@ function initialize!(solver::AbstractMadNLPSolver)
     @trace(solver.logger,"Computing objective scaling.")
     if solver.opt.nlp_scaling
         solver.obj_scale[] = scale_objective(solver.nlp, solver.f; max_gradient=solver.opt.nlp_scaling_max_gradient)
-        solver.f.*=solver.obj_scale[]
+        scal!(solver.obj_scale[], solver.f)
     end
 
     # Initialize dual variables
@@ -67,7 +67,7 @@ function initialize!(solver::AbstractMadNLPSolver)
         factorize_wrapper!(solver)
         solve_refine_wrapper!(solver,solver.d,solver.p)
         if norm(dual(solver.d), Inf) > solver.opt.constr_mult_init_max
-            fill!(solver.y, 0.0)
+            fill!(solver.y, zero(T))
         else
             copyto!(solver.y, dual(solver.d))
         end
@@ -79,10 +79,10 @@ function initialize!(solver::AbstractMadNLPSolver)
     eval_lag_hess_wrapper!(solver, solver.kkt, solver.x, solver.y)
 
     theta = get_theta(solver.c)
-    solver.theta_max=1e4*max(1,theta)
-    solver.theta_min=1e-4*max(1,theta)
-    solver.mu=solver.opt.mu_init
-    solver.tau=max(solver.opt.tau_min,1-solver.opt.mu_init)
+    solver.theta_max = 1e4*max(1,theta)
+    solver.theta_min = 1e-4*max(1,theta)
+    solver.mu = solver.opt.mu_init
+    solver.tau = max(solver.opt.tau_min,1-solver.opt.mu_init)
     solver.filter = [(solver.theta_max,-Inf)]
 
     return REGULAR
@@ -317,9 +317,9 @@ function regular!(solver::AbstractMadNLPSolver)
         end
 
         @trace(solver.logger,"Updating primal-dual variables.")
-        solver.x.=solver.x_trial
-        solver.c.=solver.c_trial
-        solver.obj_val=solver.obj_val_trial
+        copyto!(solver.x, solver.x_trial)
+        copyto!(solver.c, solver.c_trial)
+        solver.obj_val = solver.obj_val_trial
         adjusted = adjust_boundary!(solver.x_lr,solver.xl_r,solver.x_ur,solver.xu_r,solver.mu)
         adjusted > 0 &&
             @warn(solver.logger,"In iteration $(solver.cnt.k), $adjusted Slack too small, adjusting variable bound")
@@ -342,14 +342,15 @@ function regular!(solver::AbstractMadNLPSolver)
 end
 
 function restore!(solver::AbstractMadNLPSolver)
-    solver.del_w=0
-    primal(solver._w1) .= solver.x # backup the previous primal iterate
-    dual(solver._w1) .= solver.y # backup the previous primal iterate
-    dual(solver._w2) .= solver.c # backup the previous primal iterate
+    solver.del_w = 0
+    # Backup the previous primal iterate
+    copyto!(primal(solver._w1), solver.x)
+    copyto!(dual(solver._w1), solver.y)
+    copyto!(dual(solver._w2), solver.c)
 
     F = get_F(solver.c,solver.f,solver.zl,solver.zu,solver.jacl,solver.x_lr,solver.xl_r,solver.zl_r,solver.xu_r,solver.x_ur,solver.zu_r,solver.mu)
     solver.cnt.t = 0
-    solver.alpha_z = 0.
+    solver.alpha_z = 0.0
     solver.ftype = "R"
 
     while true
@@ -358,8 +359,8 @@ function restore!(solver::AbstractMadNLPSolver)
 
         solver.x .+= solver.alpha.* primal(solver.d)
         solver.y .+= solver.alpha.* dual(solver.d)
-        solver.zl_r.+=solver.alpha.* dual_lb(solver.d)
-        solver.zu_r.+=solver.alpha.* dual_ub(solver.d)
+        solver.zl_r .+= solver.alpha.* dual_lb(solver.d)
+        solver.zu_r .+= solver.alpha.* dual_ub(solver.d)
 
         eval_cons_wrapper!(solver,solver.c,solver.x)
         eval_grad_f_wrapper!(solver,solver.f,solver.x)
@@ -371,9 +372,9 @@ function restore!(solver::AbstractMadNLPSolver)
         F_trial = get_F(
             solver.c,solver.f,solver.zl,solver.zu,solver.jacl,solver.x_lr,solver.xl_r,solver.zl_r,solver.xu_r,solver.x_ur,solver.zu_r,solver.mu)
         if F_trial > solver.opt.soft_resto_pderror_reduction_factor*F
-            solver.x .= primal(solver._w1)
-            solver.y .= dual(solver._w1)
-            solver.c .= dual(solver._w2) # backup the previous primal iterate
+            copyto!(solver.x, primal(solver._w1))
+            copyto!(solver.y, dual(solver._w1))
+            copyto!(solver.c, dual(solver._w2)) # backup the previous primal iterate
             return ROBUST
         end
 
