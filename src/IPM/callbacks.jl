@@ -21,7 +21,7 @@ function eval_grad_f_wrapper!(solver::MadNLPSolver, f::Vector{T},x::Vector{T}) w
         x_nlpmodel,
         f_nlpmodel
     )
-    scal!(obj_scaling, f)
+    BLAS.scal!(obj_scaling, f)
     cnt.obj_grad_cnt+=1
     cnt.obj_grad_cnt==1 && (is_valid(f)  || throw(InvalidNumberException(:grad)))
     return f

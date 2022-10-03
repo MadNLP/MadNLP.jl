@@ -56,7 +56,7 @@ function initialize!(solver::AbstractMadNLPSolver{T}) where T
     @trace(solver.logger,"Computing objective scaling.")
     if solver.opt.nlp_scaling
         solver.obj_scale[] = scale_objective(solver.nlp, solver.f; max_gradient=solver.opt.nlp_scaling_max_gradient)
-        scal!(solver.obj_scale[], solver.f)
+        BLAS.scal!(solver.obj_scale[], solver.f)
     end
 
     # Initialize dual variables
