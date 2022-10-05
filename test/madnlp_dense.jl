@@ -178,3 +178,28 @@ end
     end
 end
 
+@testset "MadNLP: LBFGS" begin
+    @testset "Size: ($n, $m)" for (n, m) in [(10, 0), (10, 5), (50, 10)]
+        nlp = MadNLPTests.DenseDummyQP{Float64}(; )
+        # Reference solve with exact Hessian
+        solver_exact = MadNLP.MadNLPSolver(
+            nlp;
+            print_level=MadNLP.ERROR,
+        )
+        MadNLP.solve!(solver_exact)
+
+        # LBFGS solve
+        solver_qn = MadNLP.MadNLPSolver(
+            nlp;
+            hessian_approximation=MadNLP.SPARSE_COMPACT_LBFGS,
+            print_level=MadNLP.ERROR,
+        )
+        MadNLP.solve!(solver_qn)
+        @test solver_qn.status == MadNLP.SOLVE_SUCCEEDED
+        @test solver_qn.cnt.lag_hess_cnt == 0
+        @test solver_exact.obj_val ≈ solver_qn.obj_val atol=1e-6
+        @test solver_exact.x ≈ solver_qn.x atol=1e-6
+        @test solver_exact.y ≈ solver_qn.y atol=1e-4
+    end
+end
+

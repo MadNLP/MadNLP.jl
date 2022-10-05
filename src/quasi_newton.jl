@@ -35,7 +35,7 @@ struct ExactHessian{T, VT} <: AbstractHessian{T, VT} end
 ExactHessian{T, VT}(n::Int) where {T, VT} = ExactHessian{T, VT}()
 
 """
-    BFGS{T, VT} <: AbstractQuasiNewton
+    BFGS{T, VT} <: AbstractQuasiNewton{T, VT}
 
 BFGS quasi-Newton method. Update the direct Hessian approximation using
 ```math
@@ -123,5 +123,167 @@ function update!(qn::DampedBFGS{T, VT}, Bk::AbstractMatrix, sk::AbstractVector, 
     _ger!(-alpha1, qn.bsk, qn.bsk, Bk)
     _ger!(alpha2, qn.rk, qn.rk, Bk)
     return true
+end
+
+# Initial update (Nocedal & Wright, p.143)
+function init!(qn::Union{BFGS, DampedBFGS}, Bk::AbstractMatrix, sk::AbstractVector, yk::AbstractVector)
+    yksk = dot(yk, sk)
+    sksk = dot(sk, sk)
+    Bk[diagind(Bk)] .= yksk ./ sksk
+    return
+end
+
+
+"""
+    CompactLBFGS{T, VT} <: AbstractQuasiNewton
+"""
+mutable struct CompactLBFGS{T, VT, MT} <: AbstractQuasiNewton{T, VT}
+    init_strategy::BFGSInitStrategy
+    sk::VT
+    yk::VT
+    last_g::VT
+    last_x::VT
+    last_jv::VT
+    max_mem::Int
+    current_mem::Int
+    Sk::MT       # n x p
+    Yk::MT       # n x p
+    Lk::MT       # p x p
+    Mk::MT       # p x p (for Cholesky factorization Mₖ = Jₖᵀ Jₖ)
+    Tk::MT       # 2p x 2p
+    SdotS::MT    # p x p
+    DkLk::MT     # p x p
+    U::MT        # n x 2p
+    Dk::VT       # p
+    _w1::VT
+    _w2::VT
+end
+
+function CompactLBFGS{T, VT, MT}(n::Int; max_mem=5, init_strategy=SCALAR1) where {T, VT, MT}
+    return CompactLBFGS{T, VT, MT}(
+        init_strategy,
+        zeros(n),
+        zeros(n),
+        zeros(n),
+        zeros(n),
+        zeros(n),
+        max_mem,
+        0,
+        zeros(n, 0),
+        zeros(n, 0),
+        zeros(n, 0),
+        zeros(0, 0),
+        zeros(0, 0),
+        zeros(0, 0),
+        zeros(0, 0),
+        zeros(0, 0),
+        zeros(0),
+        zeros(0),
+        zeros(0),
+    )
+end
+
+Base.size(qn::CompactLBFGS) = (size(qn.Sk, 1), qn.current_mem)
+
+function _resize!(qn::CompactLBFGS)
+    n, k = size(qn)
+    qn.Lk     = zeros(k, k)
+    qn.SdotS  = zeros(k, k)
+    qn.Mk     = zeros(k, k)
+    qn.Tk     = zeros(2*k, 2*k)
+    qn.DkLk   = zeros(k, k)
+    qn.U      = zeros(n, 2*k)
+    qn._w1    = zeros(k)
+    qn._w2    = zeros(2*k)
+    return
+end
+
+# augment / shift
+function _update_SY!(qn::CompactLBFGS, s, y)
+    if qn.current_mem < qn.max_mem
+        qn.current_mem += 1
+        qn.Sk = hcat(qn.Sk, s)
+        qn.Yk = hcat(qn.Yk, y)
+        _resize!(qn)
+    else
+        k = qn.current_mem
+        # Shift
+        @inbounds for i_ in 1:k-1
+            qn.Sk[:, i_] .= qn.Sk[:, i_+1]
+            qn.Yk[:, i_] .= qn.Yk[:, i_+1]
+        end
+        qn.Sk[:, k] .= s
+        qn.Yk[:, k] .= y
+    end
+end
+
+function _refresh_D!(qn::CompactLBFGS, sk, yk)
+    k = qn.current_mem
+    sTy = dot(sk, yk)
+    if length(qn.Dk) < qn.max_mem
+        push!(qn.Dk, sTy)
+    else
+        # shift
+        @inbounds for i in 1:k-1
+            qn.Dk[i] = qn.Dk[i+1]
+        end
+        qn.Dk[k] = sTy
+    end
+end
+
+function _refresh_L!(qn::CompactLBFGS)
+    p = size(qn.Lk, 1)
+    mul!(qn.Lk, qn.Sk', qn.Yk)
+    @inbounds for i in 1:p, j in i:p
+        qn.Lk[i, j] = 0.0
+    end
+end
+
+function _refresh_STS!(qn::CompactLBFGS)
+    mul!(qn.SdotS, qn.Sk', qn.Sk, 1.0, 0.0)
+end
+
+function update!(qn::CompactLBFGS{T, VT, MT}, Bk, sk, yk) where {T, VT, MT}
+    if dot(sk, yk) < T(1e-8)
+        return false
+    end
+    # Refresh internal structures
+    _update_SY!(qn, sk, yk)
+    _refresh_D!(qn, sk, yk)
+    _refresh_L!(qn)
+    _refresh_STS!(qn)
+
+    # Load buffers
+    k = qn.current_mem
+    δ = qn._w1
+
+    # Compute compact representation Bₖ = σₖ I + Uₖ Vₖᵀ
+    #       Uₖ = [ U₁ ]     Vₖ = [ -U₁ ]
+    #            [ U₂ ]          [  U₂ ]
+
+    # Step 1: σₖ I
+    sigma = dot(sk, yk) / dot(sk, sk)         # σₖ
+    Bk .= sigma                               # Hₖ .= σₖ I (diagonal Hessian approx.)
+
+    # Step 2: Mₖ = σₖ Sₖᵀ Sₖ + Lₖ Dₖ⁻¹ Lₖᵀ
+    qn.DkLk .= (1.0 ./ qn.Dk) .* qn.Lk'       # DₖLₖ = Dₖ⁻¹ Lₖᵀ
+    qn.Mk .= qn.SdotS                         # Mₖ = Sₖᵀ Sₖ
+    mul!(qn.Mk, qn.Lk, qn.DkLk, 1.0, sigma)   # Mₖ = σₖ Sₖᵀ Sₖ + Lₖ Dₖ⁻¹ Lₖᵀ
+    symmetrize!(qn.Mk)
+    Jk = cholesky(qn.Mk).L                    # Mₖ = Jₖᵀ Jₖ (factorization)
+
+    # Step 3: Nₖ = [U₁ U₂]
+    U1 = view(qn.U, :, 1:k)
+    U1 .= qn.Sk                               # U₁ = Sₖ
+    mul!(U1, qn.Yk, qn.DkLk, 1.0, sigma)      # U₁ = σₖ Sₖ + Yₖ Dₖ⁻¹ Lₖ
+    BLAS.trsm!('R', 'L', 'T', 'N', 1.0, parent(Jk), U1) # U₁ = Jₖ⁻ᵀ (σₖ Sₖ + Yₖ Dₖ⁻¹ Lₖ)
+    U2 = view(qn.U, :, 1+k:2*k)
+    δ .= .-1.0 ./ sqrt.(qn.Dk)                # δ = 1 / √Dₖ
+    U2 .= δ' .* qn.Yk                         # U₂ = (1 / √Dₖ) * Yₖ
+    return true
+end
+
+function init!(qn::CompactLBFGS, Bk::AbstractArray, sk::AbstractVector, yk::AbstractVector)
+    return
 end
 

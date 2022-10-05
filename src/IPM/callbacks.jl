@@ -134,18 +134,19 @@ end
 
 function eval_lag_hess_wrapper!(
     solver::MadNLPSolver,
-    kkt::AbstractDenseKKTSystem{T, VT, MT, QN},
+    kkt::AbstractKKTSystem{T, VT, MT, QN},
     x::Vector{T},
     l::Vector{T};
     is_resto=false,
-) where {T, VT, MT, QN<:AbstractQuasiNewton}
+) where {T, VT, MT<:AbstractMatrix{T}, QN<:AbstractQuasiNewton{T, VT}}
     nlp = solver.nlp
     cnt = solver.cnt
     @trace(solver.logger, "Update BFGS matrices.")
+
     qn = kkt.qn
     Bk = kkt.hess
     sk, yk = qn.sk, qn.yk
-    n, p = size(Bk)
+    n = length(qn.sk)
     m = size(kkt.jac, 1)
 
     # Code for GPU support
@@ -166,27 +167,24 @@ function eval_lag_hess_wrapper!(
 
     if cnt.obj_grad_cnt >= 2
         # Build sk = x+ - x
-        copyto!(sk, 1, solver.x, 1, n)
-        axpy!(-one(T), qn.last_x, sk)
+        copyto!(sk, 1, solver.x, 1, n)   # sₖ = x₊
+        axpy!(-one(T), qn.last_x, sk)    # sₖ = x₊ - x
 
         # Build yk = ∇L+ - ∇L
-        copyto!(yk, 1, solver.f, 1, n)
-        axpy!(-one(T), qn.last_g, yk)
+        copyto!(yk, 1, solver.f, 1, n)   # yₖ = ∇f₊
+        axpy!(-one(T), qn.last_g, yk)    # yₖ = ∇f₊ - ∇f
         if m > 0
-            mul!(yk, kkt.jac', l_g, one(T), one(T))
+            jtprod!(solver.jacl, kkt, l_g)
+            yk .+= @view solver.jacl[1:n]         # yₖ += J₊ᵀ l₊
             NLPModels.jtprod!(nlp, x_g, l, j_g)
             copyto!(qn.last_jv, j_g)
-            axpy!(-one(T), qn.last_jv, yk)
+            axpy!(-one(T), qn.last_jv, yk)        # yₖ += J₊ᵀ l₊ - Jᵀ l₊
         end
 
-        # Initial update (Nocedal & Wright, p.143)
         if cnt.obj_grad_cnt == 2
-            yksk = dot(yk, sk)
-            sksk = dot(sk, sk)
-            Bk[diagind(Bk)] .= yksk ./ sksk
+            init!(qn, Bk, sk, yk)
         end
-
-        update!(kkt.qn, Bk, sk, yk)
+        update!(qn, Bk, sk, yk)
     end
 
     # Backup data for next step

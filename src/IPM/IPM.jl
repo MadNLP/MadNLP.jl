@@ -105,6 +105,8 @@ function MadNLPSolver(nlp::AbstractNLPModel{T}; kwargs...) where T
         BFGS{T, VT}
     elseif opt_ipm.hessian_approximation == DENSE_DAMPED_BFGS
         DampedBFGS{T, VT}
+    elseif opt_ipm.hessian_approximation == SPARSE_COMPACT_LBFGS
+        CompactLBFGS{T, VT, Matrix{T}}
     else
         ExactHessian{T, VT}
     end

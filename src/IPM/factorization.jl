@@ -93,3 +93,55 @@ function solve_refine_wrapper!(
     return solve_status
 end
 
+function solve_refine_wrapper!(
+    solver::MadNLPSolver{T, <:SparseKKTSystem{T, VT, MT, QN}},
+    x::AbstractKKTVector,
+    b::AbstractKKTVector,
+) where {T, VT, MT, QN<:CompactLBFGS{T, Vector{T}, Matrix{T}}}
+    cnt = solver.cnt
+    kkt = solver.kkt
+    qn = kkt.qn
+    n, p = size(qn)
+    # Load buffers
+    xr = qn._w2
+    Tk = qn.Tk  ; fill!(Tk, zero(T))
+    x_ = primal_dual(x)
+    b_ = primal_dual(b)
+    nn = length(x_)
+    V = zeros(nn, 2*p)
+    Vtilde = zeros(nn, 2*p)
+
+    fixed_variable_treatment_vec!(full(b), solver.ind_fixed)
+
+    # Solve LBFGS system with Sherman-Morrison-Woodbury formula
+    # (C + U Vᵀ)⁻¹ = C⁻¹ - C⁻¹ U (I + Vᵀ C⁻¹ U) Vᵀ C⁻¹
+
+    # Solve linear system without low-rank part
+    cnt.linear_solver_time += @elapsed begin
+        result = solve_refine!(x, solver.iterator, b)
+    end
+
+    # Add low-rank correction
+    if p > 0
+        V[1:n, :] .= qn.U                           # V = [U₁   U₂]
+        Vtilde[1:n, :] .= qn.U                      # U = [-U₁   U₂]
+        Vtilde[:, 1:p] .*= -one(T)
+
+        cnt.linear_solver_time += @elapsed begin
+            multi_solve!(solver.linear_solver, Vtilde)  # Vtilde = C⁻¹ U
+        end
+
+        Tk[diagind(Tk)] .= one(T)                   # Tₖ = I
+        mul!(Tk, V', Vtilde, one(T), one(T))        # Tₖ = (I + Vᵀ C⁻¹ U)
+        J1 = qr(Tk)                                 # Tₖ⁻¹
+
+        mul!(xr, V', x_)                            # xᵣ = Vᵀ C⁻¹ b
+        ldiv!(J1, xr)                               # xᵣ = (I + Vᵀ C⁻¹ U)⁻¹ Vᵀ C⁻¹ b
+        mul!(x_, Vtilde, xr, -one(T), one(T))       # x = x - Vᵀ xᵣ
+    end
+
+    fixed_variable_treatment_vec!(full(x), solver.ind_fixed)
+    solve_status = (result == :Solved)
+    return solve_status
+end
+

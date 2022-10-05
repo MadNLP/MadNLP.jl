@@ -54,6 +54,16 @@ end
 # Similarly, _ger! wraps ger! to dispatch on the data type.
 _ger!(alpha::Number, x::AbstractVector{T}, y::AbstractVector{T}, A::AbstractMatrix{T}) where T = BLAS.ger!(alpha, x, y, A)
 
+function symmetrize!(A::AbstractMatrix{T}) where T
+    n, m = size(A)
+    @assert n == m
+    @inbounds for i in 1:n, j=i+1:n
+        aij = T(0.5) * (A[i, j] + A[j, i])
+        A[i, j] = aij
+        A[j, i] = aij
+    end
+end
+
 const blas_num_threads = Ref{Int}(1)
 function set_blas_num_threads(n::Integer;permanent::Bool=false)
     permanent && (blas_num_threads[]=n)

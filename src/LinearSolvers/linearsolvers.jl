@@ -87,6 +87,16 @@ function solve!(s::AbstractLinearSolver, x::AbstractKKTVector)
     solve!(s, full(x))
 end
 
+function multi_solve!(s::AbstractLinearSolver, X::AbstractMatrix)
+    n, nrhs = size(X)
+    x = zeros(n)
+    for i in 1:nrhs
+        copyto!(x, 1, X, (i-1)*n + 1, n)
+        solve!(s, x)
+        copyto!(X, (i-1)*n + 1, x, 1, n)
+    end
+end
+
 #=
     Iterator's interface
 =#

@@ -156,7 +156,7 @@ function SparseKKTSystem{T, VT, MT, QN}(
     end
     jac_scaling = ones(T, n_jac)
 
-    qn = QN(n)
+    qn = QN(n - length(ind_ineq))
 
     return SparseKKTSystem{T, VT, MT, QN}(
         hess, jac, qn, pr_diag, du_diag,
@@ -177,9 +177,14 @@ function SparseKKTSystem{T, VT, MT, QN}(nlp::AbstractNLPModel, ind_cons=get_inde
     jac_J = Vector{Int32}(undef, get_nnzj(nlp.meta))
     jac_structure!(nlp,jac_I, jac_J)
 
-    hess_I = Vector{Int32}(undef, get_nnzh(nlp.meta))
-    hess_J = Vector{Int32}(undef, get_nnzh(nlp.meta))
-    hess_structure!(nlp,hess_I,hess_J)
+    if QN <: ExactHessian
+        hess_I = Vector{Int32}(undef, get_nnzh(nlp.meta))
+        hess_J = Vector{Int32}(undef, get_nnzh(nlp.meta))
+        hess_structure!(nlp,hess_I,hess_J)
+    elseif QN <: AbstractQuasiNewton
+        hess_I = collect(Int32, 1:get_nvar(nlp))
+        hess_J = collect(Int32, 1:get_nvar(nlp))
+    end
 
     force_lower_triangular!(hess_I,hess_J)
     # Incorporate slack's sparsity pattern

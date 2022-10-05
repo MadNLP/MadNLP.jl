@@ -30,6 +30,7 @@
       EXACT_HESSIAN = 1,
       DENSE_BFGS = 2,
       DENSE_DAMPED_BFGS = 3,
+      SPARSE_COMPACT_LBFGS = 4,
 )
 
 @enum(BFGSInitStrategy::Int,
