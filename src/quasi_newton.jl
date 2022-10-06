@@ -30,6 +30,11 @@ Return `true` if the update succeeded, `false` otherwise.
 """
 function update! end
 
+curvature(::Val{SCALAR1}, sk, yk) = dot(yk, sk) / dot(sk, sk)
+curvature(::Val{SCALAR2}, sk, yk) = dot(yk, yk) / dot(sk, yk)
+curvature(::Val{SCALAR3}, sk, yk) = 0.5 * (curvature(Val(SCALAR1), sk, yk) + curvature(Val(SCALAR2), sk, yk))
+curvature(::Val{SCALAR4}, sk, yk) = sqrt(curvature(Val(SCALAR1), sk, yk) * curvature(Val(SCALAR2), sk, yk))
+
 
 struct ExactHessian{T, VT} <: AbstractHessian{T, VT} end
 ExactHessian{T, VT}(n::Int) where {T, VT} = ExactHessian{T, VT}()
@@ -159,42 +164,42 @@ mutable struct CompactLBFGS{T, VT, MT} <: AbstractQuasiNewton{T, VT}
     _w2::VT
 end
 
-function CompactLBFGS{T, VT, MT}(n::Int; max_mem=5, init_strategy=SCALAR1) where {T, VT, MT}
+function CompactLBFGS{T, VT, MT}(n::Int; max_mem=5, init_strategy=SCALAR1) where {T, VT<:AbstractVector{T}, MT<:AbstractMatrix{T}}
     return CompactLBFGS{T, VT, MT}(
         init_strategy,
-        zeros(n),
-        zeros(n),
-        zeros(n),
-        zeros(n),
-        zeros(n),
+        zeros(T, n),
+        zeros(T, n),
+        zeros(T, n),
+        zeros(T, n),
+        zeros(T, n),
         max_mem,
         0,
-        zeros(n, 0),
-        zeros(n, 0),
-        zeros(n, 0),
-        zeros(0, 0),
-        zeros(0, 0),
-        zeros(0, 0),
-        zeros(0, 0),
-        zeros(0, 0),
-        zeros(0),
-        zeros(0),
-        zeros(0),
+        zeros(T, n, 0),
+        zeros(T, n, 0),
+        zeros(T, n, 0),
+        zeros(T, 0, 0),
+        zeros(T, 0, 0),
+        zeros(T, 0, 0),
+        zeros(T, 0, 0),
+        zeros(T, 0, 0),
+        zeros(T, 0),
+        zeros(T, 0),
+        zeros(T, 0),
     )
 end
 
 Base.size(qn::CompactLBFGS) = (size(qn.Sk, 1), qn.current_mem)
 
-function _resize!(qn::CompactLBFGS)
+function _resize!(qn::CompactLBFGS{T, VT, MT}) where {T, VT, MT}
     n, k = size(qn)
-    qn.Lk     = zeros(k, k)
-    qn.SdotS  = zeros(k, k)
-    qn.Mk     = zeros(k, k)
-    qn.Tk     = zeros(2*k, 2*k)
-    qn.DkLk   = zeros(k, k)
-    qn.U      = zeros(n, 2*k)
-    qn._w1    = zeros(k)
-    qn._w2    = zeros(2*k)
+    qn.Lk     = zeros(T, k, k)
+    qn.SdotS  = zeros(T, k, k)
+    qn.Mk     = zeros(T, k, k)
+    qn.Tk     = zeros(T, 2*k, 2*k)
+    qn.DkLk   = zeros(T, k, k)
+    qn.U      = zeros(T, n, 2*k)
+    qn._w1    = zeros(T, k)
+    qn._w2    = zeros(T, 2*k)
     return
 end
 
@@ -231,16 +236,16 @@ function _refresh_D!(qn::CompactLBFGS, sk, yk)
     end
 end
 
-function _refresh_L!(qn::CompactLBFGS)
+function _refresh_L!(qn::CompactLBFGS{T, VT, MT}) where {T, VT, MT}
     p = size(qn.Lk, 1)
     mul!(qn.Lk, qn.Sk', qn.Yk)
     @inbounds for i in 1:p, j in i:p
-        qn.Lk[i, j] = 0.0
+        qn.Lk[i, j] = zero(T)
     end
 end
 
-function _refresh_STS!(qn::CompactLBFGS)
-    mul!(qn.SdotS, qn.Sk', qn.Sk, 1.0, 0.0)
+function _refresh_STS!(qn::CompactLBFGS{T, VT, MT}) where {T, VT, MT}
+    mul!(qn.SdotS, qn.Sk', qn.Sk, one(T), zero(T))
 end
 
 function update!(qn::CompactLBFGS{T, VT, MT}, Bk, sk, yk) where {T, VT, MT}
@@ -262,24 +267,24 @@ function update!(qn::CompactLBFGS{T, VT, MT}, Bk, sk, yk) where {T, VT, MT}
     #            [ U₂ ]          [  U₂ ]
 
     # Step 1: σₖ I
-    sigma = dot(sk, yk) / dot(sk, sk)         # σₖ
-    Bk .= sigma                               # Hₖ .= σₖ I (diagonal Hessian approx.)
+    sigma = curvature(Val(qn.init_strategy), sk, yk)    # σₖ
+    Bk .= sigma                                  # Hₖ .= σₖ I (diagonal Hessian approx.)
 
     # Step 2: Mₖ = σₖ Sₖᵀ Sₖ + Lₖ Dₖ⁻¹ Lₖᵀ
-    qn.DkLk .= (1.0 ./ qn.Dk) .* qn.Lk'       # DₖLₖ = Dₖ⁻¹ Lₖᵀ
-    qn.Mk .= qn.SdotS                         # Mₖ = Sₖᵀ Sₖ
-    mul!(qn.Mk, qn.Lk, qn.DkLk, 1.0, sigma)   # Mₖ = σₖ Sₖᵀ Sₖ + Lₖ Dₖ⁻¹ Lₖᵀ
+    qn.DkLk .= (one(T) ./ qn.Dk) .* qn.Lk'       # DₖLₖ = Dₖ⁻¹ Lₖᵀ
+    qn.Mk .= qn.SdotS                            # Mₖ = Sₖᵀ Sₖ
+    mul!(qn.Mk, qn.Lk, qn.DkLk, one(T), sigma)   # Mₖ = σₖ Sₖᵀ Sₖ + Lₖ Dₖ⁻¹ Lₖᵀ
     symmetrize!(qn.Mk)
-    Jk = cholesky(qn.Mk).L                    # Mₖ = Jₖᵀ Jₖ (factorization)
+    Jk = cholesky(qn.Mk).L                       # Mₖ = Jₖᵀ Jₖ (factorization)
 
     # Step 3: Nₖ = [U₁ U₂]
     U1 = view(qn.U, :, 1:k)
-    U1 .= qn.Sk                               # U₁ = Sₖ
-    mul!(U1, qn.Yk, qn.DkLk, 1.0, sigma)      # U₁ = σₖ Sₖ + Yₖ Dₖ⁻¹ Lₖ
-    BLAS.trsm!('R', 'L', 'T', 'N', 1.0, parent(Jk), U1) # U₁ = Jₖ⁻ᵀ (σₖ Sₖ + Yₖ Dₖ⁻¹ Lₖ)
+    U1 .= qn.Sk                                  # U₁ = Sₖ
+    mul!(U1, qn.Yk, qn.DkLk, one(T), sigma)      # U₁ = σₖ Sₖ + Yₖ Dₖ⁻¹ Lₖ
+    BLAS.trsm!('R', 'L', 'T', 'N', one(T), parent(Jk), U1) # U₁ = Jₖ⁻ᵀ (σₖ Sₖ + Yₖ Dₖ⁻¹ Lₖ)
     U2 = view(qn.U, :, 1+k:2*k)
-    δ .= .-1.0 ./ sqrt.(qn.Dk)                # δ = 1 / √Dₖ
-    U2 .= δ' .* qn.Yk                         # U₂ = (1 / √Dₖ) * Yₖ
+    δ .= .-one(T) ./ sqrt.(qn.Dk)                # δ = 1 / √Dₖ
+    U2 .= δ' .* qn.Yk                            # U₂ = (1 / √Dₖ) * Yₖ
     return true
 end
 
