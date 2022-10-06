@@ -1,4 +1,4 @@
-mutable struct RobustRestorer{T} 
+mutable struct RobustRestorer{T}
     obj_val_R::T
     f_R::Vector{T}
     x_ref::Vector{T}

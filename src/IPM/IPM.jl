@@ -154,8 +154,8 @@ function MadNLPSolver{T,KKTSystem}(
     nlb = length(ind_cons.ind_lb)
     nub = length(ind_cons.ind_ub)
 
-    x_trial=Vector{T}(undef,n)
-    c_trial=Vector{T}(undef,m)
+    x_trial = Vector{T}(undef,n)
+    c_trial = Vector{T}(undef,m)
 
     x_slk= _madnlp_unsafe_wrap(x,ns, get_nvar(nlp)+1)
     c_slk= view(c,ind_cons.ind_ineq)
