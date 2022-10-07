@@ -66,7 +66,7 @@ function initialize_robust_restorer!(solver::AbstractMadNLPSolver)
     solver.RR == nothing && (solver.RR = RobustRestorer(solver))
     RR = solver.RR
 
-    RR.x_ref .= solver.x
+    RR.x_ref .= full(solver.x)
     RR.theta_ref = get_theta(solver.c)
     RR.D_R   .= min.(1,1 ./abs.(RR.x_ref))
 
@@ -80,7 +80,7 @@ function initialize_robust_restorer!(solver::AbstractMadNLPSolver)
     RR.zp .= RR.mu_R./RR.pp
     RR.zn .= RR.mu_R./RR.nn
 
-    RR.obj_val_R = get_obj_val_R(RR.pp,RR.nn,RR.D_R,solver.x,RR.x_ref,solver.opt.rho,RR.zeta)
+    RR.obj_val_R = get_obj_val_R(RR.pp,RR.nn,RR.D_R,full(solver.x),RR.x_ref,solver.opt.rho,RR.zeta)
     RR.f_R.=0
     empty!(RR.filter)
     push!(RR.filter,(solver.theta_max,-Inf))

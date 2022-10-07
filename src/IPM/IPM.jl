@@ -18,15 +18,15 @@ mutable struct MadNLPSolver{T,KKTSystem <: AbstractKKTSystem{T}, Model <: Abstra
     nlb::Int
     nub::Int
 
-    x::Vector{T} # primal (after reformulation)
+    x::PrimalVector{T, Vector{T}} # primal (after reformulation)
     y::Vector{T} # dual
-    zl::Vector{T} # dual (after reformulation)
-    zu::Vector{T} # dual (after reformulation)
-    xl::Vector{T} # primal lower bound (after reformulation)
-    xu::Vector{T} # primal upper bound (after reformulation)
+    zl::PrimalVector{T, Vector{T}} # dual (after reformulation)
+    zu::PrimalVector{T, Vector{T}} # dual (after reformulation)
+    xl::PrimalVector{T, Vector{T}} # primal lower bound (after reformulation)
+    xu::PrimalVector{T, Vector{T}} # primal upper bound (after reformulation)
 
     obj_val::T
-    f::Vector{T}
+    f::PrimalVector{T, Vector{T}}
     c::Vector{T}
 
     jacl::Vector{T}
@@ -40,11 +40,10 @@ mutable struct MadNLPSolver{T,KKTSystem <: AbstractKKTSystem{T}, Model <: Abstra
     _w3::AbstractKKTVector{T, Vector{T}}
     _w4::AbstractKKTVector{T, Vector{T}}
 
-    x_trial::Vector{T}
+    x_trial::PrimalVector{T, Vector{T}}
     c_trial::Vector{T}
     obj_val_trial::T
 
-    x_slk::Vector{T}
     c_slk::SubVector{T}
     rhs::Vector{T}
 
@@ -133,62 +132,70 @@ function MadNLPSolver{T,KKTSystem}(
     @trace(logger,"Initializing variables.")
     ind_cons = get_index_constraints(nlp; fixed_variable_treatment=opt.fixed_variable_treatment)
     ns = length(ind_cons.ind_ineq)
-    n = get_nvar(nlp)+ns
+    nx = get_nvar(nlp)
+    n = nx+ns
     m = get_ncon(nlp)
 
     # Initialize KKT
     kkt = KKTSystem(nlp, ind_cons)
 
-    xl = [get_lvar(nlp);view(get_lcon(nlp),ind_cons.ind_ineq)]
-    xu = [get_uvar(nlp);view(get_ucon(nlp),ind_cons.ind_ineq)]
-    x = [get_x0(nlp);zeros(T,ns)]
-    y = copy(get_y0(nlp))
-    zl= zeros(T,get_nvar(nlp)+ns)
-    zu= zeros(T,get_nvar(nlp)+ns)
+    # Primal variable
+    x = PrimalVector{T, Vector{T}}(nx, ns)
+    variable(x) .= get_x0(nlp)
+    # Bounds
+    xl = PrimalVector{T, Vector{T}}(nx, ns)
+    variable(xl) .= get_lvar(nlp)
+    slack(xl) .= view(get_lcon(nlp), ind_cons.ind_ineq)
+    xu = PrimalVector{T, Vector{T}}(nx, ns)
+    variable(xu) .= get_uvar(nlp)
+    slack(xu) .= view(get_ucon(nlp), ind_cons.ind_ineq)
+    zl = PrimalVector{T, Vector{T}}(nx, ns)
+    zu = PrimalVector{T, Vector{T}}(nx, ns)
+    # Gradient
+    f = PrimalVector{T, Vector{T}}(nx, ns)
 
-    f = zeros(T,n) # not sure why, but seems necessary to initialize to 0 when used with Plasmo interface
-    c = zeros(T,m)
+    y = copy(get_y0(nlp))
+    c = zeros(T, m)
 
     n_jac = nnz_jacobian(kkt)
 
     nlb = length(ind_cons.ind_lb)
     nub = length(ind_cons.ind_ub)
 
-    x_trial = Vector{T}(undef,n)
-    c_trial = Vector{T}(undef,m)
+    x_trial = PrimalVector{T, Vector{T}}(nx, ns)
+    c_trial = Vector{T}(undef, m)
 
-    x_slk= _madnlp_unsafe_wrap(x,ns, get_nvar(nlp)+1)
-    c_slk= view(c,ind_cons.ind_ineq)
+    c_slk = view(c,ind_cons.ind_ineq)
     rhs = (get_lcon(nlp).==get_ucon(nlp)).*get_lcon(nlp)
 
-    x_lr = view(x, ind_cons.ind_lb)
-    x_ur = view(x, ind_cons.ind_ub)
-    xl_r = view(xl, ind_cons.ind_lb)
-    xu_r = view(xu, ind_cons.ind_ub)
-    zl_r = view(zl, ind_cons.ind_lb)
-    zu_r = view(zu, ind_cons.ind_ub)
-    x_trial_lr = view(x_trial, ind_cons.ind_lb)
-    x_trial_ur = view(x_trial, ind_cons.ind_ub)
+    x_lr = view(full(x), ind_cons.ind_lb)
+    x_ur = view(full(x), ind_cons.ind_ub)
+    xl_r = view(full(xl), ind_cons.ind_lb)
+    xu_r = view(full(xu), ind_cons.ind_ub)
+    zl_r = view(full(zl), ind_cons.ind_lb)
+    zu_r = view(full(zu), ind_cons.ind_ub)
+    x_trial_lr = view(full(x_trial), ind_cons.ind_lb)
+    x_trial_ur = view(full(x_trial), ind_cons.ind_ub)
 
     if is_reduced(kkt)
-        _w1 =  ReducedKKTVector{T,typeof(x)}(n, m)
-        _w2 =  ReducedKKTVector{T,typeof(x)}(n, m)
-        _w3 =  ReducedKKTVector{T,typeof(x)}(n, m)
-        _w4 =  ReducedKKTVector{T,typeof(x)}(n, m)
+        _w1 = ReducedKKTVector{T,typeof(c)}(n, m)
+        _w2 = ReducedKKTVector{T,typeof(c)}(n, m)
+        _w3 = ReducedKKTVector{T,typeof(c)}(n, m)
+        _w4 = ReducedKKTVector{T,typeof(c)}(n, m)
     else
-        _w1 = UnreducedKKTVector{T,typeof(x)}(n, m, nlb, nub)
-        _w2 = UnreducedKKTVector{T,typeof(x)}(n, m, nlb, nub)
-        _w3 = UnreducedKKTVector{T,typeof(x)}(n, m, nlb, nub)
-        _w4 = UnreducedKKTVector{T,typeof(x)}(n, m, nlb, nub)
+        _w1 = UnreducedKKTVector{T,typeof(c)}(n, m, nlb, nub)
+        _w2 = UnreducedKKTVector{T,typeof(c)}(n, m, nlb, nub)
+        _w3 = UnreducedKKTVector{T,typeof(c)}(n, m, nlb, nub)
+        _w4 = UnreducedKKTVector{T,typeof(c)}(n, m, nlb, nub)
     end
 
     jacl = zeros(T,n) # spblas may throw an error if not initialized to zero
 
-    d = UnreducedKKTVector{T,typeof(x)}(n, m, nlb, nub)
+    d = UnreducedKKTVector{T,typeof(c)}(n, m, nlb, nub)
     dx_lr = view(d.xp, ind_cons.ind_lb) # TODO
     dx_ur = view(d.xp, ind_cons.ind_ub) # TODO
 
-    p = UnreducedKKTVector{T,typeof(x)}(n, m, nlb, nub)
+    p = UnreducedKKTVector{T,typeof(c)}(n, m, nlb, nub)
 
     obj_scale = T[1.0]
     con_scale = ones(T,m)
@@ -215,7 +222,7 @@ function MadNLPSolver{T,KKTSystem}(
         jacl,
         d, p,
         _w1, _w2, _w3, _w4,
-        x_trial,c_trial,0.,x_slk,c_slk,rhs,
+        x_trial,c_trial,0.,c_slk,rhs,
         ind_cons.ind_ineq,ind_cons.ind_fixed,ind_cons.ind_llb,ind_cons.ind_uub,
         x_lr,x_ur,xl_r,xu_r,zl_r,zu_r,dx_lr,dx_ur,x_trial_lr,x_trial_ur,
         linear_solver,iterator,

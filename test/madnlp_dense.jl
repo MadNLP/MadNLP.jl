@@ -33,15 +33,15 @@ function _compare_dense_with_sparse(
         solver = MadNLPSolver(nlp; sparse_options...)
         solverd = MadNLPSolver(nlp; dense_options...)
 
-        MadNLP.solve!(solver)
-        MadNLP.solve!(solverd)
+        result_sparse = MadNLP.solve!(solver)
+        result_dense = MadNLP.solve!(solverd)
 
         # Check that dense formulation matches exactly sparse formulation
-        @test solverd.status == MadNLP.SOLVE_SUCCEEDED
-        @test solver.cnt.k == solverd.cnt.k
-        @test solver.obj_val ≈ solverd.obj_val atol=atol
-        @test solver.x ≈ solverd.x atol=atol
-        @test solver.y ≈ solverd.y atol=atol
+        @test result_dense.status == MadNLP.SOLVE_SUCCEEDED
+        @test result_sparse.iter == result_dense.iter
+        @test result_sparse.objective ≈ result_dense.objective atol=atol
+        @test result_sparse.solution ≈ result_dense.solution atol=atol
+        @test result_sparse.multipliers ≈ result_dense.multipliers atol=atol
         @test solver.kkt.jac_com[:, 1:n] == solverd.kkt.jac
         if isa(solverd.kkt, MadNLP.AbstractReducedKKTSystem)
             @test Symmetric(solver.kkt.aug_com, :L) ≈ solverd.kkt.aug_com atol=atol
@@ -133,7 +133,7 @@ end
 
     solver = MadNLPSolver(nlp; sparse_options...)
     MadNLP.solve!(solver)
-    
+
     # Restart (should hit MadNLP.reinitialize function)
     res = MadNLP.solve!(solver)
     @test solver.status == MadNLP.SOLVE_SUCCEEDED

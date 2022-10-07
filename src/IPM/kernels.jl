@@ -2,7 +2,7 @@
 # KKT system updates -------------------------------------------------------
 # Set diagonal
 function set_aug_diagonal!(kkt::AbstractKKTSystem, solver::MadNLPSolver)
-    kkt.pr_diag .= solver.zl./(solver.x.-solver.xl) .+ solver.zu./(solver.xu.-solver.x)
+    kkt.pr_diag .= full(solver.zl)./(full(solver.x).-full(solver.xl)) .+ full(solver.zu)./(full(solver.xu).-full(solver.x))
     fill!(kkt.du_diag, 0.0)
 end
 function set_aug_diagonal!(kkt::SparseUnreducedKKTSystem, solver::MadNLPSolver)
@@ -16,7 +16,7 @@ end
 
 # Robust restoration
 function set_aug_RR!(kkt::AbstractKKTSystem, solver::MadNLPSolver, RR::RobustRestorer)
-    kkt.pr_diag .= solver.zl./(solver.x.-solver.xl) .+ solver.zu./(solver.xu.-solver.x) .+ RR.zeta.*RR.D_R.^2
+    kkt.pr_diag .= full(solver.zl)./(full(solver.x).-full(solver.xl)) .+ full(solver.zu)./(full(solver.xu).-full(solver.x)) .+ RR.zeta.*RR.D_R.^2
     kkt.du_diag .= .-RR.pp./RR.zp .- RR.nn./RR.zn
 end
 function set_aug_RR!(kkt::SparseUnreducedKKTSystem, solver::MadNLPSolver, RR::RobustRestorer)
@@ -30,12 +30,12 @@ end
 
 # Set RHS
 function set_aug_rhs!(solver::MadNLPSolver, kkt::AbstractKKTSystem, c)
-    primal(solver.p) .= .-solver.f.+solver.mu./(solver.x.-solver.xl).-solver.mu./(solver.xu.-solver.x).-solver.jacl
+    primal(solver.p) .= .-primal(solver.f).+solver.mu./(primal(solver.x).-primal(solver.xl)).-solver.mu./(primal(solver.xu).-primal(solver.x)).-solver.jacl
     dual(solver.p)   .= .-c
 end
 
 function set_aug_rhs!(solver::MadNLPSolver, kkt::SparseUnreducedKKTSystem, c)
-    primal(solver.p) .= .-solver.f.+solver.zl.-solver.zu.-solver.jacl
+    primal(solver.p) .= .-primal(solver.f).+primal(solver.zl).-primal(solver.zu).-solver.jacl
     dual(solver.p) .= .-c
     dual_lb(solver.p) .= (solver.xl_r-solver.x_lr).*kkt.l_lower .+ solver.mu./kkt.l_lower
     dual_ub(solver.p) .= (solver.xu_r-solver.x_ur).*kkt.u_lower .- solver.mu./kkt.u_lower
@@ -52,7 +52,7 @@ end
 function set_aug_rhs_RR!(
     solver::MadNLPSolver, kkt::AbstractKKTSystem, RR::RobustRestorer, rho,
 )
-    primal(solver.p) .= .-RR.f_R.-solver.jacl.+RR.mu_R./(solver.x.-solver.xl).-RR.mu_R./(solver.xu.-solver.x)
+    primal(solver.p) .= .-RR.f_R.-solver.jacl.+RR.mu_R./(full(solver.x).-full(solver.xl)).-RR.mu_R./(full(solver.xu).-full(solver.x))
     dual(solver.p) .= .-solver.c.+RR.pp.-RR.nn.+(RR.mu_R.-(rho.-solver.y).*RR.pp)./RR.zp.-(RR.mu_R.-(rho.+solver.y).*RR.nn)./RR.zn
 end
 
@@ -71,11 +71,11 @@ end
 
 # Initial
 function set_initial_rhs!(solver::MadNLPSolver, kkt::AbstractKKTSystem)
-    primal(solver.p) .= .-solver.f.+solver.zl.-solver.zu
+    primal(solver.p) .= .-primal(solver.f).+primal(solver.zl).-primal(solver.zu)
     dual(solver.p) .= 0.0
 end
 function set_initial_rhs!(solver::MadNLPSolver, kkt::SparseUnreducedKKTSystem)
-    primal(solver.p) .= .-solver.f.+solver.zl.-solver.zu
+    primal(solver.p) .= .-primal(solver.f).+primal(solver.zl).-primal(solver.zu)
     dual(solver.p) .= 0.0
     dual_lb(solver.p) .= 0.0
     dual_ub(solver.p) .= 0.0
