@@ -29,14 +29,18 @@ function initialize!(solver::AbstractMadNLPSolver{T}) where T
     @trace(solver.logger,"Initializing slack variables.")
     cons!(solver.nlp,get_x0(solver.nlp),_madnlp_unsafe_wrap(solver.c,get_ncon(solver.nlp)))
     solver.cnt.con_cnt += 1
-    solver.x_slk.=solver.c_slk
+    copyto!(solver.x_slk, solver.c_slk)
 
     # Initialization
     @trace(solver.logger,"Initializing primal and bound duals.")
     fill!(solver.zl_r, one(T))
     fill!(solver.zu_r, one(T))
-    solver.xl_r .-= max.(1,abs.(solver.xl_r)).*solver.opt.tol
-    solver.xu_r .+= max.(1,abs.(solver.xu_r)).*solver.opt.tol
+    for i in eachindex(solver.xl_r)
+        solver.xl_r[i] -= max(1,abs(solver.xl_r[i]))*solver.opt.tol
+    end
+    for i in eachindex(solver.xu_r)
+        solver.xu_r[i] += max(1,abs(solver.xu_r[i]))*solver.opt.tol
+    end
     initialize_variables!(solver.x,solver.xl,solver.xu,solver.opt.bound_push,solver.opt.bound_fac)
 
     # Automatic scaling (constraints)
@@ -190,10 +194,14 @@ end
 
 
 function unscale!(solver::AbstractMadNLPSolver)
-    solver.obj_val/=solver.obj_scale[]
-    solver.c ./= solver.con_scale
-    solver.c .+= solver.rhs
-    solver.c_slk .+= solver.x_slk
+    solver.obj_val /= solver.obj_scale[]
+    for i in eachindex(solver.c)
+        solver.c[i] /= solver.con_scale[i]
+        solver.c[i] += solver.rhs[i]
+    end
+    for i in eachindex(solver.c_slk)
+        solver.c_slk[i] += solver.x_slk[i]
+    end
 end
 
 function regular!(solver::AbstractMadNLPSolver)
@@ -357,10 +365,17 @@ function restore!(solver::AbstractMadNLPSolver)
         solver.alpha = min(get_alpha_max(solver.x,solver.xl,solver.xu,primal(solver.d),solver.tau),
                         get_alpha_z(solver.zl_r,solver.zu_r,dual_lb(solver.d),dual_ub(solver.d),solver.tau))
 
-        solver.x .+= solver.alpha.* primal(solver.d)
-        solver.y .+= solver.alpha.* dual(solver.d)
-        solver.zl_r .+= solver.alpha.* dual_lb(solver.d)
-        solver.zu_r .+= solver.alpha.* dual_ub(solver.d)
+        axpy!(solver.alpha, primal(solver.d), solver.x)
+        axpy!(solver.alpha, dual(solver.d), solver.y)
+        # Note: axpy! does not support non-contiguous view
+        dlb = dual_lb(solver.d)
+        for i in eachindex(solver.zl_r)
+            solver.zl_r[i] += solver.alpha * dlb[i]
+        end
+        dub = dual_ub(solver.d)
+        for i in eachindex(solver.zu_r)
+            solver.zu_r[i] += solver.alpha * dub[i]
+        end
 
         eval_cons_wrapper!(solver,solver.c,solver.x)
         eval_grad_f_wrapper!(solver,solver.f,solver.x)
@@ -540,13 +555,15 @@ function robust!(solver::MadNLPSolver)
         end
 
         @trace(solver.logger,"Updating primal-dual variables.")
-        solver.x.=solver.x_trial
-        solver.c.=solver.c_trial
-        RR.pp.=RR.pp_trial
-        RR.nn.=RR.nn_trial
+        copyto!(solver.x, solver.x_trial)
+        copyto!(solver.c, solver.c_trial)
+        copyto!(RR.pp, RR.pp_trial)
+        copyto!(RR.nn, RR.nn_trial)
 
         RR.obj_val_R=RR.obj_val_R_trial
-        RR.f_R .= RR.zeta.*RR.D_R.^2 .*(solver.x.-RR.x_ref)
+        @inbounds for i in eachindex(RR.f_R)
+            RR.f_R[i] = RR.zeta * RR.D_R[i]^2 *(solver.x[i]-RR.x_ref[i])
+        end
 
         axpy!(solver.alpha, dual(solver.d), solver.y)
         axpy!(solver.alpha_z, dual_lb(solver.d),solver.zl_r)
@@ -645,6 +662,7 @@ end
 function inertia_free_reg(solver::MadNLPSolver)
 
     @trace(solver.logger,"Inertia-free regularization started.")
+    dx = primal(solver.d)
     p0 = solver._w1
     d0 = solver._w2
     t = primal(solver._w3)
@@ -653,7 +671,9 @@ function inertia_free_reg(solver::MadNLPSolver)
     fill!(dual(solver._w3), 0)
 
     g = solver.x_trial # just to avoid new allocation
-    g .= solver.f.-solver.mu./(solver.x.-solver.xl).+solver.mu./(solver.xu.-solver.x).+solver.jacl
+    @inbounds for i in eachindex(g)
+        g[i] = solver.f[i] - solver.mu / (solver.x[i]-solver.xl[i]) + solver.mu / (solver.xu[i]-solver.x[i]) + solver.jacl[i]
+    end
 
     fixed_variable_treatment_vec!(primal(solver._w1), solver.ind_fixed)
     fixed_variable_treatment_vec!(primal(solver.p),   solver.ind_fixed)
@@ -661,7 +681,9 @@ function inertia_free_reg(solver::MadNLPSolver)
 
     factorize_wrapper!(solver)
     solve_status = (solve_refine_wrapper!(solver,d0,p0) && solve_refine_wrapper!(solver,solver.d,solver.p))
-    t .= primal(solver.d) .- n
+    for i in eachindex(t)
+        t[i] = dx[i] - n[i]
+    end
     mul!(solver._w4, solver.kkt, solver._w3) # prepartation for curv_test
     n_trial = 0
     solver.del_w = del_w_prev = 0.
@@ -685,7 +707,9 @@ function inertia_free_reg(solver::MadNLPSolver)
 
         factorize_wrapper!(solver)
         solve_status = (solve_refine_wrapper!(solver,d0,p0) && solve_refine_wrapper!(solver,solver.d,solver.p))
-        t .= primal(solver.d) .- n
+        for i in eachindex(dx)
+            t[i] = dx[i] - n[i]
+        end
         mul!(solver._w4, solver.kkt, solver._w3) # prepartation for curv_test
         n_trial += 1
     end
@@ -700,16 +724,21 @@ function second_order_correction(solver::AbstractMadNLPSolver,alpha_max,theta,va
                                  theta_trial,varphi_d,switching_condition::Bool)
     @trace(solver.logger,"Second-order correction started.")
 
-    dual(solver._w1) .= alpha_max .* solver.c .+ solver.c_trial
+    wx = primal(solver._w1)
+    wy = dual(solver._w1)
+    for i in eachindex(wy)
+        wy[i] = alpha_max * solver.c[i] + solver.c_trial[i]
+    end
     theta_soc_old = theta_trial
     for p=1:solver.opt.max_soc
         # compute second order correction
-        set_aug_rhs!(solver, solver.kkt, dual(solver._w1))
+        set_aug_rhs!(solver, solver.kkt, wy)
         dual_inf_perturbation!(primal(solver.p),solver.ind_llb,solver.ind_uub,solver.mu,solver.opt.kappa_d)
         solve_refine_wrapper!(solver,solver._w1,solver.p)
-        alpha_soc = get_alpha_max(solver.x,solver.xl,solver.xu,primal(solver._w1),solver.tau)
+        alpha_soc = get_alpha_max(solver.x,solver.xl,solver.xu,wx,solver.tau)
 
-        solver.x_trial .= solver.x .+ alpha_soc .* primal(solver._w1)
+        copyto!(solver.x_trial, solver.x)
+        axpy!(alpha_soc, wx, solver.x_trial)
         eval_cons_wrapper!(solver, solver.c_trial,solver.x_trial)
         solver.obj_val_trial = eval_f_wrapper(solver, solver.x_trial)
 
