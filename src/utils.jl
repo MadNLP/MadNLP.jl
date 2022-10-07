@@ -45,7 +45,12 @@ end
 # CUBLAS currently does not import symv!,
 # so using symv! is not dispatched to CUBLAS.symv!
 # symul! wraps symv! and dispatch based on the data type
-symul!(y, A, x::AbstractVector{T}, α = 1, β = 0) where T = BLAS.symv!('L', T(α), A, x, T(β), y) 
+symul!(y, A, x::AbstractVector{T}, α = 1, β = 0) where T = BLAS.symv!('L', T(α), A, x, T(β), y)
+
+# Two-arguments BLAS.scal! is not supported in Julia 1.6.
+function _scal!(a::T, x::AbstractVector{T}) where T
+    return BLAS.scal!(length(x), a, x, 1)
+end
 
 const blas_num_threads = Ref{Int}(1)
 function set_blas_num_threads(n::Integer;permanent::Bool=false)
