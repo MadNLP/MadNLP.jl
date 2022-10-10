@@ -93,6 +93,16 @@ function solve_refine_wrapper!(
     return solve_status
 end
 
+# Set V1 = [U₁   U₂]   ,   V2 = [-U₁   U₂]
+function _init_lbfgs_factors!(V1, V2, U, n, p)
+    @inbounds for i in 1:n, j in 1:p
+        V1[i, j] = U[i, j]
+        V2[i, j] = -U[i, j]
+        V1[i, j+p] = U[i, j+p]
+        V2[i, j+p] = U[i, j+p]
+    end
+end
+
 function solve_refine_wrapper!(
     solver::MadNLPSolver{T, <:SparseKKTSystem{T, VT, MT, QN}},
     x::AbstractKKTVector,
@@ -108,8 +118,14 @@ function solve_refine_wrapper!(
     x_ = primal_dual(x)
     b_ = primal_dual(b)
     nn = length(x_)
-    V = zeros(nn, 2*p)
-    Vtilde = zeros(nn, 2*p)
+    # Resize arrays with correct dimension
+    if size(qn.V1, 2) < 2*p
+        qn.V1 = zeros(nn, 2*p)
+        qn.V2 = zeros(nn, 2*p)
+    else
+        fill!(qn.V1, zero(T))
+        fill!(qn.V2, zero(T))
+    end
 
     fixed_variable_treatment_vec!(full(b), solver.ind_fixed)
 
@@ -123,21 +139,19 @@ function solve_refine_wrapper!(
 
     # Add low-rank correction
     if p > 0
-        V[1:n, :] .= qn.U                           # V = [U₁   U₂]
-        Vtilde[1:n, :] .= qn.U                      # U = [-U₁   U₂]
-        Vtilde[:, 1:p] .*= -one(T)
+        _init_lbfgs_factors!(qn.V1, qn.V2, qn.U, n, p)
 
         cnt.linear_solver_time += @elapsed begin
-            multi_solve!(solver.linear_solver, Vtilde)  # Vtilde = C⁻¹ U
+            multi_solve!(solver.linear_solver, qn.V2)  # V2 = C⁻¹ U
         end
 
         Tk[diagind(Tk)] .= one(T)                   # Tₖ = I
-        mul!(Tk, V', Vtilde, one(T), one(T))        # Tₖ = (I + Vᵀ C⁻¹ U)
+        mul!(Tk, qn.V1', qn.V2, one(T), one(T))     # Tₖ = (I + Vᵀ C⁻¹ U)
         J1 = qr(Tk)                                 # Tₖ⁻¹
 
-        mul!(xr, V', x_)                            # xᵣ = Vᵀ C⁻¹ b
+        mul!(xr, qn.V1', x_)                        # xᵣ = Vᵀ C⁻¹ b
         ldiv!(J1, xr)                               # xᵣ = (I + Vᵀ C⁻¹ U)⁻¹ Vᵀ C⁻¹ b
-        mul!(x_, Vtilde, xr, -one(T), one(T))       # x = x - Vᵀ xᵣ
+        mul!(x_, qn.V2, xr, -one(T), one(T))        # x = x - C⁻¹ U xᵣ
     end
 
     fixed_variable_treatment_vec!(full(x), solver.ind_fixed)

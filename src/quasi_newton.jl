@@ -159,6 +159,8 @@ mutable struct CompactLBFGS{T, VT, MT} <: AbstractQuasiNewton{T, VT}
     SdotS::MT    # p x p
     DkLk::MT     # p x p
     U::MT        # n x 2p
+    V1::MT       # m x 2p
+    V2::MT       # m x 2p
     Dk::VT       # p
     _w1::VT
     _w2::VT
@@ -177,6 +179,8 @@ function CompactLBFGS{T, VT, MT}(n::Int; max_mem=5, init_strategy=SCALAR1) where
         zeros(T, n, 0),
         zeros(T, n, 0),
         zeros(T, n, 0),
+        zeros(T, 0, 0),
+        zeros(T, 0, 0),
         zeros(T, 0, 0),
         zeros(T, 0, 0),
         zeros(T, 0, 0),
@@ -211,11 +215,11 @@ function _update_SY!(qn::CompactLBFGS, s, y)
         qn.Yk = hcat(qn.Yk, y)
         _resize!(qn)
     else
-        k = qn.current_mem
+        n, k = size(qn)
         # Shift
-        @inbounds for i_ in 1:k-1
-            qn.Sk[:, i_] .= qn.Sk[:, i_+1]
-            qn.Yk[:, i_] .= qn.Yk[:, i_+1]
+        @inbounds for i_ in 1:k-1, j in 1:n
+            qn.Sk[j, i_] = qn.Sk[j, i_+1]
+            qn.Yk[j, i_] = qn.Yk[j, i_+1]
         end
         qn.Sk[:, k] .= s
         qn.Yk[:, k] .= y
