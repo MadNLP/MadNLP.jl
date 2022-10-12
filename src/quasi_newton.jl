@@ -166,7 +166,7 @@ mutable struct CompactLBFGS{T, VT, MT} <: AbstractQuasiNewton{T, VT}
     _w2::VT
 end
 
-function CompactLBFGS{T, VT, MT}(n::Int; max_mem=5, init_strategy=SCALAR1) where {T, VT<:AbstractVector{T}, MT<:AbstractMatrix{T}}
+function CompactLBFGS{T, VT, MT}(n::Int; max_mem=6, init_strategy=SCALAR1) where {T, VT<:AbstractVector{T}, MT<:AbstractMatrix{T}}
     return CompactLBFGS{T, VT, MT}(
         init_strategy,
         zeros(T, n),
@@ -253,7 +253,7 @@ function _refresh_STS!(qn::CompactLBFGS{T, VT, MT}) where {T, VT, MT}
 end
 
 function update!(qn::CompactLBFGS{T, VT, MT}, Bk, sk, yk) where {T, VT, MT}
-    if dot(sk, yk) < T(1e-8)
+    if dot(sk, yk) < sqrt(eps(T)) * norm(sk) * norm(yk)
         return false
     end
     # Refresh internal structures
