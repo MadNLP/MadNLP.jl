@@ -35,10 +35,10 @@ function initialize!(solver::AbstractMadNLPSolver{T}) where T
     @trace(solver.logger,"Initializing primal and bound duals.")
     fill!(solver.zl_r, one(T))
     fill!(solver.zu_r, one(T))
-    for i in eachindex(solver.xl_r)
+    @inbounds @simd for i in eachindex(solver.xl_r)
         solver.xl_r[i] -= max(1,abs(solver.xl_r[i]))*solver.opt.tol
     end
-    for i in eachindex(solver.xu_r)
+    @inbounds @simd for i in eachindex(solver.xu_r)
         solver.xu_r[i] += max(1,abs(solver.xu_r[i]))*solver.opt.tol
     end
     initialize_variables!(solver.x,solver.xl,solver.xu,solver.opt.bound_push,solver.opt.bound_fac)
@@ -369,10 +369,10 @@ function restore!(solver::AbstractMadNLPSolver)
         axpy!(solver.alpha, dual(solver.d), solver.y)
         # Note: axpy! does not support non-contiguous view
         dlb = dual_lb(solver.d)
-        for i in eachindex(solver.zl_r)
+        @inbounds @simd for i in eachindex(solver.zl_r)
             solver.zl_r[i] += solver.alpha * dlb[i]
         end
-        dub = dual_ub(solver.d)
+        @inbounds @simd dub = dual_ub(solver.d)
         for i in eachindex(solver.zu_r)
             solver.zu_r[i] += solver.alpha * dub[i]
         end
@@ -671,7 +671,7 @@ function inertia_free_reg(solver::MadNLPSolver)
     fill!(dual(solver._w3), 0)
 
     g = solver.x_trial # just to avoid new allocation
-    @inbounds for i in eachindex(g)
+    @inbounds @simd for i in eachindex(g)
         g[i] = solver.f[i] - solver.mu / (solver.x[i]-solver.xl[i]) + solver.mu / (solver.xu[i]-solver.x[i]) + solver.jacl[i]
     end
 
@@ -707,7 +707,7 @@ function inertia_free_reg(solver::MadNLPSolver)
 
         factorize_wrapper!(solver)
         solve_status = (solve_refine_wrapper!(solver,d0,p0) && solve_refine_wrapper!(solver,solver.d,solver.p))
-        for i in eachindex(dx)
+        @inbounds @simd for i in eachindex(dx)
             t[i] = dx[i] - n[i]
         end
         mul!(solver._w4, solver.kkt, solver._w3) # prepartation for curv_test
