@@ -172,7 +172,7 @@ end
 MOI.supports(::Optimizer, ::MOI.RawOptimizerAttribute) = true
 
 function MOI.set(model::Optimizer, p::MOI.RawOptimizerAttribute, value)
-    model.options[p.name] = value
+    model.options[Symbol(p.name)] = value
     # No need to reset model.solver because this gets handled in optimize!.
     return
 end
