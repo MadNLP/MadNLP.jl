@@ -116,6 +116,13 @@ function MadNLPSolver(nlp::AbstractNLPModel{T}; kwargs...) where T
     return MadNLPSolver{T,KKTSystem}(nlp, opt_ipm, opt_linear_solver; logger=logger)
 end
 
+# Constructor for unregistered KKT systems
+function MadNLPSolver{T, KKTSystem}(nlp::AbstractNLPModel{T}; options...) where {T, KKTSystem}
+    opt_ipm, opt_linear_solver, logger = load_options(; options...)
+    @assert is_supported(opt_ipm.linear_solver, T)
+    return MadNLPSolver{T,KKTSystem}(nlp, opt_ipm, opt_linear_solver; logger=logger)
+end
+
 # Inner constructor
 function MadNLPSolver{T,KKTSystem}(
     nlp::AbstractNLPModel,
