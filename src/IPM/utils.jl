@@ -13,6 +13,11 @@ mutable struct MadNLPExecutionStats{T} <: AbstractExecutionStats
     elapsed_time::Real
 end
 
+struct InvalidNumberException <: Exception
+    callback::Symbol
+end
+struct NotEnoughDegreesOfFreedomException <: Exception end
+
 MadNLPExecutionStats(solver::MadNLPSolver) = MadNLPExecutionStats(
     solver.status,
     _madnlp_unsafe_wrap(solver.x, get_nvar(solver.nlp)),
@@ -34,10 +39,6 @@ function reset!(stats::MadNLPExecutionStats, solver::MadNLPSolver)
     stats.elapsed_time = solver.cnt.total_time
     return stats
 end
-
-struct InvalidNumberException <: Exception end
-struct NotEnoughDegreesOfFreedomException <: Exception end
-
 
 get_counters(nlp::NLPModels.AbstractNLPModel) = nlp.counters
 get_counters(nlp::NLPModels.AbstractNLSModel) = nlp.counters.counters
