@@ -888,6 +888,5 @@ function MOI.get(model::Optimizer, attr::MOI.NLPBlockDual)
 end
 
 ### MOI.BarrierIterations
-# This is impossible in Ipopt unless a custom callback function is used.
 MOI.get(model::Optimizer,::MOI.BarrierIterations) = model.solve_iterations
 
