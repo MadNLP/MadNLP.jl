@@ -25,6 +25,7 @@ MadNLP._ger!(alpha::Number, x::CuVector{T}, y::CuVector{T}, A::CuMatrix{T}) wher
 
 
 include("kernels.jl")
+include("callbacks.jl")
 
 if has_cuda()
     include("lapackgpu.jl")

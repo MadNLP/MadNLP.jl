@@ -149,22 +149,6 @@ function eval_lag_hess_wrapper!(
     n = length(qn.sk)
     m = size(kkt.jac, 1)
 
-    # Code for GPU support
-    if VT != Vector{T}
-        # Load the buffers to transfer data between the host and the device.
-        l_g = get!(kkt.etc, :l_g, VT(undef, m))
-        x_g = get!(kkt.etc, :x_g, zeros(n))
-        j_g = get!(kkt.etc, :j_g, zeros(n))
-        # Init buffers.
-        copyto!(l_g, l)
-        copyto!(x_g, qn.last_x)
-        fill!(j_g, zero(T))
-    else
-        l_g = l
-        x_g = qn.last_x
-        j_g = qn.last_jv
-    end
-
     if cnt.obj_grad_cnt >= 2
         # Build sk = x+ - x
         copyto!(sk, 1, solver.x, 1, n)   # sₖ = x₊
@@ -174,10 +158,9 @@ function eval_lag_hess_wrapper!(
         copyto!(yk, 1, solver.f, 1, n)   # yₖ = ∇f₊
         axpy!(-one(T), qn.last_g, yk)    # yₖ = ∇f₊ - ∇f
         if m > 0
-            jtprod!(solver.jacl, kkt, l_g)
+            jtprod!(solver.jacl, kkt, l)
             yk .+= @view solver.jacl[1:n]         # yₖ += J₊ᵀ l₊
-            NLPModels.jtprod!(nlp, x_g, l, j_g)
-            copyto!(qn.last_jv, j_g)
+            NLPModels.jtprod!(nlp, qn.last_x, l, qn.last_jv)
             axpy!(-one(T), qn.last_jv, yk)        # yₖ += J₊ᵀ l₊ - Jᵀ l₊
         end
 
