@@ -82,10 +82,10 @@ function solve_refine_wrapper!(
     xy = view(full(x), kkt.ind_eq_shifted)
     xz = view(full(x), kkt.ind_ineq_shifted)
 
-    v_c .= 0.0
-    # v_c[kkt.ind_ineq] .= (Σs .* bz .+ α .* bs) ./ α.^2
+    fill!(v_c, zero(T))
     v_c[kkt.ind_ineq] .= (Σs .* bz .+ α .* bs) ./ α.^2 ./ (1 .- Σs .* kkt.du_diag )
     jtprod!(jv_t, kkt, v_c)
+    
     # init right-hand-side
     b_c[1:n] .= bx .+ view(jv_t, 1:n)
     b_c[1+n:n+n_eq] .= by

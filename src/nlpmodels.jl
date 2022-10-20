@@ -33,14 +33,14 @@ before calling this function.
 
 """
 function scale_constraints!(
-    nlp::AbstractNLPModel,
+    nlp::AbstractNLPModel{T},
     con_scale::AbstractVector,
     jac::AbstractMatrix;
     max_gradient=1e-8,
-)
-    fill!(con_scale, 0.0)
+) where T
+    fill!(con_scale, zero(T))
     _set_scaling!(con_scale, jac)
-    con_scale .= min.(1.0, max_gradient ./ con_scale)
+    con_scale .= min.(one(T), max_gradient ./ con_scale)
 end
 
 """
@@ -62,11 +62,11 @@ before calling this function.
 
 """
 function scale_objective(
-    nlp::AbstractNLPModel,
+    nlp::AbstractNLPModel{T},
     grad::AbstractVector;
     max_gradient=1e-8,
-)
-    return min(1, max_gradient / norm(grad, Inf))
+) where T
+    return min(one(T), max_gradient / normInf(grad))
 end
 
 function get_index_constraints(nlp::AbstractNLPModel; fixed_variable_treatment=MAKE_PARAMETER)

@@ -13,7 +13,9 @@ struct MadNLPExecutionStats{T} <: AbstractExecutionStats
     elapsed_time::Real
 end
 
-struct InvalidNumberException <: Exception end
+struct InvalidNumberException <: Exception
+    callback::Symbol
+end
 struct NotEnoughDegreesOfFreedomException <: Exception end
 
 MadNLPExecutionStats(solver::MadNLPSolver) =MadNLPExecutionStats(
@@ -34,44 +36,99 @@ getStatus(result::MadNLPExecutionStats) = STATUS_OUTPUT_DICT[result.status]
 # Utilities
 has_constraints(solver) = solver.m != 0
 
-# Print functions -----------------------------------------------------------
-function print_init(solver::AbstractMadNLPSolver)
-    @notice(solver.logger,@sprintf("Number of nonzeros in constraint Jacobian............: %8i",get_nnzj(solver.nlp.meta)))
-    @notice(solver.logger,@sprintf("Number of nonzeros in Lagrangian Hessian.............: %8i\n",get_nnzh(solver.nlp.meta)))
-
+function get_vars_info(solver)
+    x_lb = get_lvar(solver.nlp)
+    x_ub = get_uvar(solver.nlp)
     num_fixed = length(solver.ind_fixed)
     num_var = get_nvar(solver.nlp) - num_fixed
     num_llb_vars = length(solver.ind_llb)
-    num_lu_vars = sum((get_lvar(solver.nlp).!=-Inf).*(get_uvar(solver.nlp).!=Inf)) - num_fixed
+    num_lu_vars = -num_fixed
+    # Number of bounded variables
+    for i in 1:get_nvar(solver.nlp)
+        if (x_lb[i] > -Inf) && (x_ub[i] < Inf)
+            num_lu_vars += 1
+        end
+    end
     num_uub_vars = length(solver.ind_uub)
-    num_eq_cons = sum(get_lcon(solver.nlp).==get_ucon(solver.nlp))
-    num_ineq_cons = sum(get_lcon(solver.nlp).!=get_ucon(solver.nlp))
-    num_ue_cons = sum((get_lcon(solver.nlp).!=get_ucon(solver.nlp)).*(get_lcon(solver.nlp).==-Inf).*(get_ucon(solver.nlp).!=Inf))
-    num_le_cons = sum((get_lcon(solver.nlp).!=get_ucon(solver.nlp)).*(get_lcon(solver.nlp).!=-Inf).*(get_ucon(solver.nlp).==Inf))
-    num_lu_cons = sum((get_lcon(solver.nlp).!=get_ucon(solver.nlp)).*(get_lcon(solver.nlp).!=-Inf).*(get_ucon(solver.nlp).!=Inf))
-    get_nvar(solver.nlp) < num_eq_cons && throw(NotEnoughDegreesOfFreedomException())
+    return (
+        n_free=num_var,
+        n_fixed=num_fixed,
+        n_only_lb=num_llb_vars,
+        n_only_ub=num_uub_vars,
+        n_bounded=num_lu_vars,
+    )
+end
 
-    @notice(solver.logger,@sprintf("Total number of variables............................: %8i",num_var))
-    @notice(solver.logger,@sprintf("                     variables with only lower bounds: %8i",num_llb_vars))
-    @notice(solver.logger,@sprintf("                variables with lower and upper bounds: %8i",num_lu_vars))
-    @notice(solver.logger,@sprintf("                     variables with only upper bounds: %8i",num_uub_vars))
-    @notice(solver.logger,@sprintf("Total number of equality constraints.................: %8i",num_eq_cons))
-    @notice(solver.logger,@sprintf("Total number of inequality constraints...............: %8i",num_ineq_cons))
-    @notice(solver.logger,@sprintf("        inequality constraints with only lower bounds: %8i",num_le_cons))
-    @notice(solver.logger,@sprintf("   inequality constraints with lower and upper bounds: %8i",num_lu_cons))
-    @notice(solver.logger,@sprintf("        inequality constraints with only upper bounds: %8i\n",num_ue_cons))
+function get_cons_info(solver)
+    g_lb = get_lcon(solver.nlp)
+    g_ub = get_ucon(solver.nlp)
+    # Classify constraints
+    num_eq_cons, num_ineq_cons = 0, 0
+    num_ue_cons, num_le_cons, num_lu_cons = 0, 0, 0
+    for i in 1:get_ncon(solver.nlp)
+        l, u = g_lb[i], g_ub[i]
+        if l == u
+            num_eq_cons += 1
+        elseif l < u
+            num_ineq_cons += 1
+            if isinf(l) && isfinite(u)
+                num_ue_cons += 1
+            elseif isfinite(l) && isinf(u)
+                num_le_cons +=1
+            else isfinite(l) && isfinite(u)
+                num_lu_cons += 1
+            end
+        end
+    end
+    return (
+        n_eq=num_eq_cons,
+        n_ineq=num_ineq_cons,
+        n_only_lb=num_le_cons,
+        n_only_ub=num_ue_cons,
+        n_bounded=num_lu_cons,
+    )
+end
+
+# Print functions -----------------------------------------------------------
+function print_init(solver::AbstractMadNLPSolver)
+    @notice(solver.logger,@sprintf("Number of nonzeros in constraint Jacobian............: %8i", get_nnzj(solver.nlp.meta)))
+    @notice(solver.logger,@sprintf("Number of nonzeros in Lagrangian Hessian.............: %8i\n", get_nnzh(solver.nlp.meta)))
+    var_info = get_vars_info(solver)
+    con_info = get_cons_info(solver)
+
+    if get_nvar(solver.nlp) < con_info.n_eq
+        throw(NotEnoughDegreesOfFreedomException())
+    end
+
+    @notice(solver.logger,@sprintf("Total number of variables............................: %8i",var_info.n_free))
+    @notice(solver.logger,@sprintf("                     variables with only lower bounds: %8i",var_info.n_only_lb))
+    @notice(solver.logger,@sprintf("                variables with lower and upper bounds: %8i",var_info.n_bounded))
+    @notice(solver.logger,@sprintf("                     variables with only upper bounds: %8i",var_info.n_only_ub))
+    @notice(solver.logger,@sprintf("Total number of equality constraints.................: %8i",con_info.n_eq))
+    @notice(solver.logger,@sprintf("Total number of inequality constraints...............: %8i",con_info.n_ineq))
+    @notice(solver.logger,@sprintf("        inequality constraints with only lower bounds: %8i",con_info.n_only_lb))
+    @notice(solver.logger,@sprintf("   inequality constraints with lower and upper bounds: %8i",con_info.n_bounded))
+    @notice(solver.logger,@sprintf("        inequality constraints with only upper bounds: %8i\n",con_info.n_only_ub))
     return
 end
 
 function print_iter(solver::AbstractMadNLPSolver;is_resto=false)
     mod(solver.cnt.k,10)==0&& @info(solver.logger,@sprintf(
         "iter    objective    inf_pr   inf_du lg(mu)  ||d||  lg(rg) alpha_du alpha_pr  ls"))
+    if is_resto
+        RR = solver.RR::RobustRestorer
+        inf_du = RR.inf_du_R
+        inf_pr = RR.inf_pr_R
+        mu = log10(RR.mu_R)
+    else
+        inf_du = solver.inf_du
+        inf_pr = solver.inf_pr
+        mu = log10(solver.mu)
+    end
     @info(solver.logger,@sprintf(
         "%4i%s% 10.7e %6.2e %6.2e %5.1f %6.2e %s %6.2e %6.2e%s  %i",
         solver.cnt.k,is_resto ? "r" : " ",solver.obj_val/solver.obj_scale[],
-        is_resto ? solver.RR.inf_pr_R : solver.inf_pr,
-        is_resto ? solver.RR.inf_du_R : solver.inf_du,
-        is_resto ? log(10,solver.RR.mu_R) : log(10,solver.mu),
+        inf_pr, inf_du, mu,
         solver.cnt.k == 0 ? 0. : norm(primal(solver.d),Inf),
         solver.del_w == 0 ? "   - " : @sprintf("%5.1f",log(10,solver.del_w)),
         solver.alpha_z,solver.alpha,solver.ftype,solver.cnt.l))

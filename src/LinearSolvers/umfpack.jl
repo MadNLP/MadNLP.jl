@@ -10,7 +10,7 @@ const umfpack_default_info = copy(UMFPACK.umf_info)
 end
 
 mutable struct UmfpackSolver{T} <: AbstractLinearSolver{T}
-    inner::UMFPACK.UmfpackLU
+    inner::UMFPACK.UmfpackLU{T, Int32}
     tril::SparseMatrixCSC{T}
     full::SparseMatrixCSC{T}
     tril_to_full_view::SubVector{T}

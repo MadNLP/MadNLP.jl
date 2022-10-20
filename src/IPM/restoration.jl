@@ -1,4 +1,4 @@
-mutable struct RobustRestorer{T} 
+mutable struct RobustRestorer{T}
     obj_val_R::T
     f_R::Vector{T}
     x_ref::Vector{T}
@@ -77,16 +77,16 @@ function RobustRestorer(solver::AbstractMadNLPSolver{T}) where T
     # )
 end
 
-function initialize_robust_restorer!(solver::AbstractMadNLPSolver)
+function initialize_robust_restorer!(solver::AbstractMadNLPSolver{T}) where T
     @trace(solver.logger,"Initializing restoration phase variables.")
     solver.RR == nothing && (solver.RR = RobustRestorer(solver))
     RR = solver.RR
 
-    RR.x_ref .= solver.x
+    copyto!(RR.x_ref, solver.x)
     RR.theta_ref = get_theta(solver.c)
-    RR.D_R   .= min.(1,1 ./abs.(RR.x_ref))
+    RR.D_R .= min.(one(T), one(T) ./abs.(RR.x_ref))
 
-    RR.mu_R = max(solver.mu,norm(solver.c,Inf))
+    RR.mu_R = max(solver.mu, norm(solver.c, Inf))
     RR.tau_R= max(solver.opt.tau_min,1-RR.mu_R)
     RR.zeta = sqrt(RR.mu_R)
 
@@ -102,16 +102,16 @@ function initialize_robust_restorer!(solver::AbstractMadNLPSolver)
     RR.zn .= RR.mu_R./RR.nn
 
     RR.obj_val_R = get_obj_val_R(RR.pp,RR.nn,RR.D_R,solver.x,RR.x_ref,solver.opt.rho,RR.zeta)
-    RR.f_R.=0
+    fill!(RR.f_R, zero(T))
     empty!(RR.filter)
-    push!(RR.filter,(solver.theta_max,-Inf))
+    push!(RR.filter, (solver.theta_max,-Inf))
 
-    solver.y .= 0.
-    solver.zl_r .= min.(solver.opt.rho,solver.zl_r)
-    solver.zu_r .= min.(solver.opt.rho,solver.zu_r)
+    fill!(solver.y, zero(T))
+    solver.zl_r .= min.(solver.opt.rho, solver.zl_r)
+    solver.zu_r .= min.(solver.opt.rho, solver.zu_r)
     solver.cnt.t = 0
 
     # misc
-    solver.del_w = 0
+    solver.del_w = zero(T)
 end
 
