@@ -1,5 +1,26 @@
 # Release notes
 
+## v0.5.l (October 20th, 2022)
+
+### New features
+
+- Update MOI wrapper to match new Ipopt's MOI wrapper (#224, #233)
+- Add new constructor for custom KKT type (#232)
+
+### Bug fixes
+
+- Fix detection of number of upper and lower bounds for optimization variables (#211)
+- Fix `solve!` function when dual is provided as input (#215)
+- Update initialization of meta field (#216)
+- Fix type stability in MadNLP (#220, #227, #228)
+
+### Performance and maintenance
+
+- Doc: Fix typos in quickstart.md (#210)
+- Test properly `solve!` function (#219)
+- Improve error messages when invalid number is detected (#226)
+
+
 ## v0.5.0 (August 30th, 2022)
 
 ### Breaking changes
