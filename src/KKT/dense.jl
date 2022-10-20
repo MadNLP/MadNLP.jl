@@ -287,13 +287,14 @@ function _build_condensed_kkt_system!(
 end
 
 function _build_ineq_jac!(
-    dest::AbstractMatrix, jac::AbstractMatrix, pr_diag::AbstractVector,
+    dest::AbstractMatrix, jac::AbstractMatrix, pr_diag::AbstractVector, du_diag,
     ind_ineq::AbstractVector, ind_fixed::AbstractVector, con_scale::AbstractVector,
     n, m_ineq,
 )
     @inbounds for i in 1:m_ineq, j in 1:n
         is = ind_ineq[i]
-        dest[i, j] = jac[is, j] * sqrt(pr_diag[n+i]) / con_scale[is]
+        dest[i, j] = jac[is, j] * sqrt(pr_diag[n+i] / (1 - pr_diag[n+i] * du_diag[i])) / con_scale[is]
+        # dest[i, j] = jac[is, j] * sqrt(pr_diag[n+i]) / con_scale[is]
     end
     # need to zero the fixed components
     dest[:, ind_fixed] .= 0.0
@@ -308,7 +309,7 @@ function build_kkt!(kkt::DenseCondensedKKTSystem{T, VT, MT}) where {T, VT, MT}
     kkt.pr_diag[kkt.ind_fixed] .= 0
     fill!(kkt.aug_com, zero(T))
     # Build √Σₛ * J
-    _build_ineq_jac!(kkt.jac_ineq, kkt.jac, kkt.pr_diag, kkt.ind_ineq, kkt.ind_fixed, kkt.constraint_scaling, n, ns)
+    _build_ineq_jac!(kkt.jac_ineq, kkt.jac, kkt.pr_diag, kkt.du_diag, kkt.ind_ineq, kkt.ind_fixed, kkt.constraint_scaling, n, ns)
 
     # Select upper-left block
     W = if n_eq > 0

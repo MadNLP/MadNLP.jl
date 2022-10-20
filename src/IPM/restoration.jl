@@ -42,23 +42,39 @@ function RobustRestorer(solver::AbstractMadNLPSolver{T}) where T
     dzn= Vector{T}(undef,solver.m)
     pp_trial = Vector{T}(undef,solver.m)
     nn_trial = Vector{T}(undef,solver.m)
-
     return RobustRestorer{T}(
         0.,
-        primal(solver._w2),
-        primal(solver._w1),
+        Vector{T}(undef,solver.n),
+        Vector{T}(undef,solver.n),
         0.,
-        primal(solver._w3),
+        Vector{T}(undef,solver.n),
         0.,
-        dual(solver._w3),
-        dual(solver._w4),
+        Vector{T}(undef,solver.m),
+        Vector{T}(undef,solver.m),
         zp, zn,
         dpp, dnn, dzp, dzn,
-        dual(solver._w2),
-        dual(solver._w1),
+        Vector{T}(undef,solver.m),
+        Vector{T}(undef,solver.m),
         0.,0.,0.,0.,0.,0.,
         Tuple{T,T}[],
     )
+
+    # return RobustRestorer{T}(
+    #     0.,
+    #     primal(solver._w2),
+    #     primal(solver._w1),
+    #     0.,
+    #     primal(solver._w3),
+    #     0.,
+    #     dual(solver._w3),
+    #     dual(solver._w4),
+    #     zp, zn,
+    #     dpp, dnn, dzp, dzn,
+    #     dual(solver._w2),
+    #     dual(solver._w1),
+    #     0.,0.,0.,0.,0.,0.,
+    #     Tuple{T,T}[],
+    # )
 end
 
 function initialize_robust_restorer!(solver::AbstractMadNLPSolver)
@@ -76,6 +92,11 @@ function initialize_robust_restorer!(solver::AbstractMadNLPSolver)
 
     RR.nn .= (RR.mu_R.-solver.opt.rho.*solver.c)./2 ./solver.opt.rho .+
         sqrt.(((RR.mu_R.-solver.opt.rho.*solver.c)./2 ./solver.opt.rho).^2 .+ RR.mu_R.*solver.c./2 ./solver.opt.rho)
+
+    # println("****************************")
+    # println(norm(RR.nn))
+    # println("****************************")
+
     RR.pp .= solver.c .+ RR.nn
     RR.zp .= RR.mu_R./RR.pp
     RR.zn .= RR.mu_R./RR.nn
