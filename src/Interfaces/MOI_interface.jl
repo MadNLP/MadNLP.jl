@@ -18,6 +18,7 @@ mutable struct Optimizer <: MOI.AbstractOptimizer
     silent::Bool
     options::Dict{Symbol,Any}
     solve_time::Float64
+    solve_iterations::Int
     sense::MOI.OptimizationSense
 
     variables::MOI.Utilities.VariablesContainer{Float64}
@@ -45,6 +46,7 @@ function Optimizer(; kwargs...)
         false,
         option_dict,
         NaN,
+        0,
         MOI.FEASIBILITY_SENSE,
         MOI.Utilities.VariablesContainer{Float64}(),
         Union{Nothing,Float64}[],
@@ -170,7 +172,7 @@ end
 MOI.supports(::Optimizer, ::MOI.RawOptimizerAttribute) = true
 
 function MOI.set(model::Optimizer, p::MOI.RawOptimizerAttribute, value)
-    model.options[p.name] = value
+    model.options[Symbol(p.name)] = value
     # No need to reset model.solver because this gets handled in optimize!.
     return
 end
@@ -660,6 +662,7 @@ function MOIModel(model::Optimizer)
         end
     end
 
+
     # TODO
     model.options[:jacobian_constant], model.options[:hessian_constant] = false, false
     model.options[:dual_initialized] = !iszero(y0)
@@ -689,6 +692,7 @@ function MOI.optimize!(model::Optimizer)
     model.solver = MadNLPSolver(model.nlp; model.options...)
     model.result = solve!(model.solver)
     model.solve_time = model.solver.cnt.total_time
+    model.solve_iterations = model.solver.cnt.k
     return
 end
 
@@ -882,4 +886,7 @@ function MOI.get(model::Optimizer, attr::MOI.NLPBlockDual)
     offset = length(model.qp_data)
     return s .* model.result.multipliers[(offset+1):end]
 end
+
+### MOI.BarrierIterations
+MOI.get(model::Optimizer,::MOI.BarrierIterations) = model.solve_iterations
 

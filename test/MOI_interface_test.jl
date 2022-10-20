@@ -63,12 +63,17 @@ function test_MOI_Test()
     return
 end
 
-function test_Name()
+function test_extra()
     model = MadNLP.Optimizer()
+    MOI.set(model, MOI.RawOptimizerAttribute("linear_solver"), UmfpackSolver)
+    
     @test MOI.supports(model, MOI.Name())
     @test MOI.get(model, MOI.Name()) == ""
     MOI.set(model, MOI.Name(), "Model")
     @test MOI.get(model, MOI.Name()) == "Model"
+    
+    @test MOI.get(model, MOI.BarrierIterations()) == 0
+    
     return
 end
 
