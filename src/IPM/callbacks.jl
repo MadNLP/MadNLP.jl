@@ -17,11 +17,14 @@ function eval_grad_f_wrapper!(solver::MadNLPSolver, f::PrimalVector{T}, x::Prima
     nlp = solver.nlp
     cnt = solver.cnt
     @trace(solver.logger,"Evaluating objective gradient.")
-    scale = solver.obj_scale[] * (get_minimize(nlp) ? one(T) : -one(T))
-    cnt.eval_function_time += @elapsed grad!(nlp, variable(x), variable(f))
-    grad!(nlp, variable(x), variable(f))
-    full(f) .*= scale
-    cnt.obj_grad_cnt += 1
+    obj_scaling = solver.obj_scale[] * (get_minimize(nlp) ? one(T) : -one(T))
+    cnt.eval_function_time += @elapsed grad!(
+        nlp,
+        variable(x),
+        variable(f),
+    )
+    _scal!(obj_scaling, full(f))
+    cnt.obj_grad_cnt+=1
     if cnt.obj_grad_cnt == 1 && !is_valid(full(f))
         throw(InvalidNumberException(:grad))
     end
@@ -32,11 +35,15 @@ function eval_cons_wrapper!(solver::MadNLPSolver, c::Vector{T}, x::PrimalVector{
     nlp = solver.nlp
     cnt = solver.cnt
     @trace(solver.logger, "Evaluating constraints.")
-    cnt.eval_function_time += @elapsed cons!(nlp, variable(x), c)
+    cnt.eval_function_time += @elapsed cons!(
+        nlp,
+        variable(x),
+        c,
+    )
     view(c,solver.ind_ineq) .-= slack(x)
     c .-= solver.rhs
     c .*= solver.con_scale
-    cnt.con_cnt += 1
+    cnt.con_cnt+=1
     if cnt.con_cnt == 1 && !is_valid(c)
         throw(InvalidNumberException(:cons))
     end

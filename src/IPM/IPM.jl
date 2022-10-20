@@ -5,7 +5,7 @@ abstract type AbstractMadNLPSolver{T} end
 
 include("restoration.jl")
 
-mutable struct MadNLPSolver{T,KKTSystem <: AbstractKKTSystem{T}, Model <: AbstractNLPModel} <: AbstractMadNLPSolver{T}
+mutable struct MadNLPSolver{T, KKTSystem <: AbstractKKTSystem{T}, Model <: AbstractNLPModel, LinSolver <: AbstractLinearSolver{T}, Iterator <: AbstractIterator{T}, KKTVec <: AbstractKKTVector{T, Vector{T}}} <: AbstractMadNLPSolver{T}
     nlp::Model
     kkt::KKTSystem
 
@@ -34,11 +34,11 @@ mutable struct MadNLPSolver{T,KKTSystem <: AbstractKKTSystem{T}, Model <: Abstra
     d::UnreducedKKTVector{T, Vector{T}}
     p::UnreducedKKTVector{T, Vector{T}}
 
-    _w1::AbstractKKTVector{T, Vector{T}}
-    _w2::AbstractKKTVector{T, Vector{T}}
+    _w1::KKTVec
+    _w2::KKTVec
 
-    _w3::AbstractKKTVector{T, Vector{T}}
-    _w4::AbstractKKTVector{T, Vector{T}}
+    _w3::KKTVec
+    _w4::KKTVec
 
     x_trial::PrimalVector{T, Vector{T}}
     c_trial::Vector{T}
@@ -64,8 +64,8 @@ mutable struct MadNLPSolver{T,KKTSystem <: AbstractKKTSystem{T}, Model <: Abstra
     x_trial_lr::SubVector{T}
     x_trial_ur::SubVector{T}
 
-    linear_solver::AbstractLinearSolver{T}
-    iterator::AbstractIterator{T}
+    linear_solver::LinSolver
+    iterator::Iterator
 
     obj_scale::Vector{T}
     con_scale::Vector{T}
@@ -112,6 +112,13 @@ function MadNLPSolver(nlp::AbstractNLPModel{T}; kwargs...) where T
         MT = Matrix{T}
         DenseCondensedKKTSystem{T, VT, MT}
     end
+    return MadNLPSolver{T,KKTSystem}(nlp, opt_ipm, opt_linear_solver; logger=logger)
+end
+
+# Constructor for unregistered KKT systems
+function MadNLPSolver{T, KKTSystem}(nlp::AbstractNLPModel{T}; options...) where {T, KKTSystem}
+    opt_ipm, opt_linear_solver, logger = load_options(; options...)
+    @assert is_supported(opt_ipm.linear_solver, T)
     return MadNLPSolver{T,KKTSystem}(nlp, opt_ipm, opt_linear_solver; logger=logger)
 end
 
@@ -213,11 +220,12 @@ function MadNLPSolver{T,KKTSystem}(
     @trace(logger,"Initializing fixed variable treatment scheme.")
 
     if opt.inertia_correction_method == INERTIA_AUTO
-        opt.inertia_correction_method = is_inertia(linear_solver) ? INERTIA_BASED : INERTIA_FREE
+        opt.inertia_correction_method = is_inertia(linear_solver)::Bool ? INERTIA_BASED : INERTIA_FREE
     end
 
 
-    return MadNLPSolver{T,KKTSystem,typeof(nlp)}(nlp,kkt,opt,cnt,logger,
+    return MadNLPSolver{T,KKTSystem,typeof(nlp),typeof(linear_solver),typeof(iterator),typeof(_w1)}(
+        nlp,kkt,opt,cnt,logger,
         n,m,nlb,nub,x,y,zl,zu,xl,xu,0.,f,c,
         jacl,
         d, p,

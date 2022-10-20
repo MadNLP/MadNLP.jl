@@ -114,7 +114,7 @@ function MadNLP.set_aug_diagonal!(kkt::MadNLP.AbstractDenseKKTSystem{T, VT, MT},
     pr_diag_h = kkt.etc[:pr_diag_host]::Vector{T}
     # Broadcast is not working as MadNLP array are allocated on the CPU,
     # whereas pr_diag is allocated on the GPU
-    pr_diag_h .= solver.zl./(solver.x.-solver.xl) .+ solver.zu./(solver.xu.-solver.x)
+    pr_diag_h .= full(solver.zl)./(full(solver.x).-full(solver.xl)) .+ full(solver.zu)./(full(solver.xu).-full(solver.x))
     copyto!(kkt.pr_diag, pr_diag_h)
     fill!(kkt.du_diag, 0.0)
 end
