@@ -372,8 +372,8 @@ function restore!(solver::AbstractMadNLPSolver)
         @inbounds @simd for i in eachindex(solver.zl_r)
             solver.zl_r[i] += solver.alpha * dlb[i]
         end
-        @inbounds @simd dub = dual_ub(solver.d)
-        for i in eachindex(solver.zu_r)
+        dub = dual_ub(solver.d)
+        @inbounds @simd for i in eachindex(solver.zu_r)
             solver.zu_r[i] += solver.alpha * dub[i]
         end
 
