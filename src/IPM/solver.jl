@@ -290,7 +290,6 @@ function regular!(solver::AbstractMadNLPSolver)
             varphi_trial= get_varphi(solver.obj_val_trial,solver.x_trial_lr,solver.xl_r,solver.xu_r,solver.x_trial_ur,solver.mu)
             armijo_condition = is_armijo(varphi_trial,varphi,solver.opt.eta_phi,solver.alpha,varphi_d)
 
-            # println(armijo_condition)
             small_search_norm && break
 
             solver.ftype = get_ftype(
@@ -489,14 +488,10 @@ function robust!(solver::MadNLPSolver)
 
         # set alpha_min
         alpha_max = get_alpha_max_R(solver.x,solver.xl,solver.xu,primal(solver.d),RR.pp,RR.dpp,RR.nn,RR.dnn,RR.tau_R)
-
-        
         solver.alpha_z = get_alpha_z_R(solver.zl_r,solver.zu_r,dual_lb(solver.d),dual_ub(solver.d),RR.zp,RR.dzp,RR.zn,RR.dzn,RR.tau_R)
         alpha_min = get_alpha_min(theta_R,varphi_d_R,solver.theta_min,solver.opt.gamma_theta,solver.opt.gamma_phi,
                                   solver.opt.alpha_min_frac,solver.opt.delta,solver.opt.s_theta,solver.opt.s_phi)
 
-        # println(alpha_max)
-        # println(solver.alpha_z)
         # filter start
         @trace(solver.logger,"Backtracking line search initiated.")
         solver.alpha = alpha_max

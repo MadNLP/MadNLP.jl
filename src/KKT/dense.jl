@@ -294,7 +294,6 @@ function _build_ineq_jac!(
     @inbounds for i in 1:m_ineq, j in 1:n
         is = ind_ineq[i]
         dest[i, j] = jac[is, j] * sqrt(pr_diag[n+i] / (1 - pr_diag[n+i] * du_diag[i])) / con_scale[is]
-        # dest[i, j] = jac[is, j] * sqrt(pr_diag[n+i]) / con_scale[is]
     end
     # need to zero the fixed components
     dest[:, ind_fixed] .= 0.0

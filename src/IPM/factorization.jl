@@ -32,15 +32,6 @@ function solve_refine_wrapper!(
         end
     end
     fixed_variable_treatment_vec!(full(x), solver.ind_fixed)
-
-    # println(full(x)[31:50])
-    # println(full(x)[1029:1030])
-    # println(full(x)[1031:1032])
-    # println(full(x)[1:30])
-    # println(full(x)[1031:1050])
-    # println(full(x)[1:3])
-    # println(full(x)[31:33])
-    # println(full(x)[1031:1033])
     
     return solve_status
 end
@@ -97,23 +88,9 @@ function solve_refine_wrapper!(
     xx .= x_c[1:n]
     xy .= x_c[1+n:end]
     jprod_ineq!(jv_x, kkt, xx)
-    # xz .= sqrt.(Σs) .* jv_x ./ α  .-( Σs .* bz ./ α.^2 .+ bs ./ α )
     xz .= sqrt.(Σs)./ sqrt.(1 .- Σs .* kkt.du_diag) .* jv_x ./ α .- (Σs .* bz ./ α.^2 .+ bs ./ α )  ./ (1 .- Σs .* kkt.du_diag)
     xs .= (bs .+ α .* xz) ./ Σs
-
-    #1-30
-    #31-1030
-    #1031-
-    # println(n+1:n+ns)
-    # println(full(x)[29:30])
-    # println(full(x)[1:3])
-    # println(full(x)[31:33])
-    # println(full(x)[1031:1033])
     
     fixed_variable_treatment_vec!(full(x), solver.ind_fixed)
     return solve_status
 end
-
-
-# v_c[kkt.ind_ineq] .= (Σs .* bz .+ α .* bs) ./ α.^2 ./ (Σs .* kkt.du_diag .+ 1) 
-    # xz .= ( sqrt.(Σs) ./ α .* jv_x .- Σs .* bz ./ α.^2 .- bs ./ α ) ./ (1 .- Σs .* kkt.du_diag ) 
