@@ -4,11 +4,11 @@ function madnlp(model::AbstractNLPModel; kwargs...)
     return solve!(solver)
 end
 
-solve!(nlp::AbstractNLPModel,solver::AbstractMadNLPSolver,kwargs...) = solve!(
-    nlp, solver, MadNLPExecutionStats(solver),
+solve!(nlp::AbstractNLPModel, solver::AbstractMadNLPSolver; kwargs...) = solve!(
+    nlp, solver, MadNLPExecutionStats(solver);
     kwargs...)
 solve!(solver::AbstractMadNLPSolver; kwargs...) = solve!(
-    solver.nlp, solver,
+    solver.nlp, solver;
     kwargs...)
 
 
