@@ -22,18 +22,18 @@ function _compare_gpu_with_cpu(KKTSystem, n, m, ind_fixed)
 
         # Solve on CPU
         h_solver = MadNLP.MadNLPSolver(nlp; madnlp_options...)
-        MadNLP.solve!(h_solver)
+        results_cpu = MadNLP.solve!(h_solver)
 
         # Solve on GPU
         d_solver = MadNLPGPU.CuMadNLPSolver(nlp; madnlp_options...)
-        MadNLP.solve!(d_solver)
+        results_gpu = MadNLP.solve!(d_solver)
 
         @test isa(d_solver.kkt, KKTSystem{T, CuVector{T}, CuMatrix{T}})
         # # Check that both results match exactly
         @test h_solver.cnt.k == d_solver.cnt.k
-        @test h_solver.obj_val ≈ d_solver.obj_val atol=atol
-        @test h_solver.x ≈ d_solver.x atol=atol
-        @test h_solver.y ≈ d_solver.y atol=atol
+        @test results_cpu.objective ≈ results_gpu.objective
+        @test results_cpu.solution ≈ results_gpu.solution atol=atol
+        @test results_cpu.multipliers ≈ results_gpu.multipliers atol=atol
     end
 end
 
