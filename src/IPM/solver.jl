@@ -195,11 +195,11 @@ end
 
 function unscale!(solver::AbstractMadNLPSolver)
     solver.obj_val /= solver.obj_scale[]
-    for i in eachindex(solver.c)
+    @inbounds @simd for i in eachindex(solver.c)
         solver.c[i] /= solver.con_scale[i]
         solver.c[i] += solver.rhs[i]
     end
-    for i in eachindex(solver.c_slk)
+    @inbounds @simd for i in eachindex(solver.c_slk)
         solver.c_slk[i] += solver.x_slk[i]
     end
 end
@@ -561,7 +561,7 @@ function robust!(solver::MadNLPSolver)
         copyto!(RR.nn, RR.nn_trial)
 
         RR.obj_val_R=RR.obj_val_R_trial
-        @inbounds for i in eachindex(RR.f_R)
+        @inbounds @simd for i in eachindex(RR.f_R)
             RR.f_R[i] = RR.zeta * RR.D_R[i]^2 *(solver.x[i]-RR.x_ref[i])
         end
 
@@ -681,7 +681,7 @@ function inertia_free_reg(solver::MadNLPSolver)
 
     factorize_wrapper!(solver)
     solve_status = (solve_refine_wrapper!(solver,d0,p0) && solve_refine_wrapper!(solver,solver.d,solver.p))
-    for i in eachindex(t)
+    @inbounds @simd for i in eachindex(t)
         t[i] = dx[i] - n[i]
     end
     mul!(solver._w4, solver.kkt, solver._w3) # prepartation for curv_test
@@ -726,7 +726,7 @@ function second_order_correction(solver::AbstractMadNLPSolver,alpha_max,theta,va
 
     wx = primal(solver._w1)
     wy = dual(solver._w1)
-    for i in eachindex(wy)
+    @inbounds @simd for i in eachindex(wy)
         wy[i] = alpha_max * solver.c[i] + solver.c_trial[i]
     end
     theta_soc_old = theta_trial

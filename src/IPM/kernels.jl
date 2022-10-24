@@ -12,11 +12,11 @@ end
 function set_aug_diagonal!(kkt::SparseUnreducedKKTSystem, solver::MadNLPSolver{T}) where T
     fill!(kkt.pr_diag, zero(T))
     fill!(kkt.du_diag, zero(T))
-    for i in eachindex(kkt.l_lower)
+    @inbounds @simd for i in eachindex(kkt.l_lower)
         kkt.l_lower[i] = -sqrt(solver.zl_r[i])
         kkt.l_diag[i]  = solver.xl_r[i] - solver.x_lr[i]
     end
-    for i in eachindex(kkt.u_lower)
+    @inbounds @simd for i in eachindex(kkt.u_lower)
         kkt.u_lower[i] = -sqrt(solver.zu_r[i])
         kkt.u_diag[i] = solver.x_ur[i] - solver.xu_r[i]
     end
@@ -89,7 +89,7 @@ function set_aug_rhs_ifr!(solver::MadNLPSolver{T}, kkt::SparseUnreducedKKTSystem
     fill!(dual_lb(solver._w1), zero(T))
     fill!(dual_ub(solver._w1), zero(T))
     wy = dual(solver._w1)
-    for i in eachindex(wy)
+    @inbounds @simd for i in eachindex(wy)
         wy[i] = -c[i]
     end
     return
@@ -363,18 +363,18 @@ end
 
 function get_F(c, f, zl, zu, jacl, x_lr, xl_r, zl_r, xu_r, x_ur, zu_r, mu)
     F = 0.0
-    @inbounds for i=1:length(c)
+    @inbounds @simd for i=1:length(c)
         F = max(F, c[i])
     end
-    @inbounds for i=1:length(f)
+    @inbounds @simd for i=1:length(f)
         F = max(F, f[i]-zl[i]+zu[i]+jacl[i])
     end
-    @inbounds for i=1:length(x_lr)
+    @inbounds @simd for i=1:length(x_lr)
         x_lr[i] >= xl_r[i] || return Inf
         zl_r[i] >= 0       || return Inf
         F = max(F, (x_lr[i]-xl_r[i])*zl_r[i]-mu)
     end
-    @inbounds for i=1:length(x_ur)
+    @inbounds @simd for i=1:length(x_ur)
         xu_r[i] >= x_ur[i] || return Inf
         zu_r[i] >= 0       || return Inf
         F = max(F, (xu_r[i]-xu_r[i])*zu_r[i]-mu)
@@ -517,13 +517,13 @@ function is_barr_obj_rapid_increase(varphi, varphi_trial, obj_max_inc)
 end
 
 function reset_bound_dual!(z, x, mu, kappa_sigma)
-    @inbounds for i in eachindex(z)
+    @inbounds @simd for i in eachindex(z)
         z[i] = max(min(z[i], (kappa_sigma*mu)/x[i]), (mu/kappa_sigma)/x[i])
     end
     return
 end
 function reset_bound_dual!(z, x1, x2, mu, kappa_sigma)
-    @inbounds for i in eachindex(z)
+    @inbounds @simd for i in eachindex(z)
         z[i] = max(min(z[i], (kappa_sigma*mu)/(x1[i]-x2[i])), (mu/kappa_sigma)/(x1[i]-x2[i]))
     end
     return
@@ -558,7 +558,7 @@ function _get_fixed_variable_index(
 end
 
 function fixed_variable_treatment_vec!(vec, ind_fixed)
-    @inbounds for i in ind_fixed
+    @inbounds @simd for i in ind_fixed
         vec[i] = 0.0
     end
 end

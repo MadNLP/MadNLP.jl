@@ -68,7 +68,7 @@ function initialize_robust_restorer!(solver::AbstractMadNLPSolver{T}) where T
 
     copyto!(RR.x_ref, solver.x)
     RR.theta_ref = get_theta(solver.c)
-    @inbounds for i in eachindex(RR.D_R)
+    @inbounds @simd for i in eachindex(RR.D_R)
         RR.D_R[i] = min(one(T), one(T) / abs(RR.x_ref[i]))
     end
 
@@ -76,7 +76,7 @@ function initialize_robust_restorer!(solver::AbstractMadNLPSolver{T}) where T
     RR.tau_R= max(solver.opt.tau_min,1-RR.mu_R)
     RR.zeta = sqrt(RR.mu_R)
 
-    @inbounds for i in eachindex(RR.nn)
+    @inbounds @simd for i in eachindex(RR.nn)
         RR.nn[i] = (RR.mu_R - solver.opt.rho*solver.c[i])/2 /solver.opt.rho +
             sqrt(((RR.mu_R-solver.opt.rho*solver.c[i])/2 /solver.opt.rho)^2 + RR.mu_R*solver.c[i]/2 /solver.opt.rho)
         RR.pp[i] = solver.c[i] + RR.nn[i]
@@ -90,10 +90,10 @@ function initialize_robust_restorer!(solver::AbstractMadNLPSolver{T}) where T
     push!(RR.filter, (solver.theta_max,-Inf))
 
     fill!(solver.y, zero(T))
-    @inbounds for i in eachindex(solver.zl_r)
+    @inbounds @simd for i in eachindex(solver.zl_r)
         solver.zl_r[i] = min(solver.opt.rho, solver.zl_r[i])
     end
-    @inbounds for i in eachindex(solver.zu_r)
+    @inbounds @simd for i in eachindex(solver.zu_r)
         solver.zu_r[i] = min(solver.opt.rho, solver.zu_r[i])
     end
     solver.cnt.t = 0
