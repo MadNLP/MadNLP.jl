@@ -115,7 +115,7 @@ function solve!(
         full(solver.x)[1:get_nvar(nlp)] .= x
     end
     if y != nothing
-        full(solver.y)[1:get_ncon(nlp)] .= y
+        solver.y[1:get_ncon(nlp)] .= y
     end
     if zl != nothing
         full(solver.zl)[1:get_nvar(nlp)] .= zl
