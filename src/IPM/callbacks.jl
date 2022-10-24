@@ -119,7 +119,7 @@ function eval_lag_hess_wrapper!(solver::MadNLPSolver, kkt::AbstractDenseKKTSyste
     @trace(solver.logger,"Evaluating Lagrangian Hessian.")
     dual(solver._w1) .= l .* solver.con_scale
     hess = get_hessian(kkt)
-    scale = is_resto ? zero(T) : get_minimize(nlp) ? one(T) : -one(T)
+    scale = is_resto ? zero(T) : get_minimize(nlp) ? solver.obj_scale[] : -solver.obj_scale[]
     cnt.eval_function_time += @elapsed hess_dense!(
         nlp,
         variable(x),
