@@ -1,4 +1,4 @@
-struct MadNLPExecutionStats{T} <: AbstractExecutionStats
+mutable struct MadNLPExecutionStats{T} <: AbstractExecutionStats
     status::Status
     solution::Vector{T}
     objective::T
@@ -13,11 +13,6 @@ struct MadNLPExecutionStats{T} <: AbstractExecutionStats
     elapsed_time::Real
 end
 
-struct InvalidNumberException <: Exception
-    callback::Symbol
-end
-struct NotEnoughDegreesOfFreedomException <: Exception end
-
 MadNLPExecutionStats(solver::MadNLPSolver) =MadNLPExecutionStats(
     solver.status,
     primal(solver.x),
@@ -29,9 +24,25 @@ MadNLPExecutionStats(solver::MadNLPSolver) =MadNLPExecutionStats(
     solver.cnt.k, get_counters(solver.nlp),solver.cnt.total_time
 )
 
+function update!(stats::MadNLPExecutionStats, solver::MadNLPSolver)
+    stats.status = solver.status
+    stats.objective = solver.obj_val
+    stats.dual_feas = solver.inf_du
+    stats.primal_feas = solver.inf_pr
+    stats.iter = solver.cnt.k
+    stats.elapsed_time = solver.cnt.total_time
+    return stats
+end
+
 get_counters(nlp::NLPModels.AbstractNLPModel) = nlp.counters
 get_counters(nlp::NLPModels.AbstractNLSModel) = nlp.counters.counters
 getStatus(result::MadNLPExecutionStats) = STATUS_OUTPUT_DICT[result.status]
+
+# Exceptions
+struct InvalidNumberException <: Exception
+    callback::Symbol
+end
+struct NotEnoughDegreesOfFreedomException <: Exception end
 
 # Utilities
 has_constraints(solver) = solver.m != 0
@@ -181,4 +192,3 @@ function string(solver::AbstractMadNLPSolver)
 end
 print(io::IO,solver::AbstractMadNLPSolver) = print(io, string(solver))
 show(io::IO,solver::AbstractMadNLPSolver) = print(io,solver)
-
