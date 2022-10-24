@@ -2,47 +2,110 @@
 # KKT system updates -------------------------------------------------------
 # Set diagonal
 function set_aug_diagonal!(kkt::AbstractKKTSystem, solver::MadNLPSolver{T}) where T
-    kkt.pr_diag .= full(solver.zl)./(full(solver.x).-full(solver.xl)) .+ full(solver.zu)./(full(solver.xu).-full(solver.x))
+    x = full(solver.x)
+    xl = full(solver.xl)
+    xu = full(solver.xu)
+    zl = full(solver.zl)
+    zu = full(solver.zu)
+    @inbounds @simd for i in eachindex(kkt.pr_diag)
+        kkt.pr_diag[i] = zl[i] /(x[i] - xl[i])
+        kkt.pr_diag[i] += zu[i] /(xu[i] - x[i])
+    end
     fill!(kkt.du_diag, zero(T))
     return
 end
 function set_aug_diagonal!(kkt::SparseUnreducedKKTSystem, solver::MadNLPSolver{T}) where T
     fill!(kkt.pr_diag, zero(T))
     fill!(kkt.du_diag, zero(T))
-    kkt.l_lower .= .-sqrt.(solver.zl_r)
-    kkt.u_lower .= .-sqrt.(solver.zu_r)
-    kkt.l_diag  .= solver.xl_r .- solver.x_lr
-    kkt.u_diag  .= solver.x_ur .- solver.xu_r
+    @inbounds @simd for i in eachindex(kkt.l_lower)
+        kkt.l_lower[i] = -sqrt(solver.zl_r[i])
+        kkt.l_diag[i]  = solver.xl_r[i] - solver.x_lr[i]
+    end
+    @inbounds @simd for i in eachindex(kkt.u_lower)
+        kkt.u_lower[i] = -sqrt(solver.zu_r[i])
+        kkt.u_diag[i] = solver.x_ur[i] - solver.xu_r[i]
+    end
     return
 end
 
 # Robust restoration
 function set_aug_RR!(kkt::AbstractKKTSystem, solver::MadNLPSolver, RR::RobustRestorer)
-    kkt.pr_diag .= full(solver.zl)./(full(solver.x).-full(solver.xl)) .+ full(solver.zu)./(full(solver.xu).-full(solver.x)) .+ RR.zeta.*RR.D_R.^2
-    kkt.du_diag .= .-RR.pp./RR.zp .- RR.nn./RR.zn
+    x = full(solver.x)
+    xl = full(solver.xl)
+    xu = full(solver.xu)
+    zl = full(solver.zl)
+    zu = full(solver.zu)
+    @inbounds @simd for i in eachindex(kkt.pr_diag)
+        kkt.pr_diag[i]  = zl[i] / (x[i] - xl[i])
+        kkt.pr_diag[i] += zu[i] / (xu[i] - x[i]) + RR.zeta * RR.D_R[i]^2
+    end
+    @inbounds @simd for i in eachindex(kkt.du_diag)
+        kkt.du_diag[i] = -RR.pp[i] /RR.zp[i] - RR.nn[i] /RR.zn[i]
+    end
     return
 end
 function set_aug_RR!(kkt::SparseUnreducedKKTSystem, solver::MadNLPSolver, RR::RobustRestorer)
-    kkt.pr_diag .= RR.zeta.*RR.D_R.^2
-    kkt.du_diag .= .-RR.pp./RR.zp.-RR.nn./RR.zn
-    kkt.l_lower .=.-sqrt.(solver.zl_r)
-    kkt.u_lower .=.-sqrt.(solver.zu_r)
-    kkt.l_diag  .= solver.xl_r .- solver.x_lr
-    kkt.u_diag  .= solver.x_ur .- solver.xu_r
+    @inbounds @simd for i in eachindex(kkt.pr_diag)
+        kkt.pr_diag[i] = RR.zeta * RR.D_R[i]^2
+    end
+    @inbounds @simd for i in eachindex(kkt.du_diag)
+        kkt.du_diag[i] = -RR.pp[i] / RR.zp[i] - RR.nn[i] / RR.zn[i]
+    end
+    @inbounds @simd for i in eachindex(kkt.l_lower)
+        kkt.l_lower[i] = -sqrt(solver.zl_r[i])
+        kkt.l_diag[i]  = solver.xl_r[i] - solver.x_lr[i]
+    end
+    @inbounds @simd for i in eachindex(kkt.u_lower)
+        kkt.u_lower[i] = -sqrt(solver.zu_r[i])
+        kkt.u_diag[i]  = solver.x_ur[i] - solver.xu_r[i]
+    end
     return
 end
+function set_f_RR!(solver::MadNLPSolver, RR::RobustRestorer)
+    x = full(solver.x)
+    @inbounds @simd for i in eachindex(RR.f_R)
+        RR.f_R[i] = RR.zeta * RR.D_R[i]^2 *(x[i]-RR.x_ref[i])
+    end
+end
+
 
 # Set RHS
 function set_aug_rhs!(solver::MadNLPSolver, kkt::AbstractKKTSystem, c)
-    primal(solver.p) .= .-primal(solver.f).+solver.mu./(primal(solver.x).-primal(solver.xl)).-solver.mu./(primal(solver.xu).-primal(solver.x)).-solver.jacl
-    dual(solver.p)   .= .-c
+    px = primal(solver.p)
+    x = primal(solver.x)
+    f = primal(solver.f)
+    xl = primal(solver.xl)
+    xu = primal(solver.xu)
+    @inbounds @simd for i in eachindex(px)
+        px[i] = -f[i] + solver.mu / (x[i] - xl[i]) - solver.mu / (xu[i] - x[i]) - solver.jacl[i]
+    end
+    py = dual(solver.p)
+    @inbounds @simd for i in eachindex(py)
+        py[i] = -c[i]
+    end
     return
 end
 function set_aug_rhs!(solver::MadNLPSolver, kkt::SparseUnreducedKKTSystem, c)
-    primal(solver.p) .= .-primal(solver.f).+primal(solver.zl).-primal(solver.zu).-solver.jacl
-    dual(solver.p) .= .-c
-    dual_lb(solver.p) .= (solver.xl_r-solver.x_lr) .* kkt.l_lower .+ solver.mu ./ kkt.l_lower
-    dual_ub(solver.p) .= (solver.xu_r-solver.x_ur) .* kkt.u_lower .- solver.mu ./ kkt.u_lower
+    f = primal(solver.f)
+    zl = primal(solver.zl)
+    zu = primal(solver.zu)
+    px = primal(solver.p)
+    @inbounds @simd for i in eachindex(px)
+        px[i] = -f[i] + zl[i] - zu[i] - solver.jacl[i]
+    end
+    py = dual(solver.p)
+    @inbounds @simd for i in eachindex(py)
+        py[i] = -c[i]
+    end
+    pzl = dual_lb(solver.p)
+    @inbounds @simd for i in eachindex(pzl)
+        pzl[i] = (solver.xl_r[i] - solver.x_lr[i]) * kkt.l_lower[i] + solver.mu / kkt.l_lower[i]
+    end
+    pzu = dual_ub(solver.p)
+    @inbounds @simd for i in eachindex(pzu)
+        pzu[i] = (solver.xu_r[i] -solver.x_ur[i]) * kkt.u_lower[i] - solver.mu / kkt.u_lower[i]
+    end
+# >>>>>>> origin/master
     return
 end
 
@@ -50,7 +113,10 @@ function set_aug_rhs_ifr!(solver::MadNLPSolver{T}, kkt::SparseUnreducedKKTSystem
     fill!(primal(solver._w1), zero(T))
     fill!(dual_lb(solver._w1), zero(T))
     fill!(dual_ub(solver._w1), zero(T))
-    dual(solver._w1) .= .-c
+    wy = dual(solver._w1)
+    @inbounds @simd for i in eachindex(wy)
+        wy[i] = -c[i]
+    end
     return
 end
 
@@ -58,33 +124,73 @@ end
 function set_aug_rhs_RR!(
     solver::MadNLPSolver, kkt::AbstractKKTSystem, RR::RobustRestorer, rho,
 )
-    primal(solver.p) .= .-RR.f_R.-solver.jacl.+RR.mu_R./(full(solver.x).-full(solver.xl)).-RR.mu_R./(full(solver.xu).-full(solver.x))
-    dual(solver.p) .= .-solver.c.+RR.pp.-RR.nn.+(RR.mu_R.-(rho.-solver.y).*RR.pp)./RR.zp.-(RR.mu_R.-(rho.+solver.y).*RR.nn)./RR.zn
+    x = full(solver.x)
+    xl = full(solver.xl)
+    xu = full(solver.xu)
+
+    px = primal(solver.p)
+    @inbounds @simd for i in eachindex(px)
+        px[i] = -RR.f_R[i] -solver.jacl[i] + RR.mu_R / (x[i] - xl[i]) - RR.mu_R / (xu[i] - x[i])
+    end
+    py = dual(solver.p)
+    @inbounds @simd for i in eachindex(py)
+        py[i] = -solver.c[i] + RR.pp[i] - RR.nn[i] + (RR.mu_R-(rho-solver.y[i])*RR.pp[i])/RR.zp[i]-(RR.mu_R-(rho+solver.y[i])*RR.nn[i]) / RR.zn[i]
+    end
     return
 end
 
 # Finish
 function finish_aug_solve!(solver::MadNLPSolver, kkt::AbstractKKTSystem, mu)
-    dual_lb(solver.d) .= (mu.-solver.zl_r.*solver.dx_lr)./(solver.x_lr.-solver.xl_r).-solver.zl_r
-    dual_ub(solver.d) .= (mu.+solver.zu_r.*solver.dx_ur)./(solver.xu_r.-solver.x_ur).-solver.zu_r
+    dlb = dual_lb(solver.d)
+    @inbounds @simd for i in eachindex(dlb)
+        dlb[i] = (mu-solver.zl_r[i]*solver.dx_lr[i])/(solver.x_lr[i]-solver.xl_r[i])-solver.zl_r[i]
+    end
+    dub = dual_ub(solver.d)
+    @inbounds @simd for i in eachindex(dub)
+        dub[i] = (mu+solver.zu_r[i]*solver.dx_ur[i])/(solver.xu_r[i]-solver.x_ur[i])-solver.zu_r[i]
+    end
     return
 end
 function finish_aug_solve!(solver::MadNLPSolver, kkt::SparseUnreducedKKTSystem, mu)
-    dual_lb(solver.d) .*= .-kkt.l_lower
-    dual_ub(solver.d) .*=   kkt.u_lower
-    dual_lb(solver.d) .= (mu.-solver.zl_r.*solver.dx_lr) ./ (solver.x_lr.-solver.xl_r) .- solver.zl_r
-    dual_ub(solver.d) .= (mu.+solver.zu_r.*solver.dx_ur) ./ (solver.xu_r.-solver.x_ur) .- solver.zu_r
+    dlb = dual_lb(solver.d)
+    @inbounds @simd for i in eachindex(dlb)
+        dlb[i] = (mu-solver.zl_r[i]*solver.dx_lr[i]) / (solver.x_lr[i]-solver.xl_r[i]) - solver.zl_r[i]
+    end
+    dub = dual_ub(solver.d)
+    @inbounds @simd for i in eachindex(dub)
+        dub[i] = (mu+solver.zu_r[i]*solver.dx_ur[i]) / (solver.xu_r[i]-solver.x_ur[i]) - solver.zu_r[i]
+    end
     return
 end
 
 # Initial
+function set_initial_bounds!(solver::MadNLPSolver{T}) where T
+    @inbounds @simd for i in eachindex(solver.xl_r)
+        solver.xl_r[i] -= max(one(T),abs(solver.xl_r[i]))*solver.opt.tol
+    end
+    @inbounds @simd for i in eachindex(solver.xu_r)
+        solver.xu_r[i] += max(one(T),abs(solver.xu_r[i]))*solver.opt.tol
+    end
+end
 function set_initial_rhs!(solver::MadNLPSolver{T}, kkt::AbstractKKTSystem) where T
-    primal(solver.p) .= .-primal(solver.f).+primal(solver.zl).-primal(solver.zu)
+    f = primal(solver.f)
+    zl = primal(solver.zl)
+    zu = primal(solver.zu)
+    px = primal(solver.p)
+    @inbounds @simd for i in eachindex(px)
+        px[i] = -f[i] + zl[i] - zu[i]
+    end
     fill!(dual(solver.p), zero(T))
     return
 end
 function set_initial_rhs!(solver::MadNLPSolver{T}, kkt::SparseUnreducedKKTSystem) where T
-    primal(solver.p) .= .-primal(solver.f).+primal(solver.zl).-primal(solver.zu)
+    f = primal(solver.f)
+    zl = primal(solver.zl)
+    zu = primal(solver.zu)
+    px = primal(solver.p)
+    @inbounds @simd for i in eachindex(px)
+        px[i] = -f[i] + zl[i] - zu[i]
+    end
     fill!(dual(solver.p), zero(T))
     fill!(dual_lb(solver.p), zero(T))
     fill!(dual_ub(solver.p), zero(T))
@@ -94,23 +200,51 @@ end
 # Set ifr
 function set_aug_rhs_ifr!(solver::MadNLPSolver{T}, kkt::AbstractKKTSystem) where T
     fill!(primal(solver._w1), zero(T))
-    dual(solver._w1) .= .-solver.c
+    wy = dual(solver._w1)
+    @inbounds @simd for i in eachindex(wy)
+        wy[i] = - solver.c[i]
+    end
     return
 end
+function set_g_ifr!(solver::MadNLPSolver, g)
+    f = full(solver.f)
+    x = full(solver.x)
+    xl = full(solver.xl)
+    xu = full(solver.xu)
+    @inbounds @simd for i in eachindex(g)
+        g[i] = f[i] - solver.mu / (x[i]-xl[i]) + solver.mu / (xu[i]-x[i]) + solver.jacl[i]
+    end
+end
+
 
 # Finish RR
 function finish_aug_solve_RR!(dpp, dnn, dzp, dzn, l, dl, pp, nn, zp, zn, mu_R, rho)
-    dpp .= (mu_R.+pp.*dl.-(rho.-l).*pp)./zp
-    dnn .= (mu_R.-nn.*dl.-(rho.+l).*nn)./zn
-    dzp .= (mu_R.-zp.*dpp)./pp.-zp
-    dzn .= (mu_R.-zn.*dnn)./nn.-zn
+    @inbounds @simd for i in eachindex(dpp)
+        dpp[i] = (mu_R + pp[i] * dl[i] - (rho - l[i]) * pp[i]) / zp[i]
+        dnn[i] = (mu_R - nn[i] * dl[i] - (rho + l[i]) * nn[i]) / zn[i]
+        dzp[i] = (mu_R - zp[i] * dpp[i]) / pp[i] - zp[i]
+        dzn[i] = (mu_R - zn[i] * dnn[i]) / nn[i] - zn[i]
+    end
     return
+end
+
+# Scaling
+function unscale!(solver::AbstractMadNLPSolver)
+    x_slk = slack(solver.x)
+    solver.obj_val /= solver.obj_scale[]
+    @inbounds @simd for i in eachindex(solver.c)
+        solver.c[i] /= solver.con_scale[i]
+        solver.c[i] += solver.rhs[i]
+    end
+    @inbounds @simd for i in eachindex(solver.c_slk)
+        solver.c_slk[i] += x_slk[i]
+    end
 end
 
 # Kernel functions ---------------------------------------------------------
 is_valid(val::Real) = !(isnan(val) || isinf(val))
 function is_valid(vec::AbstractArray)
-    @inbounds for i=1:length(vec)
+    @inbounds @simd for i=1:length(vec)
         is_valid(vec[i]) || return false
     end
     return true
@@ -156,7 +290,7 @@ end
 function get_varphi_d(f, x, xl, xu, dx, mu)
     varphi_d = 0.0
     @inbounds @simd for i=1:length(f)
-        varphi_d += (f[i] - mu/(x[i]-xl[i]) + mu/(xu[i]-x[i])) *dx[i]
+        varphi_d += (f[i] - mu/(x[i]-xl[i]) + mu/(xu[i]-x[i])) * dx[i]
     end
     return varphi_d
 end
@@ -295,18 +429,18 @@ end
 
 function get_F(c, f, zl, zu, jacl, x_lr, xl_r, zl_r, xu_r, x_ur, zu_r, mu)
     F = 0.0
-    @inbounds for i=1:length(c)
+    @inbounds @simd for i=1:length(c)
         F = max(F, c[i])
     end
-    @inbounds for i=1:length(f)
+    @inbounds @simd for i=1:length(f)
         F = max(F, f[i]-zl[i]+zu[i]+jacl[i])
     end
-    @inbounds for i=1:length(x_lr)
+    @inbounds @simd for i=1:length(x_lr)
         x_lr[i] >= xl_r[i] || return Inf
         zl_r[i] >= 0       || return Inf
         F = max(F, (x_lr[i]-xl_r[i])*zl_r[i]-mu)
     end
-    @inbounds for i=1:length(x_ur)
+    @inbounds @simd for i=1:length(x_ur)
         xu_r[i] >= x_ur[i] || return Inf
         zu_r[i] >= 0       || return Inf
         F = max(F, (xu_r[i]-xu_r[i])*zu_r[i]-mu)
@@ -449,11 +583,15 @@ function is_barr_obj_rapid_increase(varphi, varphi_trial, obj_max_inc)
 end
 
 function reset_bound_dual!(z, x, mu, kappa_sigma)
-    z .= max.(min.(z, (kappa_sigma*mu)./x), (mu/kappa_sigma)./x)
+    @inbounds @simd for i in eachindex(z)
+        z[i] = max(min(z[i], (kappa_sigma*mu)/x[i]), (mu/kappa_sigma)/x[i])
+    end
     return
 end
 function reset_bound_dual!(z, x1, x2, mu, kappa_sigma)
-    z .= max.(min.(z, (kappa_sigma*mu)./(x1.-x2)), (mu/kappa_sigma)./(x1.-x2))
+    @inbounds @simd for i in eachindex(z)
+        z[i] = max(min(z[i], (kappa_sigma*mu)/(x1[i]-x2[i])), (mu/kappa_sigma)/(x1[i]-x2[i]))
+    end
     return
 end
 
@@ -486,7 +624,7 @@ function _get_fixed_variable_index(
 end
 
 function fixed_variable_treatment_vec!(vec, ind_fixed)
-    @inbounds for i in ind_fixed
+    @inbounds @simd for i in ind_fixed
         vec[i] = 0.0
     end
 end
