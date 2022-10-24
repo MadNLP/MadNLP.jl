@@ -40,7 +40,9 @@ function scale_constraints!(
 ) where T
     fill!(con_scale, zero(T))
     _set_scaling!(con_scale, jac)
-    con_scale .= min.(one(T), max_gradient ./ con_scale)
+    @inbounds for i in eachindex(con_scale)
+        con_scale[i] = min(one(T), max_gradient / con_scale[i])
+    end
 end
 
 """
