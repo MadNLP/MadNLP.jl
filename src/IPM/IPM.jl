@@ -112,6 +112,9 @@ function MadNLPSolver(nlp::AbstractNLPModel{T}; kwargs...) where T
     elseif opt_ipm.kkt_system == DENSE_CONDENSED_KKT_SYSTEM
         MT = Matrix{T}
         DenseCondensedKKTSystem{T, VT, MT}
+    elseif opt_ipm.kkt_system == BFGS_DENSE_KKT_SYSTEM
+        MT = Matrix{T}
+        BFGSKKTSystem{T, VT, MT}
     end
     return MadNLPSolver{T,KKTSystem}(nlp, opt_ipm, opt_linear_solver; logger=logger)
 end

@@ -24,6 +24,7 @@
       SPARSE_UNREDUCED_KKT_SYSTEM = 2,
       DENSE_KKT_SYSTEM = 3,
       DENSE_CONDENSED_KKT_SYSTEM = 4,
+      BFGS_DENSE_KKT_SYSTEM = 5,
 )
 
 @enum(Status::Int,
