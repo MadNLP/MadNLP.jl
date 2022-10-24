@@ -12,6 +12,7 @@ import .CUBLAS: handle, CUBLAS_DIAG_NON_UNIT,
 import KernelAbstractions: @kernel, @index, wait, Event
 import CUDAKernels: CUDADevice
 
+import MadNLP: NLPModels
 import MadNLP
 import MadNLP:
     @kwdef, MadNLPLogger, @debug, @warn, @error,
