@@ -53,11 +53,6 @@ function set_aug_RR!(kkt::SparseUnreducedKKTSystem, solver::MadNLPSolver, RR::Ro
 end
 
 # Set RHS
-function set_aug_rhs!(solver::MadNLPSolver, kkt::AbstractCondensedKKTSystem, c)
-    primal(solver.p) .= .-solver.f.+solver.mu./(solver.x.-solver.xl).-solver.mu./(solver.xu.-solver.x).-solver.jacl
-    dual(solver.p)   .= .-c
-end
-
 function set_aug_rhs!(solver::MadNLPSolver, kkt::AbstractKKTSystem, c)
     px = primal(solver.p)
     @inbounds @simd for i in eachindex(px)
@@ -257,7 +252,7 @@ end
 function get_obj_val_R(p, n, D_R, x, x_ref, rho, zeta)
     obj_val_R = 0.
     @inbounds @simd for i=1:length(p)
-        obj_val_R += rho*(p[i]+n[i]) .+ zeta/2*D_R[i]^2*(x[i]-x_ref[i])^2
+        obj_val_R += rho*(p[i]+n[i]) + zeta/2*D_R[i]^2*(x[i]-x_ref[i])^2
     end
     return obj_val_R
 end

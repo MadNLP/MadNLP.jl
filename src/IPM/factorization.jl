@@ -72,9 +72,10 @@ function solve_refine_wrapper!(
     xs = view(full(x), n+1:n+ns)
     xy = view(full(x), kkt.ind_eq_shifted)
     xz = view(full(x), kkt.ind_ineq_shifted)
+    du_diag_ineq = view(kkt.du_diag, kkt.ind_ineq)
 
     fill!(v_c, zero(T))
-    v_c[kkt.ind_ineq] .= (Σs .* bz .+ α .* bs) ./ α.^2 ./ (1 .- Σs .* kkt.du_diag )
+    v_c[kkt.ind_ineq] .= (Σs .* bz .+ α .* bs) ./ α.^2 ./ (1 .- Σs .* du_diag_ineq)
     jtprod!(jv_t, kkt, v_c)
     
     # init right-hand-side
@@ -88,7 +89,7 @@ function solve_refine_wrapper!(
     xx .= x_c[1:n]
     xy .= x_c[1+n:end]
     jprod_ineq!(jv_x, kkt, xx)
-    xz .= sqrt.(Σs)./ sqrt.(1 .- Σs .* kkt.du_diag) .* jv_x ./ α .- (Σs .* bz ./ α.^2 .+ bs ./ α )  ./ (1 .- Σs .* kkt.du_diag)
+    xz .= sqrt.(Σs)./ sqrt.(1 .- Σs .* du_diag_ineq) .* jv_x ./ α .- (Σs .* bz ./ α.^2 .+ bs ./ α )  ./ (1 .- Σs .* du_diag_ineq)
     xs .= (bs .+ α .* xz) ./ Σs
     
     fixed_variable_treatment_vec!(full(x), solver.ind_fixed)

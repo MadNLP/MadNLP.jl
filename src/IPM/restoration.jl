@@ -32,7 +32,10 @@ mutable struct RobustRestorer{T}
 end
 
 function RobustRestorer(solver::AbstractMadNLPSolver{T}) where T
-
+    f_R = Vector{T}(undef,solver.n)
+    x_ref = Vector{T}(undef,solver.n)
+    D_R = Vector{T}(undef,solver.n)
+    
     nn = Vector{T}(undef,solver.m)
     zp = Vector{T}(undef,solver.m)
     zn = Vector{T}(undef,solver.m)
@@ -40,22 +43,16 @@ function RobustRestorer(solver::AbstractMadNLPSolver{T}) where T
     dnn= Vector{T}(undef,solver.m)
     dzp= Vector{T}(undef,solver.m)
     dzn= Vector{T}(undef,solver.m)
+    pp = Vector{T}(undef,solver.m)
+    nn = Vector{T}(undef,solver.m)
     pp_trial = Vector{T}(undef,solver.m)
     nn_trial = Vector{T}(undef,solver.m)
     return RobustRestorer{T}(
-        0.,
-        Vector{T}(undef,solver.n),
-        Vector{T}(undef,solver.n),
-        0.,
-        Vector{T}(undef,solver.n),
-        0.,
-        Vector{T}(undef,solver.m),
-        Vector{T}(undef,solver.m),
-        zp, zn,
+        0., f_R, x_ref, 0., D_R, 0.,
+        pp, nn, zp, zn,
         dpp, dnn, dzp, dzn,
-        Vector{T}(undef,solver.m),
-        Vector{T}(undef,solver.m),
-        0.,0.,0.,0.,0.,0.,
+        pp_trial, nn_trial,
+        0., 0., 0., 0., 0., 0.,
         Tuple{T,T}[],
     )
 end
