@@ -15,12 +15,12 @@ end
 
 MadNLPExecutionStats(solver::MadNLPSolver) =MadNLPExecutionStats(
     solver.status,
-    _madnlp_unsafe_wrap(solver.x, get_nvar(solver.nlp)),
+    primal(solver.x),
     solver.obj_val,solver.c,
     solver.inf_du, solver.inf_pr,
     solver.y,
-    _madnlp_unsafe_wrap(solver.zl, get_nvar(solver.nlp)),
-    _madnlp_unsafe_wrap(solver.zu, get_nvar(solver.nlp)),
+    primal(solver.zl),
+    primal(solver.zu),
     solver.cnt.k, get_counters(solver.nlp),solver.cnt.total_time
 )
 

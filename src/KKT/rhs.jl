@@ -152,3 +152,30 @@ primal_dual(rhs::UnreducedKKTVector) = rhs.x
 dual_lb(rhs::UnreducedKKTVector) = rhs.xzl
 dual_ub(rhs::UnreducedKKTVector) = rhs.xzu
 
+
+"""
+    PrimalVector{T, VT<:AbstractVector{T}} <: AbstractKKTVector{T, VT}
+
+Primal vector ``(x, s)``.
+
+"""
+struct PrimalVector{T, VT<:AbstractVector{T}} <: AbstractKKTVector{T, VT}
+    values::VT
+    x::VT  # unsafe view
+    s::VT # unsafe view
+end
+
+function PrimalVector{T, VT}(nx::Int, ns::Int) where {T, VT <: AbstractVector{T}}
+    values = VT(undef, nx+ns) ; fill!(values, zero(T))
+    return PrimalVector{T, VT}(
+        values,
+        _madnlp_unsafe_wrap(values, nx),
+        _madnlp_unsafe_wrap(values, ns, nx+1),
+    )
+end
+
+full(rhs::PrimalVector) = rhs.values
+primal(rhs::PrimalVector) = rhs.values
+variable(rhs::PrimalVector) = rhs.x
+slack(rhs::PrimalVector) = rhs.s
+
