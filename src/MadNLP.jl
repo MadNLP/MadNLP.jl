@@ -9,7 +9,7 @@ import Libdl: dlopen, dlext, RTLD_DEEPBIND, RTLD_GLOBAL
 import Printf: @sprintf
 import LinearAlgebra: BLAS, Adjoint, Symmetric, mul!, ldiv!, norm, dot, diagind, normInf, transpose!
 import LinearAlgebra: cholesky, qr, lu
-import LinearAlgebra.BLAS: axpy!, symv!, ger! libblas, liblapack, BlasInt, @blasfunc
+import LinearAlgebra.BLAS: axpy!, symv!, ger!, libblas, liblapack, BlasInt, @blasfunc
 import SparseArrays: AbstractSparseMatrix, SparseMatrixCSC, sparse, getcolptr, rowvals, nnz
 import Base: string, show, print, size, getindex, copyto!, @kwdef
 import SuiteSparse: UMFPACK

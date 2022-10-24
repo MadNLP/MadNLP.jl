@@ -120,8 +120,9 @@ end
 
 @testset "MadNLP: custom KKT constructor" begin
     T, VT, MT = Float64, Vector{Float64}, Matrix{Float64}
+    QN = MadNLP.ExactHessian{T, VT}
     nlp = MadNLPTests.DenseDummyQP{T}(; n=10, m=5)
-    KKT = MadNLP.DenseKKTSystem{T, VT, MT}
+    KKT = MadNLP.DenseKKTSystem{T, VT, MT, QN}
     solver = MadNLPSolver{T, KKT}(nlp; linear_solver=LapackCPUSolver)
     @test isa(solver.kkt, KKT)
 end
