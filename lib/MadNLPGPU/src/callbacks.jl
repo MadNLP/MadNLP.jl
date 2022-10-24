@@ -1,5 +1,5 @@
 
-function _init_buffer_bfgs!(kkt::AbstractKKTSystem{T, VT, MT, QN}, n, m) where {T, VT, MT, QN}
+function _init_buffer_bfgs!(kkt::MadNLP.AbstractKKTSystem{T, VT, MT, QN}, n, m) where {T, VT, MT, QN}
     haskey(kkt.etc, :x_gh) || (kkt.etc[:x_g] = zeros(T, n))
     haskey(kkt.etc, :j_gh) || (kkt.etc[:j_g] = zeros(T, n))
     haskey(kkt.etc, :j_gd) || (kkt.etc[:j_g] = VT(undef, n))
