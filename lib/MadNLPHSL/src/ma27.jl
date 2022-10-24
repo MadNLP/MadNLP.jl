@@ -21,7 +21,7 @@ mutable struct Ma27Solver{T} <: AbstractLinearSolver{T}
     info::Vector{Int32}
 
     a::Vector{T}
-    a_view::Vector{T}
+    a_view::SubArray{T, 1, Vector{T}, Tuple{UnitRange{Int64}}, true}
     la::Int32
     ikeep::Vector{Int32}
 
@@ -112,7 +112,7 @@ function Ma27Solver(csc::SparseMatrixCSC{T};
 
     la = ceil(Int32,max(nz,opt.ma27_la_init_factor*info[5]))
     a = Vector{T}(undef,la)
-    a_view = _madnlp_unsafe_wrap(a,nnz(csc))
+    a_view = view(a,1:nnz(csc)) # _madnlp_unsafe_wrap is not used because we may resize a
     liw= ceil(Int32,opt.ma27_liw_init_factor*info[6])
     resize!(iw,liw)
     maxfrt=Int32[1]
