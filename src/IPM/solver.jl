@@ -4,25 +4,13 @@ function madnlp(model::AbstractNLPModel; kwargs...)
     return solve!(solver)
 end
 
-function solve!(
-    model::AbstractNLPModel,
-    solver::MadNLPSolver,
-    nlp::AbstractNLPModel;
-    x = get_x0(nlp),
-    y = get_y0(nlp),
-    zl= nothing,
-    zu= nothing,
+solve!(nlp::AbstractNLPModel, solver::AbstractMadNLPSolver; kwargs...) = solve!(
+    nlp, solver, MadNLPExecutionStats(solver);
+    kwargs...)
+solve!(solver::AbstractMadNLPSolver; kwargs...) = solve!(
+    solver.nlp, solver;
     kwargs...)
 
-    @assert solver.nlp == nlp
-
-    solve!(
-        solver;
-        x = x, y = y,
-        zl = zl, zu = zu,
-        kwargs...
-    )
-end
 
 function initialize!(solver::AbstractMadNLPSolver{T}) where T
     # initializing slack variables
@@ -114,23 +102,25 @@ end
 
 # major loops ---------------------------------------------------------
 function solve!(
-    solver::AbstractMadNLPSolver;
+    nlp::AbstractNLPModel,
+    solver::AbstractMadNLPSolver,
+    stats::MadNLPExecutionStats;
     x = nothing, y = nothing,
     zl = nothing, zu = nothing,
     kwargs...
 )
-
+    
     if x != nothing
-        solver.x[1:get_nvar(solver.nlp)] .= x
+        solver.x[1:get_nvar(nlp)] .= x
     end
     if y != nothing
-        solver.y[1:get_ncon(solver.nlp)] .= y
+        solver.y[1:get_ncon(nlp)] .= y
     end
     if zl != nothing
-        solver.zl[1:get_nvar(solver.nlp)] .= zl
+        solver.zl[1:get_nvar(nlp)] .= zl
     end
     if zu != nothing
-        solver.zu[1:get_nvar(solver.nlp)] .= zu
+        solver.zu[1:get_nvar(nlp)] .= zu
     end
 
     if !isempty(kwargs)
@@ -188,8 +178,12 @@ function solve!(
         solver.opt.disable_garbage_collector &&
             (GC.enable(true); @warn(solver.logger,"Julia garbage collector is turned back on"))
         finalize(solver.logger)
+
+        update!(stats,solver)
     end
-    return MadNLPExecutionStats(solver)
+
+    
+    return stats
 end
 
 
