@@ -24,7 +24,7 @@ MadNLPExecutionStats(solver::MadNLPSolver) =MadNLPExecutionStats(
     solver.cnt.k, get_counters(solver.nlp),solver.cnt.total_time
 )
 
-function reset!(stats::MadNLPExecutionStats, solver::MadNLPSolver)
+function update!(stats::MadNLPExecutionStats, solver::MadNLPSolver)
     stats.status = solver.status
     stats.objective = solver.obj_val
     stats.dual_feas = solver.inf_du

@@ -104,7 +104,7 @@ function solve!(
     x = nothing, y = nothing,
     zl = nothing, zu = nothing,
     kwargs...
-        )
+)
     
     if x != nothing
         solver.x[1:get_nvar(nlp)] .= x
@@ -175,7 +175,7 @@ function solve!(
             (GC.enable(true); @warn(solver.logger,"Julia garbage collector is turned back on"))
         finalize(solver.logger)
 
-        reset!(stats,solver)
+        update!(stats,solver)
     end
 
     
