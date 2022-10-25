@@ -33,15 +33,15 @@ function _compare_dense_with_sparse(
         solver = MadNLPSolver(nlp; sparse_options...)
         solverd = MadNLPSolver(nlp; dense_options...)
 
-        MadNLP.solve!(solver)
-        MadNLP.solve!(solverd)
+        result_sparse = MadNLP.solve!(solver)
+        result_dense = MadNLP.solve!(solverd)
 
         # Check that dense formulation matches exactly sparse formulation
-        @test solverd.status == MadNLP.SOLVE_SUCCEEDED
-        @test solver.cnt.k == solverd.cnt.k
-        @test solver.obj_val ≈ solverd.obj_val atol=atol
-        @test solver.x ≈ solverd.x atol=atol
-        @test solver.y ≈ solverd.y atol=atol
+        @test result_dense.status == MadNLP.SOLVE_SUCCEEDED
+        @test result_sparse.iter == result_dense.iter
+        @test result_sparse.objective ≈ result_dense.objective atol=atol
+        @test result_sparse.solution ≈ result_dense.solution atol=atol
+        @test result_sparse.multipliers ≈ result_dense.multipliers atol=atol
         @test solver.kkt.jac_com[:, 1:n] == solverd.kkt.jac
         if isa(solverd.kkt, MadNLP.AbstractReducedKKTSystem)
             @test Symmetric(solver.kkt.aug_com, :L) ≈ solverd.kkt.aug_com atol=atol
@@ -159,7 +159,7 @@ end
             kkt_system=MadNLP.DENSE_KKT_SYSTEM,
             linear_solver=LapackCPUSolver,
         )
-        MadNLP.solve!(solver_exact)
+        results_ref = MadNLP.solve!(solver_exact)
 
         solver_qn = MadNLP.MadNLPSolver(
             nlp;
@@ -168,12 +168,12 @@ end
             hessian_approximation=QN,
             linear_solver=LapackCPUSolver,
         )
-        MadNLP.solve!(solver_qn)
+        results_qn = MadNLP.solve!(solver_qn)
 
-        @test solver_qn.status == MadNLP.SOLVE_SUCCEEDED
+        @test results_qn.status == MadNLP.SOLVE_SUCCEEDED
+        @test results_qn.objective ≈ results_ref.objective atol=1e-6
+        @test results_qn.solution ≈ results_ref.solution atol=1e-6
         @test solver_qn.cnt.lag_hess_cnt == 0
-        @test solver_exact.obj_val ≈ solver_qn.obj_val atol=1e-6
-        @test solver_exact.x ≈ solver_qn.x atol=1e-6
         # TODO: this test is currently breaking the CI, investigate why.
         # @test solver_exact.y ≈ solver_qn.y atol=1e-4
     end
@@ -187,7 +187,7 @@ end
             nlp;
             print_level=MadNLP.ERROR,
         )
-        MadNLP.solve!(solver_exact)
+        results_ref = MadNLP.solve!(solver_exact)
 
         # LBFGS solve
         solver_qn = MadNLP.MadNLPSolver(
@@ -195,11 +195,11 @@ end
             hessian_approximation=MadNLP.SPARSE_COMPACT_LBFGS,
             print_level=MadNLP.ERROR,
         )
-        MadNLP.solve!(solver_qn)
-        @test solver_qn.status == MadNLP.SOLVE_SUCCEEDED
+        results_qn = MadNLP.solve!(solver_qn)
+        @test results_qn.status == MadNLP.SOLVE_SUCCEEDED
+        @test results_qn.objective ≈ results_ref.objective atol=1e-6
+        @test results_qn.solution ≈ results_ref.solution atol=1e-6
         @test solver_qn.cnt.lag_hess_cnt == 0
-        @test solver_exact.obj_val ≈ solver_qn.obj_val atol=1e-6
-        @test solver_exact.x ≈ solver_qn.x atol=1e-6
         # TODO: this test is currently breaking the CI, investigate why.
         # @test solver_exact.y ≈ solver_qn.y atol=1e-4
     end

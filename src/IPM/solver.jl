@@ -4,44 +4,33 @@ function madnlp(model::AbstractNLPModel; kwargs...)
     return solve!(solver)
 end
 
-function solve!(
-    model::AbstractNLPModel,
-    solver::MadNLPSolver,
-    nlp::AbstractNLPModel;
-    x = get_x0(nlp),
-    y = get_y0(nlp),
-    zl= nothing,
-    zu= nothing,
+solve!(nlp::AbstractNLPModel, solver::AbstractMadNLPSolver; kwargs...) = solve!(
+    nlp, solver, MadNLPExecutionStats(solver);
+    kwargs...)
+solve!(solver::AbstractMadNLPSolver; kwargs...) = solve!(
+    solver.nlp, solver;
     kwargs...)
 
-    @assert solver.nlp == nlp
-
-    solve!(
-        solver;
-        x = x, y = y,
-        zl = zl, zu = zu,
-        kwargs...
-    )
-end
 
 function initialize!(solver::AbstractMadNLPSolver{T}) where T
     # initializing slack variables
     @trace(solver.logger,"Initializing slack variables.")
     cons!(solver.nlp,get_x0(solver.nlp),_madnlp_unsafe_wrap(solver.c,get_ncon(solver.nlp)))
     solver.cnt.con_cnt += 1
-    copyto!(solver.x_slk, solver.c_slk)
+    copyto!(slack(solver.x), solver.c_slk)
 
     # Initialization
     @trace(solver.logger,"Initializing primal and bound duals.")
     fill!(solver.zl_r, one(T))
     fill!(solver.zu_r, one(T))
-    @inbounds @simd for i in eachindex(solver.xl_r)
-        solver.xl_r[i] -= max(1,abs(solver.xl_r[i]))*solver.opt.tol
-    end
-    @inbounds @simd for i in eachindex(solver.xu_r)
-        solver.xu_r[i] += max(1,abs(solver.xu_r[i]))*solver.opt.tol
-    end
-    initialize_variables!(solver.x,solver.xl,solver.xu,solver.opt.bound_push,solver.opt.bound_fac)
+
+    set_initial_bounds!(solver)
+    initialize_variables!(
+        full(solver.x),
+        full(solver.xl),
+        full(solver.xu),
+        solver.opt.bound_push,solver.opt.bound_fac
+    )
 
     # Automatic scaling (constraints)
     @trace(solver.logger,"Computing constraint scaling.")
@@ -59,8 +48,8 @@ function initialize!(solver::AbstractMadNLPSolver{T}) where T
     eval_grad_f_wrapper!(solver, solver.f,solver.x)
     @trace(solver.logger,"Computing objective scaling.")
     if solver.opt.nlp_scaling
-        solver.obj_scale[] = scale_objective(solver.nlp, solver.f; max_gradient=solver.opt.nlp_scaling_max_gradient)
-        _scal!(solver.obj_scale[], solver.f)
+        solver.obj_scale[] = scale_objective(solver.nlp, full(solver.f); max_gradient=solver.opt.nlp_scaling_max_gradient)
+        _scal!(solver.obj_scale[], full(solver.f))
     end
 
     # Initialize dual variables
@@ -94,7 +83,7 @@ end
 
 
 function reinitialize!(solver::AbstractMadNLPSolver)
-    view(solver.x,1:get_nvar(solver.nlp)) .= get_x0(solver.nlp)
+    variable(solver.x) .= get_x0(solver.nlp)
 
     solver.obj_val = eval_f_wrapper(solver, solver.x)
     eval_grad_f_wrapper!(solver, solver.f, solver.x)
@@ -114,23 +103,25 @@ end
 
 # major loops ---------------------------------------------------------
 function solve!(
-    solver::AbstractMadNLPSolver;
+    nlp::AbstractNLPModel,
+    solver::AbstractMadNLPSolver,
+    stats::MadNLPExecutionStats;
     x = nothing, y = nothing,
     zl = nothing, zu = nothing,
     kwargs...
 )
-
+    
     if x != nothing
-        solver.x[1:get_nvar(solver.nlp)] .= x
+        full(solver.x)[1:get_nvar(nlp)] .= x
     end
     if y != nothing
-        solver.y[1:get_ncon(solver.nlp)] .= y
+        solver.y[1:get_ncon(nlp)] .= y
     end
     if zl != nothing
-        solver.zl[1:get_nvar(solver.nlp)] .= zl
+        full(solver.zl)[1:get_nvar(nlp)] .= zl
     end
     if zu != nothing
-        solver.zu[1:get_nvar(solver.nlp)] .= zu
+        full(solver.zu)[1:get_nvar(nlp)] .= zu
     end
 
     if !isempty(kwargs)
@@ -188,36 +179,41 @@ function solve!(
         solver.opt.disable_garbage_collector &&
             (GC.enable(true); @warn(solver.logger,"Julia garbage collector is turned back on"))
         finalize(solver.logger)
+
+        update!(stats,solver)
     end
-    return MadNLPExecutionStats(solver)
+
+    
+    return stats
 end
 
 
-function unscale!(solver::AbstractMadNLPSolver)
-    solver.obj_val /= solver.obj_scale[]
-    @inbounds @simd for i in eachindex(solver.c)
-        solver.c[i] /= solver.con_scale[i]
-        solver.c[i] += solver.rhs[i]
-    end
-    @inbounds @simd for i in eachindex(solver.c_slk)
-        solver.c_slk[i] += solver.x_slk[i]
-    end
-end
-
-function regular!(solver::AbstractMadNLPSolver)
+function regular!(solver::AbstractMadNLPSolver{T}) where T
     while true
         if (solver.cnt.k!=0 && !solver.opt.jacobian_constant)
             eval_jac_wrapper!(solver, solver.kkt, solver.x)
         end
         jtprod!(solver.jacl, solver.kkt, solver.y)
         fixed_variable_treatment_vec!(solver.jacl,solver.ind_fixed)
-        fixed_variable_treatment_z!(solver.zl,solver.zu,solver.f,solver.jacl,solver.ind_fixed)
+        fixed_variable_treatment_z!(
+            full(solver.zl),
+            full(solver.zu),
+            full(solver.f),
+            solver.jacl,
+            solver.ind_fixed,
+        )
 
         sd = get_sd(solver.y,solver.zl_r,solver.zu_r,solver.opt.s_max)
         sc = get_sc(solver.zl_r,solver.zu_r,solver.opt.s_max)
 
         solver.inf_pr = get_inf_pr(solver.c)
-        solver.inf_du = get_inf_du(solver.f,solver.zl,solver.zu,solver.jacl,sd)
+        solver.inf_du = get_inf_du(
+            full(solver.f),
+            full(solver.zl),
+            full(solver.zu),
+            solver.jacl,
+            sd,
+        )
         solver.inf_compl = get_inf_compl(solver.x_lr,solver.xl_r,solver.zl_r,solver.xu_r,solver.x_ur,solver.zu_r,0.,sc)
         inf_compl_mu = get_inf_compl(solver.x_lr,solver.xl_r,solver.zl_r,solver.xu_r,solver.x_ur,solver.zu_r,solver.mu,sc)
 
@@ -273,10 +269,22 @@ function regular!(solver::AbstractMadNLPSolver)
         @trace(solver.logger,"Backtracking line search initiated.")
         theta = get_theta(solver.c)
         varphi= get_varphi(solver.obj_val,solver.x_lr,solver.xl_r,solver.xu_r,solver.x_ur,solver.mu)
-        varphi_d = get_varphi_d(solver.f,solver.x,solver.xl,solver.xu,primal(solver.d),solver.mu)
+        varphi_d = get_varphi_d(
+            primal(solver.f),
+            primal(solver.x),
+            primal(solver.xl),
+            primal(solver.xu),
+            primal(solver.d),
+            solver.mu,
+        )
 
-
-        alpha_max = get_alpha_max(solver.x,solver.xl,solver.xu,primal(solver.d),solver.tau)
+        alpha_max = get_alpha_max(
+            primal(solver.x),
+            primal(solver.xl),
+            primal(solver.xu),
+            primal(solver.d),
+            solver.tau,
+        )
         solver.alpha_z = get_alpha_z(solver.zl_r,solver.zu_r,dual_lb(solver.d),dual_ub(solver.d),solver.tau)
         alpha_min = get_alpha_min(theta,varphi_d,solver.theta_min,solver.opt.gamma_theta,solver.opt.gamma_phi,
                                   solver.opt.alpha_min_frac,solver.opt.delta,solver.opt.s_theta,solver.opt.s_phi)
@@ -284,12 +292,12 @@ function regular!(solver::AbstractMadNLPSolver)
         solver.alpha = alpha_max
         varphi_trial= 0.
             theta_trial = 0.
-            small_search_norm = get_rel_search_norm(solver.x, primal(solver.d)) < 10*eps(eltype(solver.x))
+            small_search_norm = get_rel_search_norm(primal(solver.x), primal(solver.d)) < 10*eps(T)
         switching_condition = is_switching(varphi_d,solver.alpha,solver.opt.s_phi,solver.opt.delta,2.,solver.opt.s_theta)
         armijo_condition = false
         while true
-            copyto!(solver.x_trial, solver.x)
-            axpy!(solver.alpha, primal(solver.d), solver.x_trial)
+            copyto!(full(solver.x_trial), full(solver.x))
+            axpy!(solver.alpha, primal(solver.d), primal(solver.x_trial))
 
             solver.obj_val_trial = eval_f_wrapper(solver, solver.x_trial)
             eval_cons_wrapper!(solver, solver.c_trial, solver.x_trial)
@@ -318,14 +326,14 @@ function regular!(solver::AbstractMadNLPSolver)
                 return RESTORE
             else
                 @trace(solver.logger,"Step rejected; proceed with the next trial step.")
-                solver.alpha * norm(primal(solver.d)) < eps(eltype(solver.x))*10 &&
+                solver.alpha * norm(primal(solver.d)) < eps(T)*10 &&
                     return solver.cnt.acceptable_cnt >0 ?
                     SOLVED_TO_ACCEPTABLE_LEVEL : SEARCH_DIRECTION_BECOMES_TOO_SMALL
             end
         end
 
         @trace(solver.logger,"Updating primal-dual variables.")
-        copyto!(solver.x, solver.x_trial)
+        copyto!(full(solver.x), full(solver.x_trial))
         copyto!(solver.c, solver.c_trial)
         solver.obj_val = solver.obj_val_trial
         adjusted = adjust_boundary!(solver.x_lr,solver.xl_r,solver.x_ur,solver.xu_r,solver.mu)
@@ -335,8 +343,18 @@ function regular!(solver::AbstractMadNLPSolver)
         axpy!(solver.alpha,dual(solver.d),solver.y)
         axpy!(solver.alpha_z, dual_lb(solver.d), solver.zl_r)
         axpy!(solver.alpha_z, dual_ub(solver.d), solver.zu_r)
-        reset_bound_dual!(solver.zl,solver.x,solver.xl,solver.mu,solver.opt.kappa_sigma)
-        reset_bound_dual!(solver.zu,solver.xu,solver.x,solver.mu,solver.opt.kappa_sigma)
+        reset_bound_dual!(
+            primal(solver.zl),
+            primal(solver.x),
+            primal(solver.xl),
+            solver.mu,solver.opt.kappa_sigma,
+        )
+        reset_bound_dual!(
+            primal(solver.zu),
+            primal(solver.xu),
+            primal(solver.x),
+            solver.mu,solver.opt.kappa_sigma,
+        )
         eval_grad_f_wrapper!(solver, solver.f,solver.x)
 
         if !switching_condition || !armijo_condition
@@ -352,30 +370,45 @@ end
 function restore!(solver::AbstractMadNLPSolver)
     solver.del_w = 0
     # Backup the previous primal iterate
-    copyto!(primal(solver._w1), solver.x)
+    copyto!(primal(solver._w1), full(solver.x))
     copyto!(dual(solver._w1), solver.y)
     copyto!(dual(solver._w2), solver.c)
 
-    F = get_F(solver.c,solver.f,solver.zl,solver.zu,solver.jacl,solver.x_lr,solver.xl_r,solver.zl_r,solver.xu_r,solver.x_ur,solver.zu_r,solver.mu)
+    F = get_F(
+        solver.c,
+        primal(solver.f),
+        primal(solver.zl),
+        primal(solver.zu),
+        solver.jacl,
+        solver.x_lr,
+        solver.xl_r,
+        solver.zl_r,
+        solver.xu_r,
+        solver.x_ur,
+        solver.zu_r,
+        solver.mu,
+    )
     solver.cnt.t = 0
     solver.alpha_z = 0.0
     solver.ftype = "R"
 
     while true
-        solver.alpha = min(get_alpha_max(solver.x,solver.xl,solver.xu,primal(solver.d),solver.tau),
-                        get_alpha_z(solver.zl_r,solver.zu_r,dual_lb(solver.d),dual_ub(solver.d),solver.tau))
+        alpha_max = get_alpha_max(
+            primal(solver.x),
+            primal(solver.xl),
+            primal(solver.xu),
+            primal(solver.d),
+            solver.tau,
+        )
+        solver.alpha = min(
+            alpha_max,
+            get_alpha_z(solver.zl_r,solver.zu_r,dual_lb(solver.d),dual_ub(solver.d),solver.tau),
+            )
 
-        axpy!(solver.alpha, primal(solver.d), solver.x)
+        axpy!(solver.alpha, primal(solver.d), full(solver.x))
         axpy!(solver.alpha, dual(solver.d), solver.y)
-        # Note: axpy! does not support non-contiguous view
-        dlb = dual_lb(solver.d)
-        @inbounds @simd for i in eachindex(solver.zl_r)
-            solver.zl_r[i] += solver.alpha * dlb[i]
-        end
-        dub = dual_ub(solver.d)
-        @inbounds @simd for i in eachindex(solver.zu_r)
-            solver.zu_r[i] += solver.alpha * dub[i]
-        end
+        axpy!(solver.alpha, dual_lb(solver.d), solver.zl_r)
+        axpy!(solver.alpha, dual_ub(solver.d), solver.zu_r)
 
         eval_cons_wrapper!(solver,solver.c,solver.x)
         eval_grad_f_wrapper!(solver,solver.f,solver.x)
@@ -385,9 +418,21 @@ function restore!(solver::AbstractMadNLPSolver)
         jtprod!(solver.jacl,solver.kkt,solver.y)
 
         F_trial = get_F(
-            solver.c,solver.f,solver.zl,solver.zu,solver.jacl,solver.x_lr,solver.xl_r,solver.zl_r,solver.xu_r,solver.x_ur,solver.zu_r,solver.mu)
+            solver.c,
+            primal(solver.f),
+            primal(solver.zl),
+            primal(solver.zu),
+            solver.jacl,
+            solver.x_lr,
+            solver.xl_r,
+            solver.zl_r,
+            solver.xu_r,
+            solver.x_ur,
+            solver.zu_r,
+            solver.mu,
+        )
         if F_trial > solver.opt.soft_resto_pderror_reduction_factor*F
-            copyto!(solver.x, primal(solver._w1))
+            copyto!(primal(solver.x), primal(solver._w1))
             copyto!(solver.y, dual(solver._w1))
             copyto!(solver.c, dual(solver._w2)) # backup the previous primal iterate
             return ROBUST
@@ -413,7 +458,13 @@ function restore!(solver::AbstractMadNLPSolver)
         sd = get_sd(solver.y,solver.zl_r,solver.zu_r,solver.opt.s_max)
         sc = get_sc(solver.zl_r,solver.zu_r,solver.opt.s_max)
         solver.inf_pr = get_inf_pr(solver.c)
-        solver.inf_du = get_inf_du(solver.f,solver.zl,solver.zu,solver.jacl,sd)
+        solver.inf_du = get_inf_du(
+            primal(solver.f),
+            primal(solver.zl),
+            primal(solver.zu),
+            solver.jacl,
+            sd,
+        )
 
         solver.inf_compl = get_inf_compl(solver.x_lr,solver.xl_r,solver.zl_r,solver.xu_r,solver.x_ur,solver.zu_r,0.,sc)
         inf_compl_mu = get_inf_compl(solver.x_lr,solver.xl_r,solver.zl_r,solver.xu_r,solver.x_ur,solver.zu_r,solver.mu,sc)
@@ -432,7 +483,7 @@ function restore!(solver::AbstractMadNLPSolver)
     end
 end
 
-function robust!(solver::MadNLPSolver)
+function robust!(solver::MadNLPSolver{T}) where T
     initialize_robust_restorer!(solver)
     RR = solver.RR
     while true
@@ -441,19 +492,31 @@ function robust!(solver::MadNLPSolver)
         end
         jtprod!(solver.jacl, solver.kkt, solver.y)
         fixed_variable_treatment_vec!(solver.jacl,solver.ind_fixed)
-        fixed_variable_treatment_z!(solver.zl,solver.zu,solver.f,solver.jacl,solver.ind_fixed)
+        fixed_variable_treatment_z!(
+            full(solver.zl),
+            full(solver.zu),
+            full(solver.f),
+            solver.jacl,
+            solver.ind_fixed,
+        )
 
         # evaluate termination criteria
         @trace(solver.logger,"Evaluating restoration phase termination criteria.")
         sd = get_sd(solver.y,solver.zl_r,solver.zu_r,solver.opt.s_max)
         sc = get_sc(solver.zl_r,solver.zu_r,solver.opt.s_max)
         solver.inf_pr = get_inf_pr(solver.c)
-        solver.inf_du = get_inf_du(solver.f,solver.zl,solver.zu,solver.jacl,sd)
+        solver.inf_du = get_inf_du(
+            primal(solver.f),
+            primal(solver.zl),
+            primal(solver.zu),
+            solver.jacl,
+            sd,
+        )
         solver.inf_compl = get_inf_compl(solver.x_lr,solver.xl_r,solver.zl_r,solver.xu_r,solver.x_ur,solver.zu_r,0.,sc)
 
         # Robust restoration phase error
         RR.inf_pr_R = get_inf_pr_R(solver.c,RR.pp,RR.nn)
-        RR.inf_du_R = get_inf_du_R(RR.f_R,solver.y,solver.zl,solver.zu,solver.jacl,RR.zp,RR.zn,solver.opt.rho,sd)
+        RR.inf_du_R = get_inf_du_R(RR.f_R,solver.y,primal(solver.zl),primal(solver.zu),solver.jacl,RR.zp,RR.zn,solver.opt.rho,sd)
         RR.inf_compl_R = get_inf_compl_R(
             solver.x_lr,solver.xl_r,solver.zl_r,solver.xu_r,solver.x_ur,solver.zu_r,RR.pp,RR.zp,RR.nn,RR.zn,0.,sc)
         inf_compl_mu_R = get_inf_compl_R(
@@ -499,10 +562,23 @@ function robust!(solver::MadNLPSolver)
 
         theta_R = get_theta_R(solver.c,RR.pp,RR.nn)
         varphi_R = get_varphi_R(RR.obj_val_R,solver.x_lr,solver.xl_r,solver.xu_r,solver.x_ur,RR.pp,RR.nn,RR.mu_R)
-        varphi_d_R = get_varphi_d_R(RR.f_R,solver.x,solver.xl,solver.xu,primal(solver.d),RR.pp,RR.nn,RR.dpp,RR.dnn,RR.mu_R,solver.opt.rho)
+        varphi_d_R = get_varphi_d_R(
+            RR.f_R,
+            primal(solver.x),
+            primal(solver.xl),
+            primal(solver.xu),
+            primal(solver.d),
+            RR.pp,RR.nn,RR.dpp,RR.dnn,RR.mu_R,solver.opt.rho,
+        )
 
         # set alpha_min
-        alpha_max = get_alpha_max_R(solver.x,solver.xl,solver.xu,primal(solver.d),RR.pp,RR.dpp,RR.nn,RR.dnn,RR.tau_R)
+        alpha_max = get_alpha_max_R(
+            primal(solver.x),
+            primal(solver.xl),
+            primal(solver.xu),
+            primal(solver.d),
+            RR.pp,RR.dpp,RR.nn,RR.dnn,RR.tau_R,
+        )
         solver.alpha_z = get_alpha_z_R(solver.zl_r,solver.zu_r,dual_lb(solver.d),dual_ub(solver.d),RR.zp,RR.dzp,RR.zn,RR.dzn,RR.tau_R)
         alpha_min = get_alpha_min(theta_R,varphi_d_R,solver.theta_min,solver.opt.gamma_theta,solver.opt.gamma_phi,
                                   solver.opt.alpha_min_frac,solver.opt.delta,solver.opt.s_theta,solver.opt.s_phi)
@@ -513,20 +589,20 @@ function robust!(solver::MadNLPSolver)
         solver.cnt.l = 1
         theta_R_trial = 0.
         varphi_R_trial = 0.
-        small_search_norm = get_rel_search_norm(solver.x, primal(solver.d)) < 10*eps(eltype(solver.x))
+        small_search_norm = get_rel_search_norm(primal(solver.x), primal(solver.d)) < 10*eps(T)
         switching_condition = is_switching(varphi_d_R,solver.alpha,solver.opt.s_phi,solver.opt.delta,theta_R,solver.opt.s_theta)
         armijo_condition = false
 
         while true
-            copyto!(solver.x_trial,solver.x)
+            copyto!(full(solver.x_trial), full(solver.x))
             copyto!(RR.pp_trial,RR.pp)
             copyto!(RR.nn_trial,RR.nn)
-            axpy!(solver.alpha,primal(solver.d),solver.x_trial)
+            axpy!(solver.alpha,primal(solver.d),primal(solver.x_trial))
             axpy!(solver.alpha,RR.dpp,RR.pp_trial)
             axpy!(solver.alpha,RR.dnn,RR.nn_trial)
 
             RR.obj_val_R_trial = get_obj_val_R(
-                RR.pp_trial,RR.nn_trial,RR.D_R,solver.x_trial,RR.x_ref,solver.opt.rho,RR.zeta)
+                RR.pp_trial,RR.nn_trial,RR.D_R,primal(solver.x_trial),RR.x_ref,solver.opt.rho,RR.zeta)
             eval_cons_wrapper!(solver, solver.c_trial, solver.x_trial)
             theta_R_trial  = get_theta_R(solver.c_trial,RR.pp_trial,RR.nn_trial)
             varphi_R_trial = get_varphi_R(
@@ -549,21 +625,19 @@ function robust!(solver::MadNLPSolver)
                 return RESTORATION_FAILED
             else
                 @trace(solver.logger,"Step rejected; proceed with the next trial step.")
-                solver.alpha < eps(eltype(solver.x))*10 && return solver.cnt.acceptable_cnt >0 ?
+                solver.alpha < eps(T)*10 && return solver.cnt.acceptable_cnt >0 ?
                     SOLVED_TO_ACCEPTABLE_LEVEL : SEARCH_DIRECTION_BECOMES_TOO_SMALL
             end
         end
 
         @trace(solver.logger,"Updating primal-dual variables.")
-        copyto!(solver.x, solver.x_trial)
+        copyto!(full(solver.x), full(solver.x_trial))
         copyto!(solver.c, solver.c_trial)
         copyto!(RR.pp, RR.pp_trial)
         copyto!(RR.nn, RR.nn_trial)
 
         RR.obj_val_R=RR.obj_val_R_trial
-        @inbounds @simd for i in eachindex(RR.f_R)
-            RR.f_R[i] = RR.zeta * RR.D_R[i]^2 *(solver.x[i]-RR.x_ref[i])
-        end
+        set_f_RR!(solver,RR)
 
         axpy!(solver.alpha, dual(solver.d), solver.y)
         axpy!(solver.alpha_z, dual_lb(solver.d),solver.zl_r)
@@ -571,8 +645,18 @@ function robust!(solver::MadNLPSolver)
         axpy!(solver.alpha_z, RR.dzp,RR.zp)
         axpy!(solver.alpha_z, RR.dzn,RR.zn)
 
-        reset_bound_dual!(solver.zl,solver.x,solver.xl,RR.mu_R,solver.opt.kappa_sigma)
-        reset_bound_dual!(solver.zu,solver.xu,solver.x,RR.mu_R,solver.opt.kappa_sigma)
+        reset_bound_dual!(
+            primal(solver.zl),
+            primal(solver.x),
+            primal(solver.xl),
+            RR.mu_R, solver.opt.kappa_sigma,
+        )
+        reset_bound_dual!(
+            primal(solver.zu),
+            primal(solver.xu),
+            primal(solver.x),
+            RR.mu_R, solver.opt.kappa_sigma,
+        )
         reset_bound_dual!(RR.zp,RR.pp,RR.mu_R,solver.opt.kappa_sigma)
         reset_bound_dual!(RR.zn,RR.nn,RR.mu_R,solver.opt.kappa_sigma)
 
@@ -668,12 +752,10 @@ function inertia_free_reg(solver::MadNLPSolver)
     t = primal(solver._w3)
     n = primal(solver._w2)
     wx= primal(solver._w4)
+    g = full(solver.x_trial) # just to avoid new allocation
+    
     fill!(dual(solver._w3), 0)
-
-    g = solver.x_trial # just to avoid new allocation
-    @inbounds @simd for i in eachindex(g)
-        g[i] = solver.f[i] - solver.mu / (solver.x[i]-solver.xl[i]) + solver.mu / (solver.xu[i]-solver.x[i]) + solver.jacl[i]
-    end
+    set_g_ifr!(solver,g)
 
     fixed_variable_treatment_vec!(primal(solver._w1), solver.ind_fixed)
     fixed_variable_treatment_vec!(primal(solver.p),   solver.ind_fixed)
@@ -681,9 +763,8 @@ function inertia_free_reg(solver::MadNLPSolver)
 
     factorize_wrapper!(solver)
     solve_status = (solve_refine_wrapper!(solver,d0,p0) && solve_refine_wrapper!(solver,solver.d,solver.p))
-    @inbounds @simd for i in eachindex(t)
-        t[i] = dx[i] - n[i]
-    end
+    copyto!(t,dx)
+    axpy!(-1.,n,t)
     mul!(solver._w4, solver.kkt, solver._w3) # prepartation for curv_test
     n_trial = 0
     solver.del_w = del_w_prev = 0.
@@ -707,9 +788,9 @@ function inertia_free_reg(solver::MadNLPSolver)
 
         factorize_wrapper!(solver)
         solve_status = (solve_refine_wrapper!(solver,d0,p0) && solve_refine_wrapper!(solver,solver.d,solver.p))
-        @inbounds @simd for i in eachindex(dx)
-            t[i] = dx[i] - n[i]
-        end
+        copyto!(t,dx)
+        axpy!(-1.,n,t)
+
         mul!(solver._w4, solver.kkt, solver._w3) # prepartation for curv_test
         n_trial += 1
     end
@@ -726,20 +807,27 @@ function second_order_correction(solver::AbstractMadNLPSolver,alpha_max,theta,va
 
     wx = primal(solver._w1)
     wy = dual(solver._w1)
-    @inbounds @simd for i in eachindex(wy)
-        wy[i] = alpha_max * solver.c[i] + solver.c_trial[i]
-    end
+    copyto!(wy, solver.c_trial)
+    axpy!(alpha_max, solver.c, wy)
+    
     theta_soc_old = theta_trial
     for p=1:solver.opt.max_soc
         # compute second order correction
         set_aug_rhs!(solver, solver.kkt, wy)
-        dual_inf_perturbation!(primal(solver.p),solver.ind_llb,solver.ind_uub,solver.mu,solver.opt.kappa_d)
+        dual_inf_perturbation!(
+            primal(solver.p),
+            solver.ind_llb,solver.ind_uub,solver.mu,solver.opt.kappa_d,
+        )
         solve_refine_wrapper!(solver,solver._w1,solver.p)
-        alpha_soc = get_alpha_max(solver.x,solver.xl,solver.xu,wx,solver.tau)
+        alpha_soc = get_alpha_max(
+            primal(solver.x),
+            primal(solver.xl),
+            primal(solver.xu),
+            wx,solver.tau)
 
-        copyto!(solver.x_trial, solver.x)
-        axpy!(alpha_soc, wx, solver.x_trial)
-        eval_cons_wrapper!(solver, solver.c_trial,solver.x_trial)
+        copyto!(primal(solver.x_trial), primal(solver.x))
+        axpy!(alpha_soc, wx, primal(solver.x_trial))
+        eval_cons_wrapper!(solver, solver.c_trial, solver.x_trial)
         solver.obj_val_trial = eval_f_wrapper(solver, solver.x_trial)
 
         theta_soc = get_theta(solver.c_trial)

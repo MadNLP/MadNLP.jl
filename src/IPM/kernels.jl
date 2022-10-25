@@ -2,9 +2,14 @@
 # KKT system updates -------------------------------------------------------
 # Set diagonal
 function set_aug_diagonal!(kkt::AbstractKKTSystem, solver::MadNLPSolver{T}) where T
+    x = full(solver.x)
+    xl = full(solver.xl)
+    xu = full(solver.xu)
+    zl = full(solver.zl)
+    zu = full(solver.zu)
     @inbounds @simd for i in eachindex(kkt.pr_diag)
-        kkt.pr_diag[i] = solver.zl[i] /(solver.x[i] - solver.xl[i])
-        kkt.pr_diag[i] += solver.zu[i] /(solver.xu[i] - solver.x[i])
+        kkt.pr_diag[i] = zl[i] /(x[i] - xl[i])
+        kkt.pr_diag[i] += zu[i] /(xu[i] - x[i])
     end
     fill!(kkt.du_diag, zero(T))
     return
@@ -25,9 +30,14 @@ end
 
 # Robust restoration
 function set_aug_RR!(kkt::AbstractKKTSystem, solver::MadNLPSolver, RR::RobustRestorer)
+    x = full(solver.x)
+    xl = full(solver.xl)
+    xu = full(solver.xu)
+    zl = full(solver.zl)
+    zu = full(solver.zu)
     @inbounds @simd for i in eachindex(kkt.pr_diag)
-        kkt.pr_diag[i]  = solver.zl[i] / (solver.x[i] - solver.xl[i])
-        kkt.pr_diag[i] += solver.zu[i] / (solver.xu[i] - solver.x[i]) + RR.zeta * RR.D_R[i]^2
+        kkt.pr_diag[i]  = zl[i] / (x[i] - xl[i])
+        kkt.pr_diag[i] += zu[i] / (xu[i] - x[i]) + RR.zeta * RR.D_R[i]^2
     end
     @inbounds @simd for i in eachindex(kkt.du_diag)
         kkt.du_diag[i] = -RR.pp[i] /RR.zp[i] - RR.nn[i] /RR.zn[i]
@@ -51,12 +61,23 @@ function set_aug_RR!(kkt::SparseUnreducedKKTSystem, solver::MadNLPSolver, RR::Ro
     end
     return
 end
+function set_f_RR!(solver::MadNLPSolver, RR::RobustRestorer)
+    x = full(solver.x)
+    @inbounds @simd for i in eachindex(RR.f_R)
+        RR.f_R[i] = RR.zeta * RR.D_R[i]^2 *(x[i]-RR.x_ref[i])
+    end
+end
+
 
 # Set RHS
 function set_aug_rhs!(solver::MadNLPSolver, kkt::AbstractKKTSystem, c)
     px = primal(solver.p)
+    x = primal(solver.x)
+    f = primal(solver.f)
+    xl = primal(solver.xl)
+    xu = primal(solver.xu)
     @inbounds @simd for i in eachindex(px)
-        px[i] = -solver.f[i] + solver.mu / (solver.x[i] - solver.xl[i]) - solver.mu / (solver.xu[i] - solver.x[i]) - solver.jacl[i]
+        px[i] = -f[i] + solver.mu / (x[i] - xl[i]) - solver.mu / (xu[i] - x[i]) - solver.jacl[i]
     end
     py = dual(solver.p)
     @inbounds @simd for i in eachindex(py)
@@ -65,9 +86,12 @@ function set_aug_rhs!(solver::MadNLPSolver, kkt::AbstractKKTSystem, c)
     return
 end
 function set_aug_rhs!(solver::MadNLPSolver, kkt::SparseUnreducedKKTSystem, c)
+    f = primal(solver.f)
+    zl = primal(solver.zl)
+    zu = primal(solver.zu)
     px = primal(solver.p)
     @inbounds @simd for i in eachindex(px)
-        px[i] = -solver.f[i] + solver.zl[i] - solver.zu[i] - solver.jacl[i]
+        px[i] = -f[i] + zl[i] - zu[i] - solver.jacl[i]
     end
     py = dual(solver.p)
     @inbounds @simd for i in eachindex(py)
@@ -81,6 +105,7 @@ function set_aug_rhs!(solver::MadNLPSolver, kkt::SparseUnreducedKKTSystem, c)
     @inbounds @simd for i in eachindex(pzu)
         pzu[i] = (solver.xu_r[i] -solver.x_ur[i]) * kkt.u_lower[i] - solver.mu / kkt.u_lower[i]
     end
+# >>>>>>> origin/master
     return
 end
 
@@ -99,9 +124,13 @@ end
 function set_aug_rhs_RR!(
     solver::MadNLPSolver, kkt::AbstractKKTSystem, RR::RobustRestorer, rho,
 )
+    x = full(solver.x)
+    xl = full(solver.xl)
+    xu = full(solver.xu)
+
     px = primal(solver.p)
     @inbounds @simd for i in eachindex(px)
-        px[i] = -RR.f_R[i] -solver.jacl[i] + RR.mu_R / (solver.x[i] - solver.xl[i]) - RR.mu_R / (solver.xu[i] - solver.x[i])
+        px[i] = -RR.f_R[i] -solver.jacl[i] + RR.mu_R / (x[i] - xl[i]) - RR.mu_R / (xu[i] - x[i])
     end
     py = dual(solver.p)
     @inbounds @simd for i in eachindex(py)
@@ -135,18 +164,32 @@ function finish_aug_solve!(solver::MadNLPSolver, kkt::SparseUnreducedKKTSystem, 
 end
 
 # Initial
+function set_initial_bounds!(solver::MadNLPSolver{T}) where T
+    @inbounds @simd for i in eachindex(solver.xl_r)
+        solver.xl_r[i] -= max(one(T),abs(solver.xl_r[i]))*solver.opt.tol
+    end
+    @inbounds @simd for i in eachindex(solver.xu_r)
+        solver.xu_r[i] += max(one(T),abs(solver.xu_r[i]))*solver.opt.tol
+    end
+end
 function set_initial_rhs!(solver::MadNLPSolver{T}, kkt::AbstractKKTSystem) where T
+    f = primal(solver.f)
+    zl = primal(solver.zl)
+    zu = primal(solver.zu)
     px = primal(solver.p)
     @inbounds @simd for i in eachindex(px)
-        px[i] = -solver.f[i] + solver.zl[i] - solver.zu[i]
+        px[i] = -f[i] + zl[i] - zu[i]
     end
     fill!(dual(solver.p), zero(T))
     return
 end
 function set_initial_rhs!(solver::MadNLPSolver{T}, kkt::SparseUnreducedKKTSystem) where T
+    f = primal(solver.f)
+    zl = primal(solver.zl)
+    zu = primal(solver.zu)
     px = primal(solver.p)
     @inbounds @simd for i in eachindex(px)
-        px[i] = -solver.f[i] + solver.zl[i] - solver.zu[i]
+        px[i] = -f[i] + zl[i] - zu[i]
     end
     fill!(dual(solver.p), zero(T))
     fill!(dual_lb(solver.p), zero(T))
@@ -163,6 +206,16 @@ function set_aug_rhs_ifr!(solver::MadNLPSolver{T}, kkt::AbstractKKTSystem) where
     end
     return
 end
+function set_g_ifr!(solver::MadNLPSolver, g)
+    f = full(solver.f)
+    x = full(solver.x)
+    xl = full(solver.xl)
+    xu = full(solver.xu)
+    @inbounds @simd for i in eachindex(g)
+        g[i] = f[i] - solver.mu / (x[i]-xl[i]) + solver.mu / (xu[i]-x[i]) + solver.jacl[i]
+    end
+end
+
 
 # Finish RR
 function finish_aug_solve_RR!(dpp, dnn, dzp, dzn, l, dl, pp, nn, zp, zn, mu_R, rho)
@@ -173,6 +226,19 @@ function finish_aug_solve_RR!(dpp, dnn, dzp, dzn, l, dl, pp, nn, zp, zn, mu_R, r
         dzn[i] = (mu_R - zn[i] * dnn[i]) / nn[i] - zn[i]
     end
     return
+end
+
+# Scaling
+function unscale!(solver::AbstractMadNLPSolver)
+    x_slk = slack(solver.x)
+    solver.obj_val /= solver.obj_scale[]
+    @inbounds @simd for i in eachindex(solver.c)
+        solver.c[i] /= solver.con_scale[i]
+        solver.c[i] += solver.rhs[i]
+    end
+    @inbounds @simd for i in eachindex(solver.c_slk)
+        solver.c_slk[i] += x_slk[i]
+    end
 end
 
 # Kernel functions ---------------------------------------------------------

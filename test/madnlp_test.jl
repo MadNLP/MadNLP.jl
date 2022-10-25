@@ -118,6 +118,30 @@ end
     @test solver.status == MadNLP.SOLVE_SUCCEEDED
 end
 
+@testset "MadNLP callback allocations" begin
+    nlp = MadNLPTests.HS15Model()
+    solver = MadNLPSolver(nlp)
+    kkt = solver.kkt
+    x, f, c = solver.x, solver.f, solver.c
+    # Precompile
+    MadNLP.eval_f_wrapper(solver, x)
+    MadNLP.eval_grad_f_wrapper!(solver, f, x)
+    MadNLP.eval_cons_wrapper!(solver, c, x)
+    MadNLP.eval_jac_wrapper!(solver, kkt, x)
+    MadNLP.eval_lag_hess_wrapper!(solver, kkt, x, solver.y)
+
+    n_allocs = @allocated MadNLP.eval_f_wrapper(solver, x)
+    @test n_allocs == 16 # objective is still allocating
+    n_allocs = @allocated MadNLP.eval_grad_f_wrapper!(solver, f, x)
+    @test n_allocs == 0
+    n_allocs = @allocated MadNLP.eval_cons_wrapper!(solver, c, x)
+    @test n_allocs == 0
+    n_allocs = @allocated MadNLP.eval_jac_wrapper!(solver, kkt, x)
+    @test n_allocs == 0
+    n_allocs = @allocated MadNLP.eval_lag_hess_wrapper!(solver, kkt, x, solver.y)
+    @test n_allocs == 0
+end
+
 @testset "MadNLP timings" begin
     nlp = MadNLPTests.HS15Model()
     solver = MadNLPSolver(nlp)
