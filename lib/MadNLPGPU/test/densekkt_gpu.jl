@@ -65,7 +65,7 @@ end
             kkt_system=KKT,
             linear_solver=LapackGPUSolver,
         )
-        MadNLP.solve!(solver_exact)
+        results_ref = MadNLP.solve!(solver_exact)
 
         solver_qn = MadNLPGPU.CuMadNLPSolver(
             nlp;
@@ -74,12 +74,12 @@ end
             hessian_approximation=QN,
             linear_solver=LapackGPUSolver,
         )
-        MadNLP.solve!(solver_qn)
+        results_qn = MadNLP.solve!(solver_qn)
 
-        @test solver_qn.status == MadNLP.SOLVE_SUCCEEDED
+        @test results_qn.status == MadNLP.SOLVE_SUCCEEDED
+        @test results_qn.objective ≈ results_ref.objective atol=1e-6
+        @test results_qn.solution ≈ results_ref.solution atol=1e-6
         @test solver_qn.cnt.lag_hess_cnt == 0
-        @test solver_exact.obj_val ≈ solver_qn.obj_val atol=1e-6
-        @test solver_exact.x ≈ solver_qn.x atol=1e-6
     end
 end
 
