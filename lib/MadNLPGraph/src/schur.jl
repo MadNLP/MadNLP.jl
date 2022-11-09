@@ -1,8 +1,8 @@
 module MadNLPSchur
 
 import ..MadNLPGraph:
-    @kwdef, Logger, @debug, @warn, @error,
-    AbstractOptions, AbstractLinearSolver, EmptyLinearSolver, set_options!, SparseMatrixCSC, SubVector, 
+    @kwdef, MadNLPLogger, @debug, @warn, @error,
+    AbstractOptions, AbstractLinearSolver, set_options!, SparseMatrixCSC, SubVector,
     SymbolicException,FactorizationException,SolveException,InertiaException,
     introduce, factorize!, solve!, improve!, is_inertia, inertia,
     default_linear_solver, default_dense_solver, get_csc_view, get_cscsy_view, nnz, mul!,
@@ -30,7 +30,7 @@ mutable struct SolverWorker
     w::Vector{Float64}
 end
 
-mutable struct Solver <: AbstractLinearSolver
+mutable struct Solver{T} <: AbstractLinearSolver{T}
     csc::SparseMatrixCSC{Float64,Int32}
     inds::Vector{Int}
     tsp::TwoStagePartition
@@ -47,7 +47,7 @@ mutable struct Solver <: AbstractLinearSolver
     sws::Vector{SolverWorker}
 
     opt::Options
-    logger::Logger
+    logger::MadNLPLogger
 end
 
 
@@ -55,7 +55,7 @@ function Solver(csc::SparseMatrixCSC{Float64};
                 option_dict::Dict{Symbol,Any}=Dict{Symbol,Any}(),
                 opt=Options(schur_subproblem_solver=default_linear_solver(),
                             schur_dense_solver=default_dense_solver()),
-                logger=Logger(),
+                logger=MadNLPLogger(),
                 kwargs...)
 
     set_options!(opt,option_dict,kwargs...)
@@ -89,7 +89,7 @@ end
 get_colors(n0,K) = [findall((x)->mod(x-1,K)+1==k,1:n0) for k=1:K]
 
 function SolverWorker(tsp,V_0,csc::SparseMatrixCSC{Float64},inds::Vector{Int},k,
-                      SubproblemSolverModule::Module,logger::Logger,option_dict::Dict{Symbol,Any})
+                      SubproblemSolverModule::Module,logger::MadNLPLogger,option_dict::Dict{Symbol,Any})
 
     V    = findall(tsp.part.==k)
 
@@ -97,9 +97,10 @@ function SolverWorker(tsp,V_0,csc::SparseMatrixCSC{Float64},inds::Vector{Int},k,
     compl,compl_view = get_csc_view(csc,V,V_0,inds=inds)
     V_0_nz = findnz(compl.colptr)
 
-    M    = length(V) == 0 ?
-        EmptyLinearSolver() : SubproblemSolverModule.Solver(csc_k;option_dict=option_dict,logger=logger)
-    w    = Vector{Float64}(undef,csc_k.n)
+    # M    = length(V) == 0 ?
+    #     EmptyLinearSolver() : SubproblemSolverModule.Solver(csc_k;option_dict=option_dict,logger=logger)
+    M = SubproblemSolverModule.Solver(csc_k; option_dict=option_dict, logger=logger)
+    w = Vector{Float64}(undef,csc_k.n)
 
     return SolverWorker(V,V_0_nz,csc_k,csc_k_view,compl,compl_view,M,w)
 end
@@ -185,7 +186,8 @@ end
 
 function introduce(M::Solver)
     for sw in M.sws
-        sw.M isa EmptyLinearSolver || return "schur equipped with "*introduce(sw.M)
+        # sw.M isa EmptyLinearSolver || return "schur equipped with "*introduce(sw.M)
+        return "schur equipped with "*introduce(sw.M)
     end
 end
 
