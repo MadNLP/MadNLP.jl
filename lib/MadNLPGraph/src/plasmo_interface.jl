@@ -9,7 +9,7 @@ function _caching_optimizer(optinode::OptiNode)
 end
 _caching_optimizer(model::Any) = model.moi_backend
 
-# inner_optimizer => the MadNLP.Optimizer
+# NOTE: `inner_optimizer` is the MadNLP.Optimizer object
 inner_optimizer(optinode::OptiNode) = _caching_optimizer(optinode).optimizer.model
 
 # set initial dual, lower, and upper linkconstraint bounds
@@ -35,14 +35,17 @@ function set_g_link!(linkedge::OptiEdge, l, gl, gu)
     return nothing
 end
 
+# get nnz of each link constraint jacobian
 function get_nnz_link_jac(linkedge::OptiEdge)
     return sum(length(linkcon.func.terms) for (ind,linkcon) in linkedge.linkconstraints)
 end
 
+# link constraint helpers
 get_func(linkcon) = linkcon.func
 get_vars(linkcon) = keys(linkcon.func.terms)
 get_coeffs(linkcon) = values(linkcon.func.terms)
 
+# link constraint helper
 function eval_function(aff::GenericAffExpr,x,ninds,x_index_map)
     function_value = aff.constant
     for (var,coef) in aff.terms
@@ -121,8 +124,8 @@ function jacobian_structure(
     # evaluate optiedge jacobians
     @blas_safe_threads for q=1:length(linkedges)
         isempty(nnzs_link_jac_inds[q]) && continue
-        II = view(I,nnzs_link_jac_inds[q])
-        JJ = view(J,nnzs_link_jac_inds[q])
+        II = view(I, nnzs_link_jac_inds[q])
+        JJ = view(J, nnzs_link_jac_inds[q])
         jacobian_structure(
             linkedges[q], II, JJ, ninds, x_index_map, g_index_map
         )
@@ -135,9 +138,9 @@ function eval_objective(graph::OptiGraph, x, ninds, x_index_map, optinodes)
     obj = Threads.Atomic{Float64}(0.)
     @blas_safe_threads for k=1:length(optinodes)
          madnlp_optimizer = inner_optimizer(optinodes[k])
-         Threads.atomic_add!(obj, MOI.eval_objective(madnlp_optimizer, view(x,ninds[k])))
+         Threads.atomic_add!(obj, MOI.eval_objective(madnlp_optimizer, view(x, ninds[k])))
     end
-    return obj.value + eval_function(graph.objective_function, x, ninds, x_index_map)
+    return obj.value# + eval_function(graph.objective_function, x, ninds, x_index_map)
 end
 
 # gradient
@@ -195,9 +198,10 @@ function eval_hessian_lagrangian(
         madnlp_optimizer = inner_optimizer(optinodes[k])
         MOI.eval_hessian_lagrangian(
             madnlp_optimizer,
-            view(hess,nnzs_hess_inds[k]),
-            view(x,ninds[k]),sig,
-            view(l,minds[k])
+            view(hess, nnzs_hess_inds[k]),
+            view(x, ninds[k]),
+            sig,
+            view(l, minds[k])
         )
     end
     return nothing
@@ -316,14 +320,14 @@ function GraphModel(graph::OptiGraph)
         num_variables(optinode) == 0 && error("MadNLP does not support empty nodes. You will need to create your optigraph without empty optinodes.")
     end
 
-    moi_models = Vector{MadNLP.MOIModel}(undef,length(optinodes))
     #create a MadNLP optimizer on each optinode
+    moi_models = Vector{MadNLP.MOIModel}(undef,length(optinodes))
     @blas_safe_threads for k=1:length(optinodes)
         optinode = optinodes[k]
         # set constructor; optimizer not yet attached
         set_optimizer(optinode, MadNLP.Optimizer)
         # Initialize NLP evaluators on each node
-        # In JuMP, the evaluator is created for each `optimize!` call
+        # JuMP does something like this where  the evaluator is created for each `optimize!` call
         jump_model = Plasmo.jump_model(optinode)
         nonlinear_model = JuMP.nonlinear_model(jump_model)
         if nonlinear_model !== nothing
@@ -334,13 +338,13 @@ function GraphModel(graph::OptiGraph)
             )
             MOI.set(jump_model, MOI.NLPBlock(), MOI.NLPBlockData(evaluator))
             # TODO: check whether we still need to do this
-            # empty!(modelnodes[k].model.nlp_data.nlconstr_duals)
             empty!(optinode.nlp_duals)
         end
 
         # attach optimizer on node. this populates the madnlp optimizer
         MOIU.attach_optimizer(jump_model)
         madnlp_optimizer = inner_optimizer(optinode)
+        madnlp_optimizer.sense = MOI.MIN_SENSE
 
         # initializes each optinode evaluator
         moi_models[k] = MadNLP.MOIModel(madnlp_optimizer)
@@ -372,11 +376,13 @@ function GraphModel(graph::OptiGraph)
     nnzs_link_jac_cumsum = cumsum(nnzs_link_jac)
     nnz_link_jac = isempty(nnzs_link_jac) ? 0 : sum(nnzs_link_jac)
 
+    # map nodes to variable, constraint, jacobian, hessian indices
     ninds = [(i==1 ? 0 : ns_cumsum[i-1])+1:ns_cumsum[i] for i=1:K]
     minds = [(i==1 ? 0 : ms_cumsum[i-1])+1:ms_cumsum[i] for i=1:K]
     nnzs_hess_inds = [(i==1 ? 0 : nnzs_hess_cumsum[i-1])+1:nnzs_hess_cumsum[i] for i=1:K]
     nnzs_jac_inds = [(i==1 ? 0 : nnzs_jac_cumsum[i-1])+1:nnzs_jac_cumsum[i] for i=1:K]
 
+    # linking information
     Q = length(linkedges)
     ps= [Plasmo.num_linkconstraints(modeledge) for modeledge in linkedges]
     ps_cumsum =  cumsum(ps)
@@ -390,7 +396,7 @@ function GraphModel(graph::OptiGraph)
     xl = Vector{Float64}(undef,n)
     xu = Vector{Float64}(undef,n)
 
-    # duals, constraints lower, upper bounds
+    # duals, constraints lower & upper bounds
     l = Vector{Float64}(undef,m+p)
     gl = Vector{Float64}(undef,m+p)
     gu = Vector{Float64}(undef,m+p)
@@ -401,7 +407,6 @@ function GraphModel(graph::OptiGraph)
         x[ninds[k]] .= model.meta.x0
         xl[ninds[k]] .= model.meta.lvar
         xu[ninds[k]] .= model.meta.uvar
-
         l[minds[k]] .= model.meta.y0
         gl[minds[k]] .= model.meta.lcon
         gu[minds[k]] .= model.meta.ucon
@@ -444,8 +449,16 @@ function GraphModel(graph::OptiGraph)
     )
 
     return GraphModel(
-        ninds, minds, pinds, nnzs_jac_inds, nnzs_hess_inds, nnzs_link_jac_inds,
-        x_index_map, g_index_map, optinodes, linkedges,
+        ninds,
+        minds,
+        pinds,
+        nnzs_jac_inds,
+        nnzs_hess_inds,
+        nnzs_link_jac_inds,
+        x_index_map,
+        g_index_map,
+        optinodes,
+        linkedges,
         NLPModelMeta(
             n,
             ncon = m+p,
@@ -457,7 +470,7 @@ function GraphModel(graph::OptiGraph)
             ucon = gu,
             nnzj = nnz_jac + nnz_link_jac,
             nnzh = nnz_hess,
-            minimize = true # graph.objective_sense == MOI.MIN_SENSE
+            minimize = true #graph.objective_sense == MOI.MIN_SENSE
         ),
         graph,
         MadNLP.NLPModels.Counters(),
@@ -501,66 +514,61 @@ function get_partition(graph::OptiGraph, nlp::GraphModel)
         part[n+cnt] = part[n+l+q]
     end
 
-
     return part
 end
 
-function optimize!(graph::OptiGraph; option_dict = Dict{Symbol,Any}(), kwargs...)
-
-    # NOTE: we should consider a better way to interact with the solution through Plasmo.jl
-    # graph.objective_function.constant = 0.
-
-    nlp = GraphModel(graph)
+function optimize!(graph::OptiGraph; kwargs...)
+    options = Dict{Symbol,Any}(kwargs)
+    gm = GraphModel(graph)
 
     # run either schwarz or schur decompositions
+    # TODO: think of a more systematic way to specify decomposition-based linear solvers
     K = num_all_nodes(graph)
-    if (haskey(kwargs,:schwarz_custom_partition) && kwargs[:schwarz_custom_partition]) ||
-        (haskey(option_dict,:schwarz_custom_partition) && option_dict[:schwarz_custom_partition])
-
-        part = get_partition(graph,nlp)
-        option_dict[:schwarz_part] = part
-        option_dict[:schwarz_num_parts] = num_all_nodes(graph)
-
-    elseif (haskey(kwargs,:schur_custom_partition) && kwargs[:schur_custom_partition]) ||
-        (haskey(option_dict,:schur_custom_partition) && option_dict[:schur_custom_partition])
-
-        part = get_partition(graph,nlp)
-        part[part.>K].=0
-        option_dict[:schur_part] = part
-        option_dict[:schur_num_parts] = K
+    if (haskey(kwargs, :schwarz_custom_partition) && kwargs[:schwarz_custom_partition])
+        part = get_partition(graph, gm)
+        options[:schwarz_part] = part
+        options[:schwarz_num_parts] = num_all_nodes(graph)
+    elseif (haskey(kwargs, :schur_custom_partition) && kwargs[:schur_custom_partition])
+        part = get_partition(graph, gm)
+        part[part.>K].=0 # will any partition indices be greater than K?
+        options[:schur_part] = part
+        options[:schur_num_parts] = K
     end
 
-    option_dict[:jacobian_constant] = nlp.ext[:jac_constant]
-    option_dict[:hessian_constant] = nlp.ext[:hess_constant]
+    options[:jacobian_constant] = gm.ext[:jac_constant]
+    options[:hessian_constant] = gm.ext[:hess_constant]
 
-    ips = MadNLP.MadNLPSolver(nlp; option_dict=option_dict, kwargs...)
+    ips = MadNLP.MadNLPSolver(gm; options...)
     result = MadNLP.solve!(ips)
 
+    # setup a MadNLP optimizer the optigraph can use to reference solution values
     madnlp = MadNLP.Optimizer()
-    model.solver = ips
-    model.result = result
-    model.solve_time = model.solver.cnt.total_time
-    model.solve_iterations = model.solver.cnt.k
-
+    madnlp.solver = ips
+    madnlp.result = result
+    madnlp.solve_time = ips.cnt.total_time
+    madnlp.solve_iterations = ips.cnt.k
     graph.moi_backend = madnlp
 
-    #graph.optimizer = ips
-    #graph.objective_function.constant = graph.optimizer.obj_val
-
     # populate solution
+    nlps = [inner_optimizer(node) for node in gm.optinodes]
     @blas_safe_threads for k=1:K
-        nlps[k].result = MadNLPExecutionStats(
-            ips.status,view(result.solution, nlp.ninds[k]),
+        nlps[k].result = MadNLP.MadNLPExecutionStats(
+            ips.status,
+            result.solution[gm.ninds[k]],
             ips.obj_val,
-            view(result.constraints, nlp.minds[k]),
-            ips.inf_du, ips.inf_pr,
-            view(result.multipliers, nlp.minds[k]),
-            view(result.multipliers_L, nlp.ninds[k]),
-            view(result.multipliers_U, nlp.ninds[k]),
-            ips.cnt.k, ips.nlp.counters,ips.cnt.total_time)
-            # TODO: quick hack to specify to JuMP that the
-            # model is not dirty (so we do not run in `OptimizeNotCalled`
-            # exception).
-            nlp.optinodes[k].model.is_model_dirty = false
+            result.constraints[gm.minds[k]],
+            ips.inf_du,
+            ips.inf_pr,
+            result.multipliers[gm.minds[k]],
+            result.multipliers_L[gm.ninds[k]],
+            result.multipliers_U[gm.ninds[k]],
+            ips.cnt.k,
+            ips.nlp.counters,
+            ips.cnt.total_time
+        )
+        # TODO: quick hack to specify to JuMP that the
+        # model is not dirty (so we do not run in `OptimizeNotCalled`
+        # exception).
+        gm.optinodes[k].model.is_model_dirty = false
     end
 end

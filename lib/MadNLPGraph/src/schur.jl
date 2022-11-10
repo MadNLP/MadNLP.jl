@@ -52,9 +52,10 @@ end
 
 
 function Solver(csc::SparseMatrixCSC{Float64};
-                option_dict::Dict{Symbol,Any}=Dict{Symbol,Any}(),
-                opt=Options(schur_subproblem_solver=default_linear_solver(),
-                            schur_dense_solver=default_dense_solver()),
+                opt=Options(
+                    schur_subproblem_solver=default_linear_solver(),
+                    schur_dense_solver=default_dense_solver()
+                ),
                 logger=MadNLPLogger(),
                 kwargs...)
 
