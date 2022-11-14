@@ -164,7 +164,7 @@ get_raw_jacobian(kkt::AbstractDenseKKTSystem) = kkt.jac
 nnz_jacobian(kkt::AbstractDenseKKTSystem) = length(kkt.jac)
 
 #=
-    DenseReducedKKTSystem
+    DenseKKTSystem
 =#
 
 is_reduced(::DenseKKTSystem) = true

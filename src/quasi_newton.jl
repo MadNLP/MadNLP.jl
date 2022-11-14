@@ -156,6 +156,7 @@ mutable struct CompactLBFGS{T, VT, MT} <: AbstractQuasiNewton{T, VT}
     Lk::MT       # p x p
     Mk::MT       # p x p (for Cholesky factorization Mₖ = Jₖᵀ Jₖ)
     Tk::MT       # 2p x 2p
+    Jk::MT       # p x p
     SdotS::MT    # p x p
     DkLk::MT     # p x p
     U::MT        # n x 2p
@@ -186,6 +187,7 @@ function CompactLBFGS{T, VT, MT}(n::Int; max_mem=6, init_strategy=SCALAR1) where
         zeros(T, 0, 0),
         zeros(T, 0, 0),
         zeros(T, 0, 0),
+        zeros(T, 0, 0),
         zeros(T, 0),
         zeros(T, 0),
         zeros(T, 0),
@@ -199,6 +201,7 @@ function _resize!(qn::CompactLBFGS{T, VT, MT}) where {T, VT, MT}
     qn.Lk     = zeros(T, k, k)
     qn.SdotS  = zeros(T, k, k)
     qn.Mk     = zeros(T, k, k)
+    qn.Jk     = zeros(T, k, k)
     qn.Tk     = zeros(T, 2*k, 2*k)
     qn.DkLk   = zeros(T, k, k)
     qn.U      = zeros(T, n, 2*k)
@@ -221,8 +224,11 @@ function _update_SY!(qn::CompactLBFGS, s, y)
             qn.Sk[j, i_] = qn.Sk[j, i_+1]
             qn.Yk[j, i_] = qn.Yk[j, i_+1]
         end
-        qn.Sk[:, k] .= s
-        qn.Yk[:, k] .= y
+        # Latest element
+        @inbounds for j in 1:n
+            qn.Sk[j, k] = s[j]
+            qn.Yk[j, k] = y[j]
+        end
     end
 end
 
@@ -271,24 +277,26 @@ function update!(qn::CompactLBFGS{T, VT, MT}, Bk, sk, yk) where {T, VT, MT}
     #            [ U₂ ]          [  U₂ ]
 
     # Step 1: σₖ I
-    sigma = curvature(Val(qn.init_strategy), sk, yk)    # σₖ
-    Bk .= sigma                                  # Hₖ .= σₖ I (diagonal Hessian approx.)
+    sigma = curvature(Val(qn.init_strategy), sk, yk) # σₖ
+    Bk .= sigma                                      # Hₖ .= σₖ I (diagonal Hessian approx.)
 
     # Step 2: Mₖ = σₖ Sₖᵀ Sₖ + Lₖ Dₖ⁻¹ Lₖᵀ
-    qn.DkLk .= (one(T) ./ qn.Dk) .* qn.Lk'       # DₖLₖ = Dₖ⁻¹ Lₖᵀ
-    qn.Mk .= qn.SdotS                            # Mₖ = Sₖᵀ Sₖ
-    mul!(qn.Mk, qn.Lk, qn.DkLk, one(T), sigma)   # Mₖ = σₖ Sₖᵀ Sₖ + Lₖ Dₖ⁻¹ Lₖᵀ
+    qn.DkLk .= (one(T) ./ qn.Dk) .* qn.Lk'           # DₖLₖ = Dₖ⁻¹ Lₖᵀ
+    qn.Mk .= qn.SdotS                                # Mₖ = Sₖᵀ Sₖ
+    mul!(qn.Mk, qn.Lk, qn.DkLk, one(T), sigma)       # Mₖ = σₖ Sₖᵀ Sₖ + Lₖ Dₖ⁻¹ Lₖᵀ
     symmetrize!(qn.Mk)
-    Jk = cholesky(qn.Mk).L                       # Mₖ = Jₖᵀ Jₖ (factorization)
+
+    copyto!(qn.Jk, qn.Mk)
+    cholesky!(qn.Jk)                                 # Mₖ = Jₖᵀ Jₖ (factorization)
 
     # Step 3: Nₖ = [U₁ U₂]
     U1 = view(qn.U, :, 1:k)
-    U1 .= qn.Sk                                  # U₁ = Sₖ
-    mul!(U1, qn.Yk, qn.DkLk, one(T), sigma)      # U₁ = σₖ Sₖ + Yₖ Dₖ⁻¹ Lₖ
-    BLAS.trsm!('R', 'L', 'T', 'N', one(T), parent(Jk), U1) # U₁ = Jₖ⁻ᵀ (σₖ Sₖ + Yₖ Dₖ⁻¹ Lₖ)
+    copyto!(U1, qn.Sk)                               # U₁ = Sₖ
+    mul!(U1, qn.Yk, qn.DkLk, one(T), sigma)          # U₁ = σₖ Sₖ + Yₖ Dₖ⁻¹ Lₖ
+    BLAS.trsm!('R', 'U', 'N', 'N', one(T), qn.Jk, U1) # U₁ = Jₖ⁻ᵀ (σₖ Sₖ + Yₖ Dₖ⁻¹ Lₖ)
     U2 = view(qn.U, :, 1+k:2*k)
-    δ .= .-one(T) ./ sqrt.(qn.Dk)                # δ = 1 / √Dₖ
-    U2 .= δ' .* qn.Yk                            # U₂ = (1 / √Dₖ) * Yₖ
+    δ .= .-one(T) ./ sqrt.(qn.Dk)                    # δ = 1 / √Dₖ
+    U2 .= δ' .* qn.Yk                                # U₂ = (1 / √Dₖ) * Yₖ
     return true
 end
 

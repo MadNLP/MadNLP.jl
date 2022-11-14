@@ -161,16 +161,16 @@ function eval_lag_hess_wrapper!(
     if cnt.obj_grad_cnt >= 2
         # Build sk = x+ - x
         copyto!(sk, 1, variable(solver.x), 1, n)   # sₖ = x₊
-        axpy!(-one(T), qn.last_x, sk)    # sₖ = x₊ - x
+        axpy!(-one(T), qn.last_x, sk)              # sₖ = x₊ - x
 
         # Build yk = ∇L+ - ∇L
         copyto!(yk, 1, variable(solver.f), 1, n)   # yₖ = ∇f₊
-        axpy!(-one(T), qn.last_g, yk)    # yₖ = ∇f₊ - ∇f
+        axpy!(-one(T), qn.last_g, yk)              # yₖ = ∇f₊ - ∇f
         if m > 0
             jtprod!(solver.jacl, kkt, l)
-            yk .+= @view solver.jacl[1:n]         # yₖ += J₊ᵀ l₊
+            axpy!(n, one(T), solver.jacl, 1, yk, 1)  # yₖ += J₊ᵀ l₊
             NLPModels.jtprod!(nlp, qn.last_x, l, qn.last_jv)
-            axpy!(-one(T), qn.last_jv, yk)        # yₖ += J₊ᵀ l₊ - Jᵀ l₊
+            axpy!(-one(T), qn.last_jv, yk)           # yₖ += J₊ᵀ l₊ - Jᵀ l₊
         end
 
         if cnt.obj_grad_cnt == 2

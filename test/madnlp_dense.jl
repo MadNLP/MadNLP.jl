@@ -180,6 +180,16 @@ end
 end
 
 @testset "MadNLP: LBFGS" begin
+    @testset "HS15" begin
+        nlp = MadNLPTests.HS15Model()
+        solver_qn = MadNLP.MadNLPSolver(
+            nlp;
+            hessian_approximation=MadNLP.SPARSE_COMPACT_LBFGS,
+            print_level=MadNLP.ERROR,
+        )
+        results_qn = MadNLP.solve!(solver_qn)
+        @test results_qn.status == MadNLP.SOLVE_SUCCEEDED
+    end
     @testset "Size: ($n, $m)" for (n, m) in [(10, 0), (10, 5), (50, 10)]
         nlp = MadNLPTests.DenseDummyQP{Float64}(; )
         # Reference solve with exact Hessian
