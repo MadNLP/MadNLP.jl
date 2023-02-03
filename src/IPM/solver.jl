@@ -58,8 +58,8 @@ function initialize!(solver::AbstractMadNLPSolver{T}) where T
         set_initial_rhs!(solver, solver.kkt)
         initialize!(solver.kkt)
         factorize_wrapper!(solver)
-        solve_refine_wrapper!(solver,solver.d,solver.p)
-        if norm(dual(solver.d), Inf) > solver.opt.constr_mult_init_max
+        is_solved = solve_refine_wrapper!(solver,solver.d,solver.p)
+        if !is_solved || (norm(dual(solver.d), Inf) > solver.opt.constr_mult_init_max)
             fill!(solver.y, zero(T))
         else
             copyto!(solver.y, dual(solver.d))
@@ -110,7 +110,7 @@ function solve!(
     zl = nothing, zu = nothing,
     kwargs...
 )
-    
+
     if x != nothing
         full(solver.x)[1:get_nvar(nlp)] .= x
     end
@@ -183,7 +183,7 @@ function solve!(
         update!(stats,solver)
     end
 
-    
+
     return stats
 end
 
@@ -753,7 +753,7 @@ function inertia_free_reg(solver::MadNLPSolver)
     n = primal(solver._w2)
     wx= primal(solver._w4)
     g = full(solver.x_trial) # just to avoid new allocation
-    
+
     fill!(dual(solver._w3), 0)
     set_g_ifr!(solver,g)
 
@@ -809,7 +809,7 @@ function second_order_correction(solver::AbstractMadNLPSolver,alpha_max,theta,va
     wy = dual(solver._w1)
     copyto!(wy, solver.c_trial)
     axpy!(alpha_max, solver.c, wy)
-    
+
     theta_soc_old = theta_trial
     for p=1:solver.opt.max_soc
         # compute second order correction

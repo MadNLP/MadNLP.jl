@@ -77,8 +77,10 @@ function test_extra()
     return
 end
 
+# See issue #239 (https://github.com/MadNLP/MadNLP.jl/issues/239)
 function test_invalid_number_in_hessian_lagrangian()
     model = MadNLP.Optimizer()
+    MOI.set(model, MOI.Silent(), true)
     x = MOI.add_variable(model)
     y = MOI.add_variable(model)
     MOI.set(model, MOI.ObjectiveSense(), MOI.MIN_SENSE)
@@ -88,9 +90,7 @@ function test_invalid_number_in_hessian_lagrangian()
     ev = MOI.Nonlinear.Evaluator(nlp, MOI.Nonlinear.SparseReverseMode(), [x, y])
     MOI.set(model, MOI.NLPBlock(), MOI.NLPBlockData(ev))
     MOI.optimize!(model)
-    @test MOI.get(model, MOI.TerminationStatus()) == MOI.INVALID_MODEL
-    @test MOI.get(model, MOI.RawStatusString()) ==
-          "Invalid number in NLP Hessian Lagrangian detected."
+    @test MOI.get(model, MOI.TerminationStatus()) == MOI.LOCALLY_SOLVED
     return
 end
 
