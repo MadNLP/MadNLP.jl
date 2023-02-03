@@ -523,9 +523,11 @@ function get_sc(zl_r, zu_r, s_max)
 end
 
 function get_mu(mu, mu_min, mu_linear_decrease_factor, mu_superlinear_decrease_power, tol)
+    # Warning: `a * tol` should be strictly less than 100 * mu_min, see issue #242
+    a = min(99.0 * mu_min / tol, 0.01)
     return max(
         mu_min,
-        tol/10,
+        a * tol,
         min(mu_linear_decrease_factor*mu, mu^mu_superlinear_decrease_power),
     )
 end
