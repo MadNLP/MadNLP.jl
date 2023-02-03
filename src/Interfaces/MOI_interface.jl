@@ -697,7 +697,7 @@ function MOI.optimize!(model::Optimizer)
 end
 
 # From Ipopt/src/Interfaces/IpReturnCodes_inc.h
-const _STATUS_CODES = Dict(
+const _STATUS_CODES = Dict{Status,MOI.TerminationStatusCode}(
     SOLVE_SUCCEEDED => MOI.LOCALLY_SOLVED,
     SOLVED_TO_ACCEPTABLE_LEVEL => MOI.ALMOST_LOCALLY_SOLVED,
     SEARCH_DIRECTION_BECOMES_TOO_SMALL => MOI.SLOW_PROGRESS,
@@ -706,12 +706,20 @@ const _STATUS_CODES = Dict(
     MAXIMUM_ITERATIONS_EXCEEDED => MOI.ITERATION_LIMIT,
     MAXIMUM_WALLTIME_EXCEEDED => MOI.TIME_LIMIT,
     INITIAL => MOI.OPTIMIZE_NOT_CALLED,
+    # REGULAR
+    # RESTORE
+    # ROBUST
     RESTORATION_FAILED => MOI.NUMERICAL_ERROR,
     INVALID_NUMBER_DETECTED => MOI.INVALID_MODEL,
     ERROR_IN_STEP_COMPUTATION => MOI.NUMERICAL_ERROR,
     NOT_ENOUGH_DEGREES_OF_FREEDOM => MOI.INVALID_MODEL,
     USER_REQUESTED_STOP => MOI.INTERRUPTED,
     INTERNAL_ERROR => MOI.OTHER_ERROR,
+    INVALID_NUMBER_OBJECTIVE => MOI.INVALID_MODEL,
+    INVALID_NUMBER_GRADIENT => MOI.INVALID_MODEL,
+    INVALID_NUMBER_CONSTRAINTS => MOI.INVALID_MODEL,
+    INVALID_NUMBER_JACOBIAN => MOI.INVALID_MODEL,
+    INVALID_NUMBER_HESSIAN_LAGRANGIAN => MOI.INVALID_MODEL,
 )
 
 ### MOI.ResultCount
@@ -729,9 +737,12 @@ function MOI.get(model::Optimizer, ::MOI.RawStatusString)
         return "The model has no variable"
     elseif model.solver === nothing
         return "Optimize not called"
-    else
-        return string(_STATUS_CODES[model.result.status])
     end
+    return get(
+        STATUS_OUTPUT_DICT,
+        model.result.status,
+        "Unknown result status: $(model.result.status)",
+    )
 end
 
 ### MOI.TerminationStatus
@@ -742,11 +753,7 @@ function MOI.get(model::Optimizer, ::MOI.TerminationStatus)
     elseif model.solver === nothing
         return MOI.OPTIMIZE_NOT_CALLED
     end
-    if haskey(_STATUS_CODES, model.result.status)
-        return _STATUS_CODES[model.result.status]
-    else
-        return MOI.UNKNOWN_RESULT_STATUS
-    end
+    return get(_STATUS_CODES, model.result.status, MOI.OTHER_ERROR)
 end
 
 ### MOI.PrimalStatus

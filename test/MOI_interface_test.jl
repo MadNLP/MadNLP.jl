@@ -66,14 +66,31 @@ end
 function test_extra()
     model = MadNLP.Optimizer()
     MOI.set(model, MOI.RawOptimizerAttribute("linear_solver"), UmfpackSolver)
-    
+
     @test MOI.supports(model, MOI.Name())
     @test MOI.get(model, MOI.Name()) == ""
     MOI.set(model, MOI.Name(), "Model")
     @test MOI.get(model, MOI.Name()) == "Model"
-    
+
     @test MOI.get(model, MOI.BarrierIterations()) == 0
-    
+
+    return
+end
+
+function test_invalid_number_in_hessian_lagrangian()
+    model = MadNLP.Optimizer()
+    x = MOI.add_variable(model)
+    y = MOI.add_variable(model)
+    MOI.set(model, MOI.ObjectiveSense(), MOI.MIN_SENSE)
+    nlp = MOI.Nonlinear.Model()
+    MOI.Nonlinear.set_objective(nlp, :(($x - 5)^2 + ($y - 8)^2))
+    MOI.Nonlinear.add_constraint(nlp, :($x * $y), MOI.EqualTo(5.0))
+    ev = MOI.Nonlinear.Evaluator(nlp, MOI.Nonlinear.SparseReverseMode(), [x, y])
+    MOI.set(model, MOI.NLPBlock(), MOI.NLPBlockData(ev))
+    MOI.optimize!(model)
+    @test MOI.get(model, MOI.TerminationStatus()) == MOI.INVALID_MODEL
+    @test MOI.get(model, MOI.RawStatusString()) ==
+          "Invalid number in NLP Hessian Lagrangian detected."
     return
 end
 
