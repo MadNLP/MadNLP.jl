@@ -1,6 +1,21 @@
 # Release notes
 
-## v0.5.l (October 20th, 2022)
+## v0.5.2 (February 27th, 2023)
+
+### Bug fixes
+
+- Fix URL in README (#236)
+- Fix invalid return code in MOI.TerminationStatus (#241)
+- Fix potential infinite loop in feasibility restoration (#244)
+- Fix initial multipliers when initial KKT has no solution (#243)
+
+### Performance and maintenance
+
+- Replace broadcast operators by explicit for loops in IPM kernels to reduce time-to-first-solve (#231)
+- Remove allocations in nonlinear callbacks (#230)
+
+
+## v0.5.1 (October 20th, 2022)
 
 ### New features
 
