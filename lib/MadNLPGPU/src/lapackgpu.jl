@@ -105,7 +105,7 @@ for (sytrf,sytrf_buffer,getrf,getrf_buffer,getrs,geqrf,geqrf_buffer,ormqr,ormqr_
 
             copyto!(M.etc[:ipiv64],M.etc[:ipiv])
             copyto!(M.rhs,x)
-            ccall((:cusolverDnXsytrs_bufferSize, libcusolver()), cusolverStatus_t,
+            ccall((:cusolverDnXsytrs_bufferSize, libcusolver), cusolverStatus_t,
                   (cusolverDnHandle_t, cublasFillMode_t, Int64, Int64, cudaDataType,
                    CuPtr{Cdouble}, Int64, CuPtr{Int64}, cudaDataType,
                    CuPtr{Cdouble}, Int64, Ptr{Int64}, Ptr{Int64}),
@@ -114,7 +114,7 @@ for (sytrf,sytrf_buffer,getrf,getrf_buffer,getrs,geqrf,geqrf_buffer,ormqr,ormqr_
                   M.etc[:ipiv64],$cutyp,M.rhs,length(M.rhs),M.lwork,M.lwork_host)
             length(M.work) < M.lwork[] && resize!(M.work,Int(M.lwork[]))
             length(M.work_host) < M.lwork_host[] && resize!(work_host,Int(M.lwork_host[]))
-            ccall((:cusolverDnXsytrs, libcusolver()), cusolverStatus_t,
+            ccall((:cusolverDnXsytrs, libcusolver), cusolverStatus_t,
                   (cusolverDnHandle_t, cublasFillMode_t, Int64, Int64, cudaDataType,
                    CuPtr{Cdouble}, Int64, CuPtr{Int64}, cudaDataType,
                    CuPtr{Cdouble}, Int64, CuPtr{Cdouble}, Int64, Ptr{Cdouble}, Int64,

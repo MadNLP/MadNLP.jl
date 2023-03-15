@@ -25,12 +25,11 @@ symul!(y, A, x::CuVector{T}, α = 1., β = 0.) where T = CUBLAS.symv!('L', T(α)
 
 include("kernels.jl")
 
-if has_cuda()
-    include("lapackgpu.jl")
-    export LapackGPUSolver
-end
 export CuMadNLPSolver
 
 include("interface.jl")
+include("lapackgpu.jl")
+
+export LapackGPUSolver
 
 end # module
