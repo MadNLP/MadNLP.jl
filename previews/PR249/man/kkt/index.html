@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>KKT systems · MadNLP.jl</title><script data-outdated-warner src="../../assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.045/juliamono.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.13.24/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="../.."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../../assets/documenter.js"></script><script src="../../siteinfo.js"></script><script src="../../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../../assets/themeswap.js"></script></head><body><div id="documenter"><nav class="docs-sidebar"><div class="docs-package-name"><span class="docs-autofit"><a href="../../">MadNLP.jl</a></span></div><form class="docs-search" action="../../search/"><input class="docs-search-query" id="documenter-search-query" name="q" type="text" placeholder="Search docs"/></form><ul class="docs-menu"><li><a class="tocitem" href="../../">Home</a></li><li><a class="tocitem" href="../../installation/">Installation</a></li><li><a class="tocitem" href="../../quickstart/">Quickstart</a></li><li><a class="tocitem" href="../../options/">Options</a></li><li><span class="tocitem">Manual</span><ul><li><a class="tocitem" href="../solver/">Solver</a></li><li class="is-active"><a class="tocitem" href>KKT systems</a><ul class="internal"><li><a class="tocitem" href="#A-brief-look-at-the-math"><span>A brief look at the math</span></a></li><li><a class="tocitem" href="#Assembling-a-KKT-system,-step-by-step"><span>Assembling a KKT system, step by step</span></a></li></ul></li><li><a class="tocitem" href="../linear_solvers/">Linear Solvers</a></li></ul></li><li><span class="tocitem">API Reference</span><ul><li><a class="tocitem" href="../../lib/kkt/">KKT systems</a></li><li><a class="tocitem" href="../../lib/linear_solvers/">Linear Solvers</a></li></ul></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><nav class="breadcrumb"><ul class="is-hidden-mobile"><li><a class="is-disabled">Manual</a></li><li class="is-active"><a href>KKT systems</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>KKT systems</a></li></ul></nav><div class="docs-right"><a class="docs-edit-link" href="https://github.com/MadNLP/MadNLP.jl/blob/master/docs/src/man/kkt.md#" title="Edit on GitHub"><span class="docs-icon fab"></span><span class="docs-label is-hidden-touch">Edit on GitHub</span></a><a class="docs-settings-button fas fa-cog" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-sidebar-button fa fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a></div></header><article class="content" id="documenter-page"><h1 id="KKT-systems"><a class="docs-heading-anchor" href="#KKT-systems">KKT systems</a><a id="KKT-systems-1"></a><a class="docs-heading-anchor-permalink" href="#KKT-systems" title="Permalink"></a></h1><p>KKT systems are linear system with a special KKT structure. MadNLP uses a special structure <a href="../../lib/kkt/#MadNLP.AbstractKKTSystem"><code>AbstractKKTSystem</code></a> to represent internally the KKT system. The <a href="../../lib/kkt/#MadNLP.AbstractKKTSystem"><code>AbstractKKTSystem</code></a> fulfills two goals:</p><ol><li>Store the values of the Hessian of the Lagrangian and of the Jacobian.</li><li>Assemble the corresponding KKT matrix <span>$K$</span>.</li></ol><h2 id="A-brief-look-at-the-math"><a class="docs-heading-anchor" href="#A-brief-look-at-the-math">A brief look at the math</a><a id="A-brief-look-at-the-math-1"></a><a class="docs-heading-anchor-permalink" href="#A-brief-look-at-the-math" title="Permalink"></a></h2><p>We recall that at each iteration the interior-point algorithm aims at solving the following relaxed KKT equations (<span>$\mu$</span> playing the role of a homotopy parameter) with a Newton method:</p><p class="math-container">\[F_\mu(x, s, y, v, w) = 0\]</p><p>with</p><p class="math-container">\[F_\mu(x, s, y, v, w) =
+\left\{
+\begin{aligned}
+    &amp; \nabla f(x) + A^\top y + \nu + w &amp; (F_1) \\
+    &amp; - y - w  &amp; (F_2) \\
+    &amp; g(x) - s &amp;  (F_3) \\
+    &amp; X v - \mu e_n &amp; (F_4) \\
+    &amp; S w - \mu e_m &amp; (F_5)
+\end{aligned}
+\right.\]</p><p>The Newton step associated to the KKT equations writes</p><p class="math-container">\[\overline{
+\begin{pmatrix}
+ W &amp; 0 &amp; A^\top &amp; - I &amp; 0 \\
+ 0 &amp; 0 &amp; -I &amp; 0 &amp; -I \\
+ A &amp; -I &amp; 0&amp; 0 &amp; 0 \\
+ V &amp; 0 &amp; 0 &amp; X &amp; 0 \\
+ 0 &amp; W &amp; 0 &amp; 0 &amp; S
+\end{pmatrix}}^{K_{1}}
+\begin{pmatrix}
+    \Delta x \\
+    \Delta s \\
+    \Delta y \\
+    \Delta v \\
+    \Delta w
+\end{pmatrix}
+= -
+\begin{pmatrix}
+    F_1 \\ F_2 \\ F_3 \\ F_4 \\ F_5
+\end{pmatrix}\]</p><p>The matrix <span>$K_1$</span> is unsymmetric, but we can obtain an equivalent symmetric system by eliminating the two last rows:</p><p class="math-container">\[\overline{
+\begin{pmatrix}
+ W + \Sigma_x &amp; 0 &amp; A^\top \\
+ 0 &amp; \Sigma_s &amp; -I \\
+ A &amp; -I &amp; 0
+\end{pmatrix}}^{K_{2}}
+\begin{pmatrix}
+    \Delta x \\
+    \Delta s \\
+    \Delta y
+\end{pmatrix}
+= -
+\begin{pmatrix}
+    F_1 + X^{-1} F_4 \\ F_2 + S^{-1} F_5 \\ F_3
+\end{pmatrix}\]</p><p>with <span>$\Sigma_x = X^{-1} v$</span> and <span>$\Sigma_s = S^{-1} w$</span>. The matrix <span>$K_2$</span>, symmetric, has a structure more favorable for a direct linear solver.</p><p>In MadNLP, the matrix <span>$K_1$</span> is encoded as an <a href="../../lib/kkt/#MadNLP.AbstractUnreducedKKTSystem"><code>AbstractUnreducedKKTSystem</code></a> and the matrix <span>$K_2$</span> is encoded as an <a href="../../lib/kkt/#MadNLP.AbstractReducedKKTSystem"><code>AbstractReducedKKTSystem</code></a>.</p><h2 id="Assembling-a-KKT-system,-step-by-step"><a class="docs-heading-anchor" href="#Assembling-a-KKT-system,-step-by-step">Assembling a KKT system, step by step</a><a id="Assembling-a-KKT-system,-step-by-step-1"></a><a class="docs-heading-anchor-permalink" href="#Assembling-a-KKT-system,-step-by-step" title="Permalink"></a></h2><p>We note that both <span>$K_1$</span> and <span>$K_2$</span> depend on the Hessian of the Lagrangian <span>$W$</span>, the Jacobian <span>$A$</span> and the diagonal matrices <span>$\Sigma_x = X^{1}V$</span> and <span>$\Sigma_s = S^{-1}W$</span>. Hence, we have to update the KKT system at each iteration of the interior-point algorithm.</p><p>In what follows, we illustrate the inner working of any <code>AbstractKKTSystem</code> by using the KKT system used by default inside MadNLP: <a href="../../lib/kkt/#MadNLP.SparseKKTSystem"><code>SparseKKTSystem</code></a>.</p><h3 id="Initializing-a-KKT-system"><a class="docs-heading-anchor" href="#Initializing-a-KKT-system">Initializing a KKT system</a><a id="Initializing-a-KKT-system-1"></a><a class="docs-heading-anchor-permalink" href="#Initializing-a-KKT-system" title="Permalink"></a></h3><p>The size of the KKT system depends directly on the problem&#39;s characteristics (number of variables, number of of equality and inequality constraints). A <a href="../../lib/kkt/#MadNLP.SparseKKTSystem"><code>SparseKKTSystem</code></a> stores the Hessian and the Jacobian in sparse (COO) format. Depending on how we parameterize the system, it can output either a sparse matrix or a dense matrix (according to the linear solver we are employing under the hood).</p><p>For instance, we can parameterize a sparse KKT system as</p><pre><code class="language-julia hljs">T = Float64
+VT = Vector{T}
+MT = SparseMatrixCSC{T, Int}
+kkt = MadNLP.SparseKKTSystem{T, VT, MT}(nlp)
+kkt.aug_com</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">6×6 SparseArrays.SparseMatrixCSC{Float64, Int64} with 0 stored entries:
+  ⋅    ⋅    ⋅    ⋅    ⋅    ⋅ 
+  ⋅    ⋅    ⋅    ⋅    ⋅    ⋅ 
+  ⋅    ⋅    ⋅    ⋅    ⋅    ⋅ 
+  ⋅    ⋅    ⋅    ⋅    ⋅    ⋅ 
+  ⋅    ⋅    ⋅    ⋅    ⋅    ⋅ 
+  ⋅    ⋅    ⋅    ⋅    ⋅    ⋅ </code></pre><p>and a dense KKT system as</p><pre><code class="language-julia hljs">T = Float64
+VT = Vector{T}
+MT = Matrix{T}
+kkt = MadNLP.SparseKKTSystem{T, VT, MT}(nlp)
+kkt.aug_com</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">6×6 Matrix{Float64}:
+ 0.0  0.0  0.0  0.0  0.0  0.0
+ 0.0  0.0  0.0  0.0  0.0  0.0
+ 0.0  0.0  0.0  0.0  0.0  0.0
+ 0.0  0.0  0.0  0.0  0.0  0.0
+ 0.0  0.0  0.0  0.0  0.0  0.0
+ 0.0  0.0  0.0  0.0  0.0  0.0</code></pre><p>Once the KKT system built, one has to initialize it to use it inside the interior-point algorithm:</p><pre><code class="language-julia hljs">MadNLP.initialize!(kkt);</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">3-element Vector{Float64}:
+ 0.0
+ 0.0
+ 0.0</code></pre><p>The user can query the KKT matrix inside <code>kkt</code>, simply as</p><pre><code class="language-julia hljs">kkt_matrix = MadNLP.get_kkt(kkt)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">6×6 Matrix{Float64}:
+ 0.0  0.0  0.0  0.0  0.0  0.0
+ 0.0  0.0  0.0  0.0  0.0  0.0
+ 0.0  0.0  0.0  0.0  0.0  0.0
+ 0.0  0.0  0.0  0.0  0.0  0.0
+ 0.0  0.0  0.0  0.0  0.0  0.0
+ 0.0  0.0  0.0  0.0  0.0  0.0</code></pre><p>This returns a reference to the KKT matrix stores internally inside <code>kkt</code>. Each time the matrix is assembled inside <code>kkt</code>, <code>kkt_matrix</code> is updated automatically.</p><h3 id="Updating-a-KKT-system"><a class="docs-heading-anchor" href="#Updating-a-KKT-system">Updating a KKT system</a><a id="Updating-a-KKT-system-1"></a><a class="docs-heading-anchor-permalink" href="#Updating-a-KKT-system" title="Permalink"></a></h3><p>We suppose now we want to refresh the values stored in the KKT system.</p><h4 id="Updating-the-values-of-the-Hessian"><a class="docs-heading-anchor" href="#Updating-the-values-of-the-Hessian">Updating the values of the Hessian</a><a id="Updating-the-values-of-the-Hessian-1"></a><a class="docs-heading-anchor-permalink" href="#Updating-the-values-of-the-Hessian" title="Permalink"></a></h4><p>The Hessian part of the KKT system can be queried as</p><pre><code class="language-julia hljs">hess_values = MadNLP.get_hessian(kkt)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">3-element Vector{Float64}:
+ 0.0
+ 0.0
+ 0.0</code></pre><p>For a <code>SparseKKTSystem</code>, <code>hess_values</code> is a <code>Vector{Float64}</code> storing the nonzero values of the Hessian. Then, one can update the vector <code>hess_values</code> by using NLPModels.jl:</p><pre><code class="language-julia hljs">n = NLPModels.get_nvar(nlp)
+m = NLPModels.get_ncon(nlp)
+x = NLPModels.get_x0(nlp)
+l = zeros(m)
+
+NLPModels.hess_coord!(nlp, x, l, hess_values)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">3-element Vector{Float64}:
+   2.0
+   0.0
+ 200.0</code></pre><p>Eventually, a post-processing step can be applied to refresh all the values internally:</p><pre><code class="language-julia hljs">MadNLP.compress_hessian!(kkt)</code></pre><div class="admonition is-info"><header class="admonition-header">Note</header><div class="admonition-body"><p>By default, the function <a href="../../lib/kkt/#MadNLP.compress_hessian!"><code>compress_hessian!</code></a> does nothing. But it can be required for very specific use-case, for instance building internally a Schur complement matrix.</p></div></div><h4 id="Updating-the-values-of-the-Jacobian"><a class="docs-heading-anchor" href="#Updating-the-values-of-the-Jacobian">Updating the values of the Jacobian</a><a id="Updating-the-values-of-the-Jacobian-1"></a><a class="docs-heading-anchor-permalink" href="#Updating-the-values-of-the-Jacobian" title="Permalink"></a></h4><p>We proceed exaclty the same way to update the values in the Jacobian. One queries the Jacobian values in the KKT system as</p><pre><code class="language-julia hljs">jac_values = MadNLP.get_jacobian(kkt)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">4-element Vector{Float64}:
+ 0.0
+ 0.0
+ 0.0
+ 0.0</code></pre><p>We can refresh the values with NLPModels as</p><pre><code class="language-julia hljs">NLPModels.jac_coord!(nlp, x, jac_values)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">4-element Vector{Float64}:
+ 0.0
+ 0.0
+ 1.0
+ 0.0</code></pre><p>And then applies a post-processing step as</p><pre><code class="language-julia hljs">MadNLP.compress_jacobian!(kkt)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">2×4 Matrix{Float64}:
+ 0.0  0.0  -1.0   0.0
+ 1.0  0.0   0.0  -1.0</code></pre><div class="admonition is-info"><header class="admonition-header">Note</header><div class="admonition-body"><p>On the contrary to <code>compress_hessian!</code>, <code>compress_jacobian!</code> is not doing nothing by default. Instead, the post-processing step scales the values of the Jacobian row by row, applying the scaling of the constraints as computed initially by MadNLP.</p></div></div><h4 id="Updating-the-values-of-the-diagonal-matrices"><a class="docs-heading-anchor" href="#Updating-the-values-of-the-diagonal-matrices">Updating the values of the diagonal matrices</a><a id="Updating-the-values-of-the-diagonal-matrices-1"></a><a class="docs-heading-anchor-permalink" href="#Updating-the-values-of-the-diagonal-matrices" title="Permalink"></a></h4><p>Once the Hessian and the Jacobian updated, it remains to udpate the values of the diagonal matrix <span>$\Sigma_x = X^{-1} V$</span> and <span>$\Sigma_s = S^{-1} W$</span>. In the KKT&#39;s interface, this amounts to call the <a href="../../lib/kkt/#MadNLP.regularize_diagonal!"><code>regularize_diagonal!</code></a> function:</p><pre><code class="language-julia hljs">pr_values = ones(n + m)
+du_values = zeros(m)
+
+MadNLP.regularize_diagonal!(kkt, pr_values, du_values)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">2-element Vector{Float64}:
+ -0.0
+ -0.0</code></pre><p>where <code>pr_values</code> stores the diagonal values for the primal terms (accounting both for <span>$\Sigma_x$</span> and <span>$\Sigma_s$</span>) and <code>du_values</code> stores the diagonal values for the dual terms (mostly used during feasibility restoration).</p><h3 id="Assembling-the-KKT-matrix"><a class="docs-heading-anchor" href="#Assembling-the-KKT-matrix">Assembling the KKT matrix</a><a id="Assembling-the-KKT-matrix-1"></a><a class="docs-heading-anchor-permalink" href="#Assembling-the-KKT-matrix" title="Permalink"></a></h3><p>Once the values updated, one can assemble the resulting KKT matrix. This translates to</p><pre><code class="language-julia hljs">MadNLP.build_kkt!(kkt)
+kkt_matrix</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">6×6 Matrix{Float64}:
+ 4.0    0.0   0.0   0.0  0.0  0.0
+ 0.0  202.0   0.0   0.0  0.0  0.0
+ 0.0    0.0   2.0   0.0  0.0  0.0
+ 0.0    0.0   0.0   2.0  0.0  0.0
+ 0.0    0.0  -1.0   0.0  0.0  0.0
+ 1.0    0.0   0.0  -1.0  0.0  0.0</code></pre><p>By doing so, the values stored inside <code>kkt</code> will be transferred to the KKT matrix <code>kkt_matrix</code> (as returned by the function <a href="../../lib/kkt/#MadNLP.get_kkt"><code>get_kkt</code></a>).</p><p>In details, a <a href="../../lib/kkt/#MadNLP.SparseKKTSystem"><code>SparseKKTSystem</code></a> stores internally the KKT system&#39;s values using a sparse COO format. When <a href="../../lib/kkt/#MadNLP.build_kkt!"><code>build_kkt!</code></a> is called, the sparse COO matrix is transferred to <code>SparseMatrixCSC</code> (if <code>MT = SparseMatrixCSC</code>) or a <code>Matrix</code> (if <code>MT = Matrix</code>), or any format suitable for factorizing the KKT system inside a <a href="../linear_solvers/">linear solver</a>.</p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../solver/">« Solver</a><a class="docs-footer-nextpage" href="../linear_solvers/">Linear Solvers »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 0.27.24 on <span class="colophon-date" title="Wednesday 15 March 2023 00:36">Wednesday 15 March 2023</span>. Using Julia version 1.6.7.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
