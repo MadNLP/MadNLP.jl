@@ -19,7 +19,7 @@ function MadNLP.eval_lag_hess_wrapper!(
     cnt = solver.cnt
     MadNLP.@trace(solver.logger, "Update BFGS matrices.")
 
-    qn = kkt.qn
+    qn = kkt.quasi_newton
     Bk = kkt.hess
     sk, yk = qn.sk, qn.yk
     n = length(qn.sk)
