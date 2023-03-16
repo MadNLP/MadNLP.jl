@@ -110,7 +110,7 @@ function solve_refine_wrapper!(
 ) where {T, VT, MT, QN<:CompactLBFGS{T, Vector{T}, Matrix{T}}}
     cnt = solver.cnt
     kkt = solver.kkt
-    qn = kkt.qn
+    qn = kkt.quasi_newton
     n, p = size(qn)
     # Load buffers
     xr = qn._w2

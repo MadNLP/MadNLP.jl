@@ -9,7 +9,7 @@ struct SparseKKTSystem{T, VT, MT, QN} <: AbstractReducedKKTSystem{T, VT, MT, QN}
     hess::VT
     jac_callback::VT
     jac::VT
-    qn::QN
+    quasi_newton::QN
     pr_diag::VT
     du_diag::VT
     # Augmented system
@@ -37,7 +37,7 @@ struct SparseUnreducedKKTSystem{T, VT, MT, QN} <: AbstractUnreducedKKTSystem{T, 
     hess::VT
     jac_callback::VT
     jac::VT
-    qn::QN
+    quasi_newton::QN
     pr_diag::VT
     du_diag::VT
 
@@ -67,6 +67,19 @@ const AbstractSparseKKTSystem{T, VT, MT, QN} = Union{
 #=
     Generic sparse methods
 =#
+function build_hessian_structure(nlp::AbstractNLPModel, ::Type{<:ExactHessian})
+    hess_I = Vector{Int32}(undef, get_nnzh(nlp.meta))
+    hess_J = Vector{Int32}(undef, get_nnzh(nlp.meta))
+    hess_structure!(nlp,hess_I,hess_J)
+    return hess_I, hess_J
+end
+# NB. Quasi-Newton methods require only the sparsity pattern
+#     of the diagonal term to store the term ξ I.
+function build_hessian_structure(nlp::AbstractNLPModel, ::Type{<:AbstractQuasiNewton})
+    hess_I = collect(Int32, 1:get_nvar(nlp))
+    hess_J = collect(Int32, 1:get_nvar(nlp))
+    return hess_I, hess_J
+end
 
 function mul!(y::AbstractVector, kkt::AbstractSparseKKTSystem, x::AbstractVector)
     mul!(y, Symmetric(kkt.aug_com, :L), x)
@@ -170,10 +183,10 @@ function SparseKKTSystem{T, VT, MT, QN}(
     end
     jac_scaling = ones(T, n_jac+n_slack)
 
-    qn = QN(n)
+    quasi_newton = QN(n)
 
     return SparseKKTSystem{T, VT, MT, QN}(
-        hess, jac_callback, jac, qn, pr_diag, du_diag,
+        hess, jac_callback, jac, quasi_newton, pr_diag, du_diag,
         aug_raw, aug_com, aug_csc_map,
         jac_raw, jac_com, jac_csc_map,
         ind_ineq, ind_fixed, ind_aug_fixed, jac_scaling,
@@ -191,14 +204,7 @@ function SparseKKTSystem{T, VT, MT, QN}(nlp::AbstractNLPModel, ind_cons=get_inde
     jac_J = Vector{Int32}(undef, get_nnzj(nlp.meta))
     jac_structure!(nlp,jac_I, jac_J)
 
-    if QN <: ExactHessian
-        hess_I = Vector{Int32}(undef, get_nnzh(nlp.meta))
-        hess_J = Vector{Int32}(undef, get_nnzh(nlp.meta))
-        hess_structure!(nlp,hess_I,hess_J)
-    elseif QN <: AbstractQuasiNewton
-        hess_I = collect(Int32, 1:get_nvar(nlp))
-        hess_J = collect(Int32, 1:get_nvar(nlp))
-    end
+    hess_I, hess_J = build_hessian_structure(nlp, QN)
 
     force_lower_triangular!(hess_I,hess_J)
 
@@ -291,10 +297,10 @@ function SparseUnreducedKKTSystem{T, VT, MT, QN}(
         zeros(Int, 0)
     end
 
-    qn = QN(n)
+    quasi_newton = QN(n)
 
     return SparseUnreducedKKTSystem{T, VT, MT, QN}(
-        hess, jac_callback, jac, qn, pr_diag, du_diag,
+        hess, jac_callback, jac, quasi_newton, pr_diag, du_diag,
         l_diag, u_diag, l_lower, u_lower,
         aug_raw, aug_com, aug_csc_map,
         jac_raw, jac_com, jac_csc_map,

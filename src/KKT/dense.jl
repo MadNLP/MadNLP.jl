@@ -10,7 +10,7 @@ Requires a dense linear solver to be factorized (otherwise an error is returned)
 struct DenseKKTSystem{T, VT, MT, QN} <: AbstractReducedKKTSystem{T, VT, MT, QN}
     hess::MT
     jac::MT
-    qn::QN
+    quasi_newton::QN
     pr_diag::VT
     du_diag::VT
     diag_hess::VT
@@ -45,10 +45,10 @@ function DenseKKTSystem{T, VT, MT, QN}(n, m, ind_ineq, ind_fixed) where {T, VT, 
     fill!(diag_hess, zero(T))
     fill!(constraint_scaling, one(T))
 
-    qn = QN(n)
+    quasi_newton = QN(n)
 
     return DenseKKTSystem{T, VT, MT, QN}(
-        hess, jac, qn, pr_diag, du_diag, diag_hess, aug_com,
+        hess, jac, quasi_newton, pr_diag, du_diag, diag_hess, aug_com,
         ns, ind_ineq, ind_fixed, constraint_scaling, Dict{Symbol, Any}(),
     )
 end
@@ -70,7 +70,7 @@ Requires a dense linear solver to factorize the associated KKT system (otherwise
 struct DenseCondensedKKTSystem{T, VT, MT, QN} <: AbstractCondensedKKTSystem{T, VT, MT, QN}
     hess::MT
     jac::MT
-    qn::QN
+    quasi_newton::QN
     jac_ineq::MT
     pr_diag::VT
     du_diag::VT
@@ -118,9 +118,9 @@ function DenseCondensedKKTSystem{T, VT, MT, QN}(nlp::AbstractNLPModel, info_cons
     ind_eq_shifted = ind_eq .+ n .+ ns
     ind_ineq_shifted = info_constraints.ind_ineq .+ n .+ ns
 
-    qn = QN(n)
+    quasi_newton = QN(n)
     return DenseCondensedKKTSystem{T, VT, MT, QN}(
-        hess, jac, qn, jac_ineq, pr_diag, du_diag, aug_com,
+        hess, jac, quasi_newton, jac_ineq, pr_diag, du_diag, aug_com,
         n_eq, ind_eq, ind_eq_shifted,
         ns, info_constraints.ind_ineq, ind_ineq_shifted,
         info_constraints.ind_fixed,
