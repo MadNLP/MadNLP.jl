@@ -1,7 +1,7 @@
 name = "MadNLPGPU"
 uuid = "d72a61cc-809d-412f-99be-fd81f4b8a598"
 authors = ["Sungho Shin <sungho.shin.ss@gmail.com>"]
-version = "0.4.0"
+version = "0.5.0"
 
 [deps]
 CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
