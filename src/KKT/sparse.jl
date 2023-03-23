@@ -1,14 +1,15 @@
 
 """
-    SparseKKTSystem{T, VT, MT} <: AbstractReducedKKTSystem{T, VT, MT}
+    SparseKKTSystem{T, VT, MT, QN} <: AbstractReducedKKTSystem{T, VT, MT, QN}
 
 Implement the [`AbstractReducedKKTSystem`](@ref) in sparse COO format.
 
 """
-struct SparseKKTSystem{T, VT, MT} <: AbstractReducedKKTSystem{T, VT, MT}
+struct SparseKKTSystem{T, VT, MT, QN} <: AbstractReducedKKTSystem{T, VT, MT, QN}
     hess::VT
     jac_callback::VT
     jac::VT
+    quasi_newton::QN
     pr_diag::VT
     du_diag::VT
     # Augmented system
@@ -27,15 +28,16 @@ struct SparseKKTSystem{T, VT, MT} <: AbstractReducedKKTSystem{T, VT, MT}
 end
 
 """
-    SparseUnreducedKKTSystem{T, VT, MT} <: AbstractUnreducedKKTSystem{T, VT, MT}
+    SparseUnreducedKKTSystem{T, VT, MT, QN} <: AbstractUnreducedKKTSystem{T, VT, MT, QN}
 
 Implement the [`AbstractUnreducedKKTSystem`](@ref) in sparse COO format.
 
 """
-struct SparseUnreducedKKTSystem{T, VT, MT} <: AbstractUnreducedKKTSystem{T, VT, MT}
+struct SparseUnreducedKKTSystem{T, VT, MT, QN} <: AbstractUnreducedKKTSystem{T, VT, MT, QN}
     hess::VT
     jac_callback::VT
     jac::VT
+    quasi_newton::QN
     pr_diag::VT
     du_diag::VT
 
@@ -57,11 +59,27 @@ struct SparseUnreducedKKTSystem{T, VT, MT} <: AbstractUnreducedKKTSystem{T, VT, 
 end
 
 # Template to dispatch on sparse representation
-const AbstractSparseKKTSystem{T, VT, MT} = Union{SparseKKTSystem{T, VT, MT}, SparseUnreducedKKTSystem{T, VT, MT}}
+const AbstractSparseKKTSystem{T, VT, MT, QN} = Union{
+    SparseKKTSystem{T, VT, MT, QN},
+    SparseUnreducedKKTSystem{T, VT, MT, QN},
+}
 
 #=
     Generic sparse methods
 =#
+function build_hessian_structure(nlp::AbstractNLPModel, ::Type{<:ExactHessian})
+    hess_I = Vector{Int32}(undef, get_nnzh(nlp.meta))
+    hess_J = Vector{Int32}(undef, get_nnzh(nlp.meta))
+    hess_structure!(nlp,hess_I,hess_J)
+    return hess_I, hess_J
+end
+# NB. Quasi-Newton methods require only the sparsity pattern
+#     of the diagonal term to store the term ξ I.
+function build_hessian_structure(nlp::AbstractNLPModel, ::Type{<:AbstractQuasiNewton})
+    hess_I = collect(Int32, 1:get_nvar(nlp))
+    hess_J = collect(Int32, 1:get_nvar(nlp))
+    return hess_I, hess_J
+end
 
 function mul!(y::AbstractVector, kkt::AbstractSparseKKTSystem, x::AbstractVector)
     mul!(y, Symmetric(kkt.aug_com, :L), x)
@@ -105,11 +123,11 @@ end
     SparseKKTSystem
 =#
 
-function SparseKKTSystem{T, VT, MT}(
+function SparseKKTSystem{T, VT, MT, QN}(
     n::Int, m::Int, ind_ineq::Vector{Int}, ind_fixed::Vector{Int},
     hess_sparsity_I, hess_sparsity_J,
     jac_sparsity_I, jac_sparsity_J,
-) where {T, VT, MT}
+) where {T, VT, MT, QN}
     n_slack = length(ind_ineq)
     n_jac = length(jac_sparsity_I)
     n_hess = length(hess_sparsity_I)
@@ -165,8 +183,10 @@ function SparseKKTSystem{T, VT, MT}(
     end
     jac_scaling = ones(T, n_jac+n_slack)
 
-    return SparseKKTSystem{T, VT, MT}(
-        hess, jac_callback, jac, pr_diag, du_diag,
+    quasi_newton = QN(n)
+
+    return SparseKKTSystem{T, VT, MT, QN}(
+        hess, jac_callback, jac, quasi_newton, pr_diag, du_diag,
         aug_raw, aug_com, aug_csc_map,
         jac_raw, jac_com, jac_csc_map,
         ind_ineq, ind_fixed, ind_aug_fixed, jac_scaling,
@@ -174,7 +194,8 @@ function SparseKKTSystem{T, VT, MT}(
 end
 
 # Build KKT system directly from AbstractNLPModel
-function SparseKKTSystem{T, VT, MT}(nlp::AbstractNLPModel, ind_cons=get_index_constraints(nlp)) where {T, VT, MT}
+function SparseKKTSystem{T, VT, MT, QN}(nlp::AbstractNLPModel, ind_cons=get_index_constraints(nlp)) where {T, VT, MT, QN}
+    n_slack = length(ind_cons.ind_ineq)
     # Deduce KKT size.
     n = get_nvar(nlp)
     m = get_ncon(nlp)
@@ -183,13 +204,11 @@ function SparseKKTSystem{T, VT, MT}(nlp::AbstractNLPModel, ind_cons=get_index_co
     jac_J = Vector{Int32}(undef, get_nnzj(nlp.meta))
     jac_structure!(nlp,jac_I, jac_J)
 
-    hess_I = Vector{Int32}(undef, get_nnzh(nlp.meta))
-    hess_J = Vector{Int32}(undef, get_nnzh(nlp.meta))
-    hess_structure!(nlp,hess_I,hess_J)
+    hess_I, hess_J = build_hessian_structure(nlp, QN)
 
     force_lower_triangular!(hess_I,hess_J)
 
-    return SparseKKTSystem{T, VT, MT}(
+    return SparseKKTSystem{T, VT, MT, QN}(
         n, m, ind_cons.ind_ineq, ind_cons.ind_fixed,
         hess_I, hess_J, jac_I, jac_J,
     )
@@ -203,12 +222,12 @@ num_variables(kkt::SparseKKTSystem) = length(kkt.pr_diag)
     SparseUnreducedKKTSystem
 =#
 
-function SparseUnreducedKKTSystem{T, VT, MT}(
+function SparseUnreducedKKTSystem{T, VT, MT, QN}(
     n::Int, m::Int, nlb::Int, nub::Int, ind_ineq, ind_fixed,
     hess_sparsity_I, hess_sparsity_J,
     jac_sparsity_I, jac_sparsity_J,
     ind_lb, ind_ub,
-) where {T, VT, MT}
+) where {T, VT, MT, QN}
     n_slack = length(ind_ineq)
     n_jac = length(jac_sparsity_I)
     n_hess = length(hess_sparsity_I)
@@ -278,8 +297,10 @@ function SparseUnreducedKKTSystem{T, VT, MT}(
         zeros(Int, 0)
     end
 
-    return SparseUnreducedKKTSystem{T, VT, MT}(
-        hess, jac_callback, jac, pr_diag, du_diag,
+    quasi_newton = QN(n)
+
+    return SparseUnreducedKKTSystem{T, VT, MT, QN}(
+        hess, jac_callback, jac, quasi_newton, pr_diag, du_diag,
         l_diag, u_diag, l_lower, u_lower,
         aug_raw, aug_com, aug_csc_map,
         jac_raw, jac_com, jac_csc_map,
@@ -287,7 +308,7 @@ function SparseUnreducedKKTSystem{T, VT, MT}(
     )
 end
 
-function SparseUnreducedKKTSystem{T, VT, MT}(nlp::AbstractNLPModel, ind_cons=get_index_constraints(nlp)) where {T, VT, MT}
+function SparseUnreducedKKTSystem{T, VT, MT, QN}(nlp::AbstractNLPModel, ind_cons=get_index_constraints(nlp)) where {T, VT, MT, QN}
     n_slack = length(ind_cons.ind_ineq)
     nlb = length(ind_cons.ind_lb)
     nub = length(ind_cons.ind_ub)
@@ -305,7 +326,7 @@ function SparseUnreducedKKTSystem{T, VT, MT}(nlp::AbstractNLPModel, ind_cons=get
 
     force_lower_triangular!(hess_I,hess_J)
 
-    return SparseUnreducedKKTSystem{T, VT, MT}(
+    return SparseUnreducedKKTSystem{T, VT, MT, QN}(
         n, m, nlb, nub, ind_cons.ind_ineq, ind_cons.ind_fixed,
         hess_I, hess_J, jac_I, jac_J, ind_cons.ind_lb, ind_cons.ind_ub,
     )

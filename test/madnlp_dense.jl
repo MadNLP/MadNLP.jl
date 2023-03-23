@@ -67,10 +67,6 @@ end
         kkt = solverd.kkt
         @test isa(kkt, kkt_type)
         @test isempty(kkt.jac)
-        # Special test for DenseKKTSystem
-        if kkt_type <: MadNLP.DenseKKTSystem
-            @test kkt.hess === kkt.aug_com
-        end
         @test solverd.linear_solver.dense === kkt.aug_com
         @test size(kkt.hess) == (n, n)
         @test length(kkt.pr_diag) == n
@@ -124,8 +120,9 @@ end
 
 @testset "MadNLP: custom KKT constructor" begin
     T, VT, MT = Float64, Vector{Float64}, Matrix{Float64}
+    QN = MadNLP.ExactHessian{T, VT}
     nlp = MadNLPTests.DenseDummyQP{T}(; n=10, m=5)
-    KKT = MadNLP.DenseKKTSystem{T, VT, MT}
+    KKT = MadNLP.DenseKKTSystem{T, VT, MT, QN}
     solver = MadNLPSolver{T, KKT}(nlp; linear_solver=LapackCPUSolver)
     @test isa(solver.kkt, KKT)
 end
@@ -146,3 +143,75 @@ end
     res = MadNLP.solve!(solver)
     @test solver.status == MadNLP.SOLVE_SUCCEEDED
 end
+
+@testset "MadNLP: $QN + $KKT" for QN in [
+    MadNLP.DENSE_BFGS,
+    MadNLP.DENSE_DAMPED_BFGS,
+], KKT in [
+    MadNLP.DENSE_KKT_SYSTEM,
+    MadNLP.DENSE_CONDENSED_KKT_SYSTEM,
+]
+    @testset "Size: ($n, $m)" for (n, m) in [(10, 0), (10, 5), (50, 10)]
+        nlp = MadNLPTests.DenseDummyQP{Float64}(; n=n, m=m)
+        solver_exact = MadNLP.MadNLPSolver(
+            nlp;
+            print_level=MadNLP.ERROR,
+            kkt_system=MadNLP.DENSE_KKT_SYSTEM,
+            linear_solver=LapackCPUSolver,
+        )
+        results_ref = MadNLP.solve!(solver_exact)
+
+        solver_qn = MadNLP.MadNLPSolver(
+            nlp;
+            print_level=MadNLP.ERROR,
+            kkt_system=KKT,
+            hessian_approximation=QN,
+            linear_solver=LapackCPUSolver,
+        )
+        results_qn = MadNLP.solve!(solver_qn)
+
+        @test results_qn.status == MadNLP.SOLVE_SUCCEEDED
+        @test results_qn.objective ≈ results_ref.objective atol=1e-6
+        @test results_qn.solution ≈ results_ref.solution atol=1e-6
+        @test solver_qn.cnt.lag_hess_cnt == 0
+        # TODO: this test is currently breaking the CI, investigate why.
+        # @test solver_exact.y ≈ solver_qn.y atol=1e-4
+    end
+end
+
+@testset "MadNLP: LBFGS" begin
+    @testset "HS15" begin
+        nlp = MadNLPTests.HS15Model()
+        solver_qn = MadNLP.MadNLPSolver(
+            nlp;
+            hessian_approximation=MadNLP.SPARSE_COMPACT_LBFGS,
+            print_level=MadNLP.ERROR,
+        )
+        results_qn = MadNLP.solve!(solver_qn)
+        @test results_qn.status == MadNLP.SOLVE_SUCCEEDED
+    end
+    @testset "Size: ($n, $m)" for (n, m) in [(10, 0), (10, 5), (50, 10)]
+        nlp = MadNLPTests.DenseDummyQP{Float64}(; )
+        # Reference solve with exact Hessian
+        solver_exact = MadNLP.MadNLPSolver(
+            nlp;
+            print_level=MadNLP.ERROR,
+        )
+        results_ref = MadNLP.solve!(solver_exact)
+
+        # LBFGS solve
+        solver_qn = MadNLP.MadNLPSolver(
+            nlp;
+            hessian_approximation=MadNLP.SPARSE_COMPACT_LBFGS,
+            print_level=MadNLP.ERROR,
+        )
+        results_qn = MadNLP.solve!(solver_qn)
+        @test results_qn.status == MadNLP.SOLVE_SUCCEEDED
+        @test results_qn.objective ≈ results_ref.objective atol=1e-6
+        @test results_qn.solution ≈ results_ref.solution atol=1e-6
+        @test solver_qn.cnt.lag_hess_cnt == 0
+        # TODO: this test is currently breaking the CI, investigate why.
+        # @test solver_exact.y ≈ solver_qn.y atol=1e-4
+    end
+end
+

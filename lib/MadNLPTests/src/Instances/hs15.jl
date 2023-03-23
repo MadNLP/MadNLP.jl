@@ -51,6 +51,26 @@ function NLPModels.jac_coord!(nlp::HS15Model, x::AbstractVector, J::AbstractVect
     return J
 end
 
+function NLPModels.jprod!(nlp::HS15Model, x::AbstractVector, v::AbstractVector, jv::AbstractVector)
+    jv[1] = x[2] * v[1] + x[1] * v[2]
+    jv[2] = v[1] + 2 * x[2] * v[2]
+    return jv
+end
+
+function NLPModels.jtprod!(nlp::HS15Model, x::AbstractVector, v::AbstractVector, jv::AbstractVector)
+    jv[1] = x[2] * v[1] + v[2]
+    jv[2] = x[1] * v[1] + 2 * x[2] * v[2]
+    return jv
+end
+
+function MadNLP.jac_dense!(nlp::HS15Model, x::AbstractVector, J::AbstractMatrix)
+    J[1, 1] = x[2]    # (1, 1)
+    J[1, 2] = x[1]    # (1, 2)
+    J[2, 1] = 1.0     # (2, 1)
+    J[2, 2] = 2*x[2]  # (2, 2)
+    return J
+end
+
 function NLPModels.hess_structure!(nlp::HS15Model, I::AbstractVector{T}, J::AbstractVector{T}) where T
     copyto!(I, [1, 2, 2])
     copyto!(J, [1, 1, 2])
@@ -65,6 +85,18 @@ function NLPModels.hess_coord!(nlp::HS15Model, x, y, H::AbstractVector; obj_weig
     H[2] += y[1] * 1.0
     # Second constraint
     H[3] += y[2] * 2.0
+    return H
+end
+
+function MadNLP.hess_dense!(nlp::HS15Model, x, y, H::AbstractMatrix; obj_weight=1.0)
+    H[1, 1] = obj_weight * (-400.0 * x[2] + 1200.0 * x[1]^2 + 2.0)
+    H[2, 1] = obj_weight * (-400.0 * x[1])
+    H[2, 2] = obj_weight * 200.0
+    # First constraint
+    H[2, 1] += y[1] * 1.0
+    # Second constraint
+    H[2, 2] += y[2] * 2.0
+    H[1, 2] = H[2, 1]
     return H
 end
 
