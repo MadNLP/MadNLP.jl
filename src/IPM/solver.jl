@@ -13,6 +13,8 @@ solve!(solver::AbstractMadNLPSolver; kwargs...) = solve!(
 
 
 function initialize!(solver::AbstractMadNLPSolver{T}) where T
+
+
     # initializing slack variables
     @trace(solver.logger,"Initializing slack variables.")
     cons!(solver.nlp,get_x0(solver.nlp),_madnlp_unsafe_wrap(solver.c,get_ncon(solver.nlp)))
@@ -341,8 +343,11 @@ function regular!(solver::AbstractMadNLPSolver{T}) where T
             @warn(solver.logger,"In iteration $(solver.cnt.k), $adjusted Slack too small, adjusting variable bound")
 
         axpy!(solver.alpha,dual(solver.d),solver.y)
-        axpy!(solver.alpha_z, dual_lb(solver.d), solver.zl_r)
-        axpy!(solver.alpha_z, dual_ub(solver.d), solver.zu_r)
+        # axpy!(solver.alpha_z, dual_lb(solver.d), solver.zl_r)
+        # axpy!(solver.alpha_z, dual_ub(solver.d), solver.zu_r)
+        solver.zl_r .+= solver.alpha_z .* dual_lb(solver.d)
+        solver.zu_r .+= solver.alpha_z .* dual_ub(solver.d) 
+        
         reset_bound_dual!(
             primal(solver.zl),
             primal(solver.x),
@@ -407,8 +412,8 @@ function restore!(solver::AbstractMadNLPSolver)
 
         axpy!(solver.alpha, primal(solver.d), full(solver.x))
         axpy!(solver.alpha, dual(solver.d), solver.y)
-        axpy!(solver.alpha, dual_lb(solver.d), solver.zl_r)
-        axpy!(solver.alpha, dual_ub(solver.d), solver.zu_r)
+        solver.zl_r .+= solver.alpha .* dual_lb(solver.d)
+        solver.zu_r .+= solver.alpha .* dual_ub(solver.d)
 
         eval_cons_wrapper!(solver,solver.c,solver.x)
         eval_grad_f_wrapper!(solver,solver.f,solver.x)

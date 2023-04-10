@@ -1,6 +1,3 @@
-const umfpack_default_ctrl = copy(UMFPACK.umf_ctrl)
-const umfpack_default_info = copy(UMFPACK.umf_info)
-
 @kwdef mutable struct UmfpackOptions <: AbstractOptions
     umfpack_pivtol::Float64 = 1e-4
     umfpack_pivtolmax::Float64 = 1e-1
@@ -59,37 +56,21 @@ function UmfpackSolver(
     csc::SparseMatrixCSC{T};
     opt=UmfpackOptions(), logger=MadNLPLogger(),
 ) where T
+
     p = Vector{T}(undef,csc.n)
     full,tril_to_full_view = get_tril_to_full(csc)
+    inner = UMFPACK.lu(full)
 
-    full.colptr.-=1; full.rowval.-=1
-
-    inner = UMFPACK.UmfpackLU(C_NULL,C_NULL,full.n,full.n,full.colptr,full.rowval,full.nzval,0)
-    UMFPACK.finalizer(UMFPACK.umfpack_free_symbolic,inner)
-    UMFPACK.umfpack_symbolic!(inner)
-    ctrl = copy(umfpack_default_ctrl)
-    info = copy(umfpack_default_info)
-    ctrl[4]=opt.umfpack_pivtol
-    ctrl[12]=opt.umfpack_sym_pivtol
-    ctrl[5]=opt.umfpack_block_size
-    ctrl[6]=opt.umfpack_strategy
-
-    tmp = Vector{Ptr{Cvoid}}(undef, 1)
-
-    return UmfpackSolver(inner,csc,full,tril_to_full_view,p,tmp,ctrl,info,opt,logger)
+    return UmfpackSolver(inner,full,tril_to_full_view,p)
 end
 
 function factorize!(M::UmfpackSolver)
-    UMFPACK.umfpack_free_numeric(M.inner)
     M.full.nzval.=M.tril_to_full_view
-    status = umfpack_numeric(M.inner.colptr,M.inner.rowval,M.inner.nzval,M.inner.symbolic,M.tmp,M.ctrl,M.info)
-    M.inner.numeric = M.tmp[]
-
-    M.inner.status = status
+    M.inner.status = lu!(M.inner,M.full)
     return M
 end
 function solve!(M::UmfpackSolver{T},rhs::Vector{T}) where T
-    status = umfpack_solve(1,M.inner.colptr,M.inner.rowval,M.inner.nzval,M.p,rhs,M.inner.numeric,M.ctrl,M.info)
+    status = solve!(p,M.inner,M.p)
     rhs .= M.p
     return rhs
 end
@@ -99,12 +80,12 @@ input_type(::Type{UmfpackSolver}) = :csc
 default_options(::Type{UmfpackSolver}) = UmfpackOptions()
 
 function improve!(M::UmfpackSolver)
-    if M.ctrl[4] == M.opt.umfpack_pivtolmax
+    if M.inner.control[4] == M.opt.umfpack_pivtolmax
         @debug(M.logger,"improve quality failed.")
         return false
     end
-    M.ctrl[4] = min(M.opt.umfpack_pivtolmax,M.ctrl[4]^.75)
-    @debug(M.logger,"improved quality: pivtol = $(M.ctrl[4])")
+    M.inner.control[4] = min(M.opt.umfpack_pivtolmax,M.inner.control[4]^.75)
+    @debug(M.logger,"improved quality: pivtol = $(M.inner.control[4])")
     return true
 
     return false

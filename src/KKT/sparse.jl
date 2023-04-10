@@ -110,7 +110,7 @@ function SparseKKTSystem{T, VT, MT}(
     hess_sparsity_I, hess_sparsity_J,
     jac_sparsity_I, jac_sparsity_J,
 ) where {T, VT, MT}
-    n_slack = length(ind_ineq)
+        n_slack = length(ind_ineq)
     n_jac = length(jac_sparsity_I)
     n_hess = length(hess_sparsity_I)
     n_tot = n + n_slack
@@ -176,6 +176,7 @@ end
 # Build KKT system directly from AbstractNLPModel
 function SparseKKTSystem{T, VT, MT}(nlp::AbstractNLPModel, ind_cons=get_index_constraints(nlp)) where {T, VT, MT}
     # Deduce KKT size.
+    
     n = get_nvar(nlp)
     m = get_ncon(nlp)
     # Evaluate sparsity pattern
@@ -188,7 +189,7 @@ function SparseKKTSystem{T, VT, MT}(nlp::AbstractNLPModel, ind_cons=get_index_co
     hess_structure!(nlp,hess_I,hess_J)
 
     force_lower_triangular!(hess_I,hess_J)
-
+    
     return SparseKKTSystem{T, VT, MT}(
         n, m, ind_cons.ind_ineq, ind_cons.ind_fixed,
         hess_I, hess_J, jac_I, jac_J,
@@ -209,6 +210,7 @@ function SparseUnreducedKKTSystem{T, VT, MT}(
     jac_sparsity_I, jac_sparsity_J,
     ind_lb, ind_ub,
 ) where {T, VT, MT}
+
     n_slack = length(ind_ineq)
     n_jac = length(jac_sparsity_I)
     n_hess = length(hess_sparsity_I)
