@@ -9,8 +9,8 @@ end
 
 function MadNLP.diag!(dest::CuVector{T}, src::CuMatrix{T}) where T
     @assert length(dest) == size(src, 1)
-    ev = _copy_diag!(CUDADevice())(dest, src, ndrange=length(dest))
-    wait(ev)
+    ev = _copy_diag!(CUDABackend())(dest, src, ndrange=length(dest))
+    synchronize(CUDABackend())
 end
 
 @kernel function _add_diagonal!(dest, src1, src2)
@@ -19,8 +19,8 @@ end
 end
 
 function MadNLP.diag_add!(dest::CuMatrix, src1::CuVector, src2::CuVector)
-    ev = _add_diagonal!(CUDADevice())(dest, src1, src2, ndrange=size(dest, 1))
-    wait(ev)
+    ev = _add_diagonal!(CUDABackend())(dest, src1, src2, ndrange=size(dest, 1))
+    synchronize(CUDABackend())
 end
 
 #=
@@ -74,8 +74,8 @@ function MadNLP.treat_fixed_variable!(kkt::MadNLP.AbstractKKTSystem{T, VT, MT}) 
     aug = kkt.aug_com
     d_ind_fixed = kkt.ind_fixed |> CuVector # TODO: allocate ind_fixed directly on the GPU
     ndrange = (length(d_ind_fixed), size(aug, 1))
-    ev = _treat_fixed_variable_kernell!(CUDADevice())(aug, d_ind_fixed, ndrange=ndrange)
-    wait(ev)
+    ev = _treat_fixed_variable_kernell!(CUDABackend())(aug, d_ind_fixed, ndrange=ndrange)
+    synchronize(CUDABackend())
 end
 
 
@@ -180,11 +180,11 @@ function MadNLP._build_dense_kkt_system!(
 )
     ind_ineq_gpu = ind_ineq |> CuArray
     ndrange = (n+m+ns, n)
-    ev = _build_dense_kkt_system_kernel!(CUDADevice())(
+    ev = _build_dense_kkt_system_kernel!(CUDABackend())(
         dest, hess, jac, pr_diag, du_diag, diag_hess, ind_ineq_gpu, con_scale, n, m, ns,
         ndrange=ndrange
     )
-    wait(ev)
+    synchronize(CUDABackend())
 end
 
 
@@ -214,11 +214,11 @@ function MadNLP._build_ineq_jac!(
     (m_ineq == 0) && return # nothing to do if no ineq. constraints
     ind_ineq_gpu = ind_ineq |> CuArray
     ndrange = (m_ineq, n)
-    ev = _build_jacobian_condensed_kernel!(CUDADevice())(
+    ev = _build_jacobian_condensed_kernel!(CUDABackend())(
         dest, jac, pr_diag, ind_ineq_gpu, con_scale, n, m_ineq,
-        ndrange=ndrange, dependencies=Event(CUDADevice()),
+        ndrange=ndrange,
     )
-    wait(ev)
+    synchronize(CUDABackend())
     # need to zero the fixed components
     dest[:, ind_fixed] .= 0.0
     return
@@ -253,11 +253,11 @@ function MadNLP._build_condensed_kkt_system!(
 )
     ind_eq_gpu = ind_eq |> CuArray
     ndrange = (n + m_eq, n)
-    ev = _build_condensed_kkt_system_kernel!(CUDADevice())(
+    ev = _build_condensed_kkt_system_kernel!(CUDABackend())(
         dest, hess, jac, pr_diag, du_diag, ind_eq_gpu, n, m_eq,
-        ndrange=ndrange, dependencies=Event(CUDADevice()),
+        ndrange=ndrange,
     )
-    wait(ev)
+    synchronize(CUDABackend())
 end
 
 function LinearAlgebra.mul!(y::AbstractVector, kkt::MadNLP.DenseCondensedKKTSystem{T, VT, MT}, x::AbstractVector) where {T, VT<:CuVector{T}, MT<:CuMatrix{T}}
