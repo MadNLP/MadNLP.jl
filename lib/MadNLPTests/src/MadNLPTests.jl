@@ -11,7 +11,6 @@ import MadNLP
 import NLPModels
 import JuMP: Model, @variable, @constraint, @objective, @NLconstraint , @NLobjective, optimize!,
     MOI, termination_status, LowerBoundRef, UpperBoundRef, value, dual
-import ADNLPModels: ADNLSModel
 
 export test_madnlp, solcmp
 
