@@ -44,6 +44,7 @@ end
     jacobian_constant::Bool = false
     hessian_constant::Bool = false
     kkt_system::KKTLinearSystem = SPARSE_KKT_SYSTEM
+    hessian_approximation::HessianApproximation = EXACT_HESSIAN
 
     # initialization options
     dual_initialized::Bool = false
@@ -94,9 +95,15 @@ end
 end
 
 function check_option_sanity(options)
-    if input_type(options.linear_solver) == :csc && options.kkt_system == DENSE_KKT_SYSTEM
+    is_kkt_dense = (options.kkt_system == DENSE_KKT_SYSTEM) || (options.kkt_system == DENSE_CONDENSED_KKT_SYSTEM)
+    is_hess_approx_dense = (options.hessian_approximation == DENSE_BFGS) || (options.hessian_approximation == DENSE_DAMPED_BFGS)
+    if input_type(options.linear_solver) == :csc && is_kkt_dense
         error("[options] Sparse Linear solver is not supported in dense mode.\n"*
               "Please use a dense linear solver or change `kkt_system` ")
+    end
+    if is_hess_approx_dense && !is_kkt_dense
+        error("[options] DENSE_BFGS and DENSE_DAMPED_BFGS quasi-Newton approximations\n"*
+              "require a dense KKT system (DENSE_KKT_SYSTEM or DENSE_CONDENSED_KKT_SYSTEM).")
     end
 end
 

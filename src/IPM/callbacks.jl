@@ -113,7 +113,13 @@ function eval_jac_wrapper!(solver::MadNLPSolver, kkt::AbstractDenseKKTSystem, x:
     return jac
 end
 
-function eval_lag_hess_wrapper!(solver::MadNLPSolver, kkt::AbstractDenseKKTSystem, x::PrimalVector{T},l::Vector{T};is_resto=false) where T
+function eval_lag_hess_wrapper!(
+    solver::MadNLPSolver,
+    kkt::AbstractDenseKKTSystem{T, VT, MT, QN},
+    x::PrimalVector{T},
+    l::Vector{T};
+    is_resto=false,
+) where {T, VT, MT, QN<:ExactHessian}
     nlp = solver.nlp
     cnt = solver.cnt
     @trace(solver.logger,"Evaluating Lagrangian Hessian.")
@@ -133,5 +139,51 @@ function eval_lag_hess_wrapper!(solver::MadNLPSolver, kkt::AbstractDenseKKTSyste
         throw(InvalidNumberException(:hess))
     end
     return hess
+end
+
+function eval_lag_hess_wrapper!(
+    solver::MadNLPSolver,
+    kkt::AbstractKKTSystem{T, VT, MT, QN},
+    x::PrimalVector{T},
+    l::Vector{T};
+    is_resto=false,
+) where {T, VT, MT<:AbstractMatrix{T}, QN<:AbstractQuasiNewton{T, VT}}
+    nlp = solver.nlp
+    cnt = solver.cnt
+    @trace(solver.logger, "Update BFGS matrices.")
+
+    qn = kkt.quasi_newton
+    Bk = kkt.hess
+    sk, yk = qn.sk, qn.yk
+    n = length(qn.sk)
+    m = size(kkt.jac, 1)
+
+    if cnt.obj_grad_cnt >= 2
+        # Build sk = x+ - x
+        copyto!(sk, 1, variable(solver.x), 1, n)   # sₖ = x₊
+        axpy!(-one(T), qn.last_x, sk)              # sₖ = x₊ - x
+
+        # Build yk = ∇L+ - ∇L
+        copyto!(yk, 1, variable(solver.f), 1, n)   # yₖ = ∇f₊
+        axpy!(-one(T), qn.last_g, yk)              # yₖ = ∇f₊ - ∇f
+        if m > 0
+            jtprod!(solver.jacl, kkt, l)
+            axpy!(n, one(T), solver.jacl, 1, yk, 1)  # yₖ += J₊ᵀ l₊
+            NLPModels.jtprod!(nlp, qn.last_x, l, qn.last_jv)
+            axpy!(-one(T), qn.last_jv, yk)           # yₖ += J₊ᵀ l₊ - Jᵀ l₊
+        end
+
+        if cnt.obj_grad_cnt == 2
+            init!(qn, Bk, sk, yk)
+        end
+        update!(qn, Bk, sk, yk)
+    end
+
+    # Backup data for next step
+    copyto!(qn.last_x, 1, variable(solver.x), 1, n)
+    copyto!(qn.last_g, 1, variable(solver.f), 1, n)
+
+    compress_hessian!(kkt)
+    return get_hessian(kkt)
 end
 

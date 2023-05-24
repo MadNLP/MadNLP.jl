@@ -7,8 +7,9 @@ import Pkg.TOML: parsefile
 import MathOptInterface
 import Libdl: dlopen, dlext, RTLD_DEEPBIND, RTLD_GLOBAL
 import Printf: @sprintf
-import LinearAlgebra: BLAS, Adjoint, Symmetric, mul!, ldiv!, norm, dot, normInf
-import LinearAlgebra.BLAS: axpy!, symv!, libblas, liblapack, BlasInt, @blasfunc
+import LinearAlgebra: BLAS, Adjoint, Symmetric, mul!, ldiv!, norm, dot, diagind, normInf, transpose!
+import LinearAlgebra: cholesky, qr, lu, cholesky!
+import LinearAlgebra.BLAS: axpy!, symv!, ger!, libblas, liblapack, BlasInt, @blasfunc
 import SparseArrays: AbstractSparseMatrix, SparseMatrixCSC, sparse, getcolptr, rowvals, nnz
 import Base: string, show, print, size, getindex, copyto!, @kwdef
 import SuiteSparse: UMFPACK
@@ -29,6 +30,7 @@ include("enums.jl")
 include("utils.jl")
 include("matrixtools.jl")
 include("nlpmodels.jl")
+include("quasi_newton.jl")
 include(joinpath("KKT", "KKTsystem.jl"))
 include(joinpath("LinearSolvers","linearsolvers.jl"))
 include("options.jl")

@@ -1,13 +1,13 @@
 
 """
-    AbstractKKTSystem{T, VT<:AbstractVector{T}, MT<:AbstractMatrix{T}}
+    AbstractKKTSystem{T, VT<:AbstractVector{T}, MT<:AbstractMatrix{T}, QN<:AbstractHessian{T}}
 
 Abstract type for KKT system.
 """
-abstract type AbstractKKTSystem{T, VT, MT<:AbstractMatrix{T}} end
+abstract type AbstractKKTSystem{T, VT, MT<:AbstractMatrix{T}, QN<:AbstractHessian{T, VT}} end
 
 """
-    AbstractUnreducedKKTSystem{T, VT, MT} <: AbstractKKTSystem{T, VT, MT}
+    AbstractUnreducedKKTSystem{T, VT, MT, QN} <: AbstractKKTSystem{T, VT, MT, QN}
 
 Augmented KKT system associated to the linearization of the KKT
 conditions at the current primal-dual iterate ``(x, s, y, z, ν, w)``.
@@ -30,10 +30,10 @@ with
 * ``V = diag(ν)``
 * ``W = diag(w)``
 """
-abstract type AbstractUnreducedKKTSystem{T, VT, MT} <: AbstractKKTSystem{T, VT, MT} end
+abstract type AbstractUnreducedKKTSystem{T, VT, MT, QN} <: AbstractKKTSystem{T, VT, MT, QN} end
 
 """
-    AbstractReducedKKTSystem{T, VT, MT} <: AbstractKKTSystem{T, VT, MT}
+    AbstractReducedKKTSystem{T, VT, MT, QN} <: AbstractKKTSystem{T, VT, MT, QN}
 
 The reduced KKT system is a simplification of the original Augmented KKT system.
 Comparing to [`AbstractUnreducedKKTSystem`](@ref)), `AbstractReducedKKTSystem` removes
@@ -54,10 +54,10 @@ with
 * ``Σₛ = S⁻¹ W``
 
 """
-abstract type AbstractReducedKKTSystem{T, VT, MT} <: AbstractKKTSystem{T, VT, MT} end
+abstract type AbstractReducedKKTSystem{T, VT, MT, QN} <: AbstractKKTSystem{T, VT, MT, QN} end
 
 """
-    AbstractCondensedKKTSystem{T, VT, MT} <: AbstractKKTSystem{T, VT, MT}
+    AbstractCondensedKKTSystem{T, VT, MT, QN} <: AbstractKKTSystem{T, VT, MT, QN}
 
 The condensed KKT system simplifies further the [`AbstractReducedKKTSystem`](@ref)
 by removing the rows associated to the slack variables ``s`` and the inequalities.
@@ -74,7 +74,7 @@ with
 * ``Σₓ = X⁻¹ V``
 * ``Σₛ = S⁻¹ W``
 """
-abstract type AbstractCondensedKKTSystem{T, VT, MT} <: AbstractKKTSystem{T, VT, MT} end
+abstract type AbstractCondensedKKTSystem{T, VT, MT, QN} <: AbstractKKTSystem{T, VT, MT, QN} end
 
 #=
     Templates

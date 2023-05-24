@@ -26,6 +26,21 @@
       DENSE_CONDENSED_KKT_SYSTEM = 4,
 )
 
+@enum(HessianApproximation::Int,
+      EXACT_HESSIAN = 1,
+      DENSE_BFGS = 2,
+      DENSE_DAMPED_BFGS = 3,
+      SPARSE_COMPACT_LBFGS = 4,
+)
+
+@enum(BFGSInitStrategy::Int,
+      SCALAR1  = 1,
+      SCALAR2  = 2,
+      SCALAR3  = 3,
+      SCALAR4  = 4,
+      CONSTANT = 5,
+)
+
 @enum(Status::Int,
       SOLVE_SUCCEEDED = 1,
       SOLVED_TO_ACCEPTABLE_LEVEL = 2,

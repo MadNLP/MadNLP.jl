@@ -12,7 +12,8 @@ nlp = MadNLPTests.HS15Model()
 T = Float64
 VT = Vector{T}
 MT = Matrix{T}
-kkt = MadNLP.SparseKKTSystem{T, VT, MT}(nlp)
+QN = MadNLP.ExactHessian{T, VT}
+kkt = MadNLP.SparseKKTSystem{T, VT, MT, QN}(nlp)
 
 n = NLPModels.get_nvar(nlp)
 m = NLPModels.get_ncon(nlp)

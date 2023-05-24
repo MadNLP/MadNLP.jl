@@ -38,6 +38,18 @@ function NLPModels.jac_coord!(qp::DenseDummyQP, x::AbstractVector, J::AbstractVe
         index += 1
     end
 end
+
+function NLPModels.jprod!(qp::DenseDummyQP, x::AbstractVector, v::AbstractVector, jv::AbstractVector)
+    mul!(jv, qp.A, v)
+    return jv
+end
+
+function NLPModels.jtprod!(qp::DenseDummyQP, x::AbstractVector, v::AbstractVector, jv::AbstractVector)
+    mul!(jv, qp.A', v)
+    return jv
+end
+
+
 # Jacobian: dense callback
 MadNLP.jac_dense!(qp::DenseDummyQP, x, J::AbstractMatrix) = copyto!(J, qp.A)
 # Hessian: sparse callback
