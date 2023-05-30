@@ -14,66 +14,43 @@ mutable struct UmfpackSolver{T} <: AbstractLinearSolver{T}
 
     p::Vector{T}
 
-    tmp::Vector{Ptr{Cvoid}}
-    ctrl::Vector{T}
-    info::Vector{T}
-
     opt::UmfpackOptions
     logger::MadNLPLogger
 end
-
-
-for (numeric,solve,T) in (
-    (:umfpack_di_numeric, :umfpack_di_solve, Float64),
-    (:umfpack_si_numeric, :umfpack_si_solve, Float32),
-    )
-    @eval begin
-        umfpack_numeric(
-            colptr::Vector{Int32},rowval::Vector{Int32},
-            nzval::Vector{$T},symbolic::Ptr{Nothing},
-            tmp::Vector{Ptr{Nothing}},ctrl::Vector{$T},
-            info::Vector{$T}) = ccall(
-                ($(string(numeric)),:libumfpack),
-                Int32,
-                (Ptr{Int32},Ptr{Int32},Ptr{$T},Ptr{Cvoid},Ptr{Cvoid},
-                 Ptr{$T},Ptr{$T}),
-                colptr,rowval,nzval,symbolic,tmp,ctrl,info)
-        umfpack_solve(
-            typ,colptr::Vector{Int32},rowval::Vector{Int32},
-            nzval::Vector{$T},x::Vector{$T},b::Vector{$T},
-            numeric,ctrl::Vector{$T},info::Vector{$T}) = ccall(
-                ($(string(solve)),:libumfpack),
-                Int32,
-                (Int32, Ptr{Int32}, Ptr{Int32}, Ptr{$T},Ptr{$T},
-                 Ptr{$T}, Ptr{Cvoid}, Ptr{$T},Ptr{$T}),
-                typ,colptr,rowval,nzval,x,b,numeric,ctrl,info)
-    end
-end
-
-
 
 function UmfpackSolver(
     csc::SparseMatrixCSC{T};
     opt=UmfpackOptions(), logger=MadNLPLogger(),
 ) where T
-
     p = Vector{T}(undef,csc.n)
-    full,tril_to_full_view = get_tril_to_full(csc)
-    inner = UMFPACK.lu(full)
-
-    return UmfpackSolver(inner,full,tril_to_full_view,p)
+    full, tril_to_full_view = get_tril_to_full(csc)
+    controls = UMFPACK.get_umfpack_control(T, Int)
+    # Override default controls with custom setting
+    controls[4] = opt.umfpack_pivtol
+    controls[5] = opt.umfpack_block_size
+    controls[6] = opt.umfpack_strategy
+    controls[12] = opt.umfpack_sym_pivtol
+    inner = UMFPACK.UmfpackLU(csc; control=controls)
+    return UmfpackSolver(inner, csc, full, tril_to_full_view, p, opt, logger)
 end
 
 function factorize!(M::UmfpackSolver)
-    M.full.nzval.=M.tril_to_full_view
-    M.inner.status = lu!(M.inner,M.full)
+    M.full.nzval .= M.tril_to_full_view
+    # We check the factorization succeeded later in the backsolve
+    UMFPACK.lu!(M.inner, M.full; check=false)
     return M
 end
+
 function solve!(M::UmfpackSolver{T},rhs::Vector{T}) where T
-    status = solve!(p,M.inner,M.p)
-    rhs .= M.p
+    if UMFPACK.issuccess(M.inner)
+        UMFPACK.ldiv!(M.p, M.inner, rhs)
+        rhs .= M.p
+    end
+    # If the factorization failed, we return the same
+    # rhs to enter into a primal-dual regularization phase.
     return rhs
 end
+
 is_inertia(::UmfpackSolver) = false
 inertia(M::UmfpackSolver) = throw(InertiaException())
 input_type(::Type{UmfpackSolver}) = :csc
@@ -81,14 +58,12 @@ default_options(::Type{UmfpackSolver}) = UmfpackOptions()
 
 function improve!(M::UmfpackSolver)
     if M.inner.control[4] == M.opt.umfpack_pivtolmax
-        @debug(M.logger,"improve quality failed.")
+        @debug(M.logger, "improve quality failed.")
         return false
     end
-    M.inner.control[4] = min(M.opt.umfpack_pivtolmax,M.inner.control[4]^.75)
-    @debug(M.logger,"improved quality: pivtol = $(M.inner.control[4])")
+    M.inner.control[4] = min(M.opt.umfpack_pivtolmax, M.inner.control[4]^.75)
+    @debug(M.logger, "improved quality: pivtol = $(M.inner.control[4])")
     return true
-
-    return false
 end
-introduce(::UmfpackSolver)="umfpack"
+introduce(::UmfpackSolver) = "umfpack"
 is_supported(::Type{UmfpackSolver},::Type{Float64}) = true

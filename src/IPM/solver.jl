@@ -343,11 +343,10 @@ function regular!(solver::AbstractMadNLPSolver{T}) where T
             @warn(solver.logger,"In iteration $(solver.cnt.k), $adjusted Slack too small, adjusting variable bound")
 
         axpy!(solver.alpha,dual(solver.d),solver.y)
-        # axpy!(solver.alpha_z, dual_lb(solver.d), solver.zl_r)
-        # axpy!(solver.alpha_z, dual_ub(solver.d), solver.zu_r)
+
         solver.zl_r .+= solver.alpha_z .* dual_lb(solver.d)
-        solver.zu_r .+= solver.alpha_z .* dual_ub(solver.d) 
-        
+        solver.zu_r .+= solver.alpha_z .* dual_ub(solver.d)
+
         reset_bound_dual!(
             primal(solver.zl),
             primal(solver.x),
@@ -645,10 +644,11 @@ function robust!(solver::MadNLPSolver{T}) where T
         set_f_RR!(solver,RR)
 
         axpy!(solver.alpha, dual(solver.d), solver.y)
-        axpy!(solver.alpha_z, dual_lb(solver.d),solver.zl_r)
-        axpy!(solver.alpha_z, dual_ub(solver.d),solver.zu_r)
         axpy!(solver.alpha_z, RR.dzp,RR.zp)
         axpy!(solver.alpha_z, RR.dzn,RR.zn)
+
+        solver.zl_r .+= solver.alpha_z .* dual_lb(solver.d)
+        solver.zu_r .+= solver.alpha_z .* dual_ub(solver.d)
 
         reset_bound_dual!(
             primal(solver.zl),
