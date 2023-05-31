@@ -106,8 +106,6 @@ function improve!(M::UmfpackSolver)
     M.ctrl[4] = min(M.opt.umfpack_pivtolmax,M.ctrl[4]^.75)
     @debug(M.logger,"improved quality: pivtol = $(M.ctrl[4])")
     return true
-
-    return false
 end
 introduce(::UmfpackSolver)="umfpack"
 is_supported(::Type{UmfpackSolver},::Type{Float64}) = true
