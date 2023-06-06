@@ -3,14 +3,14 @@ module MadNLPGPU
 import LinearAlgebra
 # CUDA
 import CUDA: CUDA, CUBLAS, CUSOLVER, CuVector, CuMatrix, CuArray, R_64F, has_cuda, @allowscalar, runtime_version
+import CUDA: CUDABackend
 import .CUSOLVER:
     libcusolver, cusolverStatus_t, CuPtr, cudaDataType, cublasFillMode_t, cusolverDnHandle_t, dense_handle
 import .CUBLAS: handle, CUBLAS_DIAG_NON_UNIT,
     CUBLAS_FILL_MODE_LOWER, CUBLAS_FILL_MODE_UPPER, CUBLAS_SIDE_LEFT, CUBLAS_OP_N, CUBLAS_OP_T
 
 # Kernels
-import KernelAbstractions: @kernel, @index, wait, Event
-import CUDAKernels: CUDADevice
+import KernelAbstractions: @kernel, @index, synchronize
 
 import MadNLP: NLPModels
 import MadNLP
