@@ -1,6 +1,3 @@
-const umfpack_default_ctrl = copy(UMFPACK.umf_ctrl)
-const umfpack_default_info = copy(UMFPACK.umf_info)
-
 @kwdef mutable struct UmfpackOptions <: AbstractOptions
     umfpack_pivtol::Float64 = 1e-4
     umfpack_pivtolmax::Float64 = 1e-1
@@ -17,97 +14,56 @@ mutable struct UmfpackSolver{T} <: AbstractLinearSolver{T}
 
     p::Vector{T}
 
-    tmp::Vector{Ptr{Cvoid}}
-    ctrl::Vector{T}
-    info::Vector{T}
-
     opt::UmfpackOptions
     logger::MadNLPLogger
 end
-
-
-for (numeric,solve,T) in (
-    (:umfpack_di_numeric, :umfpack_di_solve, Float64),
-    (:umfpack_si_numeric, :umfpack_si_solve, Float32),
-    )
-    @eval begin
-        umfpack_numeric(
-            colptr::Vector{Int32},rowval::Vector{Int32},
-            nzval::Vector{$T},symbolic::Ptr{Nothing},
-            tmp::Vector{Ptr{Nothing}},ctrl::Vector{$T},
-            info::Vector{$T}) = ccall(
-                ($(string(numeric)),:libumfpack),
-                Int32,
-                (Ptr{Int32},Ptr{Int32},Ptr{$T},Ptr{Cvoid},Ptr{Cvoid},
-                 Ptr{$T},Ptr{$T}),
-                colptr,rowval,nzval,symbolic,tmp,ctrl,info)
-        umfpack_solve(
-            typ,colptr::Vector{Int32},rowval::Vector{Int32},
-            nzval::Vector{$T},x::Vector{$T},b::Vector{$T},
-            numeric,ctrl::Vector{$T},info::Vector{$T}) = ccall(
-                ($(string(solve)),:libumfpack),
-                Int32,
-                (Int32, Ptr{Int32}, Ptr{Int32}, Ptr{$T},Ptr{$T},
-                 Ptr{$T}, Ptr{Cvoid}, Ptr{$T},Ptr{$T}),
-                typ,colptr,rowval,nzval,x,b,numeric,ctrl,info)
-    end
-end
-
-
 
 function UmfpackSolver(
     csc::SparseMatrixCSC{T};
     opt=UmfpackOptions(), logger=MadNLPLogger(),
 ) where T
     p = Vector{T}(undef,csc.n)
-    full,tril_to_full_view = get_tril_to_full(csc)
-
-    full.colptr.-=1; full.rowval.-=1
-
-    inner = UMFPACK.UmfpackLU(C_NULL,C_NULL,full.n,full.n,full.colptr,full.rowval,full.nzval,0)
-    UMFPACK.finalizer(UMFPACK.umfpack_free_symbolic,inner)
-    UMFPACK.umfpack_symbolic!(inner)
-    ctrl = copy(umfpack_default_ctrl)
-    info = copy(umfpack_default_info)
-    ctrl[4]=opt.umfpack_pivtol
-    ctrl[12]=opt.umfpack_sym_pivtol
-    ctrl[5]=opt.umfpack_block_size
-    ctrl[6]=opt.umfpack_strategy
-
-    tmp = Vector{Ptr{Cvoid}}(undef, 1)
-
-    return UmfpackSolver(inner,csc,full,tril_to_full_view,p,tmp,ctrl,info,opt,logger)
+    full, tril_to_full_view = get_tril_to_full(csc)
+    controls = UMFPACK.get_umfpack_control(T, Int)
+    # Override default controls with custom setting
+    controls[4] = opt.umfpack_pivtol
+    controls[5] = opt.umfpack_block_size
+    controls[6] = opt.umfpack_strategy
+    controls[12] = opt.umfpack_sym_pivtol
+    inner = UMFPACK.UmfpackLU(csc; control=controls)
+    return UmfpackSolver(inner, csc, full, tril_to_full_view, p, opt, logger)
 end
 
 function factorize!(M::UmfpackSolver)
-    UMFPACK.umfpack_free_numeric(M.inner)
-    M.full.nzval.=M.tril_to_full_view
-    status = umfpack_numeric(M.inner.colptr,M.inner.rowval,M.inner.nzval,M.inner.symbolic,M.tmp,M.ctrl,M.info)
-    M.inner.numeric = M.tmp[]
-
-    M.inner.status = status
+    M.full.nzval .= M.tril_to_full_view
+    # We check the factorization succeeded later in the backsolve
+    UMFPACK.lu!(M.inner, M.full; check=false)
     return M
 end
+
 function solve!(M::UmfpackSolver{T},rhs::Vector{T}) where T
-    status = umfpack_solve(1,M.inner.colptr,M.inner.rowval,M.inner.nzval,M.p,rhs,M.inner.numeric,M.ctrl,M.info)
-    rhs .= M.p
+    if UMFPACK.issuccess(M.inner)
+        UMFPACK.ldiv!(M.p, M.inner, rhs)
+        rhs .= M.p
+    end
+    # If the factorization failed, we return the same
+    # rhs to enter into a primal-dual regularization phase.
     return rhs
 end
+
 is_inertia(::UmfpackSolver) = false
 inertia(M::UmfpackSolver) = throw(InertiaException())
 input_type(::Type{UmfpackSolver}) = :csc
 default_options(::Type{UmfpackSolver}) = UmfpackOptions()
 
 function improve!(M::UmfpackSolver)
-    if M.ctrl[4] == M.opt.umfpack_pivtolmax
-        @debug(M.logger,"improve quality failed.")
+    if M.inner.control[4] == M.opt.umfpack_pivtolmax
+        @debug(M.logger, "improve quality failed.")
         return false
     end
-    M.ctrl[4] = min(M.opt.umfpack_pivtolmax,M.ctrl[4]^.75)
-    @debug(M.logger,"improved quality: pivtol = $(M.ctrl[4])")
+    M.inner.control[4] = min(M.opt.umfpack_pivtolmax, M.inner.control[4]^.75)
+    @debug(M.logger, "improved quality: pivtol = $(M.inner.control[4])")
     return true
-
-    return false
 end
-introduce(::UmfpackSolver)="umfpack"
+introduce(::UmfpackSolver) = "umfpack"
 is_supported(::Type{UmfpackSolver},::Type{Float64}) = true

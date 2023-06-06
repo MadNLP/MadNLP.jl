@@ -168,7 +168,7 @@ function eval_lag_hess_wrapper!(
         axpy!(-one(T), qn.last_g, yk)              # yₖ = ∇f₊ - ∇f
         if m > 0
             jtprod!(solver.jacl, kkt, l)
-            axpy!(n, one(T), solver.jacl, 1, yk, 1)  # yₖ += J₊ᵀ l₊
+            BLAS.axpy!(n, one(T), solver.jacl, 1, yk, 1)  # yₖ += J₊ᵀ l₊
             NLPModels.jtprod!(nlp, qn.last_x, l, qn.last_jv)
             axpy!(-one(T), qn.last_jv, yk)           # yₖ += J₊ᵀ l₊ - Jᵀ l₊
         end
