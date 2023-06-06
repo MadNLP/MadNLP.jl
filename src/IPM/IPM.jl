@@ -146,7 +146,6 @@ function MadNLPSolver{T,KKTSystem}(
     opt.disable_garbage_collector &&
         (GC.enable(false); @warn(logger,"Julia garbage collector is temporarily disabled"))
     set_blas_num_threads(opt.blas_num_threads; permanent=true)
-
     @trace(logger,"Initializing variables.")
     ind_cons = get_index_constraints(nlp; fixed_variable_treatment=opt.fixed_variable_treatment)
     ns = length(ind_cons.ind_ineq)
@@ -167,8 +166,9 @@ function MadNLPSolver{T,KKTSystem}(
     xu = PrimalVector{T, Vector{T}}(nx, ns)
     variable(xu) .= get_uvar(nlp)
     slack(xu) .= view(get_ucon(nlp), ind_cons.ind_ineq)
-    zl = PrimalVector{T, Vector{T}}(nx, ns)
-    zu = PrimalVector{T, Vector{T}}(nx, ns)
+        zl = PrimalVector{T, Vector{T}}(nx, ns)
+        zu = PrimalVector{T, Vector{T}}(nx, ns)
+    
     # Gradient
     f = PrimalVector{T, Vector{T}}(nx, ns)
 
@@ -195,6 +195,7 @@ function MadNLPSolver{T,KKTSystem}(
     x_trial_lr = view(full(x_trial), ind_cons.ind_lb)
     x_trial_ur = view(full(x_trial), ind_cons.ind_ub)
 
+    
     if is_reduced(kkt)
         _w1 = ReducedKKTVector{T,typeof(c)}(n, m)
         _w2 = ReducedKKTVector{T,typeof(c)}(n, m)
@@ -218,7 +219,6 @@ function MadNLPSolver{T,KKTSystem}(
     obj_scale = T[1.0]
     con_scale = ones(T,m)
     con_jac_scale = ones(T,n_jac)
-
     @trace(logger,"Initializing linear solver.")
     cnt.linear_solver_time =
         @elapsed linear_solver = opt.linear_solver(get_kkt(kkt) ; opt=opt_linear_solver, logger=logger)
