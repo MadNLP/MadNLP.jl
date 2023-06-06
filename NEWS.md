@@ -1,5 +1,17 @@
 # Release notes
 
+## v0.6.0 (March 23th, 2023)
+
+### New features
+
+- add dense BFGS and compact LBFGS algorithms (#221)
+
+### Performance and maintenance
+
+- Bump CUDA.jl to 0.4 and drop support for CUDA.jl 0.3 in MadNLPGPU (#248)
+- Add support for ADNLPModels 0.5 in MadNLPTests (#240)
+
+
 ## v0.5.2 (February 27th, 2023)
 
 ### Bug fixes

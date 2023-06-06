@@ -1,7 +1,7 @@
 name = "MadNLPMumps"
 uuid = "3b83494e-c0a4-4895-918b-9157a7a085a1"
 authors = ["Sungho Shin <sungho.shin.ss@gmail.com>"]
-version = "0.3.0"
+version = "0.3.1"
 
 [deps]
 MUMPS_seq_jll = "d7ed1dd3-d0ae-5e8e-bfb4-87a502085b8d"
@@ -10,7 +10,7 @@ StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 
 [compat]
 MUMPS_seq_jll = "~5.2.1, ~5.3.5"
-MadNLP = "~0.5"
+MadNLP = "0.5, 0.6"
 MadNLPTests = "~0.3"
 StaticArrays = "1"
 julia = "1.6"

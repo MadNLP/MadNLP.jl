@@ -1,7 +1,7 @@
 name = "MadNLPTests"
 uuid = "b52a2a03-04ab-4a5f-9698-6a2deff93217"
 authors = ["Sungho Shin <sungho.shin.ss@gmail.com>"]
-version = "0.3.0"
+version = "0.3.1"
 
 [deps]
 ADNLPModels = "54578032-b7ea-4c30-94aa-7cbd1cce6c9a"
@@ -14,8 +14,8 @@ SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [compat]
-ADNLPModels = "~0.3, 0.4, 0.5"
+ADNLPModels = "0.3, 0.4, 0.5"
 JuMP = "1"
-MadNLP = "~0.5"
+MadNLP = "0.5, 0.6"
 NLPModels = "~0.17.2, 0.18, 0.19, 0.20"
 julia = "1.6"
