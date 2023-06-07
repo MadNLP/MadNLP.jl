@@ -12,3 +12,10 @@ Install this download into your current environment using:
 import Pkg
 Pkg.develop(path = "/full/path/to/HSL_jll.jl")
 ```
+
+Alternatively, one can use a custom-compiled HSL library by overriding the HSL_jll articfact.
+This can be done by editing `~/.julia/artifacts/Overrides.toml`
+```
+# replace HSL_jll artifact /usr/local/lib/libhsl.so
+ecece3e2c69a413a0e935cf52e03a3ad5492e137 = "/usr/local"
+```
