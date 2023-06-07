@@ -168,7 +168,7 @@ for (fdefault, fanalyse, ffactor, fsolve, ffinalise, fopen, finputv, finputr, ty
     ]
     @eval begin
         ma77_default_control(control::Ma77Control{$typ}) = ccall(
-            ($(string(fdefault)),libma77),
+            ($(string(fdefault)),libhsl),
             Cvoid,
             (Ref{Ma77Control{$typ}},),
             control
@@ -177,7 +177,7 @@ for (fdefault, fanalyse, ffactor, fsolve, ffinalise, fopen, finputv, finputr, ty
             n::Cint,fname1::String,fname2::String,fname3::String,fname4::String,
             keep::Vector{Ptr{Cvoid}},control::Ma77Control{$typ},info::Ma77Info{$typ}
         ) = ccall(
-            ($(string(fopen)),libma77),
+            ($(string(fopen)),libhsl),
             Cvoid,
             (Cint,Ptr{Cchar},Ptr{Cchar},Ptr{Cchar},Ptr{Cchar},
              Ptr{Ptr{Cvoid}},Ref{Ma77Control{$typ}},Ref{Ma77Info{$typ}}),
@@ -187,7 +187,7 @@ for (fdefault, fanalyse, ffactor, fsolve, ffinalise, fopen, finputv, finputr, ty
             idx::Cint,nvar::Cint,list::Vector{Cint},
             keep::Vector{Ptr{Cvoid}},control::Ma77Control{$typ},info::Ma77Info{$typ}
         ) = ccall(
-            ($(string(finputv)),libma77),
+            ($(string(finputv)),libhsl),
             Cvoid,
             (Cint,Cint,Ptr{Cint},
              Ptr{Ptr{Cvoid}},Ref{Ma77Control{$typ}},Ref{Ma77Info{$typ}}
@@ -197,7 +197,7 @@ for (fdefault, fanalyse, ffactor, fsolve, ffinalise, fopen, finputv, finputr, ty
             idx::Cint,length::Cint,reals::Vector{$typ},
             keep::Vector{Ptr{Cvoid}},control::Ma77Control{$typ},info::Ma77Info{$typ}
         ) = ccall(
-            ($(string(finputr)),libma77),
+            ($(string(finputr)),libhsl),
             Cvoid,
             (Cint,Cint,Ptr{$typ},
              Ptr{Ptr{Cvoid}},Ref{Ma77Control{$typ}},Ref{Ma77Info{$typ}}),
@@ -207,7 +207,7 @@ for (fdefault, fanalyse, ffactor, fsolve, ffinalise, fopen, finputv, finputr, ty
             order::Vector{Cint},
             keep::Vector{Ptr{Cvoid}},control::Ma77Control{$typ},info::Ma77Info{$typ}
         ) = ccall(
-            ($(string(fanalyse)),libma77),
+            ($(string(fanalyse)),libhsl),
             Cvoid,
             (Ptr{Cint},Ptr{Ptr{Cvoid}},Ref{Ma77Control{$typ}},Ref{Ma77Info{$typ}}),
             order,keep,control,info
@@ -216,7 +216,7 @@ for (fdefault, fanalyse, ffactor, fsolve, ffinalise, fopen, finputv, finputr, ty
             posdef::Cint,keep::Vector{Ptr{Cvoid}},control::Ma77Control{$typ},info::Ma77Info{$typ},
             scale::Ptr{Nothing}
         ) = ccall(
-            ($(string(ffactor)),libma77),
+            ($(string(ffactor)),libhsl),
             Cvoid,
             (Cint,Ptr{Ptr{Cvoid}},Ref{Ma77Control{$typ}},Ref{Ma77Info{$typ}},Ptr{Nothing}),
             posdef,keep,control,info,scale
@@ -226,7 +226,7 @@ for (fdefault, fanalyse, ffactor, fsolve, ffinalise, fopen, finputv, finputr, ty
             keep::Vector{Ptr{Cvoid}},control::Ma77Control{$typ},info::Ma77Info{$typ},
             scale::Ptr{Nothing}
         ) = ccall(
-            ($(string(fsolve)),libma77),
+            ($(string(fsolve)),libhsl),
             Cvoid,
             (Cint,Cint,Cint,Ptr{$typ},
              Ptr{Ptr{Cvoid}},Ref{Ma77Control{$typ}},Ref{Ma77Info{$typ}},Ptr{Nothing}),
@@ -235,7 +235,7 @@ for (fdefault, fanalyse, ffactor, fsolve, ffinalise, fopen, finputv, finputr, ty
         ma77_finalize(
             keep::Vector{Ptr{Cvoid}},control::Ma77Control{$typ},info::Ma77Info{$typ}
         ) = ccall(
-            ($(string(ffinalise)),libma77),
+            ($(string(ffinalise)),libhsl),
             Cvoid,
             (Ptr{Ptr{Cvoid}},Ref{Ma77Control{$typ}},Ref{Ma77Info{$typ}}),
             keep,control,info
