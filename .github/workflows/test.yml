@@ -33,6 +33,7 @@ jobs:
       - uses: julia-actions/setup-julia@latest
         with:
           version: ${{ matrix.julia-version }}
+      - run: /scratch/sshin/github-actions-setup
       - run: julia --color=yes --project=.ci .ci/ci.jl full
       - uses: julia-actions/julia-processcoverage@v1
         with:
