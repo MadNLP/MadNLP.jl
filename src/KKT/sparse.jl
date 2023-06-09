@@ -27,6 +27,7 @@ struct SparseKKTSystem{T, VT, MT, QN} <: AbstractReducedKKTSystem{T, VT, MT, QN}
     jacobian_scaling::VT
 end
 
+
 """
     SparseUnreducedKKTSystem{T, VT, MT, QN} <: AbstractUnreducedKKTSystem{T, VT, MT, QN}
 
@@ -61,6 +62,7 @@ end
 # Template to dispatch on sparse representation
 const AbstractSparseKKTSystem{T, VT, MT, QN} = Union{
     SparseKKTSystem{T, VT, MT, QN},
+    # SparseCondensedKKTSystem{T, VT, MT, QN},
     SparseUnreducedKKTSystem{T, VT, MT, QN},
 }
 

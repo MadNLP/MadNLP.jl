@@ -113,6 +113,9 @@ function MadNLPSolver(nlp::AbstractNLPModel{T}; kwargs...) where T
     KKTSystem = if opt_ipm.kkt_system == SPARSE_KKT_SYSTEM
         MT = (input_type(opt_ipm.linear_solver) == :csc) ? SparseMatrixCSC{T, Int32} : Matrix{T}
         SparseKKTSystem{T, VT, MT, QN}
+    elseif opt_ipm.kkt_system == SPARSE_CONDENSED_KKT_SYSTEM
+        MT = (input_type(opt_ipm.linear_solver) == :csc) ? SparseMatrixCSC{T, Int32} : Matrix{T}
+        SparseCondensedKKTSystem{T, VT, MT, QN}
     elseif opt_ipm.kkt_system == SPARSE_UNREDUCED_KKT_SYSTEM
         MT = (input_type(opt_ipm.linear_solver) == :csc) ? SparseMatrixCSC{T, Int32} : Matrix{T}
         SparseUnreducedKKTSystem{T, VT, MT, QN}

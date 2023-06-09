@@ -21,9 +21,10 @@
 
 @enum(KKTLinearSystem::Int,
       SPARSE_KKT_SYSTEM = 1,
-      SPARSE_UNREDUCED_KKT_SYSTEM = 2,
-      DENSE_KKT_SYSTEM = 3,
-      DENSE_CONDENSED_KKT_SYSTEM = 4,
+      SPARSE_CONDENSED_KKT_SYSTEM = 2, 
+      SPARSE_UNREDUCED_KKT_SYSTEM = 3,
+      DENSE_KKT_SYSTEM = 4,
+      DENSE_CONDENSED_KKT_SYSTEM = 5,
 )
 
 @enum(HessianApproximation::Int,

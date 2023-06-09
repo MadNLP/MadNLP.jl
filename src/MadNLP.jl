@@ -37,4 +37,7 @@ include("options.jl")
 include(joinpath("IPM", "IPM.jl"))
 include(joinpath("Interfaces","interfaces.jl"))
 
+include("sparsecondensed.jl")
+
+
 end # end module
