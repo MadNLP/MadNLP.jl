@@ -278,13 +278,11 @@ function Ma77Solver(
     control.static_ = opt.ma77_static
     control.u = opt.ma77_u
 
-    isfile(".ma77_int")   && rm(".ma77_int")
-    isfile(".ma77_real")  && rm(".ma77_real")
-    isfile(".ma77_work")  && rm(".ma77_work")
-    isfile(".ma77_delay") && rm(".ma77_delay")
-
-    ma77_open(Int32(full.n),".ma77_int", ".ma77_real", ".ma77_work", ".ma77_delay",
-                keep,control,info)
+    ma77_open(
+        Int32(full.n),
+        tempname(cleanup=false), tempname(cleanup=false), tempname(cleanup=false), tempname(cleanup=false),
+        keep,control,info
+    )
 
     info.flag < 0 && throw(SymbolicException())
 
@@ -338,7 +336,10 @@ function inertia(M::Ma77Solver)
     return (M.info.matrix_rank-M.info.num_neg,M.full.n-M.info.matrix_rank,M.info.num_neg)
 end
 
-finalize(M::Ma77Solver{T}) where T = ma77_finalize(M.keep,M.control,M.info)
+function finalize(M::Ma77Solver{T}) where T
+    
+    ma77_finalize(M.keep,M.control,M.info)
+end
 
 function improve!(M::Ma77Solver)
     if M.control.u == M.opt.ma77_umax
