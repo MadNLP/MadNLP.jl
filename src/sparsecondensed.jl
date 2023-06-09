@@ -20,6 +20,7 @@ struct SparseCondensedKKTSystem{T, VT, MT, QN} <: AbstractCondensedKKTSystem{T, 
     jac_com::MT
     jac_csc_map::Union{Nothing, Vector{Int}}
     # New
+    S::VT
     hess_coo::SparseMatrixCOO{T,Int32,VT}
     hess_csc::MT
     hess_csc_map::Union{Nothing, Vector{Int}}
@@ -102,12 +103,13 @@ function SparseCondensedKKTSystem{T, VT, MT, QN}(
 
     quasi_newton = QN(n)
 
-    hess_coo = SparseMatrixCOO(n_tot, n_tot, hess_sparsity_I, hess_sparsity_J, hess)
+    S = VT(undef,n)
+    hess_coo = SparseMatrixCOO(n, n, hess_sparsity_I, hess_sparsity_J, hess)
     hess_csc = MT(hess_coo)
     hess_csc_map = get_mapping(hess_csc, hess_coo)
 
     jt_coo = SparseMatrixCOO(
-        n_tot, m, 
+        n, m, 
         jac_sparsity_J,
         jac_sparsity_I,
         jac,
@@ -124,6 +126,7 @@ function SparseCondensedKKTSystem{T, VT, MT, QN}(
         hess, jac_callback, jac, quasi_newton, pr_diag, du_diag,
         aug_raw, aug_com, aug_csc_map,
         jac_raw, jac_com, jac_csc_map,
+        S,
         hess_coo,hess_csc,hess_csc_map,
         jt_coo,jt_csc,jt_csc_map,
         aug_compressed, hptr, jptr,
@@ -166,34 +169,62 @@ function solve_refine_wrapper!(
     fixed_variable_treatment_vec!(full(b), solver.ind_fixed)
 
     cnt.linear_solver_time += @elapsed begin
-        result = solve_refine!(x, solver.iterator, b)
+        result = solve_refine!(primal_dual(x), solver.iterator, primal_dual(b))
+
+        ## 
+        kkt = solver.kkt
+
+        n = size(kkt.hess_csc, 1)
+        m = size(kkt.jt_csc, 2)
+        
+        #     n = num_variables(kkt)
+        #     n_eq, ns = kkt.n_eq, kkt.n_ineq
+        #     n_condensed = n + n_eq
+
+        #     # load buffers
+        b_c = view(full(solver._w1), 1:n)
+        x_c = view(full(solver._w2), 1:n)
+        jv_x = view(full(solver._w3), 1:m) 
+        jv_t = primal(solver._w4)          
+        v_c = dual(solver._w4)
+
+        Σx = view(kkt.pr_diag, 1:n)
+        Σs = view(kkt.pr_diag, n+1:n+m)
+        Σd = kkt.du_diag
+
+
+        #     Σs = get_slack_regularization(kkt)
+        #     α = get_scaling_inequalities(kkt)
+
+        # Decompose right hand side
+        bx = view(full(b), 1:n)
+        bs = view(full(b), n+1:n+m)
+        bz = view(full(b), n+m+1:n+2*m)
+
+        # Decompose results
+        xx = view(full(x), 1:n)
+        xs = view(full(x), n+1:n+m)
+        xz = view(full(x), n+m+1:n+2*m)
+
+        fill!(v_c, zero(T))
+        v_c .= (Σs .* bz .+ bs)
+        jtprod!(jv_t, kkt, v_c)
+        #     # init right-hand-side
+        b_c[1:n] .= bx .+ jv_t[1:n]
+
+        #     cnt.linear_solver_time += @elapsed (result = solve_refine!(x_c, solver.iterator, b_c))
+
+        #     # Expand solution
+        #     xx .= x_c
+        mul!(jv_x, kkt.jt_csc', xx)
+        #     xz .= sqrt.(Σs) .* jv_x .- Σs .* bz .- bs 
+        #     xs .= (bs .+ xz) ./ Σs
+
     end
 
-    if result == :Solved
-        solve_status =  true
-    else
-        if improve!(solver.linear_solver)
-            cnt.linear_solver_time += @elapsed begin
-                factorize!(solver.linear_solver)
-                ret = solve_refine!(x, solver.iterator, b)
-                solve_status = (ret == :Solved)
-            end
-        else
-            solve_status = false
-        end
-    end
     fixed_variable_treatment_vec!(full(x), solver.ind_fixed)
-    return solve_status
+    return (result == :Solved)
 end
-
-function solve_refine!(
-    x::AbstractKKTVector{T, VT},
-    solver::RichardsonIterator{T, VT, KKT, LinSolver},
-    b::AbstractKKTVector{T, VT},
-) where {T, VT, KKT<:SparseCondensedKKTSystem, LinSolver}
-    solve_refine!(primal_dual(x), solver, primal_dual(b))
-end
-
 
 nnz_jacobian(kkt::SparseCondensedKKTSystem) = nnz(kkt.jac_raw)
 function compress_jacobian!(kkt::SparseCondensedKKTSystem{T, VT, MT}) where {T, VT, MT<:SparseMatrixCSC{T, Int32}}
@@ -213,13 +244,44 @@ function set_jacobian_scaling!(kkt::SparseCondensedKKTSystem{T, VT, MT}, constra
 end
 
 function mul!(y::AbstractVector, kkt::SparseCondensedKKTSystem, x::AbstractVector)
-    mul!(y, Symmetric(kkt.aug_com, :L), x)
+    n = size(kkt.hess_csc, 1)
+    m = size(kkt.jt_csc, 2)
+
+
+    Σx = view(kkt.pr_diag, 1:n)
+    Σs = view(kkt.pr_diag, n+1:n+m)
+    Σd = kkt.du_diag
+
+    # Decompose x
+    xx = view(x, 1:n)
+    xs = view(x, 1+n:n+m)
+    xy = view(x, 1+n+m:n+2*m)
+
+    # Decompose y
+    yx = view(y, 1:n)
+    ys = view(y, 1+n:n+m)
+    yy = view(y, 1+n+m:n+2*m)
+
+    # / x (variable)
+    yx .= Σx .* xx
+    mul!(yx, Symmetric(kkt.hess_csc, :L), xx)
+    mul!(yx, kkt.jt_csc, xy, 1.0, 1.0)
+
+    # / s (slack)
+    ys .= Σs .* xs
+    ys .-= xy
+
+    # / y (multiplier)
+    yy .= Σd .* xy
+    mul!(yy, kkt.jt_csc', xx, 1.0, 1.0)
+    yy .-= xs
 end
-function mul!(y::AbstractKKTVector, kkt::SparseCondensedKKTSystem, x::AbstractKKTVector)
-    mul!(full(y), Symmetric(kkt.aug_com, :L), full(x))
-end
+
 function jtprod!(y::AbstractVector, kkt::SparseCondensedKKTSystem, x::AbstractVector)
-    mul!(y, kkt.jt_csc, x)
+    n = size(kkt.hess_csc, 1)
+    m = size(kkt.jt_csc, 2)
+
+    mul!(view(y, 1:n), kkt.jt_csc, x)
     y[size(kkt.jt_csc,1)+1:end] .= -x
 end
 
@@ -251,24 +313,6 @@ end
             sym2[cnt] = (H.rowval[j],i)
         end
     end
-# @inbounds function hpjtsj_symbolic(H::SparseMatrixCOO{Tv,Ti}, Jt::SparseMatrixCSC{Tv,Ti}) where {Tv, Ti}
-    
-#     nnzjtsj = _sym_length(Jt)
-    
-#     sym = Vector{Tuple{Ti,Ti,Ti}}(
-#         undef,
-#         nnz(H) + nnzjtsj
-#     )
-#     sym2 = Vector{Tuple{Ti,Ti}}(
-#         undef,
-#         nnz(H) + nnzjtsj
-#     )
-
-#     cnt = 0
-#     for (k,(i,j,v)) in enumerate(zip(H.I,H.J,H.V))
-#         sym[cnt+=1] = (0,k,0)
-#         sym2[cnt] = (i,j)
-#     end
 
     for i in 1:size(Jt,2)
         for j in Jt.colptr[i]:Jt.colptr[i+1]-1
@@ -346,3 +390,22 @@ end
     end
 end
 
+
+function build_kkt!(kkt::SparseCondensedKKTSystem{T, VT, MT}) where {T, VT, MT<:SparseMatrixCSC{T, Int32}}
+    transfer!(kkt.aug_com, kkt.aug_raw, kkt.aug_csc_map)
+
+    ## 
+    transfer!(kkt.hess_csc, kkt.hess_coo, kkt.hess_csc_map)
+
+    n = size(kkt.hess_csc, 1)
+    m = size(kkt.jt_csc, 2)
+
+
+    Σx = view(kkt.pr_diag, 1:n)
+    Σs = view(kkt.pr_diag, n+1:n+m)
+    Σd = kkt.du_diag
+
+    kkt.S .= 1 ./ ( 1 ./ Σs .- Σd )
+    hpjtsj_coord!(kkt.aug_compressed, kkt.hess_csc, kkt.jt_csc, kkt.S, kkt.hptr, kkt.jptr)
+    treat_fixed_variable!(kkt)
+end
