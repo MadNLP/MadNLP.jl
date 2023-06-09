@@ -1,3 +1,4 @@
+using LinearAlgebra
 """
     SparseCondensedKKTSystem{T, VT, MT, QN} <: AbstractCondensedKKTSystem{T, VT, MT, QN}
 
@@ -103,7 +104,7 @@ function SparseCondensedKKTSystem{T, VT, MT, QN}(
 
     quasi_newton = QN(n)
 
-    S = VT(undef,n)
+    S = VT(undef,m)
     hess_coo = SparseMatrixCOO(n, n, hess_sparsity_I, hess_sparsity_J, hess)
     hess_csc = MT(hess_coo)
     hess_csc_map = get_mapping(hess_csc, hess_coo)
@@ -121,6 +122,8 @@ function SparseCondensedKKTSystem{T, VT, MT, QN}(
         hess_csc,
         jt_csc
     )
+
+    # aug_com = aug_compressed ## 
 
     return SparseCondensedKKTSystem{T, VT, MT, QN}(
         hess, jac_callback, jac, quasi_newton, pr_diag, du_diag,
@@ -154,6 +157,10 @@ function SparseCondensedKKTSystem{T, VT, MT, QN}(nlp::AbstractNLPModel, ind_cons
         hess_I, hess_J, jac_I, jac_J,
     )
 end
+# TODO: check how to handle inertia with the condensed form
+function is_inertia_correct(kkt::SparseCondensedKKTSystem, num_pos, num_zero, num_neg)
+    return (num_zero == 0)
+end
 
 is_reduced(::SparseCondensedKKTSystem) = true
 num_variables(kkt::SparseCondensedKKTSystem) = length(kkt.pr_diag)
@@ -168,63 +175,73 @@ function solve_refine_wrapper!(
     @trace(solver.logger,"Iterative solution started.")
     fixed_variable_treatment_vec!(full(b), solver.ind_fixed)
 
-    cnt.linear_solver_time += @elapsed begin
-        result = solve_refine!(primal_dual(x), solver.iterator, primal_dual(b))
-
-        ## 
-        kkt = solver.kkt
-
-        n = size(kkt.hess_csc, 1)
-        m = size(kkt.jt_csc, 2)
-        
-        #     n = num_variables(kkt)
-        #     n_eq, ns = kkt.n_eq, kkt.n_ineq
-        #     n_condensed = n + n_eq
-
-        #     # load buffers
-        b_c = view(full(solver._w1), 1:n)
-        x_c = view(full(solver._w2), 1:n)
-        jv_x = view(full(solver._w3), 1:m) 
-        jv_t = primal(solver._w4)          
-        v_c = dual(solver._w4)
-
-        Σx = view(kkt.pr_diag, 1:n)
-        Σs = view(kkt.pr_diag, n+1:n+m)
-        Σd = kkt.du_diag
+    # result = solve_refine!(primal_dual(x), solver.iterator, primal_dual(b))
 
 
-        #     Σs = get_slack_regularization(kkt)
-        #     α = get_scaling_inequalities(kkt)
+    ## 
+    kkt = solver.kkt
+    n = size(kkt.hess_csc, 1)
+    m = size(kkt.jt_csc, 2)
 
-        # Decompose right hand side
-        bx = view(full(b), 1:n)
-        bs = view(full(b), n+1:n+m)
-        bz = view(full(b), n+m+1:n+2*m)
+    # load buffers
+    b_c = view(full(solver._w1), 1:n)
+    x_c = view(full(solver._w2), 1:n)
+    jv_x = view(full(solver._w3), 1:m) 
+    jv_t = view(primal(solver._w4), 1:n)
+    v_c = dual(solver._w4)
 
-        # Decompose results
-        xx = view(full(x), 1:n)
-        xs = view(full(x), n+1:n+m)
-        xz = view(full(x), n+m+1:n+2*m)
+    Σs = view(kkt.pr_diag, n+1:n+m)
 
-        fill!(v_c, zero(T))
-        v_c .= (Σs .* bz .+ bs)
-        jtprod!(jv_t, kkt, v_c)
-        #     # init right-hand-side
-        b_c[1:n] .= bx .+ jv_t[1:n]
+    # Decompose right hand side
+    bx = view(full(b), 1:n)
+    bs = view(full(b), n+1:n+m)
+    bz = view(full(b), n+m+1:n+2*m)
 
-        #     cnt.linear_solver_time += @elapsed (result = solve_refine!(x_c, solver.iterator, b_c))
+    # Decompose results
+    xx = view(full(x), 1:n)
+    xs = view(full(x), n+1:n+m)
+    xz = view(full(x), n+m+1:n+2*m)
 
-        #     # Expand solution
-        #     xx .= x_c
-        mul!(jv_x, kkt.jt_csc', xx)
-        #     xz .= sqrt.(Σs) .* jv_x .- Σs .* bz .- bs 
-        #     xs .= (bs .+ xz) ./ Σs
+    v_c .= (Σs .* bz .+ bs) 
+    mul!(jv_t, kkt.jt_csc, v_c)
 
-    end
+    # init right-hand-side
+    b_c .= bx .+ jv_t
+
+    cnt.linear_solver_time += @elapsed (result = solve_refine!(x_c, solver.iterator, b_c))
+
+    # Expand solution
+    xx .= x_c
+    # mul!(jv_x, kkt.jt_csc', xx)
+    # xz .= sqrt.(Σs) .* jv_x .- Σs .* bz .- bs 
+    # xs .= (bs .+ xz) ./ Σs
+    # mul!(xs,
+    
+    xs .= .-bz .+ mul!(jv_x, kkt.jt_csc', xx)
+    xz .= .-bs .+ Σs .* xs
+
+    # println()
+    # show(stdout, MIME"text/plain"(), kkt.aug_compressed)
+    # println()
+    # show(stdout, MIME"text/plain"(), LinearAlgebra.tril!(kkt.aug_com[1:3,1:3] + kkt.aug_com[5,1:3] * kkt.aug_com[4,4] * kkt.aug_com[5,1:3]'))
+    # println()
+    
+    # show(stdout, MIME"text/plain"(), full(b))
+    # println()
+    # show(stdout, MIME"text/plain"(), full(x))
+    # println()
+    # println(norm(kkt.aug_compressed - LinearAlgebra.tril!(kkt.aug_com[1:3,1:3] + kkt.aug_com[5,1:3] * kkt.aug_com[4,4] * kkt.aug_com[5,1:3]'),Inf))
 
     fixed_variable_treatment_vec!(full(x), solver.ind_fixed)
     return (result == :Solved)
 end
+
+function is_inertia_correct(kkt::SparseCondensedKKTSystem, num_pos, num_zero, num_neg)
+    return (num_zero == 0)
+end
+get_kkt(kkt::SparseCondensedKKTSystem) = kkt.aug_compressed
+Base.size(kkt::SparseCondensedKKTSystem,n::Int) = size(kkt.aug_compressed,n)
+
 
 nnz_jacobian(kkt::SparseCondensedKKTSystem) = nnz(kkt.jac_raw)
 function compress_jacobian!(kkt::SparseCondensedKKTSystem{T, VT, MT}) where {T, VT, MT<:SparseMatrixCSC{T, Int32}}
@@ -243,7 +260,14 @@ function set_jacobian_scaling!(kkt::SparseCondensedKKTSystem{T, VT, MT}, constra
     end
 end
 
+
 function mul!(y::AbstractVector, kkt::SparseCondensedKKTSystem, x::AbstractVector)
+    # TODO: implement properly with AbstractKKTRHS
+    if length(y) == length(x) == size(kkt.aug_compressed, 1)
+        mul!(y, Symmetric(kkt.aug_compressed, :L), x)
+        return
+    end
+    
     n = size(kkt.hess_csc, 1)
     m = size(kkt.jt_csc, 2)
 
@@ -263,8 +287,8 @@ function mul!(y::AbstractVector, kkt::SparseCondensedKKTSystem, x::AbstractVecto
     yy = view(y, 1+n+m:n+2*m)
 
     # / x (variable)
-    yx .= Σx .* xx
     mul!(yx, Symmetric(kkt.hess_csc, :L), xx)
+    yx .+= Σx .* xx
     mul!(yx, kkt.jt_csc, xy, 1.0, 1.0)
 
     # / s (slack)
@@ -394,7 +418,7 @@ end
 function build_kkt!(kkt::SparseCondensedKKTSystem{T, VT, MT}) where {T, VT, MT<:SparseMatrixCSC{T, Int32}}
     transfer!(kkt.aug_com, kkt.aug_raw, kkt.aug_csc_map)
 
-    ## 
+    ##
     transfer!(kkt.hess_csc, kkt.hess_coo, kkt.hess_csc_map)
 
     n = size(kkt.hess_csc, 1)
@@ -407,5 +431,9 @@ function build_kkt!(kkt::SparseCondensedKKTSystem{T, VT, MT}) where {T, VT, MT<:
 
     kkt.S .= 1 ./ ( 1 ./ Σs .- Σd )
     hpjtsj_coord!(kkt.aug_compressed, kkt.hess_csc, kkt.jt_csc, kkt.S, kkt.hptr, kkt.jptr)
+
+    # this is ad-hoc
+    view(kkt.aug_compressed.nzval, @view(kkt.aug_compressed.colptr[1:end-1])) .+= Σx
+    
     treat_fixed_variable!(kkt)
 end
