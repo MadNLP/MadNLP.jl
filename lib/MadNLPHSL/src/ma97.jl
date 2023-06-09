@@ -78,7 +78,7 @@ for (fdefault, fanalyse, ffactor, fsolve, ffinalise, typ) in [
         ma97_default_control(
             control::Ma97Control{$typ}
         ) = ccall(
-            ($(string(fdefault)), libma97),
+            ($(string(fdefault)), libhsl),
             Nothing,
             (Ref{Ma97Control{$typ}},),
             control
@@ -89,7 +89,7 @@ for (fdefault, fanalyse, ffactor, fsolve, ffinalise, typ) in [
             control::Ma97Control{$typ},info::Ma97Info{$typ},
             order::Ptr{Nothing}
         ) = ccall(
-            ($(string(fanalyse)),libma97),
+            ($(string(fanalyse)),libhsl),
             Nothing,
             (Cint,Cint,Ptr{Cint},Ptr{Cint},Ptr{$typ},
              Ptr{Ptr{Nothing}},Ref{Ma97Control{$typ}},Ref{Ma97Info{$typ}},Ptr{Cint}),
@@ -100,7 +100,7 @@ for (fdefault, fanalyse, ffactor, fsolve, ffinalise, typ) in [
             val::Vector{$typ},akeep::Vector{Ptr{Nothing}},fkeep::Vector{Ptr{Nothing}},
             control::Ma97Control,info::Ma97Info,scale::Ptr{Nothing}
         ) = ccall(
-            ($(string(ffactor)),libma97),
+            ($(string(ffactor)),libhsl),
             Nothing,
             (Cint,Ptr{Cint},Ptr{Cint},Ptr{$typ},Ptr{Ptr{Nothing}},
              Ptr{Ptr{Nothing}},Ref{Ma97Control},Ref{Ma97Info},Ptr{$typ}),
@@ -111,7 +111,7 @@ for (fdefault, fanalyse, ffactor, fsolve, ffinalise, typ) in [
             akeep::Vector{Ptr{Nothing}},fkeep::Vector{Ptr{Nothing}},
             control::Ma97Control,info::Ma97Info
         ) = ccall(
-            ($(string(fsolve)),libma97),
+            ($(string(fsolve)),libhsl),
             Nothing,
             (Cint,Cint,Ptr{$typ},Cint,Ptr{Ptr{Nothing}},
              Ptr{Ptr{Nothing}},Ref{Ma97Control},Ref{Ma97Info}),
@@ -120,14 +120,14 @@ for (fdefault, fanalyse, ffactor, fsolve, ffinalise, typ) in [
         ma97_finalize(
             ::Type{$typ},akeep::Vector{Ptr{Nothing}},fkeep::Vector{Ptr{Nothing}}
         )=ccall(
-            ($(string(ffinalise)),libma97),
+            ($(string(ffinalise)),libhsl),
             Nothing,
             (Ptr{Ptr{Nothing}},Ptr{Ptr{Nothing}}),
             akeep,fkeep
         )
     end
 end
-ma97_set_num_threads(n) = ccall((:omp_set_num_threads_,libma97),
+ma97_set_num_threads(n) = ccall((:omp_set_num_threads_,libhsl),
                                 Cvoid,
                                 (Ref{Cint},),
                                 Cint(n))
@@ -138,7 +138,10 @@ function Ma97Solver(
     opt=Ma97Options(),logger=MadNLPLogger(),
 ) where T
 
-    ma97_set_num_threads(opt.ma97_num_threads)
+    # Note: the current version of HSL_jll does not support openmp.
+    # this will be reenabled once openmp is supported in HSL_jll.
+
+    # ma97_set_num_threads(opt.ma97_num_threads)
 
     n = Int32(csc.n)
 

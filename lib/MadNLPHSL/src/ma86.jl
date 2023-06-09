@@ -74,7 +74,7 @@ for (fdefault, fanalyse, ffactor, fsolve, ffinalise, typ) in [
         ma86_default_control(
             control::Ma86Control{$typ}
         ) = ccall(
-            ($(string(fdefault)),libma86),
+            ($(string(fdefault)),libhsl),
             Nothing,
             (Ref{Ma86Control{$typ}},),
             control
@@ -84,7 +84,7 @@ for (fdefault, fanalyse, ffactor, fsolve, ffinalise, typ) in [
             order::Vector{Cint},keep::Vector{Ptr{Nothing}},
             control::Ma86Control{$typ},info::Ma86Info{$typ}
         ) = ccall(
-            ($(string(fanalyse)),libma86),
+            ($(string(fanalyse)),libhsl),
             Nothing,
             (Cint,Ptr{Cint},Ptr{Cint},Ptr{$typ},
              Ptr{Ptr{Nothing}},Ref{Ma86Control{$typ}},Ref{Ma86Info{$typ}}),
@@ -96,7 +96,7 @@ for (fdefault, fanalyse, ffactor, fsolve, ffinalise, typ) in [
             keep::Vector{Ptr{Nothing}},control::Ma86Control,info::Ma86Info,
             scale::Ptr{Nothing}
         ) = ccall(
-            ($(string(ffactor)),libma86),
+            ($(string(ffactor)),libhsl),
             Nothing,
             (Cint,Ptr{Cint},Ptr{Cint},Ptr{$typ},Ptr{Cint},
              Ptr{Ptr{Nothing}},Ref{Ma86Control},Ref{Ma86Info},Ptr{Nothing}),
@@ -107,7 +107,7 @@ for (fdefault, fanalyse, ffactor, fsolve, ffinalise, typ) in [
             order::Vector{Cint},keep::Vector{Ptr{Nothing}},
             control::Ma86Control,info::Ma86Info,scale::Ptr{Nothing}
         ) = ccall(
-            ($(string(fsolve)),libma86),
+            ($(string(fsolve)),libhsl),
             Nothing,
             (Cint,Cint,Cint,Ptr{$typ},Ptr{Cint},Ptr{Ptr{Nothing}},
              Ref{Ma86Control},Ref{Ma86Info},Ptr{Nothing}),
@@ -116,14 +116,14 @@ for (fdefault, fanalyse, ffactor, fsolve, ffinalise, typ) in [
         ma86_finalize(
             keep::Vector{Ptr{Nothing}},control::Ma86Control{$typ}
         ) = ccall(
-            ($(string(ffinalise)),libma86),
+            ($(string(ffinalise)),libhsl),
             Nothing,
             (Ptr{Ptr{Nothing}},Ref{Ma86Control{$typ}}),
             keep,control
         )
     end
 end
-ma86_set_num_threads(n) = ccall((:omp_set_num_threads_,libma86),
+ma86_set_num_threads(n) = ccall((:omp_set_num_threads_,libhsl),
                                 Cvoid,
                                 (Ref{Int32},),
                                 Int32(n))
@@ -132,7 +132,11 @@ function Ma86Solver(
     csc::SparseMatrixCSC{T,Int32};
     opt=Ma86Options(),logger=MadNLPLogger(),
 ) where T
-    ma86_set_num_threads(opt.ma86_num_threads)
+
+    # Note: the current version of HSL_jll does not support openmp.
+    # this will be reenabled once openmp is supported in HSL_jll.
+    
+    # ma86_set_num_threads(opt.ma86_num_threads)
 
     order = Vector{Int32}(undef,csc.n)
 
