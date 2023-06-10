@@ -1,4 +1,3 @@
-using LinearAlgebra
 """
     SparseCondensedKKTSystem{T, VT, MT, QN} <: AbstractCondensedKKTSystem{T, VT, MT, QN}
 
@@ -15,11 +14,10 @@ struct SparseCondensedKKTSystem{T, VT, MT, QN} <: AbstractCondensedKKTSystem{T, 
     # Augmented system
     aug_raw::SparseMatrixCOO{T,Int32,VT}
     aug_com::MT
-    aug_csc_map::Union{Nothing, Vector{Int}}
     # Jacobian
     jac_raw::SparseMatrixCOO{T,Int32,VT}
-    jac_com::MT
-    jac_csc_map::Union{Nothing, Vector{Int}}
+    # jac_com::MT
+    # jac_csc_map::Union{Nothing, Vector{Int}}
     # New
     S::VT
     hess_coo::SparseMatrixCOO{T,Int32,VT}
@@ -28,7 +26,7 @@ struct SparseCondensedKKTSystem{T, VT, MT, QN} <: AbstractCondensedKKTSystem{T, 
     jt_coo::SparseMatrixCOO{T,Int32,VT}
     jt_csc::MT
     jt_csc_map::Union{Nothing, Vector{Int}}
-    aug_compressed::MT
+    # aug_compressed::MT
     hptr::Vector{Tuple{Int,Int}}
     jptr::Vector{Tuple{Int,Tuple{Int,Int,Int}}}
     # Info
@@ -90,10 +88,6 @@ function SparseCondensedKKTSystem{T, VT, MT, QN}(
     )
 
     aug_com = MT(aug_raw)
-    jac_com = MT(jac_raw)
-
-    aug_csc_map = get_mapping(aug_com, aug_raw)
-    jac_csc_map = get_mapping(jac_com, jac_raw)
 
     ind_aug_fixed = if isa(aug_com, SparseMatrixCSC)
         _get_fixed_variable_index(aug_com, ind_fixed)
@@ -118,21 +112,19 @@ function SparseCondensedKKTSystem{T, VT, MT, QN}(
     jt_csc = MT(jt_coo)
     jt_csc_map = get_mapping(jt_csc, jt_coo)
     
-    aug_compressed, hptr, jptr = hpjtsj_symbolic(
+    aug_com, hptr, jptr = hpjtsj_symbolic(
         hess_csc,
         jt_csc
     )
 
-    # aug_com = aug_compressed ## 
-
     return SparseCondensedKKTSystem{T, VT, MT, QN}(
         hess, jac_callback, jac, quasi_newton, pr_diag, du_diag,
-        aug_raw, aug_com, aug_csc_map,
-        jac_raw, jac_com, jac_csc_map,
+        aug_raw, aug_com, 
+        jac_raw, 
         S,
         hess_coo,hess_csc,hess_csc_map,
         jt_coo,jt_csc,jt_csc_map,
-        aug_compressed, hptr, jptr,
+        hptr, jptr,
         ind_ineq, ind_fixed, ind_aug_fixed, jac_scaling,
     )
 end
@@ -157,10 +149,6 @@ function SparseCondensedKKTSystem{T, VT, MT, QN}(nlp::AbstractNLPModel, ind_cons
         hess_I, hess_J, jac_I, jac_J,
     )
 end
-# TODO: check how to handle inertia with the condensed form
-function is_inertia_correct(kkt::SparseCondensedKKTSystem, num_pos, num_zero, num_neg)
-    return (num_zero == 0)
-end
 
 is_reduced(::SparseCondensedKKTSystem) = true
 num_variables(kkt::SparseCondensedKKTSystem) = length(kkt.pr_diag)
@@ -175,10 +163,6 @@ function solve_refine_wrapper!(
     @trace(solver.logger,"Iterative solution started.")
     fixed_variable_treatment_vec!(full(b), solver.ind_fixed)
 
-    # result = solve_refine!(primal_dual(x), solver.iterator, primal_dual(b))
-
-
-    ## 
     kkt = solver.kkt
     n = size(kkt.hess_csc, 1)
     m = size(kkt.jt_csc, 2)
@@ -212,25 +196,8 @@ function solve_refine_wrapper!(
 
     # Expand solution
     xx .= x_c
-    # mul!(jv_x, kkt.jt_csc', xx)
-    # xz .= sqrt.(Σs) .* jv_x .- Σs .* bz .- bs 
-    # xs .= (bs .+ xz) ./ Σs
-    # mul!(xs,
-    
     xs .= .-bz .+ mul!(jv_x, kkt.jt_csc', xx)
     xz .= .-bs .+ Σs .* xs
-
-    # println()
-    # show(stdout, MIME"text/plain"(), kkt.aug_compressed)
-    # println()
-    # show(stdout, MIME"text/plain"(), LinearAlgebra.tril!(kkt.aug_com[1:3,1:3] + kkt.aug_com[5,1:3] * kkt.aug_com[4,4] * kkt.aug_com[5,1:3]'))
-    # println()
-    
-    # show(stdout, MIME"text/plain"(), full(b))
-    # println()
-    # show(stdout, MIME"text/plain"(), full(x))
-    # println()
-    # println(norm(kkt.aug_compressed - LinearAlgebra.tril!(kkt.aug_com[1:3,1:3] + kkt.aug_com[5,1:3] * kkt.aug_com[4,4] * kkt.aug_com[5,1:3]'),Inf))
 
     fixed_variable_treatment_vec!(full(x), solver.ind_fixed)
     return (result == :Solved)
@@ -239,8 +206,7 @@ end
 function is_inertia_correct(kkt::SparseCondensedKKTSystem, num_pos, num_zero, num_neg)
     return (num_zero == 0)
 end
-get_kkt(kkt::SparseCondensedKKTSystem) = kkt.aug_compressed
-Base.size(kkt::SparseCondensedKKTSystem,n::Int) = size(kkt.aug_compressed,n)
+Base.size(kkt::SparseCondensedKKTSystem,n::Int) = size(kkt.aug_com,n)
 
 
 nnz_jacobian(kkt::SparseCondensedKKTSystem) = nnz(kkt.jac_raw)
@@ -248,7 +214,6 @@ function compress_jacobian!(kkt::SparseCondensedKKTSystem{T, VT, MT}) where {T, 
     ns = length(kkt.ind_ineq)
     kkt.jac[end-ns+1:end] .= -1.0
     kkt.jac .*= kkt.jacobian_scaling # scaling
-    transfer!(kkt.jac_com, kkt.jac_raw, kkt.jac_csc_map)
     transfer!(kkt.jt_csc, kkt.jt_coo, kkt.jt_csc_map)
 end
 
@@ -263,11 +228,11 @@ end
 
 function mul!(y::AbstractVector, kkt::SparseCondensedKKTSystem, x::AbstractVector)
     # TODO: implement properly with AbstractKKTRHS
-    if length(y) == length(x) == size(kkt.aug_compressed, 1)
-        mul!(y, Symmetric(kkt.aug_compressed, :L), x)
+    if length(y) == length(x) == size(kkt.aug_com, 1)
+        mul!(y, Symmetric(kkt.aug_com, :L), x)
         return
     end
-    
+
     n = size(kkt.hess_csc, 1)
     m = size(kkt.jt_csc, 2)
 
@@ -299,6 +264,7 @@ function mul!(y::AbstractVector, kkt::SparseCondensedKKTSystem, x::AbstractVecto
     yy .= Σd .* xy
     mul!(yy, kkt.jt_csc', xx, 1.0, 1.0)
     yy .-= xs
+
 end
 
 function jtprod!(y::AbstractVector, kkt::SparseCondensedKKTSystem, x::AbstractVector)
@@ -416,9 +382,6 @@ end
 
 
 function build_kkt!(kkt::SparseCondensedKKTSystem{T, VT, MT}) where {T, VT, MT<:SparseMatrixCSC{T, Int32}}
-    transfer!(kkt.aug_com, kkt.aug_raw, kkt.aug_csc_map)
-
-    ##
     transfer!(kkt.hess_csc, kkt.hess_coo, kkt.hess_csc_map)
 
     n = size(kkt.hess_csc, 1)
@@ -430,10 +393,10 @@ function build_kkt!(kkt::SparseCondensedKKTSystem{T, VT, MT}) where {T, VT, MT<:
     Σd = kkt.du_diag
 
     kkt.S .= 1 ./ ( 1 ./ Σs .- Σd )
-    hpjtsj_coord!(kkt.aug_compressed, kkt.hess_csc, kkt.jt_csc, kkt.S, kkt.hptr, kkt.jptr)
+    hpjtsj_coord!(kkt.aug_com, kkt.hess_csc, kkt.jt_csc, kkt.S, kkt.hptr, kkt.jptr)
 
     # this is ad-hoc
-    view(kkt.aug_compressed.nzval, @view(kkt.aug_compressed.colptr[1:end-1])) .+= Σx
+    view(kkt.aug_com.nzval, @view(kkt.aug_com.colptr[1:end-1])) .+= Σx
     
     treat_fixed_variable!(kkt)
 end
