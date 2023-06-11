@@ -7,6 +7,16 @@ import MadNLP: @kwdef, MadNLPLogger, @debug, @warn, @error,
     get_tril_to_full, transfer!, input_type, _madnlp_unsafe_wrap,
     is_supported, default_options
 import HSL_jll: libhsl
+import LinearAlgebra, OpenBLAS32_jll
+
+function __init__()
+    if VERSION ≥ v"1.7"
+        config = LinearAlgebra.BLAS.lbt_get_config()
+        if !any(lib -> lib.interface == :lp64, config.loaded_libs)
+            LinearAlgebra.BLAS.lbt_forward(OpenBLAS32_jll.libopenblas_path)
+        end
+    end
+end
 
 include("common.jl")
 include("mc68.jl")
