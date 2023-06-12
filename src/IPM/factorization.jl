@@ -160,3 +160,50 @@ function solve_refine_wrapper!(
 end
 
 
+
+function solve_refine_wrapper!(
+    solver::MadNLPSolver{T,<:SparseCondensedKKTSystem},
+    x::AbstractKKTVector,
+    b::AbstractKKTVector,
+) where T
+    cnt = solver.cnt
+    @trace(solver.logger,"Iterative solution started.")
+    fixed_variable_treatment_vec!(full(b), solver.ind_fixed)
+
+    kkt = solver.kkt
+    n = size(kkt.hess_csc, 1)
+    m = size(kkt.jt_csc, 2)
+
+    # load buffers
+    b_c = view(full(solver._w1), 1:n)
+    jv_x = view(full(solver._w3), 1:m) 
+    jv_t = view(primal(solver._w4), 1:n)
+    v_c = dual(solver._w4)
+
+    Σs = view(kkt.pr_diag, n+1:n+m)
+
+    # Decompose right hand side
+    bx = view(full(b), 1:n)
+    bs = view(full(b), n+1:n+m)
+    bz = view(full(b), n+m+1:n+2*m)
+
+    # Decompose results
+    xx = view(full(x), 1:n)
+    xs = view(full(x), n+1:n+m)
+    xz = view(full(x), n+m+1:n+2*m)
+
+    v_c .= kkt.diag_buffer .* (bz .+ bs ./ Σs) 
+    mul!(jv_t, kkt.jt_csc, v_c)
+
+    # init right-hand-side
+    b_c .= bx .+ jv_t
+
+    cnt.linear_solver_time += @elapsed (result = solve_refine!(xx, solver.iterator, b_c))
+
+    # Expand solution
+    xs .= (.- (bz + kkt.du_diag .* bs) .+ mul!(jv_x, kkt.jt_csc', xx) ) ./ ( 1 .- Σs .* kkt.du_diag )
+    xz .= .-bs .+ Σs .* xs
+
+    fixed_variable_treatment_vec!(full(x), solver.ind_fixed)
+    return (result == :Solved)
+end
