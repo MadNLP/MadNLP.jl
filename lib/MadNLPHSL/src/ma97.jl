@@ -138,10 +138,7 @@ function Ma97Solver(
     opt=Ma97Options(),logger=MadNLPLogger(),
 ) where T
 
-    # Note: the current version of HSL_jll does not support openmp.
-    # this will be reenabled once openmp is supported in HSL_jll.
-
-    # ma97_set_num_threads(opt.ma97_num_threads)
+    ma97_set_num_threads(opt.ma97_num_threads)
 
     n = Int32(csc.n)
 

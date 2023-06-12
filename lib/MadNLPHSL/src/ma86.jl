@@ -133,10 +133,7 @@ function Ma86Solver(
     opt=Ma86Options(),logger=MadNLPLogger(),
 ) where T
 
-    # Note: the current version of HSL_jll does not support openmp.
-    # this will be reenabled once openmp is supported in HSL_jll.
-    
-    # ma86_set_num_threads(opt.ma86_num_threads)
+    ma86_set_num_threads(opt.ma86_num_threads)
 
     order = Vector{Int32}(undef,csc.n)
 
