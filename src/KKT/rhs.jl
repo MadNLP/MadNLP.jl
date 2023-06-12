@@ -92,19 +92,24 @@ the dual values associated to the primal's lower and upper bounds.
 struct ReducedKKTVector{T, VT<:AbstractVector{T}} <: AbstractKKTVector{T, VT}
     values::VT
     xp::VT # unsafe view
+    xp_lr::SubVector{T}
+    xp_ur::SubVector{T}
     xl::VT # unsafe view
 end
 
 ReducedKKTVector{T,VT}(n::Int, m::Int, nlb::Int, nub::Int) where {T, VT <: AbstractVector{T}} = ReducedKKTVector{T,VT}(n, m)
-function ReducedKKTVector{T,VT}(n::Int, m::Int) where {T, VT <: AbstractVector{T}}
+function ReducedKKTVector{T,VT}(n::Int, m::Int, ind_cons) where {T, VT <: AbstractVector{T}}
     x = VT(undef, n + m)
     fill!(x, 0.0)
     # Wrap directly array x to avoid dealing with views
     xp = _madnlp_unsafe_wrap(x, n)
     xl = _madnlp_unsafe_wrap(x, m, n+1)
-    return ReducedKKTVector{T, VT}(x, xp, xl)
+    xp_lr = view(xp, ind_cons.ind_lb)
+    xp_ur = view(xp, ind_cons.ind_ub)
+
+    return ReducedKKTVector{T, VT}(x, xp, xp_lr, xp_ur, xl)
 end
-function ReducedKKTVector(rhs::AbstractKKTVector)
+function ReducedKKTVector(rhs::AbstractKKTVector, ind_cons)
     return ReducedKKTVector(number_primal(rhs), number_dual(rhs))
 end
 
@@ -128,12 +133,14 @@ struct UnreducedKKTVector{T, VT<:AbstractVector{T}} <: AbstractKKTVector{T, VT}
     values::VT
     x::VT  # unsafe view
     xp::VT # unsafe view
+    xp_lr::SubVector{T}
+    xp_ur::SubVector{T}
     xl::VT # unsafe view
     xzl::VT # unsafe view
     xzu::VT # unsafe view
 end
 
-function UnreducedKKTVector{T, VT}(n::Int, m::Int, nlb::Int, nub::Int) where {T, VT <: AbstractVector{T}}
+function UnreducedKKTVector{T, VT}(n::Int, m::Int, nlb::Int, nub::Int, ind_cons) where {T, VT <: AbstractVector{T}}
     values = VT(undef,n+m+nlb+nub)
     fill!(values, 0.0)
     # Wrap directly array x to avoid dealing with views
@@ -142,7 +149,11 @@ function UnreducedKKTVector{T, VT}(n::Int, m::Int, nlb::Int, nub::Int) where {T,
     xl = _madnlp_unsafe_wrap(values, m, n+1) # Dual
     xzl = _madnlp_unsafe_wrap(values, nlb, n + m + 1) # Lower bound
     xzu = _madnlp_unsafe_wrap(values, nub, n + m + nlb + 1) # Upper bound
-    return UnreducedKKTVector{T, VT}(values, x, xp, xl, xzl, xzu)
+
+    xp_lr = view(xp, ind_cons.ind_lb)
+    xp_ur = view(xp, ind_cons.ind_ub)
+
+    return UnreducedKKTVector{T, VT}(values, x, xp, xp_lr, xp_ur, xl, xzl, xzu)
 end
 
 full(rhs::UnreducedKKTVector) = rhs.values
@@ -161,16 +172,22 @@ Primal vector ``(x, s)``.
 """
 struct PrimalVector{T, VT<:AbstractVector{T}} <: AbstractKKTVector{T, VT}
     values::VT
+    values_lr::SubVector{T}
+    values_ur::SubVector{T}
     x::VT  # unsafe view
     s::VT # unsafe view
 end
 
-function PrimalVector{T, VT}(nx::Int, ns::Int) where {T, VT <: AbstractVector{T}}
-    values = VT(undef, nx+ns) ; fill!(values, zero(T))
+function PrimalVector{T, VT}(nx::Int, ns::Int, ind_cons) where {T, VT <: AbstractVector{T}}
+    values = VT(undef, nx+ns)
+    fill!(values, zero(T))
+    x = _madnlp_unsafe_wrap(values, nx)
+    s = _madnlp_unsafe_wrap(values, ns, nx+1)
+    values_lr = view(values, ind_cons.ind_lb)
+    values_ur = view(values, ind_cons.ind_ub)
+    
     return PrimalVector{T, VT}(
-        values,
-        _madnlp_unsafe_wrap(values, nx),
-        _madnlp_unsafe_wrap(values, ns, nx+1),
+        values, values_lr, values_ur, x, s, 
     )
 end
 

@@ -114,6 +114,10 @@ function compress_jacobian!(kkt::AbstractSparseKKTSystem{T, VT, MT}) where {T, V
     copyto!(kkt.jac_com, kkt.jac_raw)
 end
 
+function compress_hessian!(kkt::AbstractSparseKKTSystem{T, VT, MT}) where {T, VT, MT<:SparseMatrixCSC{T, Int32}}
+    transfer!(kkt.hess_com, kkt.hess_raw, kkt.hess_csc_map)
+end
+
 function set_jacobian_scaling!(kkt::AbstractSparseKKTSystem{T, VT, MT}, constraint_scaling::AbstractVector) where {T, VT, MT}
     nnzJ = length(kkt.jac)::Int
     @inbounds for i in 1:nnzJ
@@ -174,7 +178,7 @@ function SparseKKTSystem{T, VT, MT, QN}(
         jac,
     )
     hess_raw = SparseMatrixCOO(
-        m, n_tot,
+        n_tot, n_tot,
         hess_sparsity_I,
         hess_sparsity_J,
         hess,

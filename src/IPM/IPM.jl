@@ -157,20 +157,20 @@ function MadNLPSolver{T,KKTSystem}(
     kkt = KKTSystem(nlp, ind_cons)
 
     # Primal variable
-    x = PrimalVector{T, Vector{T}}(nx, ns)
+    x = PrimalVector{T, Vector{T}}(nx, ns, ind_cons)
     variable(x) .= get_x0(nlp)
     # Bounds
-    xl = PrimalVector{T, Vector{T}}(nx, ns)
+    xl = PrimalVector{T, Vector{T}}(nx, ns, ind_cons)
     variable(xl) .= get_lvar(nlp)
     slack(xl) .= view(get_lcon(nlp), ind_cons.ind_ineq)
-    xu = PrimalVector{T, Vector{T}}(nx, ns)
+    xu = PrimalVector{T, Vector{T}}(nx, ns, ind_cons)
     variable(xu) .= get_uvar(nlp)
     slack(xu) .= view(get_ucon(nlp), ind_cons.ind_ineq)
-        zl = PrimalVector{T, Vector{T}}(nx, ns)
-        zu = PrimalVector{T, Vector{T}}(nx, ns)
+    zl = PrimalVector{T, Vector{T}}(nx, ns, ind_cons)
+    zu = PrimalVector{T, Vector{T}}(nx, ns, ind_cons)
     
     # Gradient
-    f = PrimalVector{T, Vector{T}}(nx, ns)
+    f = PrimalVector{T, Vector{T}}(nx, ns, ind_cons)
 
     y = copy(get_y0(nlp))
     c = zeros(T, m)
@@ -180,7 +180,7 @@ function MadNLPSolver{T,KKTSystem}(
     nlb = length(ind_cons.ind_lb)
     nub = length(ind_cons.ind_ub)
 
-    x_trial = PrimalVector{T, Vector{T}}(nx, ns)
+    x_trial = PrimalVector{T, Vector{T}}(nx, ns, ind_cons)
     c_trial = Vector{T}(undef, m)
 
     c_slk = view(c,ind_cons.ind_ineq)
@@ -196,25 +196,25 @@ function MadNLPSolver{T,KKTSystem}(
     x_trial_ur = view(full(x_trial), ind_cons.ind_ub)
 
     
-    if is_reduced(kkt)
-        _w1 = ReducedKKTVector{T,typeof(c)}(n, m)
-        _w2 = ReducedKKTVector{T,typeof(c)}(n, m)
-        _w3 = ReducedKKTVector{T,typeof(c)}(n, m)
-        _w4 = ReducedKKTVector{T,typeof(c)}(n, m)
-    else
-        _w1 = UnreducedKKTVector{T,typeof(c)}(n, m, nlb, nub)
-        _w2 = UnreducedKKTVector{T,typeof(c)}(n, m, nlb, nub)
-        _w3 = UnreducedKKTVector{T,typeof(c)}(n, m, nlb, nub)
-        _w4 = UnreducedKKTVector{T,typeof(c)}(n, m, nlb, nub)
-    end
+    # if is_reduced(kkt)
+    #     _w1 = ReducedKKTVector{T,typeof(c)}(n, m, ind_cons)
+    #     _w2 = ReducedKKTVector{T,typeof(c)}(n, m, ind_cons)
+    #     _w3 = ReducedKKTVector{T,typeof(c)}(n, m, ind_cons)
+    #     _w4 = ReducedKKTVector{T,typeof(c)}(n, m, ind_cons)
+    # else
+    _w1 = UnreducedKKTVector{T,typeof(c)}(n, m, nlb, nub, ind_cons)
+    _w2 = UnreducedKKTVector{T,typeof(c)}(n, m, nlb, nub, ind_cons)
+    _w3 = UnreducedKKTVector{T,typeof(c)}(n, m, nlb, nub, ind_cons)
+    _w4 = UnreducedKKTVector{T,typeof(c)}(n, m, nlb, nub, ind_cons)
+    # end
 
     jacl = zeros(T,n) # spblas may throw an error if not initialized to zero
 
-    d = UnreducedKKTVector{T,typeof(c)}(n, m, nlb, nub)
+    d = UnreducedKKTVector{T,typeof(c)}(n, m, nlb, nub, ind_cons)
     dx_lr = view(d.xp, ind_cons.ind_lb) # TODO
     dx_ur = view(d.xp, ind_cons.ind_ub) # TODO
 
-    p = UnreducedKKTVector{T,typeof(c)}(n, m, nlb, nub)
+    p = UnreducedKKTVector{T,typeof(c)}(n, m, nlb, nub, ind_cons)
 
     obj_scale = T[1.0]
     con_scale = ones(T,m)

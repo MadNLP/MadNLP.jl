@@ -60,7 +60,7 @@ function initialize!(solver::AbstractMadNLPSolver{T}) where T
         set_initial_rhs!(solver, solver.kkt)
         initialize!(solver.kkt)
         factorize_wrapper!(solver)
-        is_solved = solve_refine_wrapper!(solver,solver.d,solver.p,solver._w1)
+        is_solved = solve_refine_wrapper!(solver,solver.d,solver.p,solver._w1; init = true)
         
         if !is_solved || (norm(dual(solver.d), Inf) > solver.opt.constr_mult_init_max)
             fill!(solver.y, zero(T))
@@ -680,9 +680,6 @@ function robust!(solver::MadNLPSolver{T}) where T
             theta <= solver.opt.required_infeasibility_reduction * RR.theta_ref
 
             @trace(solver.logger,"Going back to the regular phase.")
-            solver.zl_r.=1
-            solver.zu_r.=1
-
             set_initial_rhs!(solver, solver.kkt)
             initialize!(solver.kkt)
 
