@@ -8,41 +8,42 @@ end
 function solve_refine_wrapper!(
     solver::MadNLPSolver,
     x::AbstractKKTVector,
-    b::AbstractKKTVector;
+    b::AbstractKKTVector,
+    buffer::AbstractKKTVector;
     resto = false
 )
     cnt = solver.cnt
     @trace(solver.logger,"Iterative solution started.")
     fixed_variable_treatment_vec!(full(b), solver.ind_fixed)
 
-    cnt.linear_solver_time += @elapsed begin
-        copyto!(primal_dual(x), primal_dual(b))
-        solve!(solver.linear_solver, primal_dual(x))
-        result = :Solved
-    end
+    copyto!(primal_dual(x), primal_dual(b))
+    cnt.linear_solver_time += @elapsed solve!(solver.linear_solver, primal_dual(x))
 
-    if result == :Solved
-        solve_status =  true
-    else
-        if improve!(solver.linear_solver)
-            cnt.linear_solver_time += @elapsed begin
-                factorize!(solver.linear_solver)
-                ret = solve!(primal_dual(x), solver.linear_solver, primal_dual(b))
-                solve_status = (ret == :Solved)
-            end
-        else
-            solve_status = false
-        end
-    end
+    # if result == :Solved
+    #     solve_status =  true
+    # else
+    #     if improve!(solver.linear_solver)
+    #         cnt.linear_solver_time += @elapsed begin
+    #             factorize!(solver.linear_solver)
+    #             ret = solve!(primal_dual(x), solver.linear_solver, primal_dual(b))
+    #             solve_status = (ret == :Solved)
+    #         end
+    #     else
+    #         solve_status = false
+    #     end
+    # end
     fixed_variable_treatment_vec!(full(x), solver.ind_fixed)
     finish_aug_solve!(solver, solver.kkt, solver.mu)
+    
+    kkt = solver.kkt
+    # mul!(primal(b),kkt.hess_com,primal(x))
 
     if resto
         RR = solver.RR
         finish_aug_solve_RR!(RR.dpp,RR.dnn,RR.dzp,RR.dzn,solver.y,dual(solver.d),RR.pp,RR.nn,RR.zp,RR.zn,RR.mu_R,solver.opt.rho)
     end
-    
-    return solve_status
+
+    return true
 end
 
 function solve_refine_wrapper!(

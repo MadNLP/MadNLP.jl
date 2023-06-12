@@ -105,7 +105,6 @@ function set_aug_rhs!(solver::MadNLPSolver, kkt::SparseUnreducedKKTSystem, c)
     @inbounds @simd for i in eachindex(pzu)
         pzu[i] = (solver.xu_r[i] -solver.x_ur[i]) * kkt.u_lower[i] - solver.mu / kkt.u_lower[i]
     end
-# >>>>>>> origin/master
     return
 end
 
