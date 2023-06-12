@@ -12,20 +12,20 @@ case =
     # "/home/sshin/git/PowerSystemsTestData/ACTIVSg70k/case_ACTIVSg70k.m"
 
 m = SIMDiffExamples.ac_power_model(case)
-s2 = MadNLPSolver(
-    m;
-    linear_solver=Ma27Solver,
-    tol = tol,
-    # kkt_system=MadNLP.SPARSE_CONDENSED_KKT_SYSTEM,
-    # fixed_variable_treatment = MadNLP.RELAX_BOUND
-)
-@time MadNLP.solve!(s2)
+# s2 = MadNLPSolver(
+#     m;
+#     linear_solver=Ma27Solver,
+#     tol = tol,
+#     # kkt_system=MadNLP.SPARSE_CONDENSED_KKT_SYSTEM,
+#     # fixed_variable_treatment = MadNLP.RELAX_BOUND
+# )
+# @time MadNLP.solve!(s2)
 
 m.meta.ucon .+= tol
 s1 = MadNLPSolver(
     m;
-    # linear_solver=Ma27Solver,
-    linear_solver=MadNLPCUSOLVER.RFSolver,
+    linear_solver=Ma27Solver,
+    # linear_solver=MadNLPCUSOLVER.RFSolver,
     tol = tol,
     kkt_system=MadNLP.SPARSE_CONDENSED_KKT_SYSTEM,
     fixed_variable_treatment = MadNLP.RELAX_BOUND

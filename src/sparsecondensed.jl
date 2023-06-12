@@ -5,34 +5,34 @@ Implement the [`AbstractCondensedKKTSystem`](@ref) in sparse COO format.
 
 """
 struct SparseCondensedKKTSystem{T, VT, MT, QN} <: AbstractCondensedKKTSystem{T, VT, MT, QN}
+    # Hessian
     hess::VT
-    jac_callback::VT
+    hess_coo::SparseMatrixCOO{T,Int32,VT}
+    hess_csc::MT
+    hess_csc_map::Union{Nothing, Vector{Int}}
+
+    # Jacobian
     jac::VT
+    jac_raw::SparseMatrixCOO{T,Int32,VT}
+    jt_coo::SparseMatrixCOO{T,Int32,VT}
+    jt_csc::MT
+    jt_csc_map::Union{Nothing, Vector{Int}}
+    
     quasi_newton::QN
     pr_diag::VT
     du_diag::VT
     # Augmented system
-    aug_raw::SparseMatrixCOO{T,Int32,VT}
     aug_com::MT
-    # Jacobian
-    jac_raw::SparseMatrixCOO{T,Int32,VT}
-    # jac_com::MT
-    # jac_csc_map::Union{Nothing, Vector{Int}}
-    # New
-    S::VT
-    hess_coo::SparseMatrixCOO{T,Int32,VT}
-    hess_csc::MT
-    hess_csc_map::Union{Nothing, Vector{Int}}
-    jt_coo::SparseMatrixCOO{T,Int32,VT}
-    jt_csc::MT
-    jt_csc_map::Union{Nothing, Vector{Int}}
+    
+    # slack diagonal buffer
+    diag_buffer::VT
     # aug_compressed::MT
+    dptr::Vector{Tuple{Int,Int}}
     hptr::Vector{Tuple{Int,Int}}
     jptr::Vector{Tuple{Int,Tuple{Int,Int,Int}}}
     # Info
     ind_ineq::Vector{Int}
     ind_fixed::Vector{Int}
-    ind_aug_fixed::Vector{Int}
     jacobian_scaling::VT
 end
 
@@ -50,36 +50,12 @@ function SparseCondensedKKTSystem{T, VT, MT, QN}(
     n_hess = length(hess_sparsity_I)
     n_tot = n + n_slack
 
-    aug_vec_length = n_tot+m
-    aug_mat_length = n_tot+m+n_hess+n_jac+n_slack
+    pr_diag = zeros(n_tot)
+    du_diag = zeros(m)
 
-    I = Vector{Int32}(undef, aug_mat_length)
-    J = Vector{Int32}(undef, aug_mat_length)
-    V = VT(undef, aug_mat_length)
-    fill!(V, 0.0)  # Need to initiate V to avoid NaN
+    hess = zeros(n_hess)
+    jac = zeros(n_jac+n_slack)
 
-    offset = n_tot+n_jac+n_slack+n_hess+m
-
-    I[1:n_tot] .= 1:n_tot
-    I[n_tot+1:n_tot+n_hess] = hess_sparsity_I
-    I[n_tot+n_hess+1:n_tot+n_hess+n_jac] .= (jac_sparsity_I.+n_tot)
-    I[n_tot+n_hess+n_jac+1:n_tot+n_hess+n_jac+n_slack] .= ind_ineq .+ n_tot
-    I[n_tot+n_hess+n_jac+n_slack+1:offset] .= (n_tot+1:n_tot+m)
-
-    J[1:n_tot] .= 1:n_tot
-    J[n_tot+1:n_tot+n_hess] = hess_sparsity_J
-    J[n_tot+n_hess+1:n_tot+n_hess+n_jac] .= jac_sparsity_J
-    J[n_tot+n_hess+n_jac+1:n_tot+n_hess+n_jac+n_slack] .= (n+1:n+n_slack)
-    J[n_tot+n_hess+n_jac+n_slack+1:offset] .= (n_tot+1:n_tot+m)
-
-    pr_diag = _madnlp_unsafe_wrap(V, n_tot)
-    du_diag = _madnlp_unsafe_wrap(V, m, n_jac+n_slack+n_hess+n_tot+1)
-
-    hess = _madnlp_unsafe_wrap(V, n_hess, n_tot+1)
-    jac = _madnlp_unsafe_wrap(V, n_jac+n_slack, n_hess+n_tot+1)
-    jac_callback = _madnlp_unsafe_wrap(V, n_jac, n_hess+n_tot+1)
-
-    aug_raw = SparseMatrixCOO(aug_vec_length,aug_vec_length,I,J,V)
     jac_raw = SparseMatrixCOO(
         m, n_tot,
         Int32[jac_sparsity_I; ind_ineq],
@@ -87,18 +63,11 @@ function SparseCondensedKKTSystem{T, VT, MT, QN}(
         jac,
     )
 
-    aug_com = MT(aug_raw)
-
-    ind_aug_fixed = if isa(aug_com, SparseMatrixCSC)
-        _get_fixed_variable_index(aug_com, ind_fixed)
-    else
-        zeros(Int, 0)
-    end
     jac_scaling = ones(T, n_jac+n_slack)
 
     quasi_newton = QN(n)
 
-    S = VT(undef,m)
+    diag_buffer = VT(undef,m)
     hess_coo = SparseMatrixCOO(n, n, hess_sparsity_I, hess_sparsity_J, hess)
     hess_csc = MT(hess_coo)
     hess_csc_map = get_mapping(hess_csc, hess_coo)
@@ -112,20 +81,17 @@ function SparseCondensedKKTSystem{T, VT, MT, QN}(
     jt_csc = MT(jt_coo)
     jt_csc_map = get_mapping(jt_csc, jt_coo)
     
-    aug_com, hptr, jptr = hpjtsj_symbolic(
+    aug_com, dptr, hptr, jptr = aug_com_symbolic(
         hess_csc,
         jt_csc
     )
 
     return SparseCondensedKKTSystem{T, VT, MT, QN}(
-        hess, jac_callback, jac, quasi_newton, pr_diag, du_diag,
-        aug_raw, aug_com, 
-        jac_raw, 
-        S,
-        hess_coo,hess_csc,hess_csc_map,
-        jt_coo,jt_csc,jt_csc_map,
-        hptr, jptr,
-        ind_ineq, ind_fixed, ind_aug_fixed, jac_scaling,
+        hess, hess_coo,hess_csc,hess_csc_map,
+        jac, jac_raw, jt_coo,jt_csc,jt_csc_map,
+        quasi_newton, pr_diag, du_diag,
+        aug_com, diag_buffer, dptr, hptr, jptr,
+        ind_ineq, ind_fixed, jac_scaling,
     )
 end
 
@@ -284,19 +250,24 @@ function _sym_length(Jt)
     return len
 end
 
-@inbounds function hpjtsj_symbolic(H::SparseMatrixCSC{Tv,Ti}, Jt::SparseMatrixCSC{Tv,Ti}) where {Tv, Ti}
+@inbounds function aug_com_symbolic(H::SparseMatrixCSC{Tv,Ti}, Jt::SparseMatrixCSC{Tv,Ti}) where {Tv, Ti}
     nnzjtsj = _sym_length(Jt)
     
     sym = Vector{Tuple{Int,Int,Int}}(
         undef,
-        nnz(H) + nnzjtsj
+        size(H,2) + nnz(H) + nnzjtsj
     )
     sym2 = Vector{Tuple{Int,Int}}(
         undef,
-        nnz(H) + nnzjtsj
+        size(H,2) + nnz(H) + nnzjtsj
     )
 
     cnt = 0
+    for i in 1:size(H,2)
+        sym[cnt+=1] = (-1,i,0)
+        sym2[cnt] = (i,i)
+    end
+    
     for i in 1:size(H,2)
         for j in H.colptr[i]:H.colptr[i+1]-1
             sym[cnt+=1] = (0,j,0)
@@ -323,6 +294,7 @@ end
     permute!(sym, p)
     permute!(sym2, p)
 
+    dptr = Vector{Tuple{Ti,Ti}}(undef,size(H,2))
     hptr = Vector{Tuple{Ti,Ti}}(undef,nnz(H))
     jptr = Vector{Tuple{Ti,Tuple{Ti,Ti,Ti}}}(undef,nnzjtsj)
 
@@ -331,6 +303,7 @@ end
 
     a = (0,0)
     cnt = 0
+    dcnt = 0
     hcnt = 0
     jcnt = 0
     prevcol = 0
@@ -349,7 +322,9 @@ end
             end
         end
 
-        if tuple[1] == 0
+        if tuple[1] == -1
+            dptr[dcnt += 1] = (cnt, tuple[2])
+        elseif tuple[1] == 0
             hptr[hcnt += 1] = (cnt, tuple[2])
         else
             jptr[jcnt += 1] = (cnt, tuple)
@@ -358,25 +333,30 @@ end
 
     fill!(@view(colptr[prevcol+1:end]), cnt+1)
 
-    hpjtsj = SparseMatrixCSC{Tv,Ti}(
+    aug_com = SparseMatrixCSC{Tv,Ti}(
         size(H)...,
         colptr, rowval, zeros(cnt)
     )
 
-    return hpjtsj, hptr, jptr
+    return aug_com, dptr, hptr, jptr
 end
 
-@inbounds function hpjtsj_coord!(hpjtsj::SparseMatrixCSC{Tv,Ti}, H, Jt, S, hptr, jptr) where {Tv, Ti}
-    fill!(hpjtsj.nzval, zero(Tv))
+@inbounds function aug_com_coord!(aug_com::SparseMatrixCSC{Tv,Ti}, pr_diag, H, Jt, diag_buffer, dptr, hptr, jptr) where {Tv, Ti}
+    fill!(aug_com.nzval, zero(Tv))
     
     @simd for idx in eachindex(hptr)
         i,j = hptr[idx]
-        hpjtsj.nzval[i] = H.nzval[j]
+        aug_com.nzval[i] = H.nzval[j]
     end
     
+    @simd for idx in eachindex(dptr)
+        i,j = dptr[idx]
+        aug_com.nzval[i] += pr_diag[j]
+    end
+
     @simd for idx in eachindex(jptr)
         (i,(j,k,l)) = jptr[idx]
-        hpjtsj.nzval[i] += S[j] * Jt.nzval[k] * Jt.nzval[l]
+        aug_com.nzval[i] += diag_buffer[j] * Jt.nzval[k] * Jt.nzval[l]
     end
 end
 
@@ -392,11 +372,8 @@ function build_kkt!(kkt::SparseCondensedKKTSystem{T, VT, MT}) where {T, VT, MT<:
     Σs = view(kkt.pr_diag, n+1:n+m)
     Σd = kkt.du_diag
 
-    kkt.S .= 1 ./ ( 1 ./ Σs .- Σd )
-    hpjtsj_coord!(kkt.aug_com, kkt.hess_csc, kkt.jt_csc, kkt.S, kkt.hptr, kkt.jptr)
+    kkt.diag_buffer .= 1 ./ ( 1 ./ Σs .- Σd )
+    aug_com_coord!(kkt.aug_com, kkt.pr_diag, kkt.hess_csc, kkt.jt_csc, kkt.S, kkt.dptr, kkt.hptr, kkt.jptr)
 
-    # this is ad-hoc
-    view(kkt.aug_com.nzval, @view(kkt.aug_com.colptr[1:end-1])) .+= Σx
-    
     treat_fixed_variable!(kkt)
 end

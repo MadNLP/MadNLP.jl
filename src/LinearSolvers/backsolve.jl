@@ -14,7 +14,7 @@ function RichardsonIterator(
     linear_solver::AbstractLinearSolver{T},
     kkt::AbstractKKTSystem,
     res::AbstractVector;
-    max_iter=10, tol=T(1e-10), acceptable_tol=T(1e-5), logger=MadNLPLogger(),
+    max_iter=10, tol=T(1e-8), acceptable_tol=T(1e-5), logger=MadNLPLogger(),
 ) where T
     return RichardsonIterator(
         linear_solver, kkt, res, max_iter, tol, acceptable_tol, logger,
@@ -69,6 +69,7 @@ function solve_refine!(
         if (iter > solver.max_iter) || (residual_ratio < solver.tol)
             break
         end
+
 
         solve!(solver.linear_solver, ε)
         axpy!(-1, ε, x)
