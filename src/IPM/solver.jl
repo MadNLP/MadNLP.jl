@@ -61,6 +61,7 @@ function initialize!(solver::AbstractMadNLPSolver{T}) where T
         initialize!(solver.kkt)
         factorize_wrapper!(solver)
         is_solved = solve_refine_wrapper!(solver,solver.d,solver.p)
+        
         if !is_solved || (norm(dual(solver.d), Inf) > solver.opt.constr_mult_init_max)
             fill!(solver.y, zero(T))
         else
@@ -264,8 +265,6 @@ function regular!(solver::AbstractMadNLPSolver{T}) where T
         elseif solver.opt.inertia_correction_method == INERTIA_BASED
             inertia_based_reg(solver) || return ROBUST
         end
-
-        finish_aug_solve!(solver, solver.kkt, solver.mu)
 
         # filter start
         @trace(solver.logger,"Backtracking line search initiated.")
@@ -481,7 +480,6 @@ function restore!(solver::AbstractMadNLPSolver)
         dual_inf_perturbation!(primal(solver.p),solver.ind_llb,solver.ind_uub,solver.mu,solver.opt.kappa_d)
         factorize_wrapper!(solver)
         solve_refine_wrapper!(solver,solver.d,solver.p)
-        finish_aug_solve!(solver, solver.kkt, solver.mu)
 
         solver.ftype = "f"
     end
@@ -559,9 +557,6 @@ function robust!(solver::MadNLPSolver{T}) where T
         @trace(solver.logger,"Solving restoration phase primal-dual system.")
         factorize_wrapper!(solver)
         solve_refine_wrapper!(solver,solver.d,solver.p)
-
-        finish_aug_solve!(solver, solver.kkt, RR.mu_R)
-        finish_aug_solve_RR!(RR.dpp,RR.dnn,RR.dzp,RR.dzn,solver.y,dual(solver.d),RR.pp,RR.nn,RR.zp,RR.zn,RR.mu_R,solver.opt.rho)
 
 
         theta_R = get_theta_R(solver.c,RR.pp,RR.nn)
@@ -693,6 +688,7 @@ function robust!(solver::MadNLPSolver{T}) where T
 
             factorize_wrapper!(solver)
             solve_refine_wrapper!(solver,solver.d,solver.p)
+            
             if norm(dual(solver.d), Inf)>solver.opt.constr_mult_init_max
                 fill!(solver.y, 0.0)
             else

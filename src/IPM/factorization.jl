@@ -8,14 +8,17 @@ end
 function solve_refine_wrapper!(
     solver::MadNLPSolver,
     x::AbstractKKTVector,
-    b::AbstractKKTVector,
+    b::AbstractKKTVector;
+    resto = false
 )
     cnt = solver.cnt
     @trace(solver.logger,"Iterative solution started.")
     fixed_variable_treatment_vec!(full(b), solver.ind_fixed)
 
     cnt.linear_solver_time += @elapsed begin
-        result = solve_refine!(x, solver.iterator, b)
+        copyto!(primal_dual(x), primal_dual(b))
+        solve!(solver.linear_solver, primal_dual(x))
+        result = :Solved
     end
 
     if result == :Solved
@@ -24,7 +27,7 @@ function solve_refine_wrapper!(
         if improve!(solver.linear_solver)
             cnt.linear_solver_time += @elapsed begin
                 factorize!(solver.linear_solver)
-                ret = solve_refine!(x, solver.iterator, b)
+                ret = solve!(primal_dual(x), solver.linear_solver, primal_dual(b))
                 solve_status = (ret == :Solved)
             end
         else
@@ -32,13 +35,21 @@ function solve_refine_wrapper!(
         end
     end
     fixed_variable_treatment_vec!(full(x), solver.ind_fixed)
+    finish_aug_solve!(solver, solver.kkt, solver.mu)
+
+    if resto
+        RR = solver.RR
+        finish_aug_solve_RR!(RR.dpp,RR.dnn,RR.dzp,RR.dzn,solver.y,dual(solver.d),RR.pp,RR.nn,RR.zp,RR.zn,RR.mu_R,solver.opt.rho)
+    end
+    
     return solve_status
 end
 
 function solve_refine_wrapper!(
     solver::MadNLPSolver{T,<:DenseCondensedKKTSystem},
     x::AbstractKKTVector,
-    b::AbstractKKTVector,
+    b::AbstractKKTVector;
+    resto = false
 ) where T
     cnt = solver.cnt
     @trace(solver.logger,"Iterative solution started.")
@@ -90,6 +101,13 @@ function solve_refine_wrapper!(
     xs .= (bs .+ α .* xz) ./ Σs
 
     fixed_variable_treatment_vec!(full(x), solver.ind_fixed)
+    finish_aug_solve!(solver, solver.kkt, solver.mu)
+
+    if resto
+        RR = solver.RR
+        finish_aug_solve_RR!(RR.dpp,RR.dnn,RR.dzp,RR.dzn,solver.y,dual(solver.d),RR.pp,RR.nn,RR.zp,RR.zn,RR.mu_R,solver.opt.rho)
+    end
+
     return solve_status
 end
 
@@ -106,7 +124,8 @@ end
 function solve_refine_wrapper!(
     solver::MadNLPSolver{T, <:SparseKKTSystem{T, VT, MT, QN}},
     x::AbstractKKTVector,
-    b::AbstractKKTVector,
+    b::AbstractKKTVector;
+    resto = false
 ) where {T, VT, MT, QN<:CompactLBFGS{T, Vector{T}, Matrix{T}}}
     cnt = solver.cnt
     kkt = solver.kkt
@@ -155,7 +174,12 @@ function solve_refine_wrapper!(
     end
 
     fixed_variable_treatment_vec!(full(x), solver.ind_fixed)
-    solve_status = (result == :Solved)
-    return solve_status
+    finish_aug_solve!(solver, solver.kkt, solver.mu)
+    if resto
+        RR = solver.RR
+        finish_aug_solve_RR!(RR.dpp,RR.dnn,RR.dzp,RR.dzn,solver.y,dual(solver.d),RR.pp,RR.nn,RR.zp,RR.zn,RR.mu_R,solver.opt.rho)
+    end
+    
+    return result == :Solved
 end
 
