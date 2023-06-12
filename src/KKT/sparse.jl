@@ -396,11 +396,15 @@ function SparseCondensedKKTSystem{T, VT, MT, QN}(
     jac_sparsity_I, jac_sparsity_J,
 ) where {T, VT, MT, QN}
     n_slack = length(ind_ineq)
-
+    
     if n_slack != m
-        error("SparseCondensedKKTSystem currently does not support equality constrained NLPs.")
+        error("SparseCondensedKKTSystem does not support equality constrained NLPs.")
     end
     
+    if !isempty(ind_fixed)
+        error("SparseCondensedKKTSystem does not support fixed variables.")
+    end
+
     n_jac = length(jac_sparsity_I)
     n_hess = length(hess_sparsity_I)
     n_tot = n + n_slack
@@ -496,6 +500,9 @@ function set_jacobian_scaling!(kkt::SparseCondensedKKTSystem{T, VT, MT}, constra
     end
 end
 
+function mul!(y::AbstractKKTVector, kkt::SparseCondensedKKTSystem, x::AbstractKKTVector)
+    mul!(full(y), kkt, full(x))
+end
 
 function mul!(y::AbstractVector, kkt::SparseCondensedKKTSystem, x::AbstractVector)
     # TODO: implement properly with AbstractKKTRHS
