@@ -16,28 +16,17 @@ In addition to Lapack and Umfpack, the user can install the following extensions
 use a specialized linear solver.
 
 ## HSL linear solver
-If the user has access to HSL, we recommend using this set of linear
-solver inside the interior-point algorithm.
-
-To build MadNLP with HSL linear solvers (Ma27, Ma57, Ma77, Ma86, Ma97), the
-source codes need to be obtained by the user from
-<http://www.hsl.rl.ac.uk/ipopt/> under Coin-HSL Full (Stable). The source
-codes are distributed as a tarball file `coinhsl-*.tar.gz`. Once
-uncompressed, the absolute path to the extracted source code should be specified as:
+Obtain a license and download HSL_jll.jl from https://licences.stfc.ac.uk/product/julia-hsl. There are two versions available: LBT and OpenBLAS. LBT is the recommended option for Julia >= v1.9. Install this download into your current environment using:
 ```julia
-julia> ENV["MADNLP_HSL_SOURCE_PATH"] = "/opt/coinhsl"
+import Pkg
+Pkg.develop(path = "/full/path/to/HSL_jll.jl")
 ```
 
 If the user has already compiled the HSL solver library, one can
-simply provide a path to the compiled shared library (in this case, the source code is
-not compiled and the provided shared library is directly used):
-```julia
-julia> ENV["MADNLP_HSL_LIBRARY_PATH"] = "/usr/lib/libcoinhsl.so"
+simply override the path to the artifact by editing `~/.julia/artifacts/Overrides.toml`
 ```
-
-Once the environment variable set, build `MadNLPHSL` with
-```julia
-pkg> build MadNLPHSL
+# replace HSL_jll artifact /usr/local/lib/libhsl.so
+ecece3e2c69a413a0e935cf52e03a3ad5492e137 = "/usr/local"
 ```
 
 ## Mumps linear solver
