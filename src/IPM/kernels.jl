@@ -195,6 +195,8 @@ function set_initial_rhs!(solver::MadNLPSolver{T}, kkt::AbstractKKTSystem) where
         px[i] = -f[i] + zl[i] - zu[i]
     end
     fill!(dual(solver.p), zero(T))
+    fill!(dual_lb(solver.p), zero(T))
+    fill!(dual_ub(solver.p), zero(T))
     return
 end
 function set_initial_rhs!(solver::MadNLPSolver{T}, kkt::SparseUnreducedKKTSystem) where T

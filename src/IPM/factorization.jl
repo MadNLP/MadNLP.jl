@@ -30,6 +30,7 @@ function solve_refine_wrapper!(
         w.xp_ur .+= dual_ub(w) ./ (solver.xu_r .- solver.x_ur)
         
         cnt.linear_solver_time += @elapsed solve!(solver.linear_solver, primal_dual(w))
+        fixed_variable_treatment_vec!(full(w), solver.ind_fixed)
 
         if init
             full(x) .+= full(w)
@@ -52,7 +53,6 @@ function solve_refine_wrapper!(
         err = norm(full(w), Inf)
     end
 
-    fixed_variable_treatment_vec!(full(w), solver.ind_fixed)
 
     if resto
         error()
