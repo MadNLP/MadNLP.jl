@@ -21,16 +21,18 @@ function solve_refine_wrapper!(
 
     fill!(full(x), 0)
    
-    n = init ? 10 : 2
-
-    
     copyto!(full(w), full(b))
-    for i=1:n
+    for kk=1:10
+        err = norm(full(w), Inf)
+        println(err)
+        if err <= 1e-8
+            break
+        end
+
         w.xp_lr .-= dual_lb(w) ./ (solver.xl_r .- solver.x_lr)
         w.xp_ur .+= dual_ub(w) ./ (solver.xu_r .- solver.x_ur)
         
         cnt.linear_solver_time += @elapsed solve!(solver.linear_solver, primal_dual(w))
-        fixed_variable_treatment_vec!(full(w), solver.ind_fixed)
 
         if init
             full(x) .+= full(w)
@@ -49,8 +51,6 @@ function solve_refine_wrapper!(
             dual_lb(w) .+= .- x.xp_lr .* solver.zl_r .+ dual_lb(x) .* (solver.xl_r .- solver.x_lr)
             dual_ub(w) .+= .- x.xp_ur .* solver.zu_r .+ dual_ub(x) .* (solver.xu_r .- solver.x_ur)
         end
-        
-        err = norm(full(w), Inf)
     end
 
 
@@ -210,17 +210,19 @@ function solve_refine_wrapper!(
     solver::MadNLPSolver{T,<:SparseCondensedKKTSystem},
     x::AbstractKKTVector,
     b::AbstractKKTVector,
+    w::AbstractKKTVector;
+    resto = false,
+    init = false,
 ) where T
     cnt = solver.cnt
     @trace(solver.logger,"Iterative solution started.")
-    fixed_variable_treatment_vec!(full(b), solver.ind_fixed)
 
     kkt = solver.kkt
-    n = size(kkt.hess_csc, 1)
+    n = size(kkt.hess_com, 1)
     m = size(kkt.jt_csc, 2)
 
+   
     # load buffers
-    b_c = view(full(solver._w1), 1:n)
     jv_x = view(full(solver._w3), 1:m) 
     jv_t = view(primal(solver._w4), 1:n)
     v_c = dual(solver._w4)
@@ -237,18 +239,72 @@ function solve_refine_wrapper!(
     xs = view(full(x), n+1:n+m)
     xz = view(full(x), n+m+1:n+2*m)
 
-    v_c .= kkt.diag_buffer .* (bz .+ bs ./ Σs) 
-    mul!(jv_t, kkt.jt_csc, v_c)
+    # Decompose buffers
+    wx = _madnlp_unsafe_wrap(full(w), n)
+    ws = view(full(w), n+1:n+m)
+    wz = view(full(w), n+m+1:n+2*m)
+    
+    fill!(full(x), 0)
+    copyto!(full(w), full(b))
+    
+    for kk=1:10
+        err = norm(full(w), Inf)
+        println(err)
+        if err <= solver.opt.tol * 1e-2
+            break
+        end
+        w.xp_lr .-= dual_lb(w) ./ (solver.xl_r .- solver.x_lr)
+        w.xp_ur .+= dual_ub(w) ./ (solver.xu_r .- solver.x_ur)
+        
+        v_c .= kkt.diag_buffer .* (wz .+ ws ./ Σs) 
+        
+        
+        # init right-hand-side
+        wx .+= mul!(jv_t, kkt.jt_csc, v_c)
+        
+        cnt.linear_solver_time += @elapsed solve!(solver.linear_solver, wx)
 
-    # init right-hand-side
-    b_c .= bx .+ jv_t
+        v_c .= ws
+        ws .= (.- (wz + kkt.du_diag .* ws) .+ mul!(jv_x, kkt.jt_csc', wx) ) ./ ( 1 .- Σs .* kkt.du_diag )
+        wz .= .-v_c .+ Σs .* ws
+        
+        if init
+            full(x) .+= full(w)
+            break
+            # copyto!(full(w), full(b))
+            # mul!(primal_dual(w), Symmetric(kkt.aug_com, :L), primal_dual(x), -1., 1.)
+        else
+            finish_aug_solve!(solver, solver.kkt, w, solver.mu)
+            
+            full(x) .+= full(w)
 
-    cnt.linear_solver_time += @elapsed (result = solve_refine!(xx, solver.iterator, b_c))
+            copyto!(full(w), full(b))
+            
+            # mul!(primal_dual(w), Symmetric(kkt.aug_com, :L), primal_dual(x), -1., 1.)
+            mul!(wx, Symmetric(kkt.hess_com, :L), xx, -1., 1.)
+            mul!(wx, kkt.jt_csc,  xz, -1., 1.)
+            mul!(wz, kkt.jt_csc', xx, -1., 1.)
+            ws .+= xz
+            wz .+= xs
+                
+            primal(w) .-= solver.del_w .* primal(x)
+            dual(w) .-= kkt.du_diag .* dual(x)
+            
+            w.xp_lr .+= dual_lb(x)
+            w.xp_ur .-= dual_ub(x)
+            
+            dual_lb(w) .+= .- x.xp_lr .* solver.zl_r .+ dual_lb(x) .* (solver.xl_r .- solver.x_lr)
+            dual_ub(w) .+= .- x.xp_ur .* solver.zu_r .+ dual_ub(x) .* (solver.xu_r .- solver.x_ur)
+        end
+    end
 
-    # Expand solution
-    xs .= (.- (bz + kkt.du_diag .* bs) .+ mul!(jv_x, kkt.jt_csc', xx) ) ./ ( 1 .- Σs .* kkt.du_diag )
-    xz .= .-bs .+ Σs .* xs
+    # kkt = solver.kkt
 
-    fixed_variable_treatment_vec!(full(x), solver.ind_fixed)
-    return (result == :Solved)
+
+    # cnt.linear_solver_time += @elapsed (result = solve_refine!(xx, solver.iterator, b_c))
+
+    # # Expand solution
+
+    # fixed_variable_treatment_vec!(full(x), solver.ind_fixed)
+    return true
 end

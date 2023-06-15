@@ -71,8 +71,8 @@ Implement the [`AbstractCondensedKKTSystem`](@ref) in sparse COO format.
 struct SparseCondensedKKTSystem{T, VT, MT, QN} <: AbstractCondensedKKTSystem{T, VT, MT, QN}
     # Hessian
     hess::VT
-    hess_coo::SparseMatrixCOO{T,Int32,VT}
-    hess_csc::MT
+    hess_raw::SparseMatrixCOO{T,Int32,VT}
+    hess_com::MT
     hess_csc_map::Union{Nothing, Vector{Int}}
 
     # Jacobian
@@ -444,10 +444,10 @@ function SparseCondensedKKTSystem{T, VT, MT, QN}(
 
     quasi_newton = QN(n)
 
-    diag_buffer = VT(undef,m)
-    hess_coo = SparseMatrixCOO(n, n, hess_sparsity_I, hess_sparsity_J, hess)
-    hess_csc = MT(hess_coo)
-    hess_csc_map = get_mapping(hess_csc, hess_coo)
+    diag_buffer = VT(undef,m) 
+    hess_raw = SparseMatrixCOO(n, n, hess_sparsity_I, hess_sparsity_J, hess)
+    hess_com = MT(hess_raw)
+    hess_csc_map = get_mapping(hess_com, hess_raw)
 
     jt_coo = SparseMatrixCOO(
         n, m, 
@@ -459,12 +459,12 @@ function SparseCondensedKKTSystem{T, VT, MT, QN}(
     jt_csc_map = get_mapping(jt_csc, jt_coo)
     
     aug_com, dptr, hptr, jptr = build_condensed_aug_symbolic(
-        hess_csc,
+        hess_com,
         jt_csc
     )
 
     return SparseCondensedKKTSystem{T, VT, MT, QN}(
-        hess, hess_coo,hess_csc,hess_csc_map,
+        hess, hess_raw,hess_com,hess_csc_map,
         jac, jac_callback, jac_raw, jt_coo,jt_csc,jt_csc_map,
         quasi_newton, pr_diag, du_diag,
         aug_com, diag_buffer, dptr, hptr, jptr,
@@ -563,7 +563,7 @@ function mul!(y::AbstractVector, kkt::SparseCondensedKKTSystem, x::AbstractVecto
 end
 
 function jtprod!(y::AbstractVector, kkt::SparseCondensedKKTSystem, x::AbstractVector)
-    n = size(kkt.hess_csc, 1)
+    n = size(kkt.hess_com, 1)
     m = size(kkt.jt_csc, 2)
 
     mul!(view(y, 1:n), kkt.jt_csc, x)
@@ -691,9 +691,9 @@ end
 
 
 function build_kkt!(kkt::SparseCondensedKKTSystem{T, VT, MT}) where {T, VT, MT<:SparseMatrixCSC{T, Int32}}
-    transfer!(kkt.hess_csc, kkt.hess_coo, kkt.hess_csc_map)
+    transfer!(kkt.hess_com, kkt.hess_raw, kkt.hess_csc_map)
 
-    n = size(kkt.hess_csc, 1)
+    n = size(kkt.hess_com, 1)
     m = size(kkt.jt_csc, 2)
 
 
@@ -702,7 +702,7 @@ function build_kkt!(kkt::SparseCondensedKKTSystem{T, VT, MT}) where {T, VT, MT<:
     Σd = kkt.du_diag
 
     kkt.diag_buffer .= 1 ./ ( 1 ./ Σs .- Σd )
-    build_condensed_aug_coord!(kkt.aug_com, kkt.pr_diag, kkt.hess_csc, kkt.jt_csc, kkt.diag_buffer, kkt.dptr, kkt.hptr, kkt.jptr)
+    build_condensed_aug_coord!(kkt.aug_com, kkt.pr_diag, kkt.hess_com, kkt.jt_csc, kkt.diag_buffer, kkt.dptr, kkt.hptr, kkt.jptr)
 
     treat_fixed_variable!(kkt)
 end
