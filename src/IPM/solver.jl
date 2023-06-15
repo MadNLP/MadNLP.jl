@@ -60,7 +60,8 @@ function initialize!(solver::AbstractMadNLPSolver{T}) where T
         set_initial_rhs!(solver, solver.kkt)
         initialize!(solver.kkt)
         factorize_wrapper!(solver)
-        is_solved = solve_refine_wrapper!(solver,solver.d,solver.p)
+        is_solved = solve_refine_wrapper!(solver,solver.d,solver.p,solver._w1; init = true)
+        
         if !is_solved || (norm(dual(solver.d), Inf) > solver.opt.constr_mult_init_max)
             fill!(solver.y, zero(T))
         else
@@ -264,8 +265,6 @@ function regular!(solver::AbstractMadNLPSolver{T}) where T
         elseif solver.opt.inertia_correction_method == INERTIA_BASED
             inertia_based_reg(solver) || return ROBUST
         end
-
-        finish_aug_solve!(solver, solver.kkt, solver.mu)
 
         # filter start
         @trace(solver.logger,"Backtracking line search initiated.")
@@ -480,8 +479,7 @@ function restore!(solver::AbstractMadNLPSolver)
 
         dual_inf_perturbation!(primal(solver.p),solver.ind_llb,solver.ind_uub,solver.mu,solver.opt.kappa_d)
         factorize_wrapper!(solver)
-        solve_refine_wrapper!(solver,solver.d,solver.p)
-        finish_aug_solve!(solver, solver.kkt, solver.mu)
+        solve_refine_wrapper!(solver,solver.d,solver.p,solver._w1)
 
         solver.ftype = "f"
     end
@@ -558,10 +556,7 @@ function robust!(solver::MadNLPSolver{T}) where T
         # without inertia correction,
         @trace(solver.logger,"Solving restoration phase primal-dual system.")
         factorize_wrapper!(solver)
-        solve_refine_wrapper!(solver,solver.d,solver.p)
-
-        finish_aug_solve!(solver, solver.kkt, RR.mu_R)
-        finish_aug_solve_RR!(RR.dpp,RR.dnn,RR.dzp,RR.dzn,solver.y,dual(solver.d),RR.pp,RR.nn,RR.zp,RR.zn,RR.mu_R,solver.opt.rho)
+        solve_refine_wrapper!(solver,solver.d,solver.p,solver._w1)
 
 
         theta_R = get_theta_R(solver.c,RR.pp,RR.nn)
@@ -685,14 +680,12 @@ function robust!(solver::MadNLPSolver{T}) where T
             theta <= solver.opt.required_infeasibility_reduction * RR.theta_ref
 
             @trace(solver.logger,"Going back to the regular phase.")
-            solver.zl_r.=1
-            solver.zu_r.=1
-
             set_initial_rhs!(solver, solver.kkt)
             initialize!(solver.kkt)
 
             factorize_wrapper!(solver)
-            solve_refine_wrapper!(solver,solver.d,solver.p)
+            solve_refine_wrapper!(solver,solver.d,solver.p,solver._w1)
+            
             if norm(dual(solver.d), Inf)>solver.opt.constr_mult_init_max
                 fill!(solver.y, 0.0)
             else
@@ -717,7 +710,7 @@ function inertia_based_reg(solver::MadNLPSolver)
 
     factorize_wrapper!(solver)
     num_pos,num_zero,num_neg = inertia(solver.linear_solver)
-    solve_status = num_zero!= 0 ? false : solve_refine_wrapper!(solver,solver.d,solver.p)
+    solve_status = num_zero!= 0 ? false : solve_refine_wrapper!(solver,solver.d,solver.p,solver._w1)
 
     n_trial = 0
     solver.del_w = del_w_prev = 0.0
@@ -740,7 +733,7 @@ function inertia_based_reg(solver::MadNLPSolver)
 
         factorize_wrapper!(solver)
         num_pos,num_zero,num_neg = inertia(solver.linear_solver)
-        solve_status = num_zero!= 0 ? false : solve_refine_wrapper!(solver,solver.d,solver.p)
+        solve_status = num_zero!= 0 ? false : solve_refine_wrapper!(solver,solver.d,solver.p,solver._w1)
         n_trial += 1
     end
     solver.del_w != 0 && (solver.del_w_last = solver.del_w)
@@ -767,7 +760,7 @@ function inertia_free_reg(solver::MadNLPSolver)
     fixed_variable_treatment_vec!(g, solver.ind_fixed)
 
     factorize_wrapper!(solver)
-    solve_status = (solve_refine_wrapper!(solver,d0,p0) && solve_refine_wrapper!(solver,solver.d,solver.p))
+    solve_status = (solve_refine_wrapper!(solver,d0,p0,solver._w1) && solve_refine_wrapper!(solver,solver.d,solver.p,solver._w1))
     copyto!(t,dx)
     axpy!(-1.,n,t)
     mul!(solver._w4, solver.kkt, solver._w3) # prepartation for curv_test
@@ -792,7 +785,7 @@ function inertia_free_reg(solver::MadNLPSolver)
         del_w_prev = solver.del_w
 
         factorize_wrapper!(solver)
-        solve_status = (solve_refine_wrapper!(solver,d0,p0) && solve_refine_wrapper!(solver,solver.d,solver.p))
+        solve_status = (solve_refine_wrapper!(solver,d0,p0,solver._w1) && solve_refine_wrapper!(solver,solver.d,solver.p,solver._w1))
         copyto!(t,dx)
         axpy!(-1.,n,t)
 
@@ -823,7 +816,7 @@ function second_order_correction(solver::AbstractMadNLPSolver,alpha_max,theta,va
             primal(solver.p),
             solver.ind_llb,solver.ind_uub,solver.mu,solver.opt.kappa_d,
         )
-        solve_refine_wrapper!(solver,solver._w1,solver.p)
+        solve_refine_wrapper!(solver,solver._w1,solver.p,solver._w2)
         alpha_soc = get_alpha_max(
             primal(solver.x),
             primal(solver.xl),

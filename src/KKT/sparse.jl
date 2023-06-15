@@ -15,6 +15,10 @@ struct SparseKKTSystem{T, VT, MT, QN} <: AbstractReducedKKTSystem{T, VT, MT, QN}
     aug_raw::SparseMatrixCOO{T,Int32,VT}
     aug_com::MT
     aug_csc_map::Union{Nothing, Vector{Int}}
+    # Hessian
+    hess_raw::SparseMatrixCOO{T,Int32,VT}
+    hess_com::MT
+    hess_csc_map::Union{Nothing, Vector{Int}}
     # Jacobian
     jac_raw::SparseMatrixCOO{T,Int32,VT}
     jac_com::MT
@@ -150,6 +154,10 @@ function compress_jacobian!(kkt::AbstractSparseKKTSystem{T, VT, MT}) where {T, V
     copyto!(kkt.jac_com, kkt.jac_raw)
 end
 
+function compress_hessian!(kkt::AbstractSparseKKTSystem{T, VT, MT}) where {T, VT, MT<:SparseMatrixCSC{T, Int32}}
+    transfer!(kkt.hess_com, kkt.hess_raw, kkt.hess_csc_map)
+end
+
 function set_jacobian_scaling!(kkt::AbstractSparseKKTSystem{T, VT, MT}, constraint_scaling::AbstractVector) where {T, VT, MT}
     nnzJ = length(kkt.jac)::Int
     @inbounds for i in 1:nnzJ
@@ -209,12 +217,20 @@ function SparseKKTSystem{T, VT, MT, QN}(
         Int32[jac_sparsity_J; n+1:n+n_slack],
         jac,
     )
+    hess_raw = SparseMatrixCOO(
+        n_tot, n_tot,
+        hess_sparsity_I,
+        hess_sparsity_J,
+        hess,
+    )
 
     aug_com = MT(aug_raw)
     jac_com = MT(jac_raw)
+    hess_com = MT(hess_raw)
 
     aug_csc_map = get_mapping(aug_com, aug_raw)
     jac_csc_map = get_mapping(jac_com, jac_raw)
+    hess_csc_map = get_mapping(hess_com, hess_raw)
 
     ind_aug_fixed = if isa(aug_com, SparseMatrixCSC)
         _get_fixed_variable_index(aug_com, ind_fixed)
@@ -228,6 +244,7 @@ function SparseKKTSystem{T, VT, MT, QN}(
     return SparseKKTSystem{T, VT, MT, QN}(
         hess, jac_callback, jac, quasi_newton, pr_diag, du_diag,
         aug_raw, aug_com, aug_csc_map,
+        hess_raw, hess_com, hess_csc_map,
         jac_raw, jac_com, jac_csc_map,
         ind_ineq, ind_fixed, ind_aug_fixed, jac_scaling,
     )

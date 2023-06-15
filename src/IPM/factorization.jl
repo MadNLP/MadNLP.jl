@@ -9,36 +9,68 @@ function solve_refine_wrapper!(
     solver::MadNLPSolver,
     x::AbstractKKTVector,
     b::AbstractKKTVector,
+    w::AbstractKKTVector;
+    resto = false,
+    init = false,
 )
     cnt = solver.cnt
     @trace(solver.logger,"Iterative solution started.")
     fixed_variable_treatment_vec!(full(b), solver.ind_fixed)
 
-    cnt.linear_solver_time += @elapsed begin
-        result = solve_refine!(x, solver.iterator, b)
+    kkt = solver.kkt
+
+    fill!(full(x), 0)
+   
+    n = init ? 10 : 2
+
+    
+    copyto!(full(w), full(b))
+    for i=1:n
+        w.xp_lr .-= dual_lb(w) ./ (solver.xl_r .- solver.x_lr)
+        w.xp_ur .+= dual_ub(w) ./ (solver.xu_r .- solver.x_ur)
+        
+        cnt.linear_solver_time += @elapsed solve!(solver.linear_solver, primal_dual(w))
+        fixed_variable_treatment_vec!(full(w), solver.ind_fixed)
+
+        if init
+            full(x) .+= full(w)
+            copyto!(full(w), full(b))
+            mul!(primal_dual(w), Symmetric(kkt.aug_com, :L), primal_dual(x), -1., 1.)
+        else
+            finish_aug_solve!(solver, solver.kkt, w, solver.mu)
+            
+            full(x) .+= full(w)
+            copyto!(full(w), full(b))
+            mul!(primal_dual(w), Symmetric(kkt.aug_com, :L), primal_dual(x), -1., 1.)
+            primal(w) .+= kkt.pr_diag .* primal(x)
+            w.xp_lr .+= dual_lb(x)
+            w.xp_ur .-= dual_ub(x)
+            
+            dual_lb(w) .+= .- x.xp_lr .* solver.zl_r .+ dual_lb(x) .* (solver.xl_r .- solver.x_lr)
+            dual_ub(w) .+= .- x.xp_ur .* solver.zu_r .+ dual_ub(x) .* (solver.xu_r .- solver.x_ur)
+        end
+        
+        err = norm(full(w), Inf)
     end
 
-    if result == :Solved
-        solve_status =  true
-    else
-        if improve!(solver.linear_solver)
-            cnt.linear_solver_time += @elapsed begin
-                factorize!(solver.linear_solver)
-                ret = solve_refine!(x, solver.iterator, b)
-                solve_status = (ret == :Solved)
-            end
-        else
-            solve_status = false
-        end
+
+    if resto
+        error()
+        RR = solver.RR
+        finish_aug_solve_RR!(RR.dpp,RR.dnn,RR.dzp,RR.dzn,solver.y,dual(solver.d),RR.pp,RR.nn,RR.zp,RR.zn,RR.mu_R,solver.opt.rho)
     end
-    fixed_variable_treatment_vec!(full(x), solver.ind_fixed)
-    return solve_status
+
+    
+
+
+    return true
 end
 
 function solve_refine_wrapper!(
     solver::MadNLPSolver{T,<:DenseCondensedKKTSystem},
     x::AbstractKKTVector,
-    b::AbstractKKTVector,
+    b::AbstractKKTVector;
+    resto = false
 ) where T
     cnt = solver.cnt
     @trace(solver.logger,"Iterative solution started.")
@@ -90,6 +122,13 @@ function solve_refine_wrapper!(
     xs .= (bs .+ α .* xz) ./ Σs
 
     fixed_variable_treatment_vec!(full(x), solver.ind_fixed)
+    finish_aug_solve!(solver, solver.kkt, solver.mu)
+
+    if resto
+        RR = solver.RR
+        finish_aug_solve_RR!(RR.dpp,RR.dnn,RR.dzp,RR.dzn,solver.y,dual(solver.d),RR.pp,RR.nn,RR.zp,RR.zn,RR.mu_R,solver.opt.rho)
+    end
+
     return solve_status
 end
 
@@ -106,7 +145,8 @@ end
 function solve_refine_wrapper!(
     solver::MadNLPSolver{T, <:SparseKKTSystem{T, VT, MT, QN}},
     x::AbstractKKTVector,
-    b::AbstractKKTVector,
+    b::AbstractKKTVector;
+    resto = false
 ) where {T, VT, MT, QN<:CompactLBFGS{T, Vector{T}, Matrix{T}}}
     cnt = solver.cnt
     kkt = solver.kkt
@@ -155,8 +195,13 @@ function solve_refine_wrapper!(
     end
 
     fixed_variable_treatment_vec!(full(x), solver.ind_fixed)
-    solve_status = (result == :Solved)
-    return solve_status
+    finish_aug_solve!(solver, solver.kkt, solver.mu)
+    if resto
+        RR = solver.RR
+        finish_aug_solve_RR!(RR.dpp,RR.dnn,RR.dzp,RR.dzn,solver.y,dual(solver.d),RR.pp,RR.nn,RR.zp,RR.zn,RR.mu_R,solver.opt.rho)
+    end
+    
+    return result == :Solved
 end
 
 
