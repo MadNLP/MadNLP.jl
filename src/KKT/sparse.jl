@@ -559,7 +559,6 @@ function mul!(y::AbstractVector, kkt::SparseCondensedKKTSystem, x::AbstractVecto
     yy .= Σd .* xy
     mul!(yy, kkt.jt_csc', xx, 1.0, 1.0)
     yy .-= xs
-
 end
 
 function jtprod!(y::AbstractVector, kkt::SparseCondensedKKTSystem, x::AbstractVector)
@@ -703,6 +702,4 @@ function build_kkt!(kkt::SparseCondensedKKTSystem{T, VT, MT}) where {T, VT, MT<:
 
     kkt.diag_buffer .= 1 ./ ( 1 ./ Σs .- Σd )
     build_condensed_aug_coord!(kkt.aug_com, kkt.pr_diag, kkt.hess_com, kkt.jt_csc, kkt.diag_buffer, kkt.dptr, kkt.hptr, kkt.jptr)
-
-    treat_fixed_variable!(kkt)
 end

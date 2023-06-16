@@ -24,7 +24,6 @@ function solve_refine_wrapper!(
     copyto!(full(w), full(b))
     for kk=1:10
         err = norm(full(w), Inf)
-        println(err)
         if err <= 1e-8
             break
         end
@@ -204,7 +203,22 @@ function solve_refine_wrapper!(
     return result == :Solved
 end
 
-
+@inbounds function f(
+    xp_lr,wl,xl_r,x_lr,
+    xp_ur,wu,x_ur,xu_r,
+    )
+    @simd for i=1:length(xp_lr)
+        xp_lr[i] -= wl[i] / (xl_r[i] - x_lr[i])
+    end
+    @simd for i=1:length(xp_ur)
+        xp_ur[i] += wu[i] / (xu_r[i] - x_ur[i])
+    end
+end
+@inbounds function g(ws,wz,du_diag,jv_x,Σs) 
+    @simd for i=1:length(ws)
+        ws[i] = (- (wz[i] + du_diag[i] * ws[i]) + jv_x[i] ) / ( 1 - Σs[i] * du_diag[i] )
+    end
+end
 
 function solve_refine_wrapper!(
     solver::MadNLPSolver{T,<:SparseCondensedKKTSystem},
@@ -213,7 +227,8 @@ function solve_refine_wrapper!(
     w::AbstractKKTVector;
     resto = false,
     init = false,
-) where T
+    ) where T
+
     cnt = solver.cnt
     @trace(solver.logger,"Iterative solution started.")
 
@@ -249,12 +264,13 @@ function solve_refine_wrapper!(
     
     for kk=1:10
         err = norm(full(w), Inf)
-        println(err)
         if err <= solver.opt.tol * 1e-2
             break
         end
-        w.xp_lr .-= dual_lb(w) ./ (solver.xl_r .- solver.x_lr)
-        w.xp_ur .+= dual_ub(w) ./ (solver.xu_r .- solver.x_ur)
+        f(
+            w.xp_lr, dual_lb(w), solver.xl_r, solver.x_lr,
+            w.xp_ur, dual_ub(w), solver.xu_r, solver.x_ur,
+        )
         
         v_c .= kkt.diag_buffer .* (wz .+ ws ./ Σs) 
         
@@ -265,9 +281,11 @@ function solve_refine_wrapper!(
         cnt.linear_solver_time += @elapsed solve!(solver.linear_solver, wx)
 
         v_c .= ws
-        ws .= (.- (wz + kkt.du_diag .* ws) .+ mul!(jv_x, kkt.jt_csc', wx) ) ./ ( 1 .- Σs .* kkt.du_diag )
+        mul!(jv_x, kkt.jt_csc', wx)
+         
+        g(ws,wz,kkt.du_diag,jv_x,Σs) 
+
         wz .= .-v_c .+ Σs .* ws
-        
         if init
             full(x) .+= full(w)
             break
@@ -283,7 +301,7 @@ function solve_refine_wrapper!(
             # mul!(primal_dual(w), Symmetric(kkt.aug_com, :L), primal_dual(x), -1., 1.)
             mul!(wx, Symmetric(kkt.hess_com, :L), xx, -1., 1.)
             mul!(wx, kkt.jt_csc,  xz, -1., 1.)
-            mul!(wz, kkt.jt_csc', xx, -1., 1.)
+                mul!(wz, kkt.jt_csc', xx, -1., 1.)
             ws .+= xz
             wz .+= xs
                 
@@ -297,7 +315,6 @@ function solve_refine_wrapper!(
             dual_ub(w) .+= .- x.xp_ur .* solver.zu_r .+ dual_ub(x) .* (solver.xu_r .- solver.x_ur)
         end
     end
-
     # kkt = solver.kkt
 
 

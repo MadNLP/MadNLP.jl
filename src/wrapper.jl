@@ -116,13 +116,17 @@ function NLPModelWrapper(nlp::AbstractNLPModel{T, VT}) where {T, VT}
     ind_free_j = findall(j->isfree[j], jac_J)
     ind_free_h = findall(@view(isfree[hess_I]) .& @view(isfree[hess_J]))
 
-    y0   = similar(x_buffer, m) .* con_scale
-    lcon = similar(x_buffer, m) .* con_scale
-    ucon = similar(x_buffer, m) .* con_scale
+    y0   = similar(x_buffer, m) 
+    lcon = similar(x_buffer, m) 
+    ucon = similar(x_buffer, m) 
     
     copyto!(@view(y0[ind_cons])   , nlp.meta.y0)
     copyto!(@view(lcon[ind_cons]) , nlp.meta.lcon)
     copyto!(@view(ucon[ind_cons]) , nlp.meta.ucon)
+
+    y0   .*= con_scale
+    lcon .*= con_scale
+    ucon .*= con_scale
 
     lcon_slk = @view lcon[con_slack_range]
     ucon_slk = @view ucon[con_slack_range]

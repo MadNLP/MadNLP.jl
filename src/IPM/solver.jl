@@ -205,7 +205,7 @@ function regular!(solver::AbstractMadNLPSolver{T}) where T
             solver.jacl,
             solver.ind_fixed,
         )
-
+        ### more expensive than I thought
         sd = get_sd(solver.y,solver.zl_r,solver.zu_r,solver.opt.s_max)
         sc = get_sc(solver.zl_r,solver.zu_r,solver.opt.s_max)
 
@@ -219,9 +219,9 @@ function regular!(solver::AbstractMadNLPSolver{T}) where T
         )
         solver.inf_compl = get_inf_compl(solver.x_lr,solver.xl_r,solver.zl_r,solver.xu_r,solver.x_ur,solver.zu_r,0.,sc)
         inf_compl_mu = get_inf_compl(solver.x_lr,solver.xl_r,solver.zl_r,solver.xu_r,solver.x_ur,solver.zu_r,solver.mu,sc)
+        ###
 
         print_iter(solver)
-
         # evaluate termination criteria
         @trace(solver.logger,"Evaluating termination criteria.")
         max(solver.inf_pr,solver.inf_du,solver.inf_compl) <= solver.opt.tol && return SOLVE_SUCCEEDED

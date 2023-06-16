@@ -37,4 +37,5 @@ include("options.jl")
 include(joinpath("IPM", "IPM.jl"))
 include(joinpath("Interfaces","interfaces.jl"))
 include("wrapper.jl")
+include("scale.jl")
 end # end module
