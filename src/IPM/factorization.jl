@@ -20,11 +20,12 @@ function solve_refine_wrapper!(
     kkt = solver.kkt
 
     fill!(full(x), 0)
+    norm_b = norm(b, Inf)
    
     copyto!(full(w), full(b))
     for kk=1:10
-        err = norm(full(w), Inf)
-        if err <= 1e-8
+        err = norm(full(w), Inf) / (one(eltype(full(x))) + norm_b)
+        if err <= solver.opt.tol 
             break
         end
 
@@ -262,8 +263,10 @@ function solve_refine_wrapper!(
     fill!(full(x), 0)
     copyto!(full(w), full(b))
     
+    norm_b = norm(b, Inf)
+    
     for kk=1:10
-        err = norm(full(w), Inf)
+        err = norm(full(w), Inf) / (one(eltype(full(x))) + norm_b)
         if err <= solver.opt.tol * 1e-2
             break
         end
@@ -301,7 +304,7 @@ function solve_refine_wrapper!(
             # mul!(primal_dual(w), Symmetric(kkt.aug_com, :L), primal_dual(x), -1., 1.)
             mul!(wx, Symmetric(kkt.hess_com, :L), xx, -1., 1.)
             mul!(wx, kkt.jt_csc,  xz, -1., 1.)
-                mul!(wz, kkt.jt_csc', xx, -1., 1.)
+            mul!(wz, kkt.jt_csc', xx, -1., 1.)
             ws .+= xz
             wz .+= xs
                 
@@ -310,7 +313,6 @@ function solve_refine_wrapper!(
             
             w.xp_lr .+= dual_lb(x)
             w.xp_ur .-= dual_ub(x)
-            
             dual_lb(w) .+= .- x.xp_lr .* solver.zl_r .+ dual_lb(x) .* (solver.xl_r .- solver.x_lr)
             dual_ub(w) .+= .- x.xp_ur .* solver.zu_r .+ dual_ub(x) .* (solver.xu_r .- solver.x_ur)
         end
