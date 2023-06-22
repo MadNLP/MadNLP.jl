@@ -5,7 +5,38 @@ function factorize_wrapper!(solver::MadNLPSolver)
     solver.cnt.linear_solver_time += @elapsed factorize!(solver.linear_solver)
 end
 
-function solve_refine_wrapper!(
+@inbounds function _kktmul!(w,x,del_w,du_diag,zl_r,zu_r,xl_r,xu_r,x_lr,x_ur)
+    primal(w) .-= del_w .* primal(x)
+    dual(w) .-= du_diag .* dual(x)
+    w.xp_lr .+= dual_lb(x)
+    w.xp_ur .-= dual_ub(x)            
+    dual_lb(w) .+= .- x.xp_lr .* zl_r .+ dual_lb(x) .* (xl_r .- x_lr)
+    dual_ub(w) .+= .- x.xp_ur .* zu_r .+ dual_ub(x) .* (xu_r .- x_ur)
+end
+
+@inbounds function _unreduced_solve_prep!(w,x,xl_r,xu_r,x_lr,x_ur)
+    w.xp_lr .-= dual_lb(w) ./ (xl_r .- x_lr)
+    w.xp_ur .+= dual_ub(w) ./ (xu_r .- x_ur)
+end
+
+@inbounds function aug_rhs_prep(
+    xp_lr,wl,xl_r,x_lr,
+    xp_ur,wu,x_ur,xu_r,
+    )
+    @simd for i=1:length(xp_lr)
+        xp_lr[i] -= wl[i] / (xl_r[i] - x_lr[i])
+    end
+    @simd for i=1:length(xp_ur)
+        xp_ur[i] += wu[i] / (xu_r[i] - x_ur[i])
+    end
+end
+@inbounds function g(ws,wz,du_diag,jv_x,Σs) 
+    @simd for i=1:length(ws)
+        ws[i] = (- (wz[i] + du_diag[i] * ws[i]) + jv_x[i] ) / ( 1 - Σs[i] * du_diag[i] )
+    end
+end
+
+@inbounds function solve_refine_wrapper!(
     solver::MadNLPSolver,
     x::AbstractKKTVector,
     b::AbstractKKTVector,
@@ -15,7 +46,6 @@ function solve_refine_wrapper!(
 )
     cnt = solver.cnt
     @trace(solver.logger,"Iterative solution started.")
-    fixed_variable_treatment_vec!(full(b), solver.ind_fixed)
 
     kkt = solver.kkt
 
@@ -23,34 +53,32 @@ function solve_refine_wrapper!(
     norm_b = norm(b, Inf)
    
     copyto!(full(w), full(b))
+
+    status = false
     for kk=1:10
         err = norm(full(w), Inf) / (one(eltype(full(x))) + norm_b)
-        if err <= solver.opt.tol 
+        println(err)
+        
+        if err <= 1e-10
+            status = true
             break
         end
 
-        w.xp_lr .-= dual_lb(w) ./ (solver.xl_r .- solver.x_lr)
-        w.xp_ur .+= dual_ub(w) ./ (solver.xu_r .- solver.x_ur)
-        
+        aug_rhs_prep(w.xp_lr, dual_lb(w), solver.xl_r, solver.x_lr,w.xp_ur, dual_ub(w), solver.xu_r, solver.x_ur)
         cnt.linear_solver_time += @elapsed solve!(solver.linear_solver, primal_dual(w))
+        finish_aug_solve!(solver, solver.kkt, w, solver.mu)
 
-        if init
-            full(x) .+= full(w)
-            copyto!(full(w), full(b))
-            mul!(primal_dual(w), Symmetric(kkt.aug_com, :L), primal_dual(x), -1., 1.)
-        else
-            finish_aug_solve!(solver, solver.kkt, w, solver.mu)
-            
-            full(x) .+= full(w)
-            copyto!(full(w), full(b))
-            mul!(primal_dual(w), Symmetric(kkt.aug_com, :L), primal_dual(x), -1., 1.)
-            primal(w) .+= kkt.pr_diag .* primal(x)
-            w.xp_lr .+= dual_lb(x)
-            w.xp_ur .-= dual_ub(x)
-            
-            dual_lb(w) .+= .- x.xp_lr .* solver.zl_r .+ dual_lb(x) .* (solver.xl_r .- solver.x_lr)
-            dual_ub(w) .+= .- x.xp_ur .* solver.zu_r .+ dual_ub(x) .* (solver.xu_r .- solver.x_ur)
-        end
+        axpy!(1., full(w), full(x))
+        
+        copyto!(full(w), full(b))
+
+        mul!(primal(w), Symmetric(kkt.hess_com, :L), primal(x), -1., 1.)
+        mul!(primal(w), kkt.jac_com', dual(x), -1., 1.)
+        mul!(dual(w), kkt.jac_com,  primal(x), -1., 1.)
+
+        _kktmul!(w,x,solver.del_w,kkt.du_diag,solver.zl_r,solver.zu_r,solver.xl_r,solver.xu_r,solver.x_lr,solver.x_ur)
+
+        init && break
     end
 
 
@@ -60,10 +88,7 @@ function solve_refine_wrapper!(
         finish_aug_solve_RR!(RR.dpp,RR.dnn,RR.dzp,RR.dzn,solver.y,dual(solver.d),RR.pp,RR.nn,RR.zp,RR.zn,RR.mu_R,solver.opt.rho)
     end
 
-    
-
-
-    return true
+    return status
 end
 
 function solve_refine_wrapper!(
@@ -74,7 +99,6 @@ function solve_refine_wrapper!(
 ) where T
     cnt = solver.cnt
     @trace(solver.logger,"Iterative solution started.")
-    fixed_variable_treatment_vec!(full(b), solver.ind_fixed)
 
     kkt = solver.kkt
 
@@ -121,7 +145,6 @@ function solve_refine_wrapper!(
     xz .= sqrt.(Σs) ./ α .* jv_x .- Σs .* bz ./ α.^2 .- bs ./ α
     xs .= (bs .+ α .* xz) ./ Σs
 
-    fixed_variable_treatment_vec!(full(x), solver.ind_fixed)
     finish_aug_solve!(solver, solver.kkt, solver.mu)
 
     if resto
@@ -167,8 +190,6 @@ function solve_refine_wrapper!(
         fill!(qn.V2, zero(T))
     end
 
-    fixed_variable_treatment_vec!(full(b), solver.ind_fixed)
-
     # Solve LBFGS system with Sherman-Morrison-Woodbury formula
     # (C + U Vᵀ)⁻¹ = C⁻¹ - C⁻¹ U (I + Vᵀ C⁻¹ U) Vᵀ C⁻¹
 
@@ -194,7 +215,6 @@ function solve_refine_wrapper!(
         mul!(x_, qn.V2, xr, -one(T), one(T))        # x = x - C⁻¹ U xᵣ
     end
 
-    fixed_variable_treatment_vec!(full(x), solver.ind_fixed)
     finish_aug_solve!(solver, solver.kkt, solver.mu)
     if resto
         RR = solver.RR
@@ -204,22 +224,6 @@ function solve_refine_wrapper!(
     return result == :Solved
 end
 
-@inbounds function f(
-    xp_lr,wl,xl_r,x_lr,
-    xp_ur,wu,x_ur,xu_r,
-    )
-    @simd for i=1:length(xp_lr)
-        xp_lr[i] -= wl[i] / (xl_r[i] - x_lr[i])
-    end
-    @simd for i=1:length(xp_ur)
-        xp_ur[i] += wu[i] / (xu_r[i] - x_ur[i])
-    end
-end
-@inbounds function g(ws,wz,du_diag,jv_x,Σs) 
-    @simd for i=1:length(ws)
-        ws[i] = (- (wz[i] + du_diag[i] * ws[i]) + jv_x[i] ) / ( 1 - Σs[i] * du_diag[i] )
-    end
-end
 
 function solve_refine_wrapper!(
     solver::MadNLPSolver{T,<:SparseCondensedKKTSystem},
@@ -264,66 +268,57 @@ function solve_refine_wrapper!(
     copyto!(full(w), full(b))
     
     norm_b = norm(b, Inf)
-    
     for kk=1:10
         err = norm(full(w), Inf) / (one(eltype(full(x))) + norm_b)
-        if err <= solver.opt.tol * 1e-2
+        println(err)
+        if err <= 1e-10
             break
         end
-        f(
+        aug_rhs_prep(
             w.xp_lr, dual_lb(w), solver.xl_r, solver.x_lr,
             w.xp_ur, dual_ub(w), solver.xu_r, solver.x_ur,
         )
-        
+
+        ##
+
         v_c .= kkt.diag_buffer .* (wz .+ ws ./ Σs) 
         
-        
         # init right-hand-side
-        wx .+= mul!(jv_t, kkt.jt_csc, v_c)
-        
+        mul!(jv_t, kkt.jt_csc, v_c)
+        axpy!(1, jv_t, wx)
+
         cnt.linear_solver_time += @elapsed solve!(solver.linear_solver, wx)
 
-        v_c .= ws
         mul!(jv_x, kkt.jt_csc', wx)
-         
-        g(ws,wz,kkt.du_diag,jv_x,Σs) 
+        wz .= .- v_c .+ kkt.diag_buffer .* jv_x
+        ws .= (ws .+ wz) ./ Σs
 
-        wz .= .-v_c .+ Σs .* ws
+        ##
+        # mul!(jv_x, kkt.jt_csc', wx)
+        
+        # copyto!(v_c, ws)
+        # g(ws,wz,kkt.du_diag,jv_x,Σs) 
+        # wz .= .-v_c .+ Σs .* ws
+
+        ##
+        finish_aug_solve!(solver, solver.kkt, w, solver.mu)
+        
+        axpy!(1., full(w), full(x))
+
+        copyto!(full(w), full(b))
+        
+        mul!(wx, Symmetric(kkt.hess_com, :L), xx, -1., 1.)
+        mul!(wx, kkt.jt_csc,  xz, -1., 1.)
+        mul!(wz, kkt.jt_csc', xx, -1., 1.)
+        axpy!(1, xz, ws)
+        axpy!(1, xs, wz)
+        
+        _kktmul!(w,x,solver.del_w,kkt.du_diag,solver.zl_r,solver.zu_r,solver.xl_r,solver.xu_r,solver.x_lr,solver.x_ur)
         if init
-            full(x) .+= full(w)
             break
-            # copyto!(full(w), full(b))
-            # mul!(primal_dual(w), Symmetric(kkt.aug_com, :L), primal_dual(x), -1., 1.)
-        else
-            finish_aug_solve!(solver, solver.kkt, w, solver.mu)
-            
-            full(x) .+= full(w)
-
-            copyto!(full(w), full(b))
-            
-            # mul!(primal_dual(w), Symmetric(kkt.aug_com, :L), primal_dual(x), -1., 1.)
-            mul!(wx, Symmetric(kkt.hess_com, :L), xx, -1., 1.)
-            mul!(wx, kkt.jt_csc,  xz, -1., 1.)
-            mul!(wz, kkt.jt_csc', xx, -1., 1.)
-            ws .+= xz
-            wz .+= xs
-                
-            primal(w) .-= solver.del_w .* primal(x)
-            dual(w) .-= kkt.du_diag .* dual(x)
-            
-            w.xp_lr .+= dual_lb(x)
-            w.xp_ur .-= dual_ub(x)
-            dual_lb(w) .+= .- x.xp_lr .* solver.zl_r .+ dual_lb(x) .* (solver.xl_r .- solver.x_lr)
-            dual_ub(w) .+= .- x.xp_ur .* solver.zu_r .+ dual_ub(x) .* (solver.xu_r .- solver.x_ur)
         end
+        
     end
-    # kkt = solver.kkt
 
-
-    # cnt.linear_solver_time += @elapsed (result = solve_refine!(xx, solver.iterator, b_c))
-
-    # # Expand solution
-
-    # fixed_variable_treatment_vec!(full(x), solver.ind_fixed)
     return true
 end

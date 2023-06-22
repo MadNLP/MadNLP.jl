@@ -9,7 +9,7 @@ mutable struct MadNLPExecutionStats{T} <: AbstractExecutionStats
     multipliers_L::Vector{T}
     multipliers_U::Vector{T}
     iter::Int
-    counters::NLPModels.Counters
+    counters
     elapsed_time::Real
 end
 

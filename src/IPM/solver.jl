@@ -706,14 +706,15 @@ function robust!(solver::MadNLPSolver{T}) where T
 end
 
 function inertia_based_reg(solver::MadNLPSolver)
+    n_trial = 0
+    solver.del_w = del_w_prev = 0.0
+
     @trace(solver.logger,"Inertia-based regularization started.")
 
     factorize_wrapper!(solver)
     num_pos,num_zero,num_neg = inertia(solver.linear_solver)
     solve_status = num_zero!= 0 ? false : solve_refine_wrapper!(solver,solver.d,solver.p,solver._w1)
 
-    n_trial = 0
-    solver.del_w = del_w_prev = 0.0
     while !is_inertia_correct(solver.kkt, num_pos, num_zero, num_neg) || !solve_status
         @debug(solver.logger,"Primal-dual perturbed.")
         if solver.del_w == 0.0
@@ -742,6 +743,8 @@ function inertia_based_reg(solver::MadNLPSolver)
 end
 
 function inertia_free_reg(solver::MadNLPSolver)
+    n_trial = 0
+    solver.del_w = del_w_prev = 0.
 
     @trace(solver.logger,"Inertia-free regularization started.")
     dx = primal(solver.d)
@@ -764,8 +767,6 @@ function inertia_free_reg(solver::MadNLPSolver)
     copyto!(t,dx)
     axpy!(-1.,n,t)
     mul!(solver._w4, solver.kkt, solver._w3) # prepartation for curv_test
-    n_trial = 0
-    solver.del_w = del_w_prev = 0.
 
     while !curv_test(t,n,g,wx,solver.opt.inertia_free_tol)  || !solve_status
         @debug(solver.logger,"Primal-dual perturbed.")
