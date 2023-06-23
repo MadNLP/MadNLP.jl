@@ -14,11 +14,6 @@ end
     dual_ub(w) .+= .- x.xp_ur .* zu_r .+ dual_ub(x) .* (xu_r .- x_ur)
 end
 
-@inbounds function _unreduced_solve_prep!(w,x,xl_r,xu_r,x_lr,x_ur)
-    w.xp_lr .-= dual_lb(w) ./ (xl_r .- x_lr)
-    w.xp_ur .+= dual_ub(w) ./ (xu_r .- x_ur)
-end
-
 @inbounds function aug_rhs_prep(
     xp_lr,wl,xl_r,x_lr,
     xp_ur,wu,x_ur,xu_r,
@@ -64,19 +59,18 @@ end
             break
         end
 
-        aug_rhs_prep(w.xp_lr, dual_lb(w), solver.xl_r, solver.x_lr,w.xp_ur, dual_ub(w), solver.xu_r, solver.x_ur)
-        cnt.linear_solver_time += @elapsed solve!(solver.linear_solver, primal_dual(w))
-        finish_aug_solve!(solver, solver.kkt, w, solver.mu)
+        @time aug_rhs_prep(w.xp_lr, dual_lb(w), solver.xl_r, solver.x_lr,w.xp_ur, dual_ub(w), solver.xu_r, solver.x_ur)
+        @time cnt.linear_solver_time += @elapsed solve!(solver.linear_solver, primal_dual(w))
+        @time begin
+            finish_aug_solve!(solver, solver.kkt, w, solver.mu)
 
-        axpy!(1., full(w), full(x))
-        
-        copyto!(full(w), full(b))
-
-        mul!(primal(w), Symmetric(kkt.hess_com, :L), primal(x), -1., 1.)
-        mul!(primal(w), kkt.jac_com', dual(x), -1., 1.)
-        mul!(dual(w), kkt.jac_com,  primal(x), -1., 1.)
-
-        _kktmul!(w,x,solver.del_w,kkt.du_diag,solver.zl_r,solver.zu_r,solver.xl_r,solver.xu_r,solver.x_lr,solver.x_ur)
+            axpy!(1., full(w), full(x))
+            copyto!(full(w), full(b))
+            mul!(primal(w), Symmetric(kkt.hess_com, :L), primal(x), -1., 1.)
+            mul!(primal(w), kkt.jac_com', dual(x), -1., 1.)
+            mul!(dual(w), kkt.jac_com,  primal(x), -1., 1.)
+            _kktmul!(w,x,solver.del_w,kkt.du_diag,solver.zl_r,solver.zu_r,solver.xl_r,solver.xu_r,solver.x_lr,solver.x_ur)
+        end
 
         init && break
     end

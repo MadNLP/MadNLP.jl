@@ -744,7 +744,6 @@ end
 
 function inertia_free_reg(solver::MadNLPSolver)
 
-    println("A")
     n_trial = 0
     solver.del_w = del_w_prev = 0.
 
@@ -814,6 +813,7 @@ function second_order_correction(solver::AbstractMadNLPSolver,alpha_max,theta,va
     theta_soc_old = theta_trial
     for p=1:solver.opt.max_soc
         # compute second order correction
+        println("A")
         set_aug_rhs!(solver, solver.kkt, wy)
         dual_inf_perturbation!(
             primal(solver.p),
