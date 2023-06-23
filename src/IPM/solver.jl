@@ -368,8 +368,7 @@ end
 # end
 function regular!(solver::AbstractMadNLPSolver{T}) where T
     while true
-        println("time-1")
-        solver.cnt.t1 += @elapsed @time begin
+        solver.cnt.t1 += @elapsed begin
             if (solver.cnt.k!=0 && !solver.opt.jacobian_constant)
                 eval_jac_wrapper!(solver, solver.kkt, solver.x)
             end
@@ -413,8 +412,7 @@ function regular!(solver::AbstractMadNLPSolver{T}) where T
                 push!(solver.filter,(solver.theta_max,-Inf))
             end
         end
-        println("time-2")
-        solver.cnt.t2 += @elapsed @time begin
+        solver.cnt.t2 += @elapsed begin
 
             # compute the newton step
             @trace(solver.logger,"Computing the newton step.")
@@ -429,8 +427,7 @@ function regular!(solver::AbstractMadNLPSolver{T}) where T
             end
             dual_inf_perturbation!(primal(solver.p),solver.ind_llb,solver.ind_uub,solver.mu,solver.opt.kappa_d)
         end
-        println("time-3")
-        solver.cnt.t3 += @elapsed @time begin
+        solver.cnt.t3 += @elapsed begin
 
             # start inertia conrrection
             @trace(solver.logger,"Solving primal-dual system.")
@@ -440,8 +437,7 @@ function regular!(solver::AbstractMadNLPSolver{T}) where T
                 inertia_based_reg(solver) || return ROBUST
             end
         end
-        println("time-4")
-        solver.cnt.t4 += @elapsed @time begin
+        solver.cnt.t4 += @elapsed begin
 
             # filter start
             @trace(solver.logger,"Backtracking line search initiated.")
@@ -474,8 +470,7 @@ function regular!(solver::AbstractMadNLPSolver{T}) where T
             switching_condition = is_switching(varphi_d,solver.alpha,solver.opt.s_phi,solver.opt.delta,2.,solver.opt.s_theta)
             armijo_condition = false
         end
-        println("time-5")
-        solver.cnt.t5 += @elapsed @time begin
+        solver.cnt.t5 += @elapsed begin
 
             while true
                 copyto!(full(solver.x_trial), full(solver.x))
@@ -514,8 +509,7 @@ function regular!(solver::AbstractMadNLPSolver{T}) where T
                 end
             end
         end
-        println("time-6")
-        solver.cnt.t6 += @elapsed @time begin
+        solver.cnt.t6 += @elapsed begin
 
             @trace(solver.logger,"Updating primal-dual variables.")
             copyto!(full(solver.x), full(solver.x_trial))
@@ -897,11 +891,9 @@ function inertia_based_reg(solver::MadNLPSolver)
 
     @trace(solver.logger,"Inertia-based regularization started.")
 
-    println("fact")
-    @time factorize_wrapper!(solver)
+    factorize_wrapper!(solver)
     num_pos,num_zero,num_neg = inertia(solver.linear_solver)
-    println("solve")
-    @time solve_status = num_zero!= 0 ? false : solve_refine_wrapper!(solver,solver.d,solver.p,solver._w1)
+    solve_status = num_zero!= 0 ? false : solve_refine_wrapper!(solver,solver.d,solver.p,solver._w1)
 
     while !is_inertia_correct(solver.kkt, num_pos, num_zero, num_neg) || !solve_status
         @debug(solver.logger,"Primal-dual perturbed.")

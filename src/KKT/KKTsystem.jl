@@ -236,7 +236,7 @@ end
 
 function build_kkt!(kkt::AbstractKKTSystem{T, VT, MT}) where {T, VT, MT<:Matrix{T}}
     copyto!(kkt.aug_com, kkt.aug_raw)
-    treat_fixed_variable!(kkt)
+    # treat_fixed_variable!(kkt)
 end
 
 function build_kkt!(kkt::AbstractKKTSystem{T, VT, MT}) where {T, VT, MT<:SparseMatrixCSC{T, Int32}}

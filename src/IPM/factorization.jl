@@ -26,7 +26,7 @@ end
         xp_lr[i] -= wl[i] / (xl_r[i] - x_lr[i])
     end
     @simd for i=1:length(xp_ur)
-        xp_ur[i] += wu[i] / (xu_r[i] - x_ur[i])
+        xp_ur[i] -= wu[i] / (xu_r[i] - x_ur[i])
     end
 end
 @inbounds function g(ws,wz,du_diag,jv_x,Σs) 
@@ -44,27 +44,24 @@ end
     init = false,
     )
     solver.cnt.t7 += @elapsed begin
-    cnt = solver.cnt
-    @trace(solver.logger,"Iterative solution started.")
-
-    kkt = solver.kkt
-
-    fill!(full(x), 0)
-    norm_b = norm(b, Inf)
-    
-    copyto!(full(w), full(b))
-
+        @trace(solver.logger,"Iterative solution started.")
+        cnt = solver.cnt
+        kkt = solver.kkt
+        norm_b = norm(full(b), Inf)
+        fill!(full(x), 0)
+        copyto!(full(w), full(b))
+        
         status = false
     end
+
+    err = 0.
+        
     for kk=1:10
-        err = norm(primal(w), Inf) / (one(eltype(primal(x))) + norm_b)
         
-        if kk>=2 && err <= 1e-10
-            status = true
-            break
-        end
-        
-        solver.cnt.t7 += @elapsed aug_rhs_prep(w.xp_lr, dual_lb(w), solver.xl_r, solver.x_lr,w.xp_ur, dual_ub(w), solver.xu_r, solver.x_ur)
+        solver.cnt.t7 += @elapsed aug_rhs_prep(
+            w.xp_lr, dual_lb(w), solver.xl_r, solver.x_lr,
+            w.xp_ur, dual_ub(w), solver.xu_r, solver.x_ur
+        )
         solver.cnt.t8 += @elapsed (solver.cnt.linear_solver_time += @elapsed solve!(solver.linear_solver, primal_dual(w)))
         finish_aug_solve!(solver, solver.kkt, w, solver.mu)
         solver.cnt.t7 += @elapsed begin
@@ -76,6 +73,16 @@ end
         _kktmul!(w,x,solver.del_w,kkt.du_diag,solver.zl_r,solver.zu_r,solver.xl_r,solver.xu_r,solver.x_lr,solver.x_ur)
         end
         init && break
+        
+        norm_w = norm(full(w), Inf)
+        norm_x = norm(full(x), Inf)
+        err = norm_w / (min(norm_x, 1e6 * norm_b) + norm_b)
+        println(err)
+        
+        if err <= 1e-10
+            return true
+        end
+
     end
 
 
@@ -85,7 +92,7 @@ end
         finish_aug_solve_RR!(RR.dpp,RR.dnn,RR.dzp,RR.dzn,solver.y,dual(solver.d),RR.pp,RR.nn,RR.zp,RR.zn,RR.mu_R,solver.opt.rho)
     end
 
-    return status
+    return err <= 1e-5
 end
 
 function solve_refine_wrapper!(
@@ -244,7 +251,9 @@ function solve_refine_wrapper!(
     jv_t = view(primal(solver._w4), 1:n)
     v_c = dual(solver._w4)
 
+    Σd = kkt.du_diag
     Σs = view(kkt.pr_diag, n+1:n+m)
+
 
     # Decompose right hand side
     bx = view(full(b), 1:n)
@@ -265,39 +274,27 @@ function solve_refine_wrapper!(
     copyto!(full(w), full(b))
     
     norm_b = norm(b, Inf)
-    for kk=1:10
-        err = norm(full(w), Inf) / (one(eltype(full(x))) + norm_b)
-        println(err)
-        if err <= 1e-10
-            break
-        end
+    err = 0.
+    for kk=1:4
         aug_rhs_prep(
             w.xp_lr, dual_lb(w), solver.xl_r, solver.x_lr,
             w.xp_ur, dual_ub(w), solver.xu_r, solver.x_ur,
         )
 
         ##
-
         v_c .= kkt.diag_buffer .* (wz .+ ws ./ Σs) 
         
-        # init right-hand-side
         mul!(jv_t, kkt.jt_csc, v_c)
         axpy!(1, jv_t, wx)
-
+        ## 
         cnt.linear_solver_time += @elapsed solve!(solver.linear_solver, wx)
 
+        ##
         mul!(jv_x, kkt.jt_csc', wx)
         wz .= .- v_c .+ kkt.diag_buffer .* jv_x
         ws .= (ws .+ wz) ./ Σs
-
         ##
-        # mul!(jv_x, kkt.jt_csc', wx)
-        
-        # copyto!(v_c, ws)
-        # g(ws,wz,kkt.du_diag,jv_x,Σs) 
-        # wz .= .-v_c .+ Σs .* ws
 
-        ##
         finish_aug_solve!(solver, solver.kkt, w, solver.mu)
         
         axpy!(1., full(w), full(x))
@@ -314,8 +311,18 @@ function solve_refine_wrapper!(
         if init
             break
         end
+
+        norm_w = norm(full(w), Inf)
+        norm_x = norm(full(x), Inf)
+        err = norm_w / (min(norm_x, 1e6 * norm_b) + norm_b)
+        println(err)
+        
+        if err <= 1e-10
+            return true
+        end
+
         
     end
 
-    return true
+    return err <= 1e-5
 end

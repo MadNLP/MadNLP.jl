@@ -608,13 +608,8 @@ end
             for k in j:Jt.colptr[i+1]-1
                 c1 = Jt.rowval[j]
                 c2 = Jt.rowval[k]
-                if c1 >= c2
-                    sym[cnt+=1] = (i,j,k)
-                    sym2[cnt] = (c1,c2)
-                else
-                    sym[cnt+=1] = (i,j,k)
-                    sym2[cnt] = (c2,c1)
-                end
+                sym[cnt+=1] = (i,j,k)
+                sym2[cnt] = (c2,c1)
             end
         end
     end
@@ -674,7 +669,7 @@ end
     
     @simd for idx in eachindex(hptr)
         i,j = hptr[idx]
-        aug_com.nzval[i] = H.nzval[j]
+        aug_com.nzval[i] += H.nzval[j]
     end
     
     @simd for idx in eachindex(dptr)
@@ -700,6 +695,6 @@ function build_kkt!(kkt::SparseCondensedKKTSystem{T, VT, MT}) where {T, VT, MT<:
     Σs = view(kkt.pr_diag, n+1:n+m)
     Σd = kkt.du_diag
 
-    kkt.diag_buffer .= 1 ./ ( 1 ./ Σs .- Σd )
+    kkt.diag_buffer .= Σs ./ ( 1 .- Σd .* Σs)
     build_condensed_aug_coord!(kkt.aug_com, kkt.pr_diag, kkt.hess_com, kkt.jt_csc, kkt.diag_buffer, kkt.dptr, kkt.hptr, kkt.jptr)
 end
