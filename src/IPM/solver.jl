@@ -369,7 +369,7 @@ end
 function regular!(solver::AbstractMadNLPSolver{T}) where T
     while true
         println("time-1")
-        @time begin
+        solver.cnt.t1 += @elapsed @time begin
             if (solver.cnt.k!=0 && !solver.opt.jacobian_constant)
                 eval_jac_wrapper!(solver, solver.kkt, solver.x)
             end
@@ -414,7 +414,7 @@ function regular!(solver::AbstractMadNLPSolver{T}) where T
             end
         end
         println("time-2")
-        @time begin
+        solver.cnt.t1 += @elapsed @time begin
 
             # compute the newton step
             @trace(solver.logger,"Computing the newton step.")
@@ -430,7 +430,7 @@ function regular!(solver::AbstractMadNLPSolver{T}) where T
             dual_inf_perturbation!(primal(solver.p),solver.ind_llb,solver.ind_uub,solver.mu,solver.opt.kappa_d)
         end
         println("time-3")
-        @time begin
+        solver.cnt.t1 += @elapsed @time begin
 
             # start inertia conrrection
             @trace(solver.logger,"Solving primal-dual system.")
@@ -441,7 +441,7 @@ function regular!(solver::AbstractMadNLPSolver{T}) where T
             end
         end
         println("time-4")
-        @time begin
+        solver.cnt.t1 += @elapsed @time begin
 
             # filter start
             @trace(solver.logger,"Backtracking line search initiated.")
@@ -475,7 +475,7 @@ function regular!(solver::AbstractMadNLPSolver{T}) where T
             armijo_condition = false
         end
         println("time-5")
-        @time begin
+        solver.cnt.t1 += @elapsed @time begin
 
             while true
                 copyto!(full(solver.x_trial), full(solver.x))
@@ -515,7 +515,7 @@ function regular!(solver::AbstractMadNLPSolver{T}) where T
             end
         end
         println("time-6")
-        @time begin
+        solver.cnt.t1 += @elapsed @time begin
 
             @trace(solver.logger,"Updating primal-dual variables.")
             copyto!(full(solver.x), full(solver.x_trial))

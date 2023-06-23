@@ -104,6 +104,13 @@ const SubVector{Tv} = SubArray{Tv, 1, Vector{Tv}, Tuple{Vector{Int}}, false}
     con_jac_cnt::Int = 0
     lag_hess_cnt::Int = 0
 
+    t1::Float64 = 0.
+    t2::Float64 = 0.
+    t3::Float64 = 0.
+    t4::Float64 = 0.
+    t5::Float64 = 0.
+    t6::Float64 = 0.
+
     acceptable_cnt::Int = 0
 end
 
