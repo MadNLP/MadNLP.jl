@@ -39,7 +39,7 @@ end
     resto = false,
     init = false,
     )
-    solver.cnt.t6 += @elapsed begin
+    solver.cnt.t7 += @elapsed begin
     cnt = solver.cnt
     @trace(solver.logger,"Iterative solution started.")
 
@@ -60,10 +60,10 @@ end
             break
         end
         
-        solver.cnt.t6 += @elapsed aug_rhs_prep(w.xp_lr, dual_lb(w), solver.xl_r, solver.x_lr,w.xp_ur, dual_ub(w), solver.xu_r, solver.x_ur)
-        solver.cnt.t7 += @elapsed cnt.linear_solver_time += @elapsed solve!(solver.linear_solver, primal_dual(w))
+        solver.cnt.t7 += @elapsed aug_rhs_prep(w.xp_lr, dual_lb(w), solver.xl_r, solver.x_lr,w.xp_ur, dual_ub(w), solver.xu_r, solver.x_ur)
+        solver.cnt.t8 += @elapsed cnt.linear_solver_time += @elapsed solve!(solver.linear_solver, primal_dual(w))
         finish_aug_solve!(solver, solver.kkt, w, solver.mu)
-        solver.cnt.t6 += @elapsed begin
+        solver.cnt.t7 += @elapsed begin
         axpy!(1., full(w), full(x))
         copyto!(full(w), full(b))
         mul!(primal(w), Symmetric(kkt.hess_com, :L), primal(x), -1., 1.)
