@@ -2,7 +2,7 @@
 function factorize_wrapper!(solver::MadNLPSolver)
     @trace(solver.logger,"Factorization started.")
     build_kkt!(solver.kkt)
-    @time solver.cnt.linear_solver_time += @elapsed factorize!(solver.linear_solver)
+    solver.cnt.linear_solver_time += @elapsed factorize!(solver.linear_solver)
 end
 
 @inbounds function _kktmul!(w,x,del_w,du_diag,zl_r,zu_r,xl_r,xu_r,x_lr,x_ur)
