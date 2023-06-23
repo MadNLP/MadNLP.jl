@@ -14,7 +14,6 @@ solve!(solver::AbstractMadNLPSolver; kwargs...) = solve!(
 
 function initialize!(solver::AbstractMadNLPSolver{T}) where T
 
-
     # initializing slack variables
     @trace(solver.logger,"Initializing slack variables.")
     cons!(solver.nlp,get_x0(solver.nlp),_madnlp_unsafe_wrap(solver.c,get_ncon(solver.nlp)))
@@ -33,7 +32,6 @@ function initialize!(solver::AbstractMadNLPSolver{T}) where T
         full(solver.xu),
         solver.opt.bound_push,solver.opt.bound_fac
     )
-
     # Automatic scaling (constraints)
     @trace(solver.logger,"Computing constraint scaling.")
     eval_jac_wrapper!(solver, solver.kkt, solver.x)
