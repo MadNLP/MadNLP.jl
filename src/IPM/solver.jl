@@ -743,6 +743,8 @@ function inertia_based_reg(solver::MadNLPSolver)
 end
 
 function inertia_free_reg(solver::MadNLPSolver)
+
+    println("A")
     n_trial = 0
     solver.del_w = del_w_prev = 0.
 
