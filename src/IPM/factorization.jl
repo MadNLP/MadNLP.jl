@@ -52,25 +52,22 @@ end
     status = false
     for kk=1:10
         err = norm(primal(w), Inf) / (one(eltype(primal(x))) + norm_b)
-        println(err)
         
         if err <= 1e-10
             status = true
             break
         end
 
-        @time aug_rhs_prep(w.xp_lr, dual_lb(w), solver.xl_r, solver.x_lr,w.xp_ur, dual_ub(w), solver.xu_r, solver.x_ur)
-        @time cnt.linear_solver_time += @elapsed solve!(solver.linear_solver, primal_dual(w))
-        @time begin
-            finish_aug_solve!(solver, solver.kkt, w, solver.mu)
+        aug_rhs_prep(w.xp_lr, dual_lb(w), solver.xl_r, solver.x_lr,w.xp_ur, dual_ub(w), solver.xu_r, solver.x_ur)
+        cnt.linear_solver_time += @elapsed solve!(solver.linear_solver, primal_dual(w))
+        finish_aug_solve!(solver, solver.kkt, w, solver.mu)
 
-            axpy!(1., full(w), full(x))
-            copyto!(full(w), full(b))
-            mul!(primal(w), Symmetric(kkt.hess_com, :L), primal(x), -1., 1.)
-            mul!(primal(w), kkt.jac_com', dual(x), -1., 1.)
-            mul!(dual(w), kkt.jac_com,  primal(x), -1., 1.)
-            _kktmul!(w,x,solver.del_w,kkt.du_diag,solver.zl_r,solver.zu_r,solver.xl_r,solver.xu_r,solver.x_lr,solver.x_ur)
-        end
+        axpy!(1., full(w), full(x))
+        copyto!(full(w), full(b))
+        mul!(primal(w), Symmetric(kkt.hess_com, :L), primal(x), -1., 1.)
+        mul!(primal(w), kkt.jac_com', dual(x), -1., 1.)
+        mul!(dual(w), kkt.jac_com,  primal(x), -1., 1.)
+        _kktmul!(w,x,solver.del_w,kkt.du_diag,solver.zl_r,solver.zu_r,solver.xl_r,solver.xu_r,solver.x_lr,solver.x_ur)
 
         init && break
     end

@@ -205,7 +205,7 @@ function regular!(solver::AbstractMadNLPSolver{T}) where T
             solver.jacl,
             solver.ind_fixed,
         )
-        ### more expensive than I thought
+
         sd = get_sd(solver.y,solver.zl_r,solver.zu_r,solver.opt.s_max)
         sc = get_sc(solver.zl_r,solver.zu_r,solver.opt.s_max)
 
@@ -219,7 +219,6 @@ function regular!(solver::AbstractMadNLPSolver{T}) where T
         )
         solver.inf_compl = get_inf_compl(solver.x_lr,solver.xl_r,solver.zl_r,solver.xu_r,solver.x_ur,solver.zu_r,0.,sc)
         inf_compl_mu = get_inf_compl(solver.x_lr,solver.xl_r,solver.zl_r,solver.xu_r,solver.x_ur,solver.zu_r,solver.mu,sc)
-        ###
 
         print_iter(solver)
         # evaluate termination criteria
@@ -813,7 +812,6 @@ function second_order_correction(solver::AbstractMadNLPSolver,alpha_max,theta,va
     theta_soc_old = theta_trial
     for p=1:solver.opt.max_soc
         # compute second order correction
-        println("A")
         set_aug_rhs!(solver, solver.kkt, wy)
         dual_inf_perturbation!(
             primal(solver.p),
