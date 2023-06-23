@@ -39,47 +39,47 @@ end
     resto = false,
     init = false,
     )
-        cnt = solver.cnt
-        @trace(solver.logger,"Iterative solution started.")
+    solver.cnt.t6 += @elapsed begin
+    cnt = solver.cnt
+    @trace(solver.logger,"Iterative solution started.")
 
-        kkt = solver.kkt
+    kkt = solver.kkt
 
-        fill!(full(x), 0)
-        norm_b = norm(b, Inf)
-        
-        copyto!(full(w), full(b))
+    fill!(full(x), 0)
+    norm_b = norm(b, Inf)
+    
+    copyto!(full(w), full(b))
 
         status = false
-        for kk=1:10
-    @time begin
-            err = norm(primal(w), Inf) / (one(eltype(primal(x))) + norm_b)
-            
-            if kk>=2 && err <= 1e-5
-                status = true
-                break
-            end
-
-            aug_rhs_prep(w.xp_lr, dual_lb(w), solver.xl_r, solver.x_lr,w.xp_ur, dual_ub(w), solver.xu_r, solver.x_ur)
-            cnt.linear_solver_time += @elapsed solve!(solver.linear_solver, primal_dual(w))
-            finish_aug_solve!(solver, solver.kkt, w, solver.mu)
-
-            axpy!(1., full(w), full(x))
-            copyto!(full(w), full(b))
-            mul!(primal(w), Symmetric(kkt.hess_com, :L), primal(x), -1., 1.)
-            mul!(primal(w), kkt.jac_com', dual(x), -1., 1.)
-            mul!(dual(w), kkt.jac_com,  primal(x), -1., 1.)
-            _kktmul!(w,x,solver.del_w,kkt.du_diag,solver.zl_r,solver.zu_r,solver.xl_r,solver.xu_r,solver.x_lr,solver.x_ur)
-
     end
-            init && break
+    for kk=1:10
+        err = norm(primal(w), Inf) / (one(eltype(primal(x))) + norm_b)
+        
+        if kk>=2 && err <= 1e-10
+            status = true
+            break
         end
+        
+        solver.cnt.t6 += @elapsed aug_rhs_prep(w.xp_lr, dual_lb(w), solver.xl_r, solver.x_lr,w.xp_ur, dual_ub(w), solver.xu_r, solver.x_ur)
+        solver.cnt.t7 += @elapsed cnt.linear_solver_time += @elapsed solve!(solver.linear_solver, primal_dual(w))
+        finish_aug_solve!(solver, solver.kkt, w, solver.mu)
+        solver.cnt.t6 += @elapsed begin
+        axpy!(1., full(w), full(x))
+        copyto!(full(w), full(b))
+        mul!(primal(w), Symmetric(kkt.hess_com, :L), primal(x), -1., 1.)
+        mul!(primal(w), kkt.jac_com', dual(x), -1., 1.)
+        mul!(dual(w), kkt.jac_com,  primal(x), -1., 1.)
+        _kktmul!(w,x,solver.del_w,kkt.du_diag,solver.zl_r,solver.zu_r,solver.xl_r,solver.xu_r,solver.x_lr,solver.x_ur)
+        end
+        init && break
+    end
 
 
-        if resto
-            error()
-            RR = solver.RR
-            finish_aug_solve_RR!(RR.dpp,RR.dnn,RR.dzp,RR.dzn,solver.y,dual(solver.d),RR.pp,RR.nn,RR.zp,RR.zn,RR.mu_R,solver.opt.rho)
-        end
+    if resto
+        error()
+        RR = solver.RR
+        finish_aug_solve_RR!(RR.dpp,RR.dnn,RR.dzp,RR.dzn,solver.y,dual(solver.d),RR.pp,RR.nn,RR.zp,RR.zn,RR.mu_R,solver.opt.rho)
+    end
 
     return status
 end
@@ -89,7 +89,7 @@ function solve_refine_wrapper!(
     x::AbstractKKTVector,
     b::AbstractKKTVector;
     resto = false
-) where T
+    ) where T
     cnt = solver.cnt
     @trace(solver.logger,"Iterative solution started.")
 
@@ -163,7 +163,7 @@ function solve_refine_wrapper!(
     x::AbstractKKTVector,
     b::AbstractKKTVector;
     resto = false
-) where {T, VT, MT, QN<:CompactLBFGS{T, Vector{T}, Matrix{T}}}
+    ) where {T, VT, MT, QN<:CompactLBFGS{T, Vector{T}, Matrix{T}}}
     cnt = solver.cnt
     kkt = solver.kkt
     qn = kkt.quasi_newton
@@ -234,7 +234,7 @@ function solve_refine_wrapper!(
     n = size(kkt.hess_com, 1)
     m = size(kkt.jt_csc, 2)
 
-   
+    
     # load buffers
     jv_x = view(full(solver._w3), 1:m) 
     jv_t = view(primal(solver._w4), 1:n)

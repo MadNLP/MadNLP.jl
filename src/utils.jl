@@ -110,7 +110,9 @@ const SubVector{Tv} = SubArray{Tv, 1, Vector{Tv}, Tuple{Vector{Int}}, false}
     t4::Float64 = 0.
     t5::Float64 = 0.
     t6::Float64 = 0.
-
+    t7::Float64 = 0.
+    t8::Float64 = 0.
+    
     acceptable_cnt::Int = 0
 end
 
