@@ -1,8 +1,12 @@
 
 function factorize_wrapper!(solver::MadNLPSolver)
     @trace(solver.logger,"Factorization started.")
-    build_kkt!(solver.kkt)
-    solver.cnt.linear_solver_time += @elapsed factorize!(solver.linear_solver)
+    solver.cnt.t7 += @elapsed begin
+        build_kkt!(solver.kkt)
+    end
+    solver.cnt.t8 += @elapsed begin
+        solver.cnt.linear_solver_time += @elapsed factorize!(solver.linear_solver)
+    end
 end
 
 @inbounds function _kktmul!(w,x,del_w,du_diag,zl_r,zu_r,xl_r,xu_r,x_lr,x_ur)
@@ -61,7 +65,7 @@ end
         end
         
         solver.cnt.t7 += @elapsed aug_rhs_prep(w.xp_lr, dual_lb(w), solver.xl_r, solver.x_lr,w.xp_ur, dual_ub(w), solver.xu_r, solver.x_ur)
-        solver.cnt.t8 += @elapsed cnt.linear_solver_time += @elapsed solve!(solver.linear_solver, primal_dual(w))
+        solver.cnt.t8 += @elapsed (solver.cnt.linear_solver_time += @elapsed solve!(solver.linear_solver, primal_dual(w)))
         finish_aug_solve!(solver, solver.kkt, w, solver.mu)
         solver.cnt.t7 += @elapsed begin
         axpy!(1., full(w), full(x))

@@ -241,7 +241,7 @@ end
 
 function build_kkt!(kkt::AbstractKKTSystem{T, VT, MT}) where {T, VT, MT<:SparseMatrixCSC{T, Int32}}
     transfer!(kkt.aug_com, kkt.aug_raw, kkt.aug_csc_map)
-    treat_fixed_variable!(kkt)
+    # treat_fixed_variable!(kkt)
 end
 
 compress_hessian!(kkt::AbstractKKTSystem) = nothing
