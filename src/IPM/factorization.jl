@@ -51,7 +51,7 @@ end
 
     status = false
     for kk=1:10
-        err = norm(full(w), Inf) / (one(eltype(full(x))) + norm_b)
+        err = norm(primal(w), Inf) / (one(eltype(primal(x))) + norm_b)
         println(err)
         
         if err <= 1e-10
