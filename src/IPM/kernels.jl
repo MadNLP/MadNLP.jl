@@ -12,6 +12,15 @@ function set_aug_diagonal!(kkt::AbstractKKTSystem, solver::MadNLPSolver{T}) wher
         kkt.pr_diag[i] += zu[i] /(xu[i] - x[i])
     end
     fill!(kkt.du_diag, zero(T))
+    @inbounds @simd for i in eachindex(kkt.l_lower)
+        kkt.l_lower[i] = solver.zl_r[i]
+        kkt.l_diag[i]  = solver.x_lr[i] - solver.xl_r[i]
+    end
+    @inbounds @simd for i in eachindex(kkt.u_lower)
+        kkt.u_lower[i] = solver.zu_r[i]
+        kkt.u_diag[i] = solver.x_ur[i] - solver.xu_r[i]
+    end
+
     return
 end
 function set_aug_diagonal!(kkt::SparseUnreducedKKTSystem, solver::MadNLPSolver{T}) where T
@@ -80,7 +89,6 @@ function set_aug_rhs!(solver::MadNLPSolver, kkt::AbstractKKTSystem, c)
     zu = full(solver.zu)
     @inbounds @simd for i in eachindex(px)
         px[i] = -f[i] + zl[i] - zu[i] - solver.jacl[i]
-        # px[i] = -f[i] + solver.mu / (x[i] - xl[i]) - solver.mu / (xu[i] - x[i]) - solver.jacl[i]
     end
     
     py = dual(solver.p)
@@ -153,14 +161,14 @@ function set_aug_rhs_RR!(
 end
 
 # Finish
-function finish_aug_solve!(solver::MadNLPSolver, kkt::AbstractKKTSystem, d, mu)
+function finish_aug_solve!(kkt::AbstractKKTSystem, d)
     dlb = dual_lb(d)
     dub = dual_ub(d)
     @inbounds @simd for i in eachindex(dlb)
-        dlb[i] = (dlb[i] - solver.zl_r[i] * d.xp_lr[i]) / (solver.x_lr[i]-solver.xl_r[i])
+        dlb[i] = (dlb[i] - kkt.l_lower[i] * d.xp_lr[i]) / kkt.l_diag[i]
     end
     @inbounds @simd for i in eachindex(dub)
-        dub[i] = ( -dub[i] + solver.zu_r[i] * d.xp_ur[i]) / (solver.xu_r[i]-solver.x_ur[i])
+        dub[i] = (dub[i] - kkt.u_lower[i] * d.xp_ur[i]) / kkt.u_diag[i]
     end
 
     return

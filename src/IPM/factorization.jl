@@ -5,28 +5,28 @@ function factorize_wrapper!(solver::MadNLPSolver)
         build_kkt!(solver.kkt)
     end
     solver.cnt.t8 += @elapsed begin
-        solver.cnt.linear_solver_time += @elapsed factorize!(solver.linear_solver)
+        solver.cnt.linear_solver_time += @elapsed factorize!(solver.kkt.linear_solver)
     end
 end
 
-@inbounds function _kktmul!(w,x,del_w,du_diag,zl_r,zu_r,xl_r,xu_r,x_lr,x_ur)
+@inbounds function _kktmul!(w,x,del_w,du_diag,l_lower,u_lower,l_diag,u_diag)
     primal(w) .-= del_w .* primal(x)
     dual(w) .-= du_diag .* dual(x)
     w.xp_lr .+= dual_lb(x)
     w.xp_ur .-= dual_ub(x)            
-    dual_lb(w) .+= .- x.xp_lr .* zl_r .+ dual_lb(x) .* (xl_r .- x_lr)
-    dual_ub(w) .+= .- x.xp_ur .* zu_r .+ dual_ub(x) .* (xu_r .- x_ur)
+    dual_lb(w) .-= x.xp_lr .* l_lower .+ dual_lb(x) .* l_diag
+    dual_ub(w) .-= x.xp_ur .* u_lower .+ dual_ub(x) .* u_diag
 end
 
 @inbounds function aug_rhs_prep(
-    xp_lr,wl,xl_r,x_lr,
-    xp_ur,wu,x_ur,xu_r,
+    xp_lr,wl,l_diag,
+    xp_ur,wu,u_diag,
     )
     @simd for i=1:length(xp_lr)
-        xp_lr[i] -= wl[i] / (xl_r[i] - x_lr[i])
+        xp_lr[i] += wl[i] / l_diag[i]
     end
     @simd for i=1:length(xp_ur)
-        xp_ur[i] -= wu[i] / (xu_r[i] - x_ur[i])
+        xp_ur[i] -= wu[i] / u_diag[i]
     end
 end
 @inbounds function g(ws,wz,du_diag,jv_x,Σs) 
@@ -35,64 +35,18 @@ end
     end
 end
 
-@inbounds function solve_refine_wrapper!(
-    solver::MadNLPSolver,
-    x::AbstractKKTVector,
-    b::AbstractKKTVector,
-    w::AbstractKKTVector;
-    resto = false,
-    init = false,
-    )
-    solver.cnt.t7 += @elapsed begin
-        @trace(solver.logger,"Iterative solution started.")
-        cnt = solver.cnt
-        kkt = solver.kkt
-        norm_b = norm(full(b), Inf)
-        fill!(full(x), 0)
-        copyto!(full(w), full(b))
-        
-        status = false
-    end
 
-    err = 0.
-        
-    for kk=1:10
-        
-        solver.cnt.t7 += @elapsed aug_rhs_prep(
-            w.xp_lr, dual_lb(w), solver.xl_r, solver.x_lr,
-            w.xp_ur, dual_ub(w), solver.xu_r, solver.x_ur
-        )
-        solver.cnt.t8 += @elapsed (solver.cnt.linear_solver_time += @elapsed solve!(solver.linear_solver, primal_dual(w)))
-        finish_aug_solve!(solver, solver.kkt, w, solver.mu)
-        solver.cnt.t7 += @elapsed begin
-        axpy!(1., full(w), full(x))
-        copyto!(full(w), full(b))
-        mul!(primal(w), Symmetric(kkt.hess_com, :L), primal(x), -1., 1.)
-        mul!(primal(w), kkt.jac_com', dual(x), -1., 1.)
-        mul!(dual(w), kkt.jac_com,  primal(x), -1., 1.)
-        _kktmul!(w,x,solver.del_w,kkt.du_diag,solver.zl_r,solver.zu_r,solver.xl_r,solver.xu_r,solver.x_lr,solver.x_ur)
-        end
-        init && break
-        
-        norm_w = norm(full(w), Inf)
-        norm_x = norm(full(x), Inf)
-        err = norm_w / (min(norm_x, 1e6 * norm_b) + norm_b)
-        println(err)
-        
-        if err <= 1e-10
-            return true
-        end
+function solve!(kkt::SparseKKTSystem, w::AbstractKKTVector, cnt)  #TODO cnt goes into linear solver
+    aug_rhs_prep(w.xp_lr, dual_lb(w), kkt.l_diag,w.xp_ur, dual_ub(w), kkt.u_diag)
+    cnt.linear_solver_time += @elapsed solve!(kkt.linear_solver, primal_dual(w))
+    finish_aug_solve!(kkt, w)
+end
 
-    end
-
-
-    if resto
-        error()
-        RR = solver.RR
-        finish_aug_solve_RR!(RR.dpp,RR.dnn,RR.dzp,RR.dzn,solver.y,dual(solver.d),RR.pp,RR.nn,RR.zp,RR.zn,RR.mu_R,solver.opt.rho)
-    end
-
-    return err <= 1e-5
+function mul_subtract!(w::AbstractKKTVector, kkt::SparseKKTSystem, x::AbstractKKTVector)
+    mul!(primal(w), Symmetric(kkt.hess_com, :L), primal(x), -1., 1.)
+    mul!(primal(w), kkt.jac_com', dual(x), -1., 1.)
+    mul!(dual(w), kkt.jac_com,  primal(x), -1., 1.)
+    _kktmul!(w,x,kkt.del_w,kkt.du_diag,kkt.l_lower,kkt.u_lower,kkt.l_diag,kkt.u_diag)
 end
 
 function solve_refine_wrapper!(
@@ -275,7 +229,7 @@ function solve_refine_wrapper!(
     
     norm_b = norm(b, Inf)
     err = 0.
-    for kk=1:4
+    for kk=1:10
         aug_rhs_prep(
             w.xp_lr, dual_lb(w), solver.xl_r, solver.x_lr,
             w.xp_ur, dual_ub(w), solver.xu_r, solver.x_ur,
@@ -315,7 +269,7 @@ function solve_refine_wrapper!(
         norm_w = norm(full(w), Inf)
         norm_x = norm(full(x), Inf)
         err = norm_w / (min(norm_x, 1e6 * norm_b) + norm_b)
-        println(err)
+        # println(err)
         
         if err <= 1e-10
             return true

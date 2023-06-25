@@ -4,13 +4,17 @@
 Implement the [`AbstractReducedKKTSystem`](@ref) in sparse COO format.
 
 """
-struct SparseKKTSystem{T, VT, MT, QN} <: AbstractReducedKKTSystem{T, VT, MT, QN}
+mutable struct SparseKKTSystem{T, VT, MT, QN} <: AbstractReducedKKTSystem{T, VT, MT, QN}
     hess::VT
     jac_callback::VT
     jac::VT
     quasi_newton::QN
     pr_diag::VT
     du_diag::VT
+    l_diag::VT
+    u_diag::VT
+    l_lower::VT
+    u_lower::VT
     # Augmented system
     aug_raw::SparseMatrixCOO{T,Int32,VT}
     aug_com::MT
@@ -23,10 +27,16 @@ struct SparseKKTSystem{T, VT, MT, QN} <: AbstractReducedKKTSystem{T, VT, MT, QN}
     jac_raw::SparseMatrixCOO{T,Int32,VT}
     jac_com::MT
     jac_csc_map::Union{Nothing, Vector{Int}}
+    # Regularization
+    del_w::T
+    del_w_last::T
+    del_c::T
+    # LinearSolver
+    linear_solver
     # Info
     ind_ineq::Vector{Int}
-    ind_fixed::Vector{Int}
-    ind_aug_fixed::Vector{Int}
+    # ind_fixed::Vector{Int}
+    # ind_aug_fixed::Vector{Int}
     jacobian_scaling::VT
 end
 
@@ -57,8 +67,8 @@ struct SparseUnreducedKKTSystem{T, VT, MT, QN} <: AbstractUnreducedKKTSystem{T, 
     jac_com::MT
     jac_csc_map::Union{Nothing, Vector{Int}}
     ind_ineq::Vector{Int}
-    ind_fixed::Vector{Int}
-    ind_aug_fixed::Vector{Int}
+    # ind_fixed::Vector{Int}
+    # ind_aug_fixed::Vector{Int}
     jacobian_scaling::VT
 end
 
@@ -97,7 +107,7 @@ struct SparseCondensedKKTSystem{T, VT, MT, QN} <: AbstractCondensedKKTSystem{T, 
     jptr::Vector{Tuple{Int,Tuple{Int,Int,Int}}}
     # Info
     ind_ineq::Vector{Int}
-    ind_fixed::Vector{Int}
+    # ind_fixed::Vector{Int}
     jacobian_scaling::VT
 end
 
@@ -171,15 +181,41 @@ end
     SparseKKTSystem
 =#
 
+# function SparseKKTSystem{T, VT, MT, QN}(
+#     n::Int, m::Int, nlb::Int, nub::Int, ind_ineq::Vector{Int}, ind_fixed::Vector{Int},
+#     hess_sparsity_I, hess_sparsity_J,
+#     jac_sparsity_I, jac_sparsity_J,
+#     opt, cnt
+# ) where {T, VT, MT, QN}
+# end
+
+# Build KKT system directly from AbstractNLPModel
 function SparseKKTSystem{T, VT, MT, QN}(
-    n::Int, m::Int, ind_ineq::Vector{Int}, ind_fixed::Vector{Int},
-    hess_sparsity_I, hess_sparsity_J,
-    jac_sparsity_I, jac_sparsity_J,
-) where {T, VT, MT, QN}
+    nlp::AbstractNLPModel, ind_cons, opt, cnt) where {T, VT, MT, QN}
+    n_slack = length(ind_cons.ind_ineq)
+    # Deduce KKT size.
+
+    n = get_nvar(nlp)
+    m = get_ncon(nlp)
+    # Evaluate sparsity pattern
+    jac_sparsity_I = Vector{Int32}(undef, get_nnzj(nlp.meta))
+    jac_sparsity_J = Vector{Int32}(undef, get_nnzj(nlp.meta))
+    jac_structure!(nlp,jac_sparsity_I, jac_sparsity_J)
+
+    hess_sparsity_I, hess_sparsity_J = build_hessian_structure(nlp, QN)
+
+    nlb = length(ind_cons.ind_lb)
+    nub = length(ind_cons.ind_ub)
+
+    force_lower_triangular!(hess_sparsity_I,hess_sparsity_J)
+
+    ind_ineq = ind_cons.ind_ineq
+    
     n_slack = length(ind_ineq)
     n_jac = length(jac_sparsity_I)
     n_hess = length(hess_sparsity_I)
     n_tot = n + n_slack
+
 
     aug_vec_length = n_tot+m
     aug_mat_length = n_tot+m+n_hess+n_jac+n_slack
@@ -205,7 +241,13 @@ function SparseKKTSystem{T, VT, MT, QN}(
 
     pr_diag = _madnlp_unsafe_wrap(V, n_tot)
     du_diag = _madnlp_unsafe_wrap(V, m, n_jac+n_slack+n_hess+n_tot+1)
-
+    
+    l_diag = VT(undef, nlb)
+    u_diag = VT(undef, nub)
+    
+    l_lower = VT(undef, nlb)
+    u_lower = VT(undef, nub)
+    
     hess = _madnlp_unsafe_wrap(V, n_hess, n_tot+1)
     jac = _madnlp_unsafe_wrap(V, n_jac+n_slack, n_hess+n_tot+1)
     jac_callback = _madnlp_unsafe_wrap(V, n_jac, n_hess+n_tot+1)
@@ -232,43 +274,40 @@ function SparseKKTSystem{T, VT, MT, QN}(
     jac_csc_map = get_mapping(jac_com, jac_raw)
     hess_csc_map = get_mapping(hess_com, hess_raw)
 
-    ind_aug_fixed = if isa(aug_com, SparseMatrixCSC)
-        _get_fixed_variable_index(aug_com, ind_fixed)
-    else
-        zeros(Int, 0)
-    end
+    # ind_aug_fixed = if isa(aug_com, SparseMatrixCSC)
+    #     _get_fixed_variable_index(aug_com, ind_fixed)
+    # else
+    #     zeros(Int, 0)
+    # end
     jac_scaling = ones(T, n_jac+n_slack)
 
     quasi_newton = QN(n)
 
+    del_w = 1.
+    del_w_last = 0.
+    del_c = 0.
+
+    # @trace(logger,"Initializing linear solver.")
+    # cnt.linear_solver_time =
+    @elapsed linear_solver = opt.linear_solver(aug_com)
+    # ; opt=opt_linear_solver, logger=logger)
+
+
+
+
     return SparseKKTSystem{T, VT, MT, QN}(
         hess, jac_callback, jac, quasi_newton, pr_diag, du_diag,
+        l_diag, u_diag, l_lower, u_lower,
         aug_raw, aug_com, aug_csc_map,
         hess_raw, hess_com, hess_csc_map,
         jac_raw, jac_com, jac_csc_map,
-        ind_ineq, ind_fixed, ind_aug_fixed, jac_scaling,
+        del_w, del_w_last, del_c,
+        linear_solver,
+        ind_ineq,
+        # ind_fixed, ind_aug_fixed,
+        jac_scaling,
     )
-end
 
-# Build KKT system directly from AbstractNLPModel
-function SparseKKTSystem{T, VT, MT, QN}(nlp::AbstractNLPModel, ind_cons=get_index_constraints(nlp)) where {T, VT, MT, QN}
-    n_slack = length(ind_cons.ind_ineq)
-    # Deduce KKT size.
-
-    n = get_nvar(nlp)
-    m = get_ncon(nlp)
-    # Evaluate sparsity pattern
-    jac_I = Vector{Int32}(undef, get_nnzj(nlp.meta))
-    jac_J = Vector{Int32}(undef, get_nnzj(nlp.meta))
-    jac_structure!(nlp,jac_I, jac_J)
-
-    hess_I, hess_J = build_hessian_structure(nlp, QN)
-
-    force_lower_triangular!(hess_I,hess_J)
-    return SparseKKTSystem{T, VT, MT, QN}(
-        n, m, ind_cons.ind_ineq, ind_cons.ind_fixed,
-        hess_I, hess_J, jac_I, jac_J,
-    )
 end
 
 is_reduced(::SparseKKTSystem) = true
@@ -280,7 +319,8 @@ num_variables(kkt::SparseKKTSystem) = length(kkt.pr_diag)
 =#
 
 function SparseUnreducedKKTSystem{T, VT, MT, QN}(
-    n::Int, m::Int, nlb::Int, nub::Int, ind_ineq, ind_fixed,
+    n::Int, m::Int, nlb::Int, nub::Int, ind_ineq,
+    # ind_fixed,
     hess_sparsity_I, hess_sparsity_J,
     jac_sparsity_I, jac_sparsity_J,
     ind_lb, ind_ub,
@@ -348,11 +388,11 @@ function SparseUnreducedKKTSystem{T, VT, MT, QN}(
 
     jac_scaling = ones(T, n_jac+n_slack)
 
-    ind_aug_fixed = if isa(aug_com, SparseMatrixCSC)
-        _get_fixed_variable_index(aug_com, ind_fixed)
-    else
-        zeros(Int, 0)
-    end
+    # ind_aug_fixed = if isa(aug_com, SparseMatrixCSC)
+    #     _get_fixed_variable_index(aug_com, ind_fixed)
+    # else
+    #     zeros(Int, 0)
+    # end
 
     quasi_newton = QN(n)
 
@@ -361,7 +401,9 @@ function SparseUnreducedKKTSystem{T, VT, MT, QN}(
         l_diag, u_diag, l_lower, u_lower,
         aug_raw, aug_com, aug_csc_map,
         jac_raw, jac_com, jac_csc_map,
-        ind_ineq, ind_fixed, ind_aug_fixed, jac_scaling,
+        ind_ineq,
+        # ind_fixed, ind_aug_fixed,
+        jac_scaling,
     )
 end
 
@@ -384,19 +426,30 @@ function SparseUnreducedKKTSystem{T, VT, MT, QN}(nlp::AbstractNLPModel, ind_cons
     force_lower_triangular!(hess_I,hess_J)
 
     return SparseUnreducedKKTSystem{T, VT, MT, QN}(
-        n, m, nlb, nub, ind_cons.ind_ineq, ind_cons.ind_fixed,
+        n, m, nlb, nub, ind_cons.ind_ineq,
+        # ind_cons.ind_fixed,
         hess_I, hess_J, jac_I, jac_J, ind_cons.ind_lb, ind_cons.ind_ub,
     )
 end
 
+function initialize!(kkt::SparseKKTSystem)
+    fill!(kkt.pr_diag, 1.0)
+    fill!(kkt.du_diag, 0.0)
+    fill!(kkt.hess, 0.0)
+    fill!(kkt.l_lower, 0.0)
+    fill!(kkt.u_lower, 0.0)
+    fill!(kkt.l_diag, 1.0)
+    fill!(kkt.u_diag, 1.0)
+    fill!(kkt.hess_com.nzval, 0.) # so that mul! in the initial primal-dual solve has no effect
+end
 function initialize!(kkt::SparseUnreducedKKTSystem)
-    kkt.pr_diag.=1
-    kkt.du_diag.=0
-    kkt.hess.=0
-    kkt.l_lower.=0
-    kkt.u_lower.=0
-    kkt.l_diag.=1
-    kkt.u_diag.=1
+    fill!(kkt.pr_diag, 1.0)
+    fill!(kkt.du_diag, 0.0)
+    fill!(kkt.hess, 0.0)
+    fill!(kkt.l_lower, 0.0)
+    fill!(kkt.u_lower, 0.0)
+    fill!(kkt.l_diag, 1.0)
+    fill!(kkt.u_diag, 1.0)
 end
 
 is_reduced(::SparseUnreducedKKTSystem) = false
@@ -408,7 +461,8 @@ num_variables(kkt::SparseUnreducedKKTSystem) = length(kkt.pr_diag)
 =#
 
 function SparseCondensedKKTSystem{T, VT, MT, QN}(
-    n::Int, m::Int, ind_ineq::Vector{Int}, ind_fixed::Vector{Int},
+    n::Int, m::Int, ind_ineq::Vector{Int},
+    # ind_fixed::Vector{Int},
     hess_sparsity_I, hess_sparsity_J,
     jac_sparsity_I, jac_sparsity_J,
 ) where {T, VT, MT, QN}
@@ -418,9 +472,9 @@ function SparseCondensedKKTSystem{T, VT, MT, QN}(
         error("SparseCondensedKKTSystem does not support equality constrained NLPs.")
     end
     
-    if !isempty(ind_fixed)
-        error("SparseCondensedKKTSystem does not support fixed variables.")
-    end
+    # if !isempty(ind_fixed)
+    #     error("SparseCondensedKKTSystem does not support fixed variables.")
+    # end
 
     n_jac = length(jac_sparsity_I)
     n_hess = length(hess_sparsity_I)
@@ -468,7 +522,9 @@ function SparseCondensedKKTSystem{T, VT, MT, QN}(
         jac, jac_callback, jac_raw, jt_coo,jt_csc,jt_csc_map,
         quasi_newton, pr_diag, du_diag,
         aug_com, diag_buffer, dptr, hptr, jptr,
-        ind_ineq, ind_fixed, jac_scaling,
+        ind_ineq,
+        # ind_fixed,
+        jac_scaling,
     )
 end
 
@@ -488,7 +544,8 @@ function SparseCondensedKKTSystem{T, VT, MT, QN}(nlp::AbstractNLPModel, ind_cons
 
     force_lower_triangular!(hess_I,hess_J)
     return SparseCondensedKKTSystem{T, VT, MT, QN}(
-        n, m, ind_cons.ind_ineq, ind_cons.ind_fixed,
+        n, m, ind_cons.ind_ineq,
+        # ind_cons.ind_fixed,
         hess_I, hess_J, jac_I, jac_J,
     )
 end

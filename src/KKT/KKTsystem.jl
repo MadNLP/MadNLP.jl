@@ -210,25 +210,25 @@ get_raw_jacobian(kkt::AbstractKKTSystem) = kkt.jac_raw
 
 
 # Fix variable treatment
-function treat_fixed_variable!(kkt::AbstractKKTSystem{T, VT, MT}) where {T, VT, MT<:SparseMatrixCSC{T, Int32}}
-    length(kkt.ind_fixed) == 0 && return
-    aug = kkt.aug_com
+# function treat_fixed_variable!(kkt::AbstractKKTSystem{T, VT, MT}) where {T, VT, MT<:SparseMatrixCSC{T, Int32}}
+#     length(kkt.ind_fixed) == 0 && return
+#     aug = kkt.aug_com
 
-    fixed_aug_diag = view(aug.nzval, aug.colptr[kkt.ind_fixed])
-    fixed_aug_diag .= 1.0
-    fixed_aug = view(aug.nzval, kkt.ind_aug_fixed)
-    fixed_aug .= 0.0
-    return
-end
-function treat_fixed_variable!(kkt::AbstractKKTSystem{T, VT, MT}) where {T, VT, MT<:Matrix{T}}
-    length(kkt.ind_fixed) == 0 && return
-    aug = kkt.aug_com
-    @inbounds for i in kkt.ind_fixed
-        aug[i, :] .= 0.0
-        aug[:, i] .= 0.0
-        aug[i, i]  = 1.0
-    end
-end
+#     fixed_aug_diag = view(aug.nzval, aug.colptr[kkt.ind_fixed])
+#     fixed_aug_diag .= 1.0
+#     fixed_aug = view(aug.nzval, kkt.ind_aug_fixed)
+#     fixed_aug .= 0.0
+#     return
+# end
+# function treat_fixed_variable!(kkt::AbstractKKTSystem{T, VT, MT}) where {T, VT, MT<:Matrix{T}}
+#     length(kkt.ind_fixed) == 0 && return
+#     aug = kkt.aug_com
+#     @inbounds for i in kkt.ind_fixed
+#         aug[i, :] .= 0.0
+#         aug[:, i] .= 0.0
+#         aug[i, i]  = 1.0
+#     end
+# end
 
 function is_inertia_correct(kkt::AbstractKKTSystem, num_pos, num_zero, num_neg)
     return (num_zero == 0) && (num_pos == num_variables(kkt))

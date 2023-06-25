@@ -5,7 +5,9 @@ abstract type AbstractMadNLPSolver{T} end
 
 include("restoration.jl")
 
-mutable struct MadNLPSolver{T, KKTSystem <: AbstractKKTSystem{T}, Model <: AbstractNLPModel, LinSolver <: AbstractLinearSolver{T}, Iterator <: AbstractIterator{T}, KKTVec <: AbstractKKTVector{T, Vector{T}}} <: AbstractMadNLPSolver{T}
+mutable struct MadNLPSolver{T, KKTSystem <: AbstractKKTSystem{T}, Model <: AbstractNLPModel,
+                            Iterator <: AbstractIterator{T},
+                            KKTVec <: AbstractKKTVector{T, Vector{T}}} <: AbstractMadNLPSolver{T}
     nlp::Model
     kkt::KKTSystem
 
@@ -64,7 +66,7 @@ mutable struct MadNLPSolver{T, KKTSystem <: AbstractKKTSystem{T}, Model <: Abstr
     x_trial_lr::SubVector{T}
     x_trial_ur::SubVector{T}
 
-    linear_solver::LinSolver
+    # linear_solver::LinSolver
     iterator::Iterator
 
     obj_scale::Vector{T}
@@ -83,9 +85,9 @@ mutable struct MadNLPSolver{T, KKTSystem <: AbstractKKTSystem{T}, Model <: Abstr
     alpha_z::T
     ftype::String
 
-    del_w::T
-    del_c::T
-    del_w_last::T
+    # del_w::T
+    # del_c::T
+    # del_w_last::T
 
     filter::Vector{Tuple{T,T}}
 
@@ -157,7 +159,7 @@ function MadNLPSolver{T,KKTSystem}(
     m = get_ncon(nlp)
 
     # Initialize KKT
-    kkt = KKTSystem(nlp, ind_cons)
+    kkt = KKTSystem(nlp, ind_cons, opt, cnt)
 
     # Primal variable
     x = PrimalVector{T, Vector{T}}(nx, ns, ind_cons)
@@ -222,35 +224,39 @@ function MadNLPSolver{T,KKTSystem}(
     obj_scale = T[1.0]
     con_scale = ones(T,m)
     con_jac_scale = ones(T,n_jac)
-    @trace(logger,"Initializing linear solver.")
-    cnt.linear_solver_time =
-        @elapsed linear_solver = opt.linear_solver(get_kkt(kkt) ; opt=opt_linear_solver, logger=logger)
 
     n_kkt = size(kkt, 1)
-    buffer_vec = similar(full(d), n_kkt)
     @trace(logger,"Initializing iterative solver.")
-    iterator = opt.iterator(linear_solver, kkt, buffer_vec)
+    residual = UnreducedKKTVector{T,typeof(c)}(n, m, nlb, nub, ind_cons)
+    iterator = opt.iterator(kkt, residual; cnt = cnt, logger = logger)
+
 
     @trace(logger,"Initializing fixed variable treatment scheme.")
 
     if opt.inertia_correction_method == INERTIA_AUTO
-        opt.inertia_correction_method = is_inertia(linear_solver)::Bool ? INERTIA_BASED : INERTIA_FREE
+        opt.inertia_correction_method = is_inertia(kkt.linear_solver)::Bool ? INERTIA_BASED : INERTIA_FREE
     end
 
 
-    return MadNLPSolver{T,KKTSystem,typeof(nlp),typeof(linear_solver),typeof(iterator),typeof(_w1)}(
-        nlp,kkt,opt,cnt,logger,
-        n,m,nlb,nub,x,y,zl,zu,xl,xu,0.,f,c,
-        jacl,
-        d, p,
-        _w1, _w2, _w3, _w4,
-        x_trial,c_trial,0.,c_slk,rhs,
-        ind_cons.ind_ineq,ind_cons.ind_fixed,ind_cons.ind_llb,ind_cons.ind_uub,
-        x_lr,x_ur,xl_r,xu_r,zl_r,zu_r,dx_lr,dx_ur,x_trial_lr,x_trial_ur,
-        linear_solver,iterator,
-        obj_scale,con_scale,con_jac_scale,
-        0.,0.,0.,0.,0.,0.,0.,0.,0.," ",0.,0.,0.,
-        Vector{T}[],nothing,INITIAL,Dict(),
+    return MadNLPSolver{
+        T,KKTSystem,typeof(nlp),
+        # typeof(linear_solver),
+        typeof(iterator),
+        typeof(_w1)}(
+            nlp,kkt,opt,cnt,logger,
+            n,m,nlb,nub,x,y,zl,zu,xl,xu,0.,f,c,
+            jacl,
+            d, p,
+            _w1, _w2, _w3, _w4,
+            x_trial,c_trial,0.,c_slk,rhs,
+            ind_cons.ind_ineq,ind_cons.ind_fixed,ind_cons.ind_llb,ind_cons.ind_uub,
+            x_lr,x_ur,xl_r,xu_r,zl_r,zu_r,dx_lr,dx_ur,x_trial_lr,x_trial_ur,
+            # linear_solver,
+            iterator,
+            obj_scale,con_scale,con_jac_scale,
+            0.,0.,0.,0.,0.,0.,0.,0.,0.," ",
+            # 0.,0.,0.,
+            Vector{T}[],nothing,INITIAL,Dict(),
     )
 end
 

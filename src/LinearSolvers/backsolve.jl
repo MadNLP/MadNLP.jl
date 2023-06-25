@@ -1,95 +1,73 @@
 # MadNLP.jl
 # Created by Sungho Shin (sungho.shin@wisc.edu)
 
-struct RichardsonIterator{T, VT, KKT, LinSolver <: AbstractLinearSolver{T}} <: AbstractIterator{T}
-    linear_solver::LinSolver
+struct RichardsonIterator{T, VT, KKT} <: AbstractIterator{T}
     kkt::KKT
     residual::VT
     max_iter::Int
     tol::T
     acceptable_tol::T
+    cnt::MadNLPCounters
     logger::MadNLPLogger
 end
+
 function RichardsonIterator(
-    linear_solver::AbstractLinearSolver{T},
-    kkt::AbstractKKTSystem,
-    res::AbstractVector;
-    max_iter=10, tol=T(1e-8), acceptable_tol=T(1e-5), logger=MadNLPLogger(),
+    kkt::AbstractKKTSystem{T},
+    residual::UnreducedKKTVector{T};
+    max_iter=10,
+    tol=T(1e-8),
+    acceptable_tol=T(1e-5),
+    logger=MadNLPLogger(),
+    cnt=MadNLPCounters()
 ) where T
     return RichardsonIterator(
-        linear_solver, kkt, res, max_iter, tol, acceptable_tol, logger,
+        kkt, residual, max_iter, tol, acceptable_tol, cnt, logger
     )
 end
 
-# Solve reduced KKT system. Require only the primal/dual values.
-function solve_refine!(
-    x::AbstractKKTVector{T, VT},
-    solver::RichardsonIterator{T, VT, KKT, LinSolver},
-    b::AbstractKKTVector{T, VT},
-) where {T, VT, KKT<:AbstractReducedKKTSystem, LinSolver}
-    solve_refine!(primal_dual(x), solver, primal_dual(b))
-end
-
-# Solve unreduced KKT system. Require UnreducedKKTVector as inputs.
 function solve_refine!(
     x::UnreducedKKTVector{T, VT},
-    solver::RichardsonIterator{T, VT, KKT, LinSolver},
+    iterator::RichardsonIterator{T},
     b::UnreducedKKTVector{T, VT},
-) where {T, VT, KKT<:AbstractUnreducedKKTSystem, LinSolver}
-    solve_refine!(full(x), solver, full(b))
-end
+) where {T, VT}
+    @debug(iterator.logger, "Iterative solver initiated")
+    kkt = iterator.kkt
+    norm_b = norm(full(b), Inf)
+    residual_ratio = 0.0
 
-function solve_refine!(
-    x::AbstractVector{T},
-    solver::RichardsonIterator{T},
-    b::AbstractVector{T},
-) where T
-    @debug(solver.logger, "Iterative solver initiated")
-
-    ε = solver.residual
-    norm_b = norm(b, Inf)
-
-    fill!(x, zero(T))
-    fill!(ε, zero(T))
-
-    ε = solver.residual
-    axpy!(-1, b, ε)
-    norm_res = norm(ε, Inf)
-    residual_ratio = norm_res / (one(T) + norm_b)
-
+    w = iterator.residual
+    fill!(full(x), 0)
+    copyto!(full(w), full(b))
     iter = 0
-    residual_ratio_old = Inf
-    noprogress = 0
 
     while true
+        solve!(kkt,w,iterator.cnt)
+        axpy!(1., full(w), full(x))
+        copyto!(full(w), full(b))
+        mul_subtract!(w, kkt, x)
+        
+        norm_w = norm(full(w), Inf)
+        norm_x = norm(full(x), Inf)
+        residual_ratio = norm_w / (min(norm_x, 1e6 * norm_b) + norm_b)
+        
         mod(iter, 10)==0 &&
-            @debug(solver.logger,"iter ||res||")
-        @debug(solver.logger, @sprintf("%4i %6.2e", iter, residual_ratio))
+            @debug(iterator.logger,"iter ||res||")
+        @debug(iterator.logger, @sprintf("%4i %6.2e", iter, residual_ratio))
         iter += 1
-        if (iter > solver.max_iter) || (residual_ratio < solver.tol)
+        if (iter > iterator.max_iter) || (residual_ratio < iterator.tol)
             break
         end
-
-
-        solve!(solver.linear_solver, ε)
-        axpy!(-1, ε, x)
-        mul!(ε, solver.kkt, x)
-        axpy!(-1, b, ε)
-        norm_res = norm(ε, Inf)
-
-        residual_ratio_old = residual_ratio
-        residual_ratio = norm_res / (one(T)+norm_b)
     end
 
-    @debug(solver.logger, @sprintf(
+    @debug(iterator.logger, @sprintf(
         "Iterative solver terminated with %4i refinement steps and residual = %6.2e",
         iter, residual_ratio),
-    )
+           )
 
-    if residual_ratio < solver.acceptable_tol
-        return :Solved
+    if residual_ratio < iterator.acceptable_tol
+        return true
     else
-        return :Failed
+        return false
     end
 end
 
