@@ -89,11 +89,11 @@ KKT vector ``(x, s, y, z)``, associated to a [`AbstractReducedKKTSystem`](@ref).
 Compared to [`UnreducedKKTVector`](@ref), it does not store
 the dual values associated to the primal's lower and upper bounds.
 """
-struct ReducedKKTVector{T, VT<:AbstractVector{T}} <: AbstractKKTVector{T, VT}
+struct ReducedKKTVector{T, VT<:AbstractVector{T}, VI} <: AbstractKKTVector{T, VT}
     values::VT
     xp::VT # unsafe view
-    xp_lr::SubVector{T}
-    xp_ur::SubVector{T}
+    xp_lr::SubVector{T, VT, VI}
+    xp_ur::SubVector{T, VT, VI}
     xl::VT # unsafe view
 end
 
@@ -129,12 +129,12 @@ primal_dual(rhs::ReducedKKTVector) = rhs.values
 Full KKT vector ``(x, s, y, z, ν, w)``, associated to a [`AbstractUnreducedKKTSystem`](@ref).
 
 """
-struct UnreducedKKTVector{T, VT<:AbstractVector{T}} <: AbstractKKTVector{T, VT}
+struct UnreducedKKTVector{T, VT<:AbstractVector{T}, VI} <: AbstractKKTVector{T, VT}
     values::VT
     x::VT  # unsafe view
     xp::VT # unsafe view
-    xp_lr::SubVector{T}
-    xp_ur::SubVector{T}
+    xp_lr::SubVector{T, VT, VI}
+    xp_ur::SubVector{T, VT, VI}
     xl::VT # unsafe view
     xzl::VT # unsafe view
     xzu::VT # unsafe view
@@ -170,10 +170,10 @@ dual_ub(rhs::UnreducedKKTVector) = rhs.xzu
 Primal vector ``(x, s)``.
 
 """
-struct PrimalVector{T, VT<:AbstractVector{T}} <: AbstractKKTVector{T, VT}
+struct PrimalVector{T, VT<:AbstractVector{T}, VI} <: AbstractKKTVector{T, VT}
     values::VT
-    values_lr::SubVector{T}
-    values_ur::SubVector{T}
+    values_lr::SubVector{T, VT, VI}
+    values_ur::SubVector{T, VT, VI}
     x::VT  # unsafe view
     s::VT # unsafe view
 end

@@ -183,36 +183,36 @@ function solve_refine_wrapper!(
 end
 
 
-function solve_refine_wrapper!(
-    solver::MadNLPSolver{T,<:SparseCondensedKKTSystem},
-    x::AbstractKKTVector,
-    b::AbstractKKTVector,
-    w::AbstractKKTVector;
-    resto = false,
-    init = false,
-    ) where T
+function solve!(kkt::SparseCondensedKKTSystem, w::AbstractKKTVector, cnt)  #TODO cnt goes into linear solver
 
-    cnt = solver.cnt
-    @trace(solver.logger,"Iterative solution started.")
-
-    kkt = solver.kkt
     n = size(kkt.hess_com, 1)
     m = size(kkt.jt_csc, 2)
 
-    
-    # load buffers
-    jv_x = view(full(solver._w3), 1:m) 
-    jv_t = view(primal(solver._w4), 1:n)
-    v_c = dual(solver._w4)
-
-    Σd = kkt.du_diag
+    # Decompose buffers
+    wx = _madnlp_unsafe_wrap(full(w), n)
+    ws = view(full(w), n+1:n+m)
+    wz = view(full(w), n+m+1:n+2*m)
+    v_c = zeros(m) # TODO: pre-allocate buffer
     Σs = view(kkt.pr_diag, n+1:n+m)
 
+    aug_rhs_prep(w.xp_lr, dual_lb(w), kkt.l_diag, w.xp_ur, dual_ub(w), kkt.u_diag)
 
-    # Decompose right hand side
-    bx = view(full(b), 1:n)
-    bs = view(full(b), n+1:n+m)
-    bz = view(full(b), n+m+1:n+2*m)
+    v_c .= kkt.diag_buffer .* (wz .+ ws ./ Σs) 
+    
+    mul!(wx, kkt.jt_csc, v_c, 1., 1.)
+    cnt.linear_solver_time += @elapsed solve!(kkt.linear_solver, wx)
+
+    mul!(wz, kkt.jt_csc', wx)
+    wz .= .- v_c .+ kkt.diag_buffer .* wz
+    ws .= (ws .+ wz) ./ Σs
+
+    finish_aug_solve!(kkt, w)
+
+end
+
+function mul_subtract!(w::AbstractKKTVector, kkt::SparseCondensedKKTSystem, x::AbstractKKTVector)
+    n = size(kkt.hess_com, 1)
+    m = size(kkt.jt_csc, 2)
 
     # Decompose results
     xx = view(full(x), 1:n)
@@ -223,60 +223,12 @@ function solve_refine_wrapper!(
     wx = _madnlp_unsafe_wrap(full(w), n)
     ws = view(full(w), n+1:n+m)
     wz = view(full(w), n+m+1:n+2*m)
+
+    mul!(wx, Symmetric(kkt.hess_com, :L), xx, -1., 1.)
+    mul!(wx, kkt.jt_csc,  xz, -1., 1.)
+    mul!(wz, kkt.jt_csc', xx, -1., 1.)
+    axpy!(1, xz, ws)
+    axpy!(1, xs, wz)
     
-    fill!(full(x), 0)
-    copyto!(full(w), full(b))
-    
-    norm_b = norm(b, Inf)
-    err = 0.
-    for kk=1:10
-        aug_rhs_prep(
-            w.xp_lr, dual_lb(w), solver.xl_r, solver.x_lr,
-            w.xp_ur, dual_ub(w), solver.xu_r, solver.x_ur,
-        )
-
-        ##
-        v_c .= kkt.diag_buffer .* (wz .+ ws ./ Σs) 
-        
-        mul!(jv_t, kkt.jt_csc, v_c)
-        axpy!(1, jv_t, wx)
-        ## 
-        cnt.linear_solver_time += @elapsed solve!(solver.linear_solver, wx)
-
-        ##
-        mul!(jv_x, kkt.jt_csc', wx)
-        wz .= .- v_c .+ kkt.diag_buffer .* jv_x
-        ws .= (ws .+ wz) ./ Σs
-        ##
-
-        finish_aug_solve!(solver, solver.kkt, w, solver.mu)
-        
-        axpy!(1., full(w), full(x))
-
-        copyto!(full(w), full(b))
-        
-        mul!(wx, Symmetric(kkt.hess_com, :L), xx, -1., 1.)
-        mul!(wx, kkt.jt_csc,  xz, -1., 1.)
-        mul!(wz, kkt.jt_csc', xx, -1., 1.)
-        axpy!(1, xz, ws)
-        axpy!(1, xs, wz)
-        
-        _kktmul!(w,x,solver.del_w,kkt.du_diag,solver.zl_r,solver.zu_r,solver.xl_r,solver.xu_r,solver.x_lr,solver.x_ur)
-        if init
-            break
-        end
-
-        norm_w = norm(full(w), Inf)
-        norm_x = norm(full(x), Inf)
-        err = norm_w / (min(norm_x, 1e6 * norm_b) + norm_b)
-        # println(err)
-        
-        if err <= 1e-10
-            return true
-        end
-
-        
-    end
-
-    return err <= 1e-5
+    _kktmul!(w,x,kkt.del_w,kkt.du_diag,kkt.l_lower,kkt.u_lower,kkt.l_diag,kkt.u_diag)
 end

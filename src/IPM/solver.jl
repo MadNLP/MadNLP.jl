@@ -1,5 +1,5 @@
 function madnlp(model::AbstractNLPModel; kwargs...)
-    so
+    solver = MadNLPSolver(model;kwargs...)
     initialize!(solver.kkt)
     return solve!(solver)
 end

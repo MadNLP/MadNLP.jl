@@ -22,3 +22,32 @@ function CuMadNLPSolver(nlp::AbstractNLPModel{T}; kwargs...) where T
     end
     return MadNLP.MadNLPSolver{T,KKTSystem}(nlp, opt_ipm, opt_linear_solver; logger=logger)
 end
+
+function MadNLP.coo_to_csc(coo::MadNLP.SparseMatrixCOO{T,I,VT,VI}) where {T,I, VT <: CuArray, VI <: CuArray}
+    csc, map = MadNLP.coo_to_csc(
+        MadNLP.SparseMatrixCOO(coo.m, coo.n, Array(coo.I), Array(coo.J), Array(coo.V))
+    )
+
+    return CUDA.CUSPARSE.CuSparseMatrixCSC(csc), CuArray(map) 
+end
+
+function MadNLP.get_tril_to_full(csc::CUDA.CUSPARSE.CuSparseMatrixCSC{Tv,Ti}) where {Tv,Ti}
+    cscind = MadNLP.SparseMatrixCSC{Int,Ti}(
+        MadNLP.Symmetric(
+            MadNLP.SparseMatrixCSC{Int,Ti}(
+                size(csc)...,
+                Array(csc.colPtr),
+                Array(csc.rowVal),
+                collect(1:MadNLP.nnz(csc))
+            ),
+            :L
+        )
+    )
+    return CUDA.CUSPARSE.CuSparseMatrixCSC{Tv,Ti}(
+        CuArray(cscind.colptr),
+        CuArray(cscind.rowval),
+        CuVector{Tv}(undef,MadNLP.nnz(cscind)),
+        size(csc),
+    ),
+    view(csc.nzVal,CuArray(cscind.nzval))
+end

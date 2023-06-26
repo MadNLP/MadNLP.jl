@@ -3,11 +3,11 @@
 
 abstract type AbstractSparseMatrixCOO{Tv,Ti<:Integer} <: AbstractSparseMatrix{Tv,Ti} end
 
-mutable struct SparseMatrixCOO{Tv,Ti<:Integer, VTv<:AbstractVector{Tv}} <: AbstractSparseMatrixCOO{Tv,Ti}
+mutable struct SparseMatrixCOO{Tv,Ti,VTv<:AbstractVector{Tv},VTi<:AbstractVector{Ti}} <: AbstractSparseMatrixCOO{Tv,Ti}
     m::Int
     n::Int
-    I::Vector{Ti}
-    J::Vector{Ti}
+    I::VTi
+    J::VTi
     V::VTv
 end
 size(A::SparseMatrixCOO) = (A.m,A.n)
@@ -52,13 +52,23 @@ function tril_to_full!(dense::Matrix{T}) where T
     end
 end
 
-function SparseMatrixCSC{Tv, Ti}(coo::SparseMatrixCOO{Tv,Ti}) where {Tv,Ti <: Integer}
-    cscind = sparse(coo.I,coo.J,ones(Ti,nnz(coo)),coo.m,coo.n)
-    nzval = Vector{Tv}(undef,nnz(cscind))
-    fill!(nzval, zero(Tv))
-    return SparseMatrixCSC{Tv, Ti}(
+function coo_to_csc(coo) 
+    cscind = sparse(
+        coo.I,
+        coo.J,
+        fill!(similar(coo.I,nnz(coo)), 1),
+        coo.m,
+        coo.n
+    )
+    nzval = similar(coo.V, nnz(cscind))
+    fill!(nzval, 0)
+    
+    csc = SparseMatrixCSC(
         coo.m,coo.n,cscind.colptr,cscind.rowval,nzval,
     )
+    map = get_mapping(csc, coo)
+    
+    return csc, map
 end
 
 function _get_coo_to_csc(I,J,cscind,map)
@@ -88,7 +98,7 @@ function Matrix{Tv}(coo::SparseMatrixCOO{Tv,Ti}) where {Tv,Ti<:Integer}
     return Matrix{Tv}(undef,coo.m,coo.n)
 end
 
-Base.copyto!(dense::Matrix{Tv},coo::SparseMatrixCOO{Tv,Ti}) where {Tv,Ti<:Integer} = _copyto!(dense,coo.I,coo.J,coo.V)
+Base.copyto!(dense::Matrix,coo::SparseMatrixCOO) = _copyto!(dense,coo.I,coo.J,coo.V)
 function _copyto!(dense::Matrix{Tv},I,J,V) where Tv
     fill!(dense, zero(Tv))
     for i=1:length(I)

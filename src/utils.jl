@@ -84,7 +84,7 @@ function _madnlp_unsafe_wrap(vec::VT, n, shift=1) where VT
 end
 
 # Type definitions for noncontiguous views
-const SubVector{Tv} = SubArray{Tv, 1, Vector{Tv}, Tuple{Vector{Int}}, false}
+const SubVector{Tv,VT, VI} = SubArray{Tv, 1, VT, Tuple{VI}, false}
 
 @kwdef mutable struct MadNLPCounters
     k::Int = 0 # total iteration counter

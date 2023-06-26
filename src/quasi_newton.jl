@@ -36,9 +36,6 @@ curvature(::Val{SCALAR3}, sk, yk) = 0.5 * (curvature(Val(SCALAR1), sk, yk) + cur
 curvature(::Val{SCALAR4}, sk, yk) = sqrt(curvature(Val(SCALAR1), sk, yk) * curvature(Val(SCALAR2), sk, yk))
 
 
-struct ExactHessian{T, VT} <: AbstractHessian{T, VT} end
-ExactHessian{T, VT}(n::Int) where {T, VT} = ExactHessian{T, VT}()
-
 """
     BFGS{T, VT} <: AbstractQuasiNewton{T, VT}
 
@@ -304,3 +301,6 @@ function init!(qn::CompactLBFGS, Bk::AbstractArray, sk::AbstractVector, yk::Abst
     return
 end
 
+
+struct ExactHessian{T, VT} <: AbstractHessian{T, VT} end
+create_quasi_newton(::Type{ExactHessian}, nlp::AbstractNLPModel{T,VT}, n) where {T,VT} = ExactHessian{T, VT}()

@@ -57,26 +57,26 @@ function MadNLP.scale_constraints!(
     con_scale .= min.(1.0, max_gradient ./ con_scale)
 end
 
-@kernel function _treat_fixed_variable_kernell!(dest, ind_fixed)
-    k, j = @index(Global, NTuple)
-    i = ind_fixed[k]
+# @kernel function _treat_fixed_variable_kernell!(dest, ind_fixed)
+#     k, j = @index(Global, NTuple)
+#     i = ind_fixed[k]
 
-    if i == j
-        dest[i, i] = 1.0
-    else
-        dest[i, j] = 0.0
-        dest[j, i] = 0.0
-    end
-end
+#     if i == j
+#         dest[i, i] = 1.0
+#     else
+#         dest[i, j] = 0.0
+#         dest[j, i] = 0.0
+#     end
+# end
 
-function MadNLP.treat_fixed_variable!(kkt::MadNLP.AbstractKKTSystem{T, VT, MT}) where {T, VT, MT<:CuMatrix{T}}
-    length(kkt.ind_fixed) == 0 && return
-    aug = kkt.aug_com
-    d_ind_fixed = kkt.ind_fixed |> CuVector # TODO: allocate ind_fixed directly on the GPU
-    ndrange = (length(d_ind_fixed), size(aug, 1))
-    ev = _treat_fixed_variable_kernell!(CUDABackend())(aug, d_ind_fixed, ndrange=ndrange)
-    synchronize(CUDABackend())
-end
+# function MadNLP.treat_fixed_variable!(kkt::MadNLP.AbstractKKTSystem{T, VT, MT}) where {T, VT, MT<:CuMatrix{T}}
+#     length(kkt.ind_fixed) == 0 && return
+#     aug = kkt.aug_com
+#     d_ind_fixed = kkt.ind_fixed |> CuVector # TODO: allocate ind_fixed directly on the GPU
+#     ndrange = (length(d_ind_fixed), size(aug, 1))
+#     ev = _treat_fixed_variable_kernell!(CUDABackend())(aug, d_ind_fixed, ndrange=ndrange)
+#     synchronize(CUDABackend())
+# end
 
 
 #=

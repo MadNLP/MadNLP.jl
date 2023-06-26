@@ -43,8 +43,8 @@ end
     fixed_variable_treatment::FixedVariableTreatments = MAKE_PARAMETER
     jacobian_constant::Bool = false
     hessian_constant::Bool = false
-    kkt_system::KKTLinearSystem = SPARSE_KKT_SYSTEM
-    hessian_approximation::HessianApproximation = EXACT_HESSIAN
+    kkt_system::Type = SparseKKTSystem
+    hessian_approximation::Type = ExactHessian
 
     # initialization options
     dual_initialized::Bool = false
