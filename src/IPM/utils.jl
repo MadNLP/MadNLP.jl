@@ -1,13 +1,13 @@
-mutable struct MadNLPExecutionStats{T} <: AbstractExecutionStats
+mutable struct MadNLPExecutionStats{T, VT} <: AbstractExecutionStats
     status::Status
-    solution::Vector{T}
+    solution::VT
     objective::T
-    constraints::Vector{T}
+    constraints::VT
     dual_feas::T
     primal_feas::T
-    multipliers::Vector{T}
-    multipliers_L::Vector{T}
-    multipliers_U::Vector{T}
+    multipliers::VT
+    multipliers_L::VT
+    multipliers_U::VT
     iter::Int
     counters
     elapsed_time::Real
@@ -53,13 +53,11 @@ function get_vars_info(solver)
     num_fixed = length(solver.ind_fixed)
     num_var = get_nvar(solver.nlp) - num_fixed
     num_llb_vars = length(solver.ind_llb)
-    num_lu_vars = -num_fixed
-    # Number of bounded variables
-    for i in 1:get_nvar(solver.nlp)
-        if (x_lb[i] > -Inf) && (x_ub[i] < Inf)
-            num_lu_vars += 1
-        end
-    end
+    num_lu_vars = reduce(
+        (acc, (l,u)) -> acc + ((l > -Inf) && (u < Inf)),
+        zip(x_lb,x_ub);
+        init = -num_fixed
+    ) 
     num_uub_vars = length(solver.ind_uub)
     return (
         n_free=num_var,

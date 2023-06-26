@@ -7,6 +7,8 @@ include("restoration.jl")
 
 mutable struct MadNLPSolver{
     T,
+    VT <: AbstractVector{T},
+    VI <: AbstractVector{Int},
     KKTSystem <: AbstractKKTSystem{T},
     Model <: AbstractNLPModel,
     Iterator <: AbstractIterator{T},
@@ -25,21 +27,21 @@ mutable struct MadNLPSolver{
     nlb::Int
     nub::Int
 
-    x::PrimalVector{T, Vector{T}} # primal (after reformulation)
-    y::Vector{T} # dual
-    zl::PrimalVector{T, Vector{T}} # dual (after reformulation)
-    zu::PrimalVector{T, Vector{T}} # dual (after reformulation)
-    xl::PrimalVector{T, Vector{T}} # primal lower bound (after reformulation)
-    xu::PrimalVector{T, Vector{T}} # primal upper bound (after reformulation)
+    x::PrimalVector{T, VT} # primal (after reformulation)
+    y::VT # dual
+    zl::PrimalVector{T, VT} # dual (after reformulation)
+    zu::PrimalVector{T, VT} # dual (after reformulation)
+    xl::PrimalVector{T, VT} # primal lower bound (after reformulation)
+    xu::PrimalVector{T, VT} # primal upper bound (after reformulation)
 
     obj_val::T
-    f::PrimalVector{T, Vector{T}}
-    c::Vector{T}
+    f::PrimalVector{T, VT}
+    c::VT
 
-    jacl::Vector{T}
+    jacl::VT
 
-    d::UnreducedKKTVector{T, Vector{T}}
-    p::UnreducedKKTVector{T, Vector{T}}
+    d::UnreducedKKTVector{T, VT}
+    p::UnreducedKKTVector{T, VT}
 
     _w1::KKTVec
     _w2::KKTVec
@@ -47,36 +49,36 @@ mutable struct MadNLPSolver{
     _w3::KKTVec
     _w4::KKTVec
 
-    x_trial::PrimalVector{T, Vector{T}}
-    c_trial::Vector{T}
+    x_trial::PrimalVector{T, VT}
+    c_trial::VT
     obj_val_trial::T
 
-    c_slk::SubVector{T}
-    rhs::Vector{T}
+    c_slk::SubVector{T,VT,VI}
+    rhs::VT
 
-    ind_ineq::Vector{Int}
-    ind_fixed::Vector{Int}
-    ind_llb::Vector{Int}
-    ind_uub::Vector{Int}
+    ind_ineq::VI
+    ind_fixed::VI
+    ind_llb::VI
+    ind_uub::VI
 
-    x_lr::SubVector{T}
-    x_ur::SubVector{T}
-    xl_r::SubVector{T}
-    xu_r::SubVector{T}
-    zl_r::SubVector{T}
-    zu_r::SubVector{T}
+    x_lr::SubVector{T,VT,VI}
+    x_ur::SubVector{T,VT,VI}
+    xl_r::SubVector{T,VT,VI}
+    xu_r::SubVector{T,VT,VI}
+    zl_r::SubVector{T,VT,VI}
+    zu_r::SubVector{T,VT,VI}
 
-    dx_lr::SubVector{T}
-    dx_ur::SubVector{T}
-    x_trial_lr::SubVector{T}
-    x_trial_ur::SubVector{T}
+    dx_lr::SubVector{T,VT,VI}
+    dx_ur::SubVector{T,VT,VI}
+    x_trial_lr::SubVector{T,VT,VI}
+    x_trial_ur::SubVector{T,VT,VI}
 
     # linear_solver::LinSolver
     iterator::Iterator
 
-    obj_scale::Vector{T}
-    con_scale::Vector{T}
-    con_jac_scale::Vector{T}
+    obj_scale::VT
+    con_scale::VT
+    con_jac_scale::VT
     inf_pr::T
     inf_du::T
     inf_compl::T
@@ -123,20 +125,20 @@ function MadNLPSolver(nlp::AbstractNLPModel{T,VT}; kwargs...) where {T, VT}
     kkt = create_kkt_system(opt.kkt_system, nlp, opt, cnt, ind_cons)
 
     # Primal variable
-    x = PrimalVector{T, VT}(nx, ns, ind_cons)
+    x = PrimalVector(VT,nx, ns, ind_cons)
     variable(x) .= get_x0(nlp)
     # Bounds
-    xl = PrimalVector{T, VT}(nx, ns, ind_cons)
+    xl = PrimalVector(VT,nx, ns, ind_cons)
     variable(xl) .= get_lvar(nlp)
     slack(xl) .= view(get_lcon(nlp), ind_cons.ind_ineq)
-    xu = PrimalVector{T, VT}(nx, ns, ind_cons)
+    xu = PrimalVector(VT,nx, ns, ind_cons)
     variable(xu) .= get_uvar(nlp)
     slack(xu) .= view(get_ucon(nlp), ind_cons.ind_ineq)
-    zl = PrimalVector{T, VT}(nx, ns, ind_cons)
-    zu = PrimalVector{T, VT}(nx, ns, ind_cons)
+    zl = PrimalVector(VT,nx, ns, ind_cons)
+    zu = PrimalVector(VT,nx, ns, ind_cons)
     
     # Gradient
-    f = PrimalVector{T, VT}(nx, ns, ind_cons)
+    f = PrimalVector(VT,nx, ns, ind_cons)
 
     y = copy(get_y0(nlp))
     c = VT(undef, m)
@@ -146,7 +148,7 @@ function MadNLPSolver(nlp::AbstractNLPModel{T,VT}; kwargs...) where {T, VT}
     nlb = length(ind_cons.ind_lb)
     nub = length(ind_cons.ind_ub)
 
-    x_trial = PrimalVector{T, VT}(nx, ns, ind_cons)
+    x_trial = PrimalVector(VT,nx, ns, ind_cons)
     c_trial = VT(undef, m)
 
     c_slk = view(c,ind_cons.ind_ineq)
@@ -161,26 +163,26 @@ function MadNLPSolver(nlp::AbstractNLPModel{T,VT}; kwargs...) where {T, VT}
     x_trial_lr = view(full(x_trial), ind_cons.ind_lb)
     x_trial_ur = view(full(x_trial), ind_cons.ind_ub)
 
-    _w1 = UnreducedKKTVector{T,VT}(n, m, nlb, nub, ind_cons)
-    _w2 = UnreducedKKTVector{T,VT}(n, m, nlb, nub, ind_cons)
-    _w3 = UnreducedKKTVector{T,VT}(n, m, nlb, nub, ind_cons)
-    _w4 = UnreducedKKTVector{T,VT}(n, m, nlb, nub, ind_cons)
+    _w1 = UnreducedKKTVector(VT, n, m, nlb, nub, ind_cons)
+    _w2 = UnreducedKKTVector(VT, n, m, nlb, nub, ind_cons)
+    _w3 = UnreducedKKTVector(VT, n, m, nlb, nub, ind_cons)
+    _w4 = UnreducedKKTVector(VT, n, m, nlb, nub, ind_cons)
 
     jacl = fill!(VT(undef,n), zero(T)) # spblas may throw an error if not initialized to zero
 
-    d = UnreducedKKTVector{T,VT}(n, m, nlb, nub, ind_cons)
+    d = UnreducedKKTVector(VT, n, m, nlb, nub, ind_cons)
     dx_lr = view(d.xp, ind_cons.ind_lb) # TODO
     dx_ur = view(d.xp, ind_cons.ind_ub) # TODO
 
-    p = UnreducedKKTVector{T,VT}(n, m, nlb, nub, ind_cons)
+    p = UnreducedKKTVector(VT, n, m, nlb, nub, ind_cons)
 
-    obj_scale = T[1.0]
-    con_scale = ones(T,m)
-    con_jac_scale = ones(T,n_jac)
+    obj_scale = fill!(VT(undef,1), one(T))
+    con_scale = fill!(VT(undef,m), one(T))
+    con_jac_scale = fill!(VT(undef,n_jac), one(T))
 
     n_kkt = size(kkt, 1)
     @trace(logger,"Initializing iterative solver.")
-    residual = UnreducedKKTVector{T,typeof(c)}(n, m, nlb, nub, ind_cons)
+    residual = UnreducedKKTVector(VT, n, m, nlb, nub, ind_cons)
     iterator = opt.iterator(kkt, residual; cnt = cnt, logger = logger)
 
 
@@ -200,35 +202,18 @@ function MadNLPSolver(nlp::AbstractNLPModel{T,VT}; kwargs...) where {T, VT}
             x_trial,c_trial,0.,c_slk,rhs,
             ind_cons.ind_ineq,ind_cons.ind_fixed,ind_cons.ind_llb,ind_cons.ind_uub,
             x_lr,x_ur,xl_r,xu_r,zl_r,zu_r,dx_lr,dx_ur,x_trial_lr,x_trial_ur,
-            # linear_solver,
             iterator,
             obj_scale,con_scale,con_jac_scale,
             0.,0.,0.,0.,0.,0.,0.,0.,0.," ",
-            # 0.,0.,0.,
             Tuple{T,T}[],nothing,INITIAL,Dict(),
         )
 
 end
-
-# Constructor for unregistered KKT systems
-# function MadNLPSolver{T, KKTSystem}(nlp::AbstractNLPModel{T}; options...) where {T, KKTSystem}
-#     opt_ipm, opt_linear_solver, logger = load_options(; options...)
-#     @assert is_supported(opt_ipm.linear_solver, T)
-#     return MadNLPSolver{T,KKTSystem}(nlp, opt_ipm, opt_linear_solver; logger=logger)
-# end
-
-# Inner constructor
-# function MadNLPSolver{T,KKTSystem}(
-#     nlp::AbstractNLPModel,
-#     opt::MadNLPOptions,
-#     opt_linear_solver::AbstractOptions;
-#     logger=MadNLPLogger(),
-# ) where {T, KKTSystem<:AbstractKKTSystem{T}}
-# end
 
 include("utils.jl")
 include("kernels.jl")
 include("callbacks.jl")
 include("factorization.jl")
 include("solver.jl")
+
 

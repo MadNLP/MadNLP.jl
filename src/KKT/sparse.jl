@@ -214,7 +214,8 @@ function create_kkt_system(
     nlb = length(ind_cons.ind_lb)
     nub = length(ind_cons.ind_ub)
 
-    force_lower_triangular!(hess_sparsity_I,hess_sparsity_J)
+    # TODO make this work on GPU
+    # force_lower_triangular!(hess_sparsity_I,hess_sparsity_J)
 
     ind_ineq = ind_cons.ind_ineq
     
@@ -462,7 +463,8 @@ function SparseCondensedKKTSystem{T, VT, MT, QN}(
 
     hess_sparsity_I, hess_sparsity_J = build_hessian_structure(nlp, QN)
 
-    force_lower_triangular!(hess_sparsity_I,hess_sparsity_J)
+    # TODO make this work on GPU
+    # force_lower_triangular!(hess_sparsity_I,hess_sparsity_J)
 
     n_jac = length(jac_sparsity_I)
     n_hess = length(hess_sparsity_I)
