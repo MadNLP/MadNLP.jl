@@ -22,12 +22,8 @@ end
     xp_lr,wl,l_diag,
     xp_ur,wu,u_diag,
     )
-    @simd for i=1:length(xp_lr)
-        xp_lr[i] += wl[i] / l_diag[i]
-    end
-    @simd for i=1:length(xp_ur)
-        xp_ur[i] -= wu[i] / u_diag[i]
-    end
+    xp_lr .+= wl ./ l_diag
+    xp_ur .-= wu ./ u_diag
 end
 @inbounds function g(ws,wz,du_diag,jv_x,Σs) 
     @simd for i=1:length(ws)
@@ -192,18 +188,17 @@ function solve!(kkt::SparseCondensedKKTSystem, w::AbstractKKTVector, cnt)  #TODO
     wx = _madnlp_unsafe_wrap(full(w), n)
     ws = view(full(w), n+1:n+m)
     wz = view(full(w), n+m+1:n+2*m)
-    v_c = zeros(m) # TODO: pre-allocate buffer
     Σs = view(kkt.pr_diag, n+1:n+m)
 
     aug_rhs_prep(w.xp_lr, dual_lb(w), kkt.l_diag, w.xp_ur, dual_ub(w), kkt.u_diag)
 
-    v_c .= kkt.diag_buffer .* (wz .+ ws ./ Σs) 
+    kkt.buffer .= kkt.diag_buffer .* (wz .+ ws ./ Σs) 
     
-    mul!(wx, kkt.jt_csc, v_c, 1., 1.)
+    mul!(wx, kkt.jt_csc, kkt.buffer, 1., 1.)
     cnt.linear_solver_time += @elapsed solve!(kkt.linear_solver, wx)
 
     mul!(wz, kkt.jt_csc', wx)
-    wz .= .- v_c .+ kkt.diag_buffer .* wz
+    wz .= .- kkt.buffer .+ kkt.diag_buffer .* wz
     ws .= (ws .+ wz) ./ Σs
 
     finish_aug_solve!(kkt, w)
@@ -224,7 +219,7 @@ function mul_subtract!(w::AbstractKKTVector, kkt::SparseCondensedKKTSystem, x::A
     ws = view(full(w), n+1:n+m)
     wz = view(full(w), n+m+1:n+2*m)
 
-    mul!(wx, Symmetric(kkt.hess_com, :L), xx, -1., 1.)
+    mul!(wx, Symmetric(kkt.hess_com, :L), xx, -1., 1.) # TODO: make this symmetric
     mul!(wx, kkt.jt_csc,  xz, -1., 1.)
     mul!(wz, kkt.jt_csc', xx, -1., 1.)
     axpy!(1, xz, ws)

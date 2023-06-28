@@ -1,28 +1,47 @@
 
 # KKT system updates -------------------------------------------------------
 # Set diagonal
+# temporaily commented out
+# function set_aug_diagonal!(kkt::AbstractKKTSystem, solver::MadNLPSolver{T}) where T
+#     x = full(solver.x)
+#     xl = full(solver.xl)
+#     xu = full(solver.xu)
+#     zl = full(solver.zl)
+#     zu = full(solver.zu)
+#     @inbounds @simd for i in eachindex(kkt.pr_diag)
+#         kkt.pr_diag[i] = zl[i] /(x[i] - xl[i])
+#         kkt.pr_diag[i] += zu[i] /(xu[i] - x[i])
+#     end
+#     fill!(kkt.du_diag, zero(T))
+#     @inbounds @simd for i in eachindex(kkt.l_lower)
+#         kkt.l_lower[i] = solver.zl_r[i]
+#         kkt.l_diag[i]  = solver.x_lr[i] - solver.xl_r[i]
+#     end
+#     @inbounds @simd for i in eachindex(kkt.u_lower)
+#         kkt.u_lower[i] = solver.zu_r[i]
+#         kkt.u_diag[i] = solver.x_ur[i] - solver.xu_r[i]
+#     end
+
+#     return
+# end
 function set_aug_diagonal!(kkt::AbstractKKTSystem, solver::MadNLPSolver{T}) where T
     x = full(solver.x)
     xl = full(solver.xl)
     xu = full(solver.xu)
     zl = full(solver.zl)
     zu = full(solver.zu)
-    @inbounds @simd for i in eachindex(kkt.pr_diag)
-        kkt.pr_diag[i] = zl[i] /(x[i] - xl[i])
-        kkt.pr_diag[i] += zu[i] /(xu[i] - x[i])
-    end
+    
+    kkt.pr_diag .= zl ./(x .- xl)
+    kkt.pr_diag .+= zu ./(xu .- x)
     fill!(kkt.du_diag, zero(T))
-    @inbounds @simd for i in eachindex(kkt.l_lower)
-        kkt.l_lower[i] = solver.zl_r[i]
-        kkt.l_diag[i]  = solver.x_lr[i] - solver.xl_r[i]
-    end
-    @inbounds @simd for i in eachindex(kkt.u_lower)
-        kkt.u_lower[i] = solver.zu_r[i]
-        kkt.u_diag[i] = solver.x_ur[i] - solver.xu_r[i]
-    end
+    kkt.l_lower .= solver.zl_r
+    kkt.l_diag  .= solver.x_lr .- solver.xl_r
+    kkt.u_lower .= solver.zu_r
+    kkt.u_diag .= solver.x_ur .- solver.xu_r
 
     return
 end
+
 function set_aug_diagonal!(kkt::SparseUnreducedKKTSystem, solver::MadNLPSolver{T}) where T
     fill!(kkt.pr_diag, zero(T))
     fill!(kkt.du_diag, zero(T))
@@ -87,26 +106,43 @@ function set_aug_rhs!(solver::MadNLPSolver, kkt::AbstractKKTSystem, c)
     xu = primal(solver.xu)
     zl = full(solver.zl)
     zu = full(solver.zu)
-    @inbounds @simd for i in eachindex(px)
-        px[i] = -f[i] + zl[i] - zu[i] - solver.jacl[i]
-    end
-    
     py = dual(solver.p)
-    @inbounds @simd for i in eachindex(py)
-        py[i] = -c[i]
-    end
-
     pzl = dual_lb(solver.p)
-    @inbounds @simd for i in eachindex(pzl)
-        pzl[i] = (solver.xl_r[i] - solver.x_lr[i]) * solver.zl_r[i] + solver.mu 
-    end
-
     pzu = dual_ub(solver.p)
-    @inbounds @simd for i in eachindex(pzu)
-        pzu[i] = (solver.xu_r[i] -solver.x_ur[i]) * solver.zu_r[i] - solver.mu 
-    end
-return
+
+    px .= .-f .+ zl .- zu .- solver.jacl
+    py .= -c
+    pzl .= (solver.xl_r .- solver.x_lr) .* solver.zl_r .+ solver.mu 
+    pzu .= (solver.xu_r .- solver.x_ur) .* solver.zu_r .- solver.mu 
 end
+# function set_aug_rhs!(solver::MadNLPSolver, kkt::AbstractKKTSystem, c)
+#     px = primal(solver.p)
+#     x = primal(solver.x)
+#     f = primal(solver.f)
+#     xl = primal(solver.xl)
+#     xu = primal(solver.xu)
+#     zl = full(solver.zl)
+#     zu = full(solver.zu)
+#     @inbounds @simd for i in eachindex(px)
+#         px[i] = -f[i] + zl[i] - zu[i] - solver.jacl[i]
+#     end
+    
+#     py = dual(solver.p)
+#     @inbounds @simd for i in eachindex(py)
+#         py[i] = -c[i]
+#     end
+
+#     pzl = dual_lb(solver.p)
+#     @inbounds @simd for i in eachindex(pzl)
+#         pzl[i] = (solver.xl_r[i] - solver.x_lr[i]) * solver.zl_r[i] + solver.mu 
+#     end
+
+#     pzu = dual_ub(solver.p)
+#     @inbounds @simd for i in eachindex(pzu)
+#         pzu[i] = (solver.xu_r[i] -solver.x_ur[i]) * solver.zu_r[i] - solver.mu 
+#     end
+# return
+# end
 function set_aug_rhs!(solver::MadNLPSolver, kkt::SparseUnreducedKKTSystem, c)
     f = primal(solver.f)
     zl = primal(solver.zl)
@@ -161,16 +197,25 @@ function set_aug_rhs_RR!(
 end
 
 # Finish
+# temporaily commented out
+# function finish_aug_solve!(kkt::AbstractKKTSystem, d)
+#     dlb = dual_lb(d)
+#     dub = dual_ub(d)
+#     @inbounds @simd for i in eachindex(dlb)
+#         dlb[i] = (dlb[i] - kkt.l_lower[i] * d.xp_lr[i]) / kkt.l_diag[i]
+#     end
+#     @inbounds @simd for i in eachindex(dub)
+#         dub[i] = (dub[i] - kkt.u_lower[i] * d.xp_ur[i]) / kkt.u_diag[i]
+#     end
+
+#     return
+# end
+
 function finish_aug_solve!(kkt::AbstractKKTSystem, d)
     dlb = dual_lb(d)
     dub = dual_ub(d)
-    @inbounds @simd for i in eachindex(dlb)
-        dlb[i] = (dlb[i] - kkt.l_lower[i] * d.xp_lr[i]) / kkt.l_diag[i]
-    end
-    @inbounds @simd for i in eachindex(dub)
-        dub[i] = (dub[i] - kkt.u_lower[i] * d.xp_ur[i]) / kkt.u_diag[i]
-    end
-
+    dlb .= (dlb .- kkt.l_lower .* d.xp_lr) ./ kkt.l_diag
+    dub .= (dub .- kkt.u_lower .* d.xp_ur) ./ kkt.u_diag
     return
 end
 function finish_aug_solve!(solver::MadNLPSolver, kkt::SparseUnreducedKKTSystem, mu)
@@ -205,9 +250,11 @@ function set_initial_rhs!(solver::MadNLPSolver{T}, kkt::AbstractKKTSystem) where
     zl = primal(solver.zl)
     zu = primal(solver.zu)
     px = primal(solver.p)
-    @inbounds @simd for i in eachindex(px)
-        px[i] = -f[i] + zl[i] - zu[i]
-    end
+    # temporaily commented out
+    px .= .-f .+ zl .- zu
+    # @inbounds @simd for i in eachindex(px)
+    #     px[i] = -f[i] + zl[i] - zu[i]
+    # end
     fill!(dual(solver.p), zero(T))
     fill!(dual_lb(solver.p), zero(T))
     fill!(dual_ub(solver.p), zero(T))
@@ -300,23 +347,44 @@ end
 
 @inline get_inf_pr(c) = norm(c, Inf)
 
+# temporarily commented out
+# function get_inf_du(f, zl, zu, jacl, sd)
+#     inf_du = 0.0
+#     @inbounds @simd for i=1:length(f)
+#         inf_du = max(inf_du,abs(f[i]-zl[i]+zu[i]+jacl[i]))
+#     end
+#     return inf_du/sd
+# end
 function get_inf_du(f, zl, zu, jacl, sd)
-    inf_du = 0.0
-    @inbounds @simd for i=1:length(f)
-        inf_du = max(inf_du,abs(f[i]-zl[i]+zu[i]+jacl[i]))
-    end
-    return inf_du/sd
+    return mapreduce((f,zl,zu,jacl) -> abs(f-zl+zu+jacl), max, f, zl, zu, jacl; init = zero(eltype(f))) / sd
 end
 
+# temporarily commented out
+# function get_inf_compl(x_lr, xl_r, zl_r, xu_r, x_ur, zu_r, mu, sc)
+#     inf_compl = 0.0
+#     @inbounds @simd for i=1:length(x_lr)
+#         inf_compl = max(inf_compl,abs((x_lr[i]-xl_r[i])*zl_r[i]-mu))
+#     end
+#     @inbounds @simd for i=1:length(x_ur)
+#         inf_compl = max(inf_compl,abs((xu_r[i]-x_ur[i])*zu_r[i]-mu))
+#     end
+#     return inf_compl/sc
+# end
 function get_inf_compl(x_lr, xl_r, zl_r, xu_r, x_ur, zu_r, mu, sc)
-    inf_compl = 0.0
-    @inbounds @simd for i=1:length(x_lr)
-        inf_compl = max(inf_compl,abs((x_lr[i]-xl_r[i])*zl_r[i]-mu))
-    end
-    @inbounds @simd for i=1:length(x_ur)
-        inf_compl = max(inf_compl,abs((xu_r[i]-x_ur[i])*zu_r[i]-mu))
-    end
-    return inf_compl/sc
+    return max(
+        mapreduce(
+            (x_lr, xl_r, zl_r) -> abs((x_lr-xl_r)*zl_r-mu),
+            max,
+            x_lr, xl_r, zl_r;
+            init = zero(eltype(x_lr))
+        ),
+        mapreduce(
+            (xu_r, x_ur, zu_r) -> abs((xu_r-x_ur)*zu_r-mu),
+            max,
+            xu_r, x_ur, zu_r;
+            init = zero(eltype(x_lr))
+        )
+    ) / sc
 end
 
 function get_varphi_d(f, x, xl, xu, dx, mu)

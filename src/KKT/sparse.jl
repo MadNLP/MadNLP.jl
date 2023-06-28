@@ -94,6 +94,9 @@ mutable struct SparseCondensedKKTSystem{T, VT, MT, QN, VI, VI32, VTu1, VTu2} <: 
     l_lower::VT
     u_lower::VT
 
+    # buffer
+    buffer::VT
+
     # Augmented system
     aug_com::MT
     
@@ -479,6 +482,8 @@ function create_kkt_system(
         jt_csc
     )
 
+    buffer = VT(undef, m)
+
     del_w = 1.
     del_w_last = 0.
     del_c = 0.
@@ -491,6 +496,7 @@ function create_kkt_system(
         jac, jt_coo,jt_csc,jt_csc_map,
         quasi_newton, pr_diag, du_diag,
         l_diag, u_diag, l_lower, u_lower,
+        buffer,
         aug_com, diag_buffer, dptr, hptr, jptr,
         del_w, del_w_last, del_c,
         linear_solver,
@@ -680,7 +686,7 @@ end
 end
 
 
-function build_kkt!(kkt::SparseCondensedKKTSystem{T, VT, MT}) where {T, VT, MT<:SparseMatrixCSC{T, Int32}}
+function build_kkt!(kkt::SparseCondensedKKTSystem{T, VT, MT}) where {T, VT, MT<:AbstractSparseMatrix{T}}
     transfer!(kkt.hess_com, kkt.hess_raw, kkt.hess_csc_map)
 
     n = size(kkt.hess_com, 1)

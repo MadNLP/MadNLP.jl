@@ -93,3 +93,65 @@ function MadNLP.build_condensed_aug_symbolic(
 
     return CUDA.CUSPARSE.CuSparseMatrixCSC(aug_com), CuArray(dptr), CuArray(hptr), CuArray(jptr)
 end
+
+@inbounds function MadNLP.build_condensed_aug_coord!(aug_com::CUDA.CUSPARSE.CuSparseMatrixCSC{Tv,Ti}, pr_diag, H, Jt, diag_buffer, dptr, hptr, jptr) where {Tv, Ti}
+    
+    # TODO
+    # @simd for idx in eachindex(hptr)
+    #     i,j = hptr[idx]
+    #     aug_com.nzval[i] += H.nzval[j]
+    # end
+    
+    # @simd for idx in eachindex(dptr)
+    #     i,j = dptr[idx]
+    #     aug_com.nzval[i] += pr_diag[j]
+    # end
+
+    # @simd for idx in eachindex(jptr)
+    #     (i,(j,k,l)) = jptr[idx]
+    #     aug_com.nzval[i] += diag_buffer[j] * Jt.nzval[k] * Jt.nzval[l]
+    # end
+end
+
+# @inbounds function MadNLP.build_condensed_aug_coord!(aug_com::CUDA.CUSPARSE.CuSparseMatrixCSC{Tv,Ti}, pr_diag, H, Jt, diag_buffer, dptr, hptr, jptr) where {Tv, Ti}
+#     fill!(aug_com.nzval, zero(Tv))
+    
+#     @simd for idx in eachindex(hptr)
+#         i,j = hptr[idx]
+#         aug_com.nzval[i] += H.nzval[j]
+#     end
+    
+#     @simd for idx in eachindex(dptr)
+#         i,j = dptr[idx]
+#         aug_com.nzval[i] += pr_diag[j]
+#     end
+
+#     @simd for idx in eachindex(jptr)
+#         (i,(j,k,l)) = jptr[idx]
+#         aug_com.nzval[i] += diag_buffer[j] * Jt.nzval[k] * Jt.nzval[l]
+#     end
+# end
+
+function MadNLP.mul_subtract!(w::MadNLP.AbstractKKTVector, kkt::MadNLP.SparseCondensedKKTSystem{T,VT}, x::MadNLP.AbstractKKTVector) where {T,VT <: CuVector{T}}
+    # TODO
+    n = size(kkt.hess_com, 1)
+    m = size(kkt.jt_csc, 2)
+
+    # Decompose results
+    xx = view(MadNLP.full(x), 1:n)
+    xs = view(MadNLP.full(x), n+1:n+m)
+    xz = view(MadNLP.full(x), n+m+1:n+2*m)
+
+    # Decompose buffers
+    wx = view(MadNLP.full(w), 1:n)
+    ws = view(MadNLP.full(w), n+1:n+m)
+    wz = view(MadNLP.full(w), n+m+1:n+2*m)
+
+    MadNLP.mul!(wx, kkt.hess_com, xx, -1., 1.) # TODO: make this symmetric
+    MadNLP.mul!(wx, kkt.jt_csc,  xz, -1., 1.)
+    MadNLP.mul!(wz, kkt.jt_csc', xx, -1., 1.)
+    MadNLP.axpy!(1, xz, ws)
+    MadNLP.axpy!(1, xs, wz)
+    
+    MadNLP._kktmul!(w,x,kkt.del_w,kkt.du_diag,kkt.l_lower,kkt.u_lower,kkt.l_diag,kkt.u_diag)
+end
