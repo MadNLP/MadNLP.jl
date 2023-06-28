@@ -16,7 +16,25 @@ mutable struct ScaledNLPModel{T, VT <: AbstractVector{T}, VI <: AbstractVector{I
     counters::NLPModels.Counters
 end
 
-function ScaledNLPModel(nlp::AbstractNLPModel{T, VT}) where {T, VT}
+function get_con_scale(jac_I,jac_buffer::VT, ncon, nnzj, max_gradient) where {T, VT <: AbstractVector{T}}
+    
+    con_scale = fill!(similar(jac_buffer, ncon), 1)
+    jac_scale = fill!(similar(jac_buffer, nnzj), 1)    
+    @inbounds for i in 1:nnzj
+        row = jac_I[i]
+        con_scale[row] = max(con_scale[row], abs(jac_buffer[i]))
+    end
+    @inbounds for i in eachindex(con_scale)
+        con_scale[i] = min(one(T), max_gradient / con_scale[i])
+    end
+    @inbounds for i in 1:nnzj
+        index = jac_I[i]
+        jac_scale[i] = con_scale[index]
+    end
+    return con_scale, jac_scale
+end
+
+function ScaledNLPModel(nlp::AbstractNLPModel{T, VT}; max_gradient=100) where {T, VT}
 
     n = get_nvar(nlp)
     m = get_ncon(nlp)
@@ -38,23 +56,11 @@ function ScaledNLPModel(nlp::AbstractNLPModel{T, VT}) where {T, VT}
     hess_structure!(nlp,hess_I,hess_J)
 
     # scale constraints
-    max_gradient = 100
-    
     NLPModels.cons!(nlp,x_buffer,l_buffer)
     NLPModels.jac_coord!(nlp,x_buffer,jac_buffer)
-    con_scale = fill!(similar(x_buffer, get_ncon(nlp)), 1)
-    jac_scale = fill!(similar(x_buffer, get_nnzj(nlp)), 1)    
-    @inbounds for i in 1:nnzj
-        row = jac_I[i]
-        con_scale[row] = max(con_scale[row], abs(jac_buffer[i]))
-    end
-    @inbounds for i in eachindex(con_scale)
-        con_scale[i] = min(one(T), max_gradient / con_scale[i])
-    end
-    @inbounds for i in 1:nnzj
-        index = jac_I[i]
-        jac_scale[i] = con_scale[index]
-    end
+    
+    # TODO: get max_gradient from option
+    con_scale, jac_scale = get_con_scale(jac_I, jac_buffer, get_ncon(nlp), get_nnzj(nlp), max_gradient)
 
     # scale objective
     NLPModels.grad!(nlp,x_buffer,grad_buffer)

@@ -53,11 +53,9 @@ function get_vars_info(solver)
     num_fixed = length(solver.ind_fixed)
     num_var = get_nvar(solver.nlp) - num_fixed
     num_llb_vars = length(solver.ind_llb)
-    num_lu_vars = reduce(
-        (acc, (l,u)) -> acc + ((l > -Inf) && (u < Inf)),
-        zip(x_lb,x_ub);
-        init = -num_fixed
-    ) 
+    
+    # TODO make this non-allocating
+    num_lu_vars = sum((x_lb .==-Inf) .& (x_ub .== Inf)) - num_fixed
     num_uub_vars = length(solver.ind_uub)
     return (
         n_free=num_var,
@@ -71,24 +69,14 @@ end
 function get_cons_info(solver)
     g_lb = get_lcon(solver.nlp)
     g_ub = get_ucon(solver.nlp)
-    # Classify constraints
-    num_eq_cons, num_ineq_cons = 0, 0
-    num_ue_cons, num_le_cons, num_lu_cons = 0, 0, 0
-    for i in 1:get_ncon(solver.nlp)
-        l, u = g_lb[i], g_ub[i]
-        if l == u
-            num_eq_cons += 1
-        elseif l < u
-            num_ineq_cons += 1
-            if isinf(l) && isfinite(u)
-                num_ue_cons += 1
-            elseif isfinite(l) && isinf(u)
-                num_le_cons +=1
-            else isfinite(l) && isfinite(u)
-                num_lu_cons += 1
-            end
-        end
-    end
+
+    # TODO make this non-allocating
+    num_eq_cons = sum(g_lb .== g_ub)
+    num_ineq_cons = length(g_lb) - num_eq_cons
+    num_le_cons = sum(g_lb .== -Inf)
+    num_ue_cons = sum(g_ub .==  Inf)
+    num_lu_cons = num_ineq_cons - num_le_cons - num_ue_cons
+                           
     return (
         n_eq=num_eq_cons,
         n_ineq=num_ineq_cons,
@@ -122,6 +110,8 @@ function print_init(solver::AbstractMadNLPSolver)
 end
 
 function print_iter(solver::AbstractMadNLPSolver;is_resto=false)
+    # TODO inquire this from nlpmodel wrapper
+    obj_scale = 1
     mod(solver.cnt.k,10)==0&& @info(solver.logger,@sprintf(
         "iter    objective    inf_pr   inf_du lg(mu)  ||d||  lg(rg) alpha_du alpha_pr  ls"))
     if is_resto
@@ -136,7 +126,7 @@ function print_iter(solver::AbstractMadNLPSolver;is_resto=false)
     end
     @info(solver.logger,@sprintf(
         "%4i%s% 10.7e %6.2e %6.2e %5.1f %6.2e %s %6.2e %6.2e%s  %i",
-        solver.cnt.k,is_resto ? "r" : " ",solver.obj_val/solver.obj_scale[],
+        solver.cnt.k,is_resto ? "r" : " ",solver.obj_val/obj_scale,
         inf_pr, inf_du, mu,
         solver.cnt.k == 0 ? 0. : norm(primal(solver.d),Inf),
         solver.kkt.del_w == 0 ? "   - " : @sprintf("%5.1f",log(10,solver.kkt.del_w)),
@@ -145,16 +135,18 @@ function print_iter(solver::AbstractMadNLPSolver;is_resto=false)
 end
 
 function print_summary_1(solver::AbstractMadNLPSolver)
+    # TODO inquire this from nlpmodel wrapper
+    obj_scale = 1
     @notice(solver.logger,"")
     @notice(solver.logger,"Number of Iterations....: $(solver.cnt.k)\n")
     @notice(solver.logger,"                                   (scaled)                 (unscaled)")
-    @notice(solver.logger,@sprintf("Objective...............:  % 1.16e   % 1.16e",solver.obj_val,solver.obj_val/solver.obj_scale[]))
-    @notice(solver.logger,@sprintf("Dual infeasibility......:   %1.16e    %1.16e",solver.inf_du,solver.inf_du/solver.obj_scale[]))
+    @notice(solver.logger,@sprintf("Objective...............:  % 1.16e   % 1.16e",solver.obj_val,solver.obj_val/obj_scale))
+    @notice(solver.logger,@sprintf("Dual infeasibility......:   %1.16e    %1.16e",solver.inf_du,solver.inf_du/obj_scale))
     @notice(solver.logger,@sprintf("Constraint violation....:   %1.16e    %1.16e",norm(solver.c,Inf),solver.inf_pr))
     @notice(solver.logger,@sprintf("Complementarity.........:   %1.16e    %1.16e",
-                                solver.inf_compl*solver.obj_scale[],solver.inf_compl))
+                                solver.inf_compl*obj_scale,solver.inf_compl))
     @notice(solver.logger,@sprintf("Overall NLP error.......:   %1.16e    %1.16e\n",
-                                max(solver.inf_du*solver.obj_scale[],norm(solver.c,Inf),solver.inf_compl),
+                                max(solver.inf_du*obj_scale,norm(solver.c,Inf),solver.inf_compl),
                                 max(solver.inf_du,solver.inf_pr,solver.inf_compl)))
     return
 end

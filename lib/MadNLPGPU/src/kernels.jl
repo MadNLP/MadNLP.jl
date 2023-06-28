@@ -44,40 +44,6 @@ end
 # Overload MadNLP.is_valid to avoid fallback to default is_valid, slow on GPU
 MadNLP.is_valid(src::CuArray) = true
 
-# Constraint scaling
-function MadNLP.scale_constraints!(
-    nlp::AbstractNLPModel,
-    con_scale::AbstractVector,
-    jac::CuMatrix;
-    max_gradient=1e-8,
-)
-    # Compute reduction on the GPU with built-in CUDA.jl function
-    d_con_scale = maximum(abs, jac, dims=2)
-    copyto!(con_scale, d_con_scale)
-    con_scale .= min.(1.0, max_gradient ./ con_scale)
-end
-
-# @kernel function _treat_fixed_variable_kernell!(dest, ind_fixed)
-#     k, j = @index(Global, NTuple)
-#     i = ind_fixed[k]
-
-#     if i == j
-#         dest[i, i] = 1.0
-#     else
-#         dest[i, j] = 0.0
-#         dest[j, i] = 0.0
-#     end
-# end
-
-# function MadNLP.treat_fixed_variable!(kkt::MadNLP.AbstractKKTSystem{T, VT, MT}) where {T, VT, MT<:CuMatrix{T}}
-#     length(kkt.ind_fixed) == 0 && return
-#     aug = kkt.aug_com
-#     d_ind_fixed = kkt.ind_fixed |> CuVector # TODO: allocate ind_fixed directly on the GPU
-#     ndrange = (length(d_ind_fixed), size(aug, 1))
-#     ev = _treat_fixed_variable_kernell!(CUDABackend())(aug, d_ind_fixed, ndrange=ndrange)
-#     synchronize(CUDABackend())
-# end
-
 
 #=
     AbstractDenseKKTSystem
@@ -304,4 +270,3 @@ function MadNLP.jprod_ineq!(y::AbstractVector, kkt::MadNLP.DenseCondensedKKTSyst
     LinearAlgebra.mul!(y_d, kkt.jac_ineq, x_d)
     copyto!(parent(y), 1, y_d, 1, length(y))
 end
-

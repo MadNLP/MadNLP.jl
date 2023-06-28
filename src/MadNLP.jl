@@ -10,7 +10,7 @@ import Printf: @sprintf
 import LinearAlgebra: BLAS, Adjoint, Symmetric, mul!, ldiv!, norm, dot, diagind, normInf, transpose!
 import LinearAlgebra: cholesky, qr, lu, cholesky!, axpy!
 import LinearAlgebra.BLAS: symv!, ger!, libblas, liblapack, BlasInt, @blasfunc
-import SparseArrays: AbstractSparseMatrix, SparseMatrixCSC, sparse, getcolptr, rowvals, nnz
+import SparseArrays: SparseArrays, AbstractSparseMatrix, SparseMatrixCSC, sparse, getcolptr, rowvals, nnz
 import Base: string, show, print, size, getindex, copyto!, @kwdef
 import SuiteSparse: UMFPACK
 import NLPModels

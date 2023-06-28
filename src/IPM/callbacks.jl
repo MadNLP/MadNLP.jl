@@ -10,20 +10,19 @@ function eval_f_wrapper(solver::MadNLPSolver, x::PrimalVector{T}) where T
     if cnt.obj_cnt == 1 && !is_valid(obj_val)
         throw(InvalidNumberException(:obj))
     end
-    return obj_val * solver.obj_scale[]
+    return obj_val
 end
 
 function eval_grad_f_wrapper!(solver::MadNLPSolver, f::PrimalVector{T}, x::PrimalVector{T}) where T
     nlp = solver.nlp
     cnt = solver.cnt
     @trace(solver.logger,"Evaluating objective gradient.")
-    obj_scaling = solver.obj_scale[] * (get_minimize(nlp) ? one(T) : -one(T))
+    obj_scaling = (get_minimize(nlp) ? one(T) : -one(T))
     cnt.eval_function_time += @elapsed grad!(
         nlp,
         variable(x),
         variable(f),
     )
-    _scal!(obj_scaling, full(f))
     cnt.obj_grad_cnt+=1
     if cnt.obj_grad_cnt == 1 && !is_valid(full(f))
         throw(InvalidNumberException(:grad))
@@ -42,7 +41,6 @@ function eval_cons_wrapper!(solver::MadNLPSolver, c::Vector{T}, x::PrimalVector{
     )
     view(c,solver.ind_ineq) .-= slack(x)
     c .-= solver.rhs
-    c .*= solver.con_scale
     cnt.con_cnt+=1
     if cnt.con_cnt == 1 && !is_valid(c)
         throw(InvalidNumberException(:cons))
@@ -74,14 +72,12 @@ function eval_lag_hess_wrapper!(solver::MadNLPSolver, kkt::AbstractKKTSystem, x:
     nlp = solver.nlp
     cnt = solver.cnt
     @trace(solver.logger,"Evaluating Lagrangian Hessian.")
-    dual(solver._w1) .= l .* solver.con_scale
     hess = get_hessian(kkt)
-    scale = (get_minimize(nlp) ? one(T) : -one(T))
-    scale *= (is_resto ? zero(T) : solver.obj_scale[])
+    scale = (get_minimize(nlp) ? one(T) : -one(T)) * (is_resto ? zero(T) : one(T))
     cnt.eval_function_time += @elapsed hess_coord!(
         nlp,
         variable(x),
-        dual(solver._w1),
+        l,
         hess;
         obj_weight = scale,
     )
@@ -123,13 +119,12 @@ function eval_lag_hess_wrapper!(
     nlp = solver.nlp
     cnt = solver.cnt
     @trace(solver.logger,"Evaluating Lagrangian Hessian.")
-    dual(solver._w1) .= l .* solver.con_scale
     hess = get_hessian(kkt)
-    scale = is_resto ? zero(T) : get_minimize(nlp) ? solver.obj_scale[] : -solver.obj_scale[]
+    scale = is_resto ? zero(T) : get_minimize(nlp) ? 1 : -1
     cnt.eval_function_time += @elapsed hess_dense!(
         nlp,
         variable(x),
-        dual(solver._w1),
+        l,
         hess;
         obj_weight = scale,
     )

@@ -186,14 +186,20 @@ function finish_aug_solve!(solver::MadNLPSolver, kkt::SparseUnreducedKKTSystem, 
 end
 
 # Initial
-function set_initial_bounds!(solver::MadNLPSolver{T}) where T
-    @inbounds @simd for i in eachindex(solver.xl_r)
-        solver.xl_r[i] -= max(one(T),abs(solver.xl_r[i]))*solver.opt.tol
-    end
-    @inbounds @simd for i in eachindex(solver.xu_r)
-        solver.xu_r[i] += max(one(T),abs(solver.xu_r[i]))*solver.opt.tol
-    end
+# temporaily commented out
+# function set_initial_bounds!(solver::MadNLPSolver{T}) where T
+#     @inbounds @simd for i in eachindex(solver.xl_r)
+#         solver.xl_r[i] -= max(one(T),abs(solver.xl_r[i]))*solver.opt.tol
+#     end
+#     @inbounds @simd for i in eachindex(solver.xu_r)
+#         solver.xu_r[i] += max(one(T),abs(solver.xu_r[i]))*solver.opt.tol
+#     end
+# end
+function set_initial_bounds!(solver::MadNLP.MadNLPSolver{T, VT}) where {T, VT}
+    solver.xl_r .-= max.(one(T), abs.(solver.xl_r)) .* solver.opt.tol
+    solver.xu_r .+= max.(one(T), abs.(solver.xu_r)) .* solver.opt.tol
 end
+
 function set_initial_rhs!(solver::MadNLPSolver{T}, kkt::AbstractKKTSystem) where T
     f = primal(solver.f)
     zl = primal(solver.zl)
@@ -254,15 +260,17 @@ end
 
 # Scaling
 function unscale!(solver::AbstractMadNLPSolver)
-    x_slk = slack(solver.x)
-    solver.obj_val /= solver.obj_scale[]
-    @inbounds @simd for i in eachindex(solver.c)
-        solver.c[i] /= solver.con_scale[i]
-        solver.c[i] += solver.rhs[i]
-    end
-    @inbounds @simd for i in eachindex(solver.c_slk)
-        solver.c_slk[i] += x_slk[i]
-    end
+    #  TODO: do this with NLPModel wrapper
+    # obj_scale = 1
+    # x_slk = slack(solver.x)
+    # solver.obj_val /= solver.obj_scale
+    # @inbounds @simd for i in eachindex(solver.c)
+    #     solver.c[i] /= solver.con_scale[i]
+    #     solver.c[i] += solver.rhs[i]
+    # end
+    # @inbounds @simd for i in eachindex(solver.c_slk)
+    #     solver.c_slk[i] += x_slk[i]
+    # end
 end
 
 # Kernel functions ---------------------------------------------------------
@@ -486,20 +494,41 @@ function get_varphi_d_R(f_R, x, xl, xu, dx, pp, nn, dpp, dnn, mu_R, rho)
     return varphi_d
 end
 
+# temporarily commented out
+# function initialize_variables!(x, xl, xu, bound_push, bound_fac)
+#     @inbounds @simd for i=1:length(x)
+#         if xl[i]!=-Inf && xu[i]!=Inf
+#             x[i] = min(
+#                 xu[i]-min(bound_push*max(1,abs(xu[i])), bound_fac*(xu[i]-xl[i])),
+#                 max(xl[i]+min(bound_push*max(1,abs(xl[i])),bound_fac*(xu[i]-xl[i])),x[i]),
+#             )
+#         elseif xl[i]!=-Inf && xu[i]==Inf
+#             x[i] = max(xl[i]+bound_push*max(1,abs(xl[i])), x[i])
+#         elseif xl[i]==-Inf && xu[i]!=Inf
+#             x[i] = min(xu[i]-bound_push*max(1,abs(xu[i])), x[i])
+#         end
+#     end
+# end
+
 function initialize_variables!(x, xl, xu, bound_push, bound_fac)
-    @inbounds @simd for i=1:length(x)
-        if xl[i]!=-Inf && xu[i]!=Inf
-            x[i] = min(
-                xu[i]-min(bound_push*max(1,abs(xu[i])), bound_fac*(xu[i]-xl[i])),
-                max(xl[i]+min(bound_push*max(1,abs(xl[i])),bound_fac*(xu[i]-xl[i])),x[i]),
-            )
-        elseif xl[i]!=-Inf && xu[i]==Inf
-            x[i] = max(xl[i]+bound_push*max(1,abs(xl[i])), x[i])
-        elseif xl[i]==-Inf && xu[i]!=Inf
-            x[i] = min(xu[i]-bound_push*max(1,abs(xu[i])), x[i])
-        end
-    end
+    map!((x,l,u) -> _initialize_variables!(x,l,u, bound_push, bound_fac), x, x, xl, xu)
 end
+
+function _initialize_variables!(x, xl, xu, bound_push, bound_fac)
+    if xl!=-Inf && xu!=Inf
+        return min(
+            xu-min(bound_push*max(1,abs(xu)), bound_fac*(xu-xl)),
+            max(xl+min(bound_push*max(1,abs(xl)),bound_fac*(xu-xl)),x),
+        )
+    elseif xl!=-Inf && xu==Inf
+        return max(xl+bound_push*max(1,abs(xl)), x)
+    elseif xl==-Inf && xu!=Inf
+        return min(xu-bound_push*max(1,abs(xu)), x)
+    end
+    return x
+end
+
+
 
 function adjust_boundary!(x_lr::VT, xl_r, x_ur, xu_r, mu) where {T, VT <: AbstractVector{T}}
     adjusted = 0

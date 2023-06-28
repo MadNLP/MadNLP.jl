@@ -36,21 +36,21 @@ function initialize!(solver::AbstractMadNLPSolver{T}) where T
     @trace(solver.logger,"Computing constraint scaling.")
     eval_jac_wrapper!(solver, solver.kkt, solver.x)
     compress_jacobian!(solver.kkt)
-    if (solver.m > 0) && solver.opt.nlp_scaling
-        jac = get_raw_jacobian(solver.kkt)
-        scale_constraints!(solver.nlp, solver.con_scale, jac; max_gradient=solver.opt.nlp_scaling_max_gradient)
-        set_jacobian_scaling!(solver.kkt, solver.con_scale)
-        solver.y ./= solver.con_scale
-    end
+    # if (solver.m > 0) 
+        # jac = get_raw_jacobian(solver.kkt)
+        # scale_constraints!(solver.nlp, solver.con_scale, jac; max_gradient=solver.opt.nlp_scaling_max_gradient)
+        # set_jacobian_scaling!(solver.kkt, solver.con_scale)
+        # solver.y ./= solver.con_scale
+    # end
     compress_jacobian!(solver.kkt)
 
     # Automatic scaling (objective)
     eval_grad_f_wrapper!(solver, solver.f,solver.x)
     @trace(solver.logger,"Computing objective scaling.")
-    if solver.opt.nlp_scaling
-        solver.obj_scale[] = scale_objective(solver.nlp, full(solver.f); max_gradient=solver.opt.nlp_scaling_max_gradient)
-        _scal!(solver.obj_scale[], full(solver.f))
-    end
+    # if solver.opt.nlp_scaling
+        # solver.obj_scale[] = scale_objective(solver.nlp, full(solver.f); max_gradient=solver.opt.nlp_scaling_max_gradient)
+    #     _scal!(solver.obj_scale[], full(solver.f))
+    # end
 
     # Initialize dual variables
     @trace(solver.logger,"Initializing constraint duals.")

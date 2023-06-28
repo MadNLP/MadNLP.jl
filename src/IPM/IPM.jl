@@ -76,9 +76,6 @@ mutable struct MadNLPSolver{
     # linear_solver::LinSolver
     iterator::Iterator
 
-    obj_scale::VT
-    con_scale::VT
-    con_jac_scale::VT
     inf_pr::T
     inf_du::T
     inf_compl::T
@@ -143,8 +140,6 @@ function MadNLPSolver(nlp::AbstractNLPModel{T,VT}; kwargs...) where {T, VT}
     y = copy(get_y0(nlp))
     c = VT(undef, m)
 
-    n_jac = nnz_jacobian(kkt)
-
     nlb = length(ind_cons.ind_lb)
     nub = length(ind_cons.ind_ub)
 
@@ -176,10 +171,6 @@ function MadNLPSolver(nlp::AbstractNLPModel{T,VT}; kwargs...) where {T, VT}
 
     p = UnreducedKKTVector(VT, n, m, nlb, nub, ind_cons)
 
-    obj_scale = fill!(VT(undef,1), one(T))
-    con_scale = fill!(VT(undef,m), one(T))
-    con_jac_scale = fill!(VT(undef,n_jac), one(T))
-
     n_kkt = size(kkt, 1)
     @trace(logger,"Initializing iterative solver.")
     residual = UnreducedKKTVector(VT, n, m, nlb, nub, ind_cons)
@@ -194,19 +185,18 @@ function MadNLPSolver(nlp::AbstractNLPModel{T,VT}; kwargs...) where {T, VT}
 
 
     return MadNLPSolver(
-            nlp,kkt,opt,cnt,logger,
-            n,m,nlb,nub,x,y,zl,zu,xl,xu,0.,f,c,
-            jacl,
-            d, p,
-            _w1, _w2, _w3, _w4,
-            x_trial,c_trial,0.,c_slk,rhs,
-            ind_cons.ind_ineq,ind_cons.ind_fixed,ind_cons.ind_llb,ind_cons.ind_uub,
-            x_lr,x_ur,xl_r,xu_r,zl_r,zu_r,dx_lr,dx_ur,x_trial_lr,x_trial_ur,
-            iterator,
-            obj_scale,con_scale,con_jac_scale,
-            0.,0.,0.,0.,0.,0.,0.,0.,0.," ",
-            Tuple{T,T}[],nothing,INITIAL,Dict(),
-        )
+        nlp,kkt,opt,cnt,logger,
+        n,m,nlb,nub,x,y,zl,zu,xl,xu,0.,f,c,
+        jacl,
+        d, p,
+        _w1, _w2, _w3, _w4,
+        x_trial,c_trial,0.,c_slk,rhs,
+        ind_cons.ind_ineq,ind_cons.ind_fixed,ind_cons.ind_llb,ind_cons.ind_uub,
+        x_lr,x_ur,xl_r,xu_r,zl_r,zu_r,dx_lr,dx_ur,x_trial_lr,x_trial_ur,
+        iterator,
+        0.,0.,0.,0.,0.,0.,0.,0.,0.," ",
+        Tuple{T,T}[],nothing,INITIAL,Dict(),
+    )
 
 end
 
