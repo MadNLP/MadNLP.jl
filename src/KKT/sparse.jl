@@ -71,7 +71,7 @@ end
 Implement the [`AbstractCondensedKKTSystem`](@ref) in sparse COO format.
 
 """
-mutable struct SparseCondensedKKTSystem{T, VT, MT, QN, VI, VI32, VTu1, VTu2} <: AbstractCondensedKKTSystem{T, VT, MT, QN}
+mutable struct SparseCondensedKKTSystem{T, VT, MT, QN, VI, VI32, VTu1, VTu2, EXT} <: AbstractCondensedKKTSystem{T, VT, MT, QN}
     # Hessian
     hess::VT
     hess_raw::SparseMatrixCOO{T,Int32,VT, VI32}
@@ -117,6 +117,9 @@ mutable struct SparseCondensedKKTSystem{T, VT, MT, QN, VI, VI32, VTu1, VTu2} <: 
 
     # Info
     ind_ineq::VI
+
+    # extra
+    ext::EXT
 end
  
 # Template to dispatch on sparse representation
@@ -272,9 +275,6 @@ function create_kkt_system(
     cnt.linear_solver_time += @elapsed linear_solver = opt.linear_solver(aug_com)
     # ; opt=opt_linear_solver, logger=logger)
 
-
-
-
     return SparseKKTSystem(
         hess, jac_callback, jac, quasi_newton, pr_diag, du_diag,
         l_diag, u_diag, l_lower, u_lower,
@@ -283,7 +283,7 @@ function create_kkt_system(
         jac_raw, jac_com, jac_csc_map,
         del_w, del_w_last, del_c,
         linear_solver,
-        ind_ineq,
+        ind_ineq
     )
 
 end
@@ -490,6 +490,13 @@ function create_kkt_system(
 
     cnt.linear_solver_time += @elapsed linear_solver = opt.linear_solver(aug_com)
 
+    ext = get_sparse_condensed_ext(
+        VT,
+        dptr,
+        hptr,
+        jptr
+    )
+    
 
     return SparseCondensedKKTSystem( 
         hess, hess_raw,hess_com,hess_csc_map,
@@ -501,8 +508,13 @@ function create_kkt_system(
         del_w, del_w_last, del_c,
         linear_solver,
         ind_ineq,
+        ext
     )
 end
+
+    
+get_sparse_condensed_ext(::Type{Vector{T}},args...) where T = nothing
+
 
 is_reduced(::SparseCondensedKKTSystem) = true
 num_variables(kkt::SparseCondensedKKTSystem) = length(kkt.pr_diag)
@@ -666,7 +678,7 @@ end
     return aug_com, dptr, hptr, jptr
 end
 
-@inbounds function build_condensed_aug_coord!(aug_com::SparseMatrixCSC{Tv,Ti}, pr_diag, H, Jt, diag_buffer, dptr, hptr, jptr) where {Tv, Ti}
+@inbounds function _build_condensed_aug_coord!(aug_com::SparseMatrixCSC{Tv,Ti}, pr_diag, H, Jt, diag_buffer, dptr, hptr, jptr) where {Tv, Ti}
     fill!(aug_com.nzval, zero(Tv))
     
     @simd for idx in eachindex(hptr)
@@ -685,8 +697,15 @@ end
     end
 end
 
+function build_condensed_aug_coord!(kkt::SparseCondensedKKTSystem{T,VT,MT}) where {T, VT, MT <: SparseMatrixCSC{T}}
+    _build_condensed_aug_coord!(
+        kkt.aug_com, kkt.pr_diag, kkt.hess_com, kkt.jt_csc, kkt.diag_buffer,
+        kkt.dptr, kkt.hptr, kkt.jptr
+    )
+end
 
-function build_kkt!(kkt::SparseCondensedKKTSystem{T, VT, MT}) where {T, VT, MT<:AbstractSparseMatrix{T}}
+
+function build_kkt!(kkt::SparseCondensedKKTSystem) 
     transfer!(kkt.hess_com, kkt.hess_raw, kkt.hess_csc_map)
 
     n = size(kkt.hess_com, 1)
@@ -698,7 +717,7 @@ function build_kkt!(kkt::SparseCondensedKKTSystem{T, VT, MT}) where {T, VT, MT<:
     Σd = kkt.du_diag
 
     kkt.diag_buffer .= Σs ./ ( 1 .- Σd .* Σs)
-    build_condensed_aug_coord!(kkt.aug_com, kkt.pr_diag, kkt.hess_com, kkt.jt_csc, kkt.diag_buffer, kkt.dptr, kkt.hptr, kkt.jptr)
+    build_condensed_aug_coord!(kkt)
 end
 
 get_jacobian(kkt::SparseCondensedKKTSystem) = kkt.jac

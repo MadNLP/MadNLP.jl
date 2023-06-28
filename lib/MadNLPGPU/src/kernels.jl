@@ -270,3 +270,27 @@ function MadNLP.jprod_ineq!(y::AbstractVector, kkt::MadNLP.DenseCondensedKKTSyst
     LinearAlgebra.mul!(y_d, kkt.jac_ineq, x_d)
     copyto!(parent(y), 1, y_d, 1, length(y))
 end
+
+
+
+
+
+# function MadNLP.set_initial_bounds!(solver::MadNLP.MadNLPSolver{T, VT})
+#     solver.xl_r .-= max.(one(T), abs.(solver.xl_r)) .* solver.opt.tol
+#     solver.xu_r .+= max.(one(T), abs.(solver.xu_r)) .* solver.opt.tol
+# end
+
+# function MadNLP.initialize_variables!(x::VT, xl, xu, bound_push, bound_fac)
+#     @inbounds @simd for i=1:length(x)
+#         if xl[i]!=-Inf && xu[i]!=Inf
+#             x[i] = min(
+#                 xu[i]-min(bound_push*max(1,abs(xu[i])), bound_fac*(xu[i]-xl[i])),
+#                 max(xl[i]+min(bound_push*max(1,abs(xl[i])),bound_fac*(xu[i]-xl[i])),x[i]),
+#             )
+#         elseif xl[i]!=-Inf && xu[i]==Inf
+#             x[i] = max(xl[i]+bound_push*max(1,abs(xl[i])), x[i])
+#         elseif xl[i]==-Inf && xu[i]!=Inf
+#             x[i] = min(xu[i]-bound_push*max(1,abs(xu[i])), x[i])
+#         end
+#     end
+# end

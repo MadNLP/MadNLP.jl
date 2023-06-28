@@ -10,7 +10,7 @@ import .CUBLAS: handle, CUBLAS_DIAG_NON_UNIT,
     CUBLAS_FILL_MODE_LOWER, CUBLAS_FILL_MODE_UPPER, CUBLAS_SIDE_LEFT, CUBLAS_OP_N, CUBLAS_OP_T
 
 # Kernels
-import KernelAbstractions: @kernel, @index, synchronize
+import KernelAbstractions: @kernel, @index, synchronize, @Const
 
 import MadNLP: NLPModels
 import MadNLP
