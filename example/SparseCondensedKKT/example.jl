@@ -3,9 +3,9 @@ CUDA.allowscalar(false)
 
 tol=1e-5
 case =
-    "/home/sshin/git/pglib-opf/pglib_opf_case9241_pegase.m"
+    # "/home/sshin/git/pglib-opf/pglib_opf_case9241_pegase.m"
     # "/home/sshin/git/pglib-opf/pglib_opf_case13659_pegase.m"
-    # "/home/sshin/git/PowerSystemsTestData/ACTIVSg70k/case_ACTIVSg70k.m"
+    "/home/sshin/git/PowerSystemsTestData/ACTIVSg70k/case_ACTIVSg70k.m"
 
 m = MadNLP.ScaledNLPModel(SIMDiffExamples.ac_power_model(case, CuArray, CUDABackend()))
 
