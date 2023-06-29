@@ -427,6 +427,7 @@ function regular!(solver::AbstractMadNLPSolver{T}) where T
             end
             dual_inf_perturbation!(primal(solver.p),solver.ind_llb,solver.ind_uub,solver.mu,solver.opt.kappa_d)
         end
+
         solver.cnt.t3 += @elapsed begin
 
             # start inertia conrrection

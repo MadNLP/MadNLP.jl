@@ -15,7 +15,7 @@ function RichardsonIterator(
     kkt::AbstractKKTSystem{T},
     residual::UnreducedKKTVector{T};
     max_iter=10,
-    tol=T(1e-8),
+    tol=T(1e-10),
     acceptable_tol=T(1e-5),
     logger=MadNLPLogger(),
     cnt=MadNLPCounters()
@@ -45,6 +45,7 @@ function solve_refine!(
         axpy!(1., full(w), full(x))
         copyto!(full(w), full(b))
         mul_subtract!(w, kkt, x)
+
         
         norm_w = norm(full(w), Inf)
         norm_x = norm(full(x), Inf)

@@ -2,12 +2,13 @@ module MadNLPGPU
 
 import LinearAlgebra
 # CUDA
-import CUDA: CUDA, CUBLAS, CUSOLVER, CuVector, CuMatrix, CuArray, R_64F, has_cuda, @allowscalar, runtime_version
-import CUDA: CUDABackend
+import CUDA: CUDA, CUSPARSE, CUBLAS, CUSOLVER, CuVector, CuMatrix, CuArray, R_64F,
+    has_cuda, @allowscalar, runtime_version, CUDABackend
 import .CUSOLVER:
     libcusolver, cusolverStatus_t, CuPtr, cudaDataType, cublasFillMode_t, cusolverDnHandle_t, dense_handle
 import .CUBLAS: handle, CUBLAS_DIAG_NON_UNIT,
     CUBLAS_FILL_MODE_LOWER, CUBLAS_FILL_MODE_UPPER, CUBLAS_SIDE_LEFT, CUBLAS_OP_N, CUBLAS_OP_T
+import CUSOLVERRF
 
 # Kernels
 import KernelAbstractions: @kernel, @index, synchronize, @Const
@@ -32,6 +33,7 @@ export CuMadNLPSolver
 
 include("interface.jl")
 include("lapackgpu.jl")
+include("cusolver.jl")
 
 export LapackGPUSolver
 

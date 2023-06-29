@@ -492,9 +492,9 @@ function create_kkt_system(
 
     ext = get_sparse_condensed_ext(
         VT,
-        dptr,
-        hptr,
-        jptr
+        jptr,
+        jt_csc_map,
+        hess_csc_map,
     )
     
 
@@ -705,8 +705,7 @@ function build_condensed_aug_coord!(kkt::SparseCondensedKKTSystem{T,VT,MT}) wher
 end
 
 
-function build_kkt!(kkt::SparseCondensedKKTSystem) 
-    transfer!(kkt.hess_com, kkt.hess_raw, kkt.hess_csc_map)
+function build_kkt!(kkt::SparseCondensedKKTSystem)
 
     n = size(kkt.hess_com, 1)
     m = size(kkt.jt_csc, 2)

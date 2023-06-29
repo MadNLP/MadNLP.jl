@@ -192,6 +192,8 @@ function solve!(kkt::SparseCondensedKKTSystem, w::AbstractKKTVector, cnt)  #TODO
 
     aug_rhs_prep(w.xp_lr, dual_lb(w), kkt.l_diag, w.xp_ur, dual_ub(w), kkt.u_diag)
 
+
+
     kkt.buffer .= kkt.diag_buffer .* (wz .+ ws ./ Σs) 
     
     mul!(wx, kkt.jt_csc, kkt.buffer, 1., 1.)
@@ -220,6 +222,7 @@ function mul_subtract!(w::AbstractKKTVector, kkt::SparseCondensedKKTSystem, x::A
     wz = view(full(w), n+m+1:n+2*m)
 
     mul!(wx, Symmetric(kkt.hess_com, :L), xx, -1., 1.) # TODO: make this symmetric
+
     mul!(wx, kkt.jt_csc,  xz, -1., 1.)
     mul!(wz, kkt.jt_csc', xx, -1., 1.)
     axpy!(1, xz, ws)

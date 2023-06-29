@@ -5,12 +5,14 @@ version = "0.5.0"
 
 [deps]
 CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
+CUSOLVERRF = "a8cc9031-bad2-4722-94f5-40deabb4245c"
 KernelAbstractions = "63c18a36-062a-441e-b654-da1e3ab1ce7c"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 MadNLP = "2621e9c9-9eb4-46b1-8089-e8c72242dfb6"
 
 [compat]
 CUDA = "~4"
+CUSOLVERRF = "0.2"
 KernelAbstractions = "0.9"
 MadNLP = "0.6"
 MadNLPTests = "~0.3"

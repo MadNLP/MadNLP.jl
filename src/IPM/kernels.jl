@@ -330,19 +330,37 @@ function is_valid(vec::AbstractArray)
 end
 is_valid(args...) = all(is_valid(arg) for arg in args)
 
+# temporaily commented out
+# function get_varphi(obj_val, x_lr, xl_r, xu_r, x_ur, mu)
+#     varphi = obj_val
+#     @inbounds @simd for i=1:length(x_lr)
+#         xll = x_lr[i]-xl_r[i]
+#         xll < 0 && return Inf
+#         varphi -= mu*log(xll)
+#     end
+#     @inbounds @simd for i=1:length(x_ur)
+#         xuu = xu_r[i]-x_ur[i]
+#         xuu < 0 && return Inf
+#         varphi -= mu*log(xuu)
+#     end
+#     return varphi
+# end
+
 function get_varphi(obj_val, x_lr, xl_r, xu_r, x_ur, mu)
-    varphi = obj_val
-    @inbounds @simd for i=1:length(x_lr)
-        xll = x_lr[i]-xl_r[i]
-        xll < 0 && return Inf
-        varphi -= mu*log(xll)
+    
+    return obj_val + mapreduce(
+        (x1,x2) -> _get_varphi(x1,x2,mu), +, x_lr, xl_r
+    ) + mapreduce(
+        (x1,x2) -> _get_varphi(x1,x2,mu), +, xu_r, x_ur
+    )
+end
+function _get_varphi(x1,x2,mu)
+    x = x1 - x2
+    if x < 0
+        return Inf
+    else
+        return -mu * log(x)
     end
-    @inbounds @simd for i=1:length(x_ur)
-        xuu = xu_r[i]-x_ur[i]
-        xuu < 0 && return Inf
-        varphi -= mu*log(xuu)
-    end
-    return varphi
 end
 
 @inline get_inf_pr(c) = norm(c, Inf)
@@ -387,32 +405,76 @@ function get_inf_compl(x_lr, xl_r, zl_r, xu_r, x_ur, zu_r, mu, sc)
     ) / sc
 end
 
+# temporarily commented out
+# function get_varphi_d(f, x, xl, xu, dx, mu)
+#     varphi_d = 0.0
+#     @inbounds @simd for i=1:length(f)
+#         varphi_d += (f[i] - mu/(x[i]-xl[i]) + mu/(xu[i]-x[i])) * dx[i]
+#     end
+#     return varphi_d
+# end
 function get_varphi_d(f, x, xl, xu, dx, mu)
-    varphi_d = 0.0
-    @inbounds @simd for i=1:length(f)
-        varphi_d += (f[i] - mu/(x[i]-xl[i]) + mu/(xu[i]-x[i])) * dx[i]
-    end
-    return varphi_d
+    return mapreduce(
+        (f,x,xl,xu,dx)-> (f - mu/(x-xl) + mu/(xu-x)) * dx,
+        +,
+        f, x, xl, xu, dx;
+        init = zero(eltype(f))
+    )
 end
 
+# temporarily commented out
+# function get_alpha_max(x, xl, xu, dx, tau)
+#     alpha_max = 1.0
+#     @inbounds @simd for i=1:length(x)
+#         dx[i]<0 && (alpha_max=min(alpha_max,(-x[i]+xl[i])*tau/dx[i]))
+#         dx[i]>0 && (alpha_max=min(alpha_max,(-x[i]+xu[i])*tau/dx[i]))
+#     end
+#     return alpha_max
+# end
 function get_alpha_max(x, xl, xu, dx, tau)
-    alpha_max = 1.0
-    @inbounds @simd for i=1:length(x)
-        dx[i]<0 && (alpha_max=min(alpha_max,(-x[i]+xl[i])*tau/dx[i]))
-        dx[i]>0 && (alpha_max=min(alpha_max,(-x[i]+xu[i])*tau/dx[i]))
-    end
-    return alpha_max
+    return min(
+        mapreduce(
+            (x, xl, dx) -> dx < 0 ? (-x+xl)*tau/dx : Inf,
+            min,
+            x, xl, dx,
+            init = one(eltype(x))
+        ),
+        mapreduce(
+            (x, xu, dx) -> dx > 0 ? (-x+xu)*tau/dx : Inf,
+            min,
+            x, xu, dx,
+            init = one(eltype(x))
+        )
+    )
 end
 
+
+# temporarily commented out
+# function get_alpha_z(zl_r, zu_r, dzl, dzu, tau)
+#     alpha_z = 1.0
+#     @inbounds @simd for i=1:length(zl_r)
+#         dzl[i] < 0 && (alpha_z=min(alpha_z,-zl_r[i]*tau/dzl[i]))
+#      end
+#     @inbounds @simd for i=1:length(zu_r)
+#         dzu[i] < 0 && (alpha_z=min(alpha_z,-zu_r[i]*tau/dzu[i]))
+#     end
+#     return alpha_z
+# end
 function get_alpha_z(zl_r, zu_r, dzl, dzu, tau)
-    alpha_z = 1.0
-    @inbounds @simd for i=1:length(zl_r)
-        dzl[i] < 0 && (alpha_z=min(alpha_z,-zl_r[i]*tau/dzl[i]))
-     end
-    @inbounds @simd for i=1:length(zu_r)
-        dzu[i] < 0 && (alpha_z=min(alpha_z,-zu_r[i]*tau/dzu[i]))
-    end
-    return alpha_z
+    return min(
+        mapreduce(
+            (zl_r, dzl) -> dzl < 0 ? (-zl_r)*tau/dzl : Inf,
+            min,
+            zl_r, dzl,
+            init = one(eltype(dzl))
+        ),
+        mapreduce(
+            (zu_r, dzu) -> dzu < 0 ? (-zu_r)*tau/dzu : Inf,
+            min,
+            zu_r, dzu,
+            init = one(eltype(dzl))
+        )
+    )
 end
 
 function get_obj_val_R(p, n, D_R, x, x_ref, rho, zeta)
@@ -598,34 +660,57 @@ end
 
 
 
+# temporarily commented out
+# function adjust_boundary!(x_lr::VT, xl_r, x_ur, xu_r, mu) where {T, VT <: AbstractVector{T}}
+#     adjusted = 0
+#     c1 = eps(T)*mu
+#     c2= eps(T)^(3/4)
+#     @inbounds @simd for i=1:length(xl_r)
+#         if x_lr[i]-xl_r[i] < c1
+#             xl_r[i] -= c2*max(1,abs(x_lr[i]))
+#             adjusted += 1
+#         end
+#     end
+#     @inbounds @simd for i=1:length(xu_r)
+#         if xu_r[i]-x_ur[i] < c1
+#             xu_r[i] += c2*max(1, abs(x_ur[i]))
+#             adjusted += 1
+#         end
+#     end
+#     return adjusted
+# end
 function adjust_boundary!(x_lr::VT, xl_r, x_ur, xu_r, mu) where {T, VT <: AbstractVector{T}}
-    adjusted = 0
     c1 = eps(T)*mu
-    c2= eps(T)^(3/4)
-    @inbounds @simd for i=1:length(xl_r)
-        if x_lr[i]-xl_r[i] < c1
-            xl_r[i] -= c2*max(1,abs(x_lr[i]))
-            adjusted += 1
-        end
-    end
-    @inbounds @simd for i=1:length(xu_r)
-        if xu_r[i]-x_ur[i] < c1
-            xu_r[i] += c2*max(1, abs(x_ur[i]))
-            adjusted += 1
-        end
-    end
-    return adjusted
+    c2 = eps(T)^(3/4)
+    #TODO
+    # map!(
+    #     (x_lr, xl_r) -> (x_lr-xl_r < c1) ? (xl_r - c2*max(1,abs(x_lr))) : xl_r,
+    #     x_lr, x_lr, xl_r
+    # )
+    # map!(
+    #     (xu_r, x_ur) -> (xu_r-x_ur < c1) ? (xu_r + c2*max(1,abs(x_ur))) : xu_r,
+    #     xu_r, xu_r, x_ur
+    # )
+    return 0
 end
 
+# temporarily commented out
+# function get_rel_search_norm(x, dx)
+#     rel_search_norm = 0.0
+#     @inbounds @simd for i=1:length(x)
+#         rel_search_norm = max(
+#             rel_search_norm,
+#             abs(dx[i]) / (1.0 + abs(x[i])),
+#         )
+#     end
+#     return rel_search_norm
+# end
 function get_rel_search_norm(x, dx)
-    rel_search_norm = 0.0
-    @inbounds @simd for i=1:length(x)
-        rel_search_norm = max(
-            rel_search_norm,
-            abs(dx[i]) / (1.0 + abs(x[i])),
-        )
-    end
-    return rel_search_norm
+    return mapreduce(
+        (x,dx) -> abs(dx) / (1.0 + abs(x)),
+        max,
+        x, dx
+    )
 end
 
 # Utility functions
@@ -705,18 +790,37 @@ function is_barr_obj_rapid_increase(varphi, varphi_trial, obj_max_inc)
     return (varphi_trial >= varphi) && (log10(varphi_trial-varphi) > obj_max_inc + max(1.0, log10(abs(varphi))))
 end
 
+# temporarily commented out
+# function reset_bound_dual!(z, x, mu, kappa_sigma)
+#     @inbounds @simd for i in eachindex(z)
+#         z[i] = max(min(z[i], (kappa_sigma*mu)/x[i]), (mu/kappa_sigma)/x[i])
+#     end
+#     return
+# end
 function reset_bound_dual!(z, x, mu, kappa_sigma)
-    @inbounds @simd for i in eachindex(z)
-        z[i] = max(min(z[i], (kappa_sigma*mu)/x[i]), (mu/kappa_sigma)/x[i])
-    end
+    map!(
+        (z, x) -> max(min(z, (kappa_sigma*mu)/x), (mu/kappa_sigma)/x),
+        z, z, x
+    )
     return
 end
+
+# temporarily commented out
+# function reset_bound_dual!(z, x1, x2, mu, kappa_sigma)
+#     @inbounds @simd for i in eachindex(z)
+#         z[i] = max(min(z[i], (kappa_sigma*mu)/(x1[i]-x2[i])), (mu/kappa_sigma)/(x1[i]-x2[i]))
+#     end
+#     return
+# end
+
 function reset_bound_dual!(z, x1, x2, mu, kappa_sigma)
-    @inbounds @simd for i in eachindex(z)
-        z[i] = max(min(z[i], (kappa_sigma*mu)/(x1[i]-x2[i])), (mu/kappa_sigma)/(x1[i]-x2[i]))
-    end
+    map!(
+        (z,x1,x2) -> max(min(z, (kappa_sigma*mu)/(x1-x2)), (mu/kappa_sigma)/(x1-x2)),
+        z,z,x1,x2
+    )
     return
 end
+
 
 function get_ftype(filter,theta,theta_trial,varphi,varphi_trial,switching_condition,armijo_condition,
                    theta_min,obj_max_inc,gamma_theta,gamma_phi,has_constraints)
