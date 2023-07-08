@@ -1,4 +1,10 @@
-mutable struct ScaledNLPModel{T, VT <: AbstractVector{T}, VI <: AbstractVector{Int}} <: AbstractNLPModel{T, VT}
+mutable struct FixedVariableMakeParameter{VI}
+    fixed::VI
+    fixedj::VI
+    fixedh::VI
+end
+
+mutable struct ScaledNLPModel{T, VT <: AbstractVector{T}, VI <: AbstractVector{Int}, FH} <: AbstractNLPModel{T, VT}
     inner::AbstractNLPModel{T, VT}
 
     l_buffer::VT
@@ -11,6 +17,8 @@ mutable struct ScaledNLPModel{T, VT <: AbstractVector{T}, VI <: AbstractVector{I
     obj_scale::T
     con_scale::VT
     jac_scale::VT
+
+    fixed_handler::FH
     
     meta::NLPModelMeta{T, VT}
     counters::NLPModels.Counters
@@ -55,6 +63,15 @@ function ScaledNLPModel(nlp::AbstractNLPModel{T, VT}; max_gradient=100) where {T
     jac_structure!(nlp,jac_I,jac_J)
     hess_structure!(nlp,hess_I,hess_J)
 
+    isfixed  = (nlp.meta.lvar .== nlp.meta.uvar)
+    isfixedj = isfixed[jac_J]
+    isfixedh = isfixed[hess_I] .|| isfixed[hess_J]
+    fixed  = findall(isfixed)
+    fixedj = findall(isfixedj)
+    fixedh = findall(isfixedh)
+    nfixed = length(fixed)
+    fixed_handler = FixedVariableMakeParameter(fixed, fixedj, fixedh)
+
     # scale constraints
     NLPModels.cons!(nlp,x_buffer,l_buffer)
     NLPModels.jac_coord!(nlp,x_buffer,jac_buffer)
@@ -70,6 +87,11 @@ function ScaledNLPModel(nlp::AbstractNLPModel{T, VT}; max_gradient=100) where {T
     lcon = get_lcon(nlp) .* con_scale
     ucon = get_ucon(nlp) .* con_scale
 
+    lvar = copy(get_lvar(nlp))
+    uvar = copy(get_uvar(nlp))
+    fill!(@view(lvar[fixed]), -Inf)
+    fill!(@view(uvar[fixed]),  Inf)
+    
 
     return ScaledNLPModel(
         nlp,
@@ -81,17 +103,18 @@ function ScaledNLPModel(nlp::AbstractNLPModel{T, VT}; max_gradient=100) where {T
         obj_scale,
         con_scale,
         jac_scale,
+        fixed_handler,
         NLPModelMeta(
             n,
             x0 = get_x0(nlp),
-            lvar = get_lvar(nlp),
-            uvar = get_uvar(nlp),
+            lvar = lvar,
+            uvar = uvar,
             ncon = m,
             y0 = y0,
             lcon = lcon,
             ucon = ucon,
             nnzj = nnzj,
-            nnzh = nnzh,
+            nnzh = nnzh + nfixed,
             minimize = nlp.meta.minimize
         ),
         NLPModels.Counters()
@@ -105,8 +128,13 @@ end
 
 
 function NLPModels.hess_structure!(nlp::ScaledNLPModel,I::AbstractVector,J::AbstractVector)
-    copyto!(I, nlp.hess_I)
-    copyto!(J, nlp.hess_J)
+    copyto!(view(I, 1:length(nlp.hess_I)), nlp.hess_I)
+    copyto!(view(J, 1:length(nlp.hess_I)), nlp.hess_J)
+
+    fixed = nlp.fixed_handler.fixed
+    nfixed = length(fixed)
+    copyto!(@view(I[length(nlp.hess_I)+1:end]), fixed)
+    copyto!(@view(J[length(nlp.hess_J)+1:end]), fixed)
 end
 
 
@@ -117,14 +145,18 @@ function NLPModels.cons!(nlp::ScaledNLPModel,x::AbstractVector,c::AbstractVector
 end
 
 
-function NLPModels.jac_coord!(nlp::ScaledNLPModel,x::AbstractVector,jac::AbstractVector)
+function NLPModels.jac_coord!(nlp::ScaledNLPModel{T},x::AbstractVector,jac::AbstractVector) where T
+    nnzj_orig = nlp.inner.meta.nnzj
     NLPModels.jac_coord!(nlp.inner, x, jac)
     jac .*= nlp.jac_scale
+    fill!(@view(jac[nlp.fixed_handler.fixedj]), zero(T))
 end
 
 function NLPModels.grad!(nlp::ScaledNLPModel,x::AbstractVector,grad::AbstractVector)
     NLPModels.grad!(nlp.inner, x, grad)
     grad .*= nlp.obj_scale
+    
+    grad[nlp.fixed_handler.fixed] .= .- @view(nlp.inner.meta.lvar[nlp.fixed_handler.fixed])
 end
 
 function NLPModels.obj(nlp::ScaledNLPModel,x::AbstractVector)
@@ -135,6 +167,13 @@ function NLPModels.hess_coord!(
     nlp::ScaledNLPModel{T},x::AbstractVector,y::AbstractVector,hess::AbstractVector; 
     obj_weight = 1.) where T
 
+    nnzh_orig = nlp.inner.meta.nnzh
+    
     nlp.l_buffer .= y .* nlp.con_scale
-    NLPModels.hess_coord!(nlp.inner, x, nlp.l_buffer, hess; obj_weight=obj_weight * nlp.obj_scale)
+    NLPModels.hess_coord!(
+        nlp.inner, x, nlp.l_buffer, view(hess, 1:nnzh_orig);
+        obj_weight=obj_weight * nlp.obj_scale
+    )
+    fill!(@view(hess[nlp.fixed_handler.fixedh]), zero(T))
+    fill!(@view(hess[nnzh_orig+1:end]), one(T))
 end

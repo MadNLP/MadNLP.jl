@@ -10,11 +10,11 @@ tol=1e-5
 save = []
 
 for (path,casename) in (
-    (ENV["PGLIB_PATH"], "pglib_opf_case89_pegase.m"),
-    (ENV["PGLIB_PATH"], "pglib_opf_case1354_pegase.m"),
+    # (ENV["PGLIB_PATH"], "pglib_opf_case89_pegase.m"),
+    # (ENV["PGLIB_PATH"], "pglib_opf_case1354_pegase.m"),
     # (ENV["PGLIB_PATH"], "pglib_opf_case2869_pegase.m"),
     # (ENV["PGLIB_PATH"], "pglib_opf_case8387_pegase.m"),
-    # (ENV["PGLIB_PATH"], "pglib_opf_case9241_pegase.m"),
+    (ENV["PGLIB_PATH"], "pglib_opf_case9241_pegase.m"),
     # (ENV["PGLIB_PATH"], "pglib_opf_case13659_pegase.m"),
     # ("/home/sshin/git/PowerSystemsTestData/ACTIVSg2000/", "case_ACTIVSg2000.m"),
     # ("/home/sshin/git/PowerSystemsTestData/ACTIVSg10k/", "case_ACTIVSg10k.m"),
@@ -33,11 +33,15 @@ for (path,casename) in (
     end
     t21 = sum(getfield(m.inner.counters, t) for t in [:teval_obj, :teval_obj, :teval_obj, :teval_obj, :teval_obj])
 
-    m = MadNLP.ScaledNLPModel(SIMDiffExamples.ac_power_model(case))
-    t11 = @elapsed begin
-        madnlp(m; kkt_system=MadNLP.SparseCondensedKKTSystem, linear_solver=MadNLPGPU.RFSolver, tol=tol)
-    end
-    t21 = sum(getfield(m.inner.counters, t) for t in [:teval_obj, :teval_obj, :teval_obj, :teval_obj, :teval_obj])
+    # m = MadNLP.ScaledNLPModel(SIMDiffExamples.ac_power_model(case))
+    # m.meta.uvar .+= tol
+    # m.meta.ucon .+= tol
+    # t11 = @elapsed begin
+    #     s = MadNLPSolver(m; linear_solver=Ma27Solver, tol=tol)
+    #     MadNLP.initialize!(s.kkt)
+    #     solve!(s)
+    # end
+    # t21 = sum(getfield(m.inner.counters, t) for t in [:teval_obj, :teval_obj, :teval_obj, :teval_obj, :teval_obj]) 
 
     m = SIMDiffExamples.jump_ac_power_model(case)
     set_optimizer(m, Ipopt.Optimizer)
