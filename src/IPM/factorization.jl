@@ -1,12 +1,8 @@
 
 function factorize_wrapper!(solver::MadNLPSolver)
     @trace(solver.logger,"Factorization started.")
-    solver.cnt.t7 += @elapsed begin
-        build_kkt!(solver.kkt)
-    end
-    solver.cnt.t8 += @elapsed begin
-        solver.cnt.linear_solver_time += @elapsed factorize!(solver.kkt.linear_solver)
-    end
+    build_kkt!(solver.kkt)
+    solver.cnt.linear_solver_time += @elapsed factorize!(solver.kkt.linear_solver)
 end
 
 @inbounds function _kktmul!(w,x,del_w,du_diag,l_lower,u_lower,l_diag,u_diag)
@@ -24,11 +20,6 @@ end
     )
     xp_lr .+= wl ./ l_diag
     xp_ur .-= wu ./ u_diag
-end
-@inbounds function g(ws,wz,du_diag,jv_x,Σs) 
-    @simd for i=1:length(ws)
-        ws[i] = (- (wz[i] + du_diag[i] * ws[i]) + jv_x[i] ) / ( 1 - Σs[i] * du_diag[i] )
-    end
 end
 
 

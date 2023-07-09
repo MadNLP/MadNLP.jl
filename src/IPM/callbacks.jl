@@ -58,7 +58,7 @@ function eval_jac_wrapper!(solver::MadNLPSolver, kkt::AbstractKKTSystem, x::Prim
         nlp,
         variable(x),
         jac,
-    )
+        )
     compress_jacobian!(kkt)
     cnt.con_jac_cnt += 1
     if cnt.con_jac_cnt == 1 && !is_valid(jac)

@@ -37,10 +37,10 @@ function initialize!(solver::AbstractMadNLPSolver{T}) where T
     eval_jac_wrapper!(solver, solver.kkt, solver.x)
     compress_jacobian!(solver.kkt)
     # if (solver.m > 0) 
-        # jac = get_raw_jacobian(solver.kkt)
-        # scale_constraints!(solver.nlp, solver.con_scale, jac; max_gradient=solver.opt.nlp_scaling_max_gradient)
-        # set_jacobian_scaling!(solver.kkt, solver.con_scale)
-        # solver.y ./= solver.con_scale
+    # jac = get_raw_jacobian(solver.kkt)
+    # scale_constraints!(solver.nlp, solver.con_scale, jac; max_gradient=solver.opt.nlp_scaling_max_gradient)
+    # set_jacobian_scaling!(solver.kkt, solver.con_scale)
+    # solver.y ./= solver.con_scale
     # end
     compress_jacobian!(solver.kkt)
 
@@ -48,7 +48,7 @@ function initialize!(solver::AbstractMadNLPSolver{T}) where T
     eval_grad_f_wrapper!(solver, solver.f,solver.x)
     @trace(solver.logger,"Computing objective scaling.")
     # if solver.opt.nlp_scaling
-        # solver.obj_scale[] = scale_objective(solver.nlp, full(solver.f); max_gradient=solver.opt.nlp_scaling_max_gradient)
+    # solver.obj_scale[] = scale_objective(solver.nlp, full(solver.f); max_gradient=solver.opt.nlp_scaling_max_gradient)
     #     _scal!(solver.obj_scale[], full(solver.f))
     # end
 
@@ -110,7 +110,7 @@ function solve!(
     x = nothing, y = nothing,
     zl = nothing, zu = nothing,
     kwargs...
-)
+        )
 
     if x != nothing
         full(solver.x)[1:get_nvar(nlp)] .= x
@@ -368,12 +368,10 @@ end
 # end
 function regular!(solver::AbstractMadNLPSolver{T}) where T
     while true
-        solver.cnt.t1 += @elapsed begin
-            if (solver.cnt.k!=0 && !solver.opt.jacobian_constant)
-                eval_jac_wrapper!(solver, solver.kkt, solver.x)
-            end
+        if (solver.cnt.k!=0 && !solver.opt.jacobian_constant)
+            eval_jac_wrapper!(solver, solver.kkt, solver.x)
+        end
             jtprod!(solver.jacl, solver.kkt, solver.y)
-
             sd = get_sd(solver.y,solver.zl_r,solver.zu_r,solver.opt.s_max)
             sc = get_sc(solver.zl_r,solver.zu_r,solver.opt.s_max)
 
@@ -388,165 +386,152 @@ function regular!(solver::AbstractMadNLPSolver{T}) where T
             solver.inf_compl = get_inf_compl(solver.x_lr,solver.xl_r,solver.zl_r,solver.xu_r,solver.x_ur,solver.zu_r,0.,sc)
             inf_compl_mu = get_inf_compl(solver.x_lr,solver.xl_r,solver.zl_r,solver.xu_r,solver.x_ur,solver.zu_r,solver.mu,sc)
 
-            print_iter(solver)
-            # evaluate termination criteria
-            @trace(solver.logger,"Evaluating termination criteria.")
-            max(solver.inf_pr,solver.inf_du,solver.inf_compl) <= solver.opt.tol && return SOLVE_SUCCEEDED
-            max(solver.inf_pr,solver.inf_du,solver.inf_compl) <= solver.opt.acceptable_tol ?
-                (solver.cnt.acceptable_cnt < solver.opt.acceptable_iter ?
-                solver.cnt.acceptable_cnt+=1 : return SOLVED_TO_ACCEPTABLE_LEVEL) : (solver.cnt.acceptable_cnt = 0)
-            max(solver.inf_pr,solver.inf_du,solver.inf_compl) >= solver.opt.diverging_iterates_tol && return DIVERGING_ITERATES
-            solver.cnt.k>=solver.opt.max_iter && return MAXIMUM_ITERATIONS_EXCEEDED
-            time()-solver.cnt.start_time>=solver.opt.max_wall_time && return MAXIMUM_WALLTIME_EXCEEDED
+        print_iter(solver)
 
-            # update the barrier parameter
-            @trace(solver.logger,"Updating the barrier parameter.")
-            while solver.mu != max(solver.opt.mu_min,solver.opt.tol/10) &&
-                max(solver.inf_pr,solver.inf_du,inf_compl_mu) <= solver.opt.barrier_tol_factor*solver.mu
-                mu_new = get_mu(solver.mu,solver.opt.mu_min,
-                                solver.opt.mu_linear_decrease_factor,solver.opt.mu_superlinear_decrease_power,solver.opt.tol)
-                inf_compl_mu = get_inf_compl(solver.x_lr,solver.xl_r,solver.zl_r,solver.xu_r,solver.x_ur,solver.zu_r,solver.mu,sc)
-                solver.tau= get_tau(solver.mu,solver.opt.tau_min)
-                solver.mu = mu_new
-                empty!(solver.filter)
-                push!(solver.filter,(solver.theta_max,-Inf))
-            end
-        end
-        solver.cnt.t2 += @elapsed begin
+        # evaluate termination criteria
+        @trace(solver.logger,"Evaluating termination criteria.")
+        max(solver.inf_pr,solver.inf_du,solver.inf_compl) <= solver.opt.tol && return SOLVE_SUCCEEDED
+        max(solver.inf_pr,solver.inf_du,solver.inf_compl) <= solver.opt.acceptable_tol ?
+            (solver.cnt.acceptable_cnt < solver.opt.acceptable_iter ?
+            solver.cnt.acceptable_cnt+=1 : return SOLVED_TO_ACCEPTABLE_LEVEL) : (solver.cnt.acceptable_cnt = 0)
+        max(solver.inf_pr,solver.inf_du,solver.inf_compl) >= solver.opt.diverging_iterates_tol && return DIVERGING_ITERATES
+        solver.cnt.k>=solver.opt.max_iter && return MAXIMUM_ITERATIONS_EXCEEDED
+        time()-solver.cnt.start_time>=solver.opt.max_wall_time && return MAXIMUM_WALLTIME_EXCEEDED
 
-            # compute the newton step
-            @trace(solver.logger,"Computing the newton step.")
-            if (solver.cnt.k!=0 && !solver.opt.hessian_constant)
-                eval_lag_hess_wrapper!(solver, solver.kkt, solver.x, solver.y)
-            end
-
-            set_aug_diagonal!(solver.kkt,solver)
-            set_aug_rhs!(solver, solver.kkt, solver.c)
-            if solver.opt.inertia_correction_method == INERTIA_FREE
-                set_aug_rhs_ifr!(solver, solver.kkt)
-            end
-            dual_inf_perturbation!(primal(solver.p),solver.ind_llb,solver.ind_uub,solver.mu,solver.opt.kappa_d)
+        # update the barrier parameter
+        @trace(solver.logger,"Updating the barrier parameter.")
+        while solver.mu != max(solver.opt.mu_min,solver.opt.tol/10) &&
+            max(solver.inf_pr,solver.inf_du,inf_compl_mu) <= solver.opt.barrier_tol_factor*solver.mu
+            mu_new = get_mu(solver.mu,solver.opt.mu_min,
+                            solver.opt.mu_linear_decrease_factor,solver.opt.mu_superlinear_decrease_power,solver.opt.tol)
+            inf_compl_mu = get_inf_compl(solver.x_lr,solver.xl_r,solver.zl_r,solver.xu_r,solver.x_ur,solver.zu_r,solver.mu,sc)
+            solver.tau= get_tau(solver.mu,solver.opt.tau_min)
+            solver.mu = mu_new
+            empty!(solver.filter)
+            push!(solver.filter,(solver.theta_max,-Inf))
         end
 
-        solver.cnt.t3 += @elapsed begin
+        # compute the newton step
+        @trace(solver.logger,"Computing the newton step.")
+        if (solver.cnt.k!=0 && !solver.opt.hessian_constant)
+            eval_lag_hess_wrapper!(solver, solver.kkt, solver.x, solver.y)
+        end
 
-            # start inertia conrrection
-            @trace(solver.logger,"Solving primal-dual system.")
-            if solver.opt.inertia_correction_method == INERTIA_FREE
-                inertia_free_reg(solver) || return ROBUST
-            elseif solver.opt.inertia_correction_method == INERTIA_BASED
-                inertia_based_reg(solver) || return ROBUST
+        set_aug_diagonal!(solver.kkt,solver)
+        set_aug_rhs!(solver, solver.kkt, solver.c)
+        if solver.opt.inertia_correction_method == INERTIA_FREE
+            set_aug_rhs_ifr!(solver, solver.kkt)
+        end
+        dual_inf_perturbation!(primal(solver.p),solver.ind_llb,solver.ind_uub,solver.mu,solver.opt.kappa_d)
+
+
+        # start inertia conrrection
+        if solver.opt.inertia_correction_method == INERTIA_FREE
+            inertia_free_reg(solver) || return ROBUST
+        elseif solver.opt.inertia_correction_method == INERTIA_BASED
+            inertia_based_reg(solver) || return ROBUST
+        end
+        # filter start
+        @trace(solver.logger,"Backtracking line search initiated.")
+        theta = get_theta(solver.c)
+        varphi= get_varphi(solver.obj_val,solver.x_lr,solver.xl_r,solver.xu_r,solver.x_ur,solver.mu)
+        varphi_d = get_varphi_d(
+            primal(solver.f),
+            primal(solver.x),
+            primal(solver.xl),
+            primal(solver.xu),
+            primal(solver.d),
+            solver.mu,
+        )
+
+        alpha_max = get_alpha_max(
+            primal(solver.x),
+            primal(solver.xl),
+            primal(solver.xu),
+            primal(solver.d),
+            solver.tau,
+        )
+        solver.alpha_z = get_alpha_z(solver.zl_r,solver.zu_r,dual_lb(solver.d),dual_ub(solver.d),solver.tau)
+        alpha_min = get_alpha_min(theta,varphi_d,solver.theta_min,solver.opt.gamma_theta,solver.opt.gamma_phi,
+                                  solver.opt.alpha_min_frac,solver.opt.delta,solver.opt.s_theta,solver.opt.s_phi)
+        solver.cnt.l = 1
+        solver.alpha = alpha_max
+        varphi_trial= 0.
+            theta_trial = 0.
+            small_search_norm = get_rel_search_norm(primal(solver.x), primal(solver.d)) < 10*eps(T)
+        switching_condition = is_switching(varphi_d,solver.alpha,solver.opt.s_phi,solver.opt.delta,2.,solver.opt.s_theta)
+        armijo_condition = false
+
+        while true
+            copyto!(full(solver.x_trial), full(solver.x))
+            axpy!(solver.alpha, primal(solver.d), primal(solver.x_trial))
+            solver.obj_val_trial = eval_f_wrapper(solver, solver.x_trial)
+            eval_cons_wrapper!(solver, solver.c_trial, solver.x_trial)
+
+            theta_trial = get_theta(solver.c_trial)
+            varphi_trial= get_varphi(solver.obj_val_trial,solver.x_trial_lr,solver.xl_r,solver.xu_r,solver.x_trial_ur,solver.mu)
+            armijo_condition = is_armijo(varphi_trial,varphi,solver.opt.eta_phi,solver.alpha,varphi_d)
+
+            small_search_norm && break
+
+            solver.ftype = get_ftype(
+                solver.filter,theta,theta_trial,varphi,varphi_trial,switching_condition,armijo_condition,
+                solver.theta_min,solver.opt.obj_max_inc,solver.opt.gamma_theta,solver.opt.gamma_phi,
+                has_constraints(solver))
+            solver.ftype in ["f","h"] && (@trace(solver.logger,"Step accepted with type $(solver.ftype)"); break)
+
+            solver.cnt.l==1 && theta_trial>=theta && second_order_correction(
+                solver,alpha_max,theta,varphi,theta_trial,varphi_d,switching_condition) && break
+
+            solver.alpha /= 2
+            solver.cnt.l += 1
+            if solver.alpha < alpha_min
+                @debug(solver.logger,
+                       "Cannot find an acceptable step at iteration $(solver.cnt.k). Switching to restoration phase.")
+                solver.cnt.k+=1
+                return RESTORE
+            else
+                @trace(solver.logger,"Step rejected; proceed with the next trial step.")
+                solver.alpha * norm(primal(solver.d)) < eps(T)*10 &&
+                    return solver.cnt.acceptable_cnt >0 ?
+                    SOLVED_TO_ACCEPTABLE_LEVEL : SEARCH_DIRECTION_BECOMES_TOO_SMALL
             end
         end
-        solver.cnt.t4 += @elapsed begin
 
-            # filter start
-            @trace(solver.logger,"Backtracking line search initiated.")
-            theta = get_theta(solver.c)
-            varphi= get_varphi(solver.obj_val,solver.x_lr,solver.xl_r,solver.xu_r,solver.x_ur,solver.mu)
-            varphi_d = get_varphi_d(
-                primal(solver.f),
-                primal(solver.x),
-                primal(solver.xl),
-                primal(solver.xu),
-                primal(solver.d),
-                solver.mu,
-            )
 
-            alpha_max = get_alpha_max(
-                primal(solver.x),
-                primal(solver.xl),
-                primal(solver.xu),
-                primal(solver.d),
-                solver.tau,
-            )
-            solver.alpha_z = get_alpha_z(solver.zl_r,solver.zu_r,dual_lb(solver.d),dual_ub(solver.d),solver.tau)
-            alpha_min = get_alpha_min(theta,varphi_d,solver.theta_min,solver.opt.gamma_theta,solver.opt.gamma_phi,
-                                      solver.opt.alpha_min_frac,solver.opt.delta,solver.opt.s_theta,solver.opt.s_phi)
-            solver.cnt.l = 1
-            solver.alpha = alpha_max
-            varphi_trial= 0.
-                theta_trial = 0.
-                small_search_norm = get_rel_search_norm(primal(solver.x), primal(solver.d)) < 10*eps(T)
-            switching_condition = is_switching(varphi_d,solver.alpha,solver.opt.s_phi,solver.opt.delta,2.,solver.opt.s_theta)
-            armijo_condition = false
+        @trace(solver.logger,"Updating primal-dual variables.")
+        copyto!(full(solver.x), full(solver.x_trial))
+        copyto!(solver.c, solver.c_trial)
+        solver.obj_val = solver.obj_val_trial
+        adjusted = adjust_boundary!(solver.x_lr,solver.xl_r,solver.x_ur,solver.xu_r,solver.mu)
+        adjusted > 0 &&
+            @warn(solver.logger,"In iteration $(solver.cnt.k), $adjusted Slack too small, adjusting variable bound")
+
+        axpy!(solver.alpha,dual(solver.d),solver.y)
+
+        solver.zl_r .+= solver.alpha_z .* dual_lb(solver.d)
+        solver.zu_r .+= solver.alpha_z .* dual_ub(solver.d)
+        reset_bound_dual!(
+            primal(solver.zl),
+            primal(solver.x),
+            primal(solver.xl),
+            solver.mu,solver.opt.kappa_sigma,
+        )
+        reset_bound_dual!(
+            primal(solver.zu),
+            primal(solver.xu),
+            primal(solver.x),
+            solver.mu,solver.opt.kappa_sigma,
+        )
+        eval_grad_f_wrapper!(solver, solver.f,solver.x)
+
+        if !switching_condition || !armijo_condition
+            @trace(solver.logger,"Augmenting filter.")
+            augment_filter!(solver.filter,theta_trial,varphi_trial,solver.opt.gamma_theta)
         end
-        solver.cnt.t5 += @elapsed begin
 
-            while true
-                copyto!(full(solver.x_trial), full(solver.x))
-                axpy!(solver.alpha, primal(solver.d), primal(solver.x_trial))
-
-                solver.obj_val_trial = eval_f_wrapper(solver, solver.x_trial)
-                eval_cons_wrapper!(solver, solver.c_trial, solver.x_trial)
-
-                theta_trial = get_theta(solver.c_trial)
-                varphi_trial= get_varphi(solver.obj_val_trial,solver.x_trial_lr,solver.xl_r,solver.xu_r,solver.x_trial_ur,solver.mu)
-                armijo_condition = is_armijo(varphi_trial,varphi,solver.opt.eta_phi,solver.alpha,varphi_d)
-
-                small_search_norm && break
-
-                solver.ftype = get_ftype(
-                    solver.filter,theta,theta_trial,varphi,varphi_trial,switching_condition,armijo_condition,
-                    solver.theta_min,solver.opt.obj_max_inc,solver.opt.gamma_theta,solver.opt.gamma_phi,
-                    has_constraints(solver))
-                solver.ftype in ["f","h"] && (@trace(solver.logger,"Step accepted with type $(solver.ftype)"); break)
-
-                solver.cnt.l==1 && theta_trial>=theta && second_order_correction(
-                    solver,alpha_max,theta,varphi,theta_trial,varphi_d,switching_condition) && break
-
-                solver.alpha /= 2
-                solver.cnt.l += 1
-                if solver.alpha < alpha_min
-                    @debug(solver.logger,
-                           "Cannot find an acceptable step at iteration $(solver.cnt.k). Switching to restoration phase.")
-                    solver.cnt.k+=1
-                    return RESTORE
-                else
-                    @trace(solver.logger,"Step rejected; proceed with the next trial step.")
-                    solver.alpha * norm(primal(solver.d)) < eps(T)*10 &&
-                        return solver.cnt.acceptable_cnt >0 ?
-                        SOLVED_TO_ACCEPTABLE_LEVEL : SEARCH_DIRECTION_BECOMES_TOO_SMALL
-                end
-            end
-        end
-        solver.cnt.t6 += @elapsed begin
-
-            @trace(solver.logger,"Updating primal-dual variables.")
-            copyto!(full(solver.x), full(solver.x_trial))
-            copyto!(solver.c, solver.c_trial)
-            solver.obj_val = solver.obj_val_trial
-            adjusted = adjust_boundary!(solver.x_lr,solver.xl_r,solver.x_ur,solver.xu_r,solver.mu)
-            adjusted > 0 &&
-                @warn(solver.logger,"In iteration $(solver.cnt.k), $adjusted Slack too small, adjusting variable bound")
-
-            axpy!(solver.alpha,dual(solver.d),solver.y)
-
-            solver.zl_r .+= solver.alpha_z .* dual_lb(solver.d)
-            solver.zu_r .+= solver.alpha_z .* dual_ub(solver.d)
-
-            reset_bound_dual!(
-                primal(solver.zl),
-                primal(solver.x),
-                primal(solver.xl),
-                solver.mu,solver.opt.kappa_sigma,
-            )
-            reset_bound_dual!(
-                primal(solver.zu),
-                primal(solver.xu),
-                primal(solver.x),
-                solver.mu,solver.opt.kappa_sigma,
-            )
-            eval_grad_f_wrapper!(solver, solver.f,solver.x)
-
-            if !switching_condition || !armijo_condition
-                @trace(solver.logger,"Augmenting filter.")
-                augment_filter!(solver.filter,theta_trial,varphi_trial,solver.opt.gamma_theta)
-            end
-
-            solver.cnt.k+=1
+        solver.cnt.k+=1
             @trace(solver.logger,"Proceeding to the next interior point iteration.")
-        end
     end
 end
 
@@ -888,14 +873,16 @@ function robust!(solver::MadNLPSolver{T}) where T
 end
 
 function inertia_based_reg(solver::MadNLPSolver)
-    n_trial = 0
-    solver.kkt.del_w = del_w_prev = 0.0
+        n_trial = 0
+        solver.kkt.del_w = del_w_prev = 0.0
 
-    @trace(solver.logger,"Inertia-based regularization started.")
+        @trace(solver.logger,"Inertia-based regularization started.")
 
-    factorize_wrapper!(solver)
-    num_pos,num_zero,num_neg = inertia(solver.kkt.linear_solver)
-    solve_status = num_zero!= 0 ? false : solve_refine!(solver.d, solver.iterator, solver.p)
+        factorize_wrapper!(solver)
+    @time begin
+        num_pos,num_zero,num_neg = inertia(solver.kkt.linear_solver)
+    end
+        solve_status = num_zero!= 0 ? false : solve_refine!(solver.d, solver.iterator, solver.p)
 
     while !is_inertia_correct(solver.kkt, num_pos, num_zero, num_neg) || !solve_status
         @debug(solver.logger,"Primal-dual perturbed.")
@@ -911,7 +898,7 @@ function inertia_based_reg(solver::MadNLPSolver)
         end
         solver.kkt.del_c = (num_zero == 0 || !solve_status) ?
             solver.opt.jacobian_regularization_value * solver.mu^(solver.opt.jacobian_regularization_exponent) : 0.
-        regularize_diagonal!(solver.kkt, solver.kkt.del_w - del_w_prev, solver.kkt.del_c)
+            regularize_diagonal!(solver.kkt, solver.kkt.del_w - del_w_prev, solver.kkt.del_c)
         del_w_prev = solver.kkt.del_w
 
         factorize_wrapper!(solver)
@@ -920,7 +907,6 @@ function inertia_based_reg(solver::MadNLPSolver)
         n_trial += 1
     end
     solver.kkt.del_w != 0 && (solver.kkt.del_w_last = solver.kkt.del_w)
-
     return true
 end
 

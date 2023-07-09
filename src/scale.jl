@@ -1,11 +1,16 @@
-mutable struct FixedVariableMakeParameter{VI}
+struct FixedVariableMakeParameter{VI}
     fixed::VI
     fixedj::VI
     fixedh::VI
 end
 
-mutable struct ScaledNLPModel{T, VT <: AbstractVector{T}, VI <: AbstractVector{Int}, FH} <: AbstractNLPModel{T, VT}
-    inner::AbstractNLPModel{T, VT}
+struct ScaledNLPModel{
+    T, VT <: AbstractVector{T},
+    VI <: AbstractVector{Int}, I <: AbstractNLPModel{T, VT},
+    FH
+    } <: AbstractNLPModel{T, VT}
+    
+    inner::I
 
     l_buffer::VT
 
@@ -152,11 +157,14 @@ function NLPModels.jac_coord!(nlp::ScaledNLPModel{T},x::AbstractVector,jac::Abst
     fill!(@view(jac[nlp.fixed_handler.fixedj]), zero(T))
 end
 
-function NLPModels.grad!(nlp::ScaledNLPModel,x::AbstractVector,grad::AbstractVector)
+function NLPModels.grad!(nlp::ScaledNLPModel{T},x::AbstractVector,grad::AbstractVector) where T
     NLPModels.grad!(nlp.inner, x, grad)
     grad .*= nlp.obj_scale
-    
-    grad[nlp.fixed_handler.fixed] .= .- @view(nlp.inner.meta.lvar[nlp.fixed_handler.fixed])
+    map!(
+        -,
+        @view(grad[nlp.fixed_handler.fixed]),
+        @view(nlp.inner.meta.lvar[nlp.fixed_handler.fixed])
+    )
 end
 
 function NLPModels.obj(nlp::ScaledNLPModel,x::AbstractVector)

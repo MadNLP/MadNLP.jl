@@ -111,9 +111,10 @@ function set_aug_rhs!(solver::MadNLPSolver, kkt::AbstractKKTSystem, c)
     pzu = dual_ub(solver.p)
 
     px .= .-f .+ zl .- zu .- solver.jacl
-    py .= -c
+    py .= .-c
     pzl .= (solver.xl_r .- solver.x_lr) .* solver.zl_r .+ solver.mu 
-    pzu .= (solver.xu_r .- solver.x_ur) .* solver.zu_r .- solver.mu 
+    pzu .= (solver.xu_r .- solver.x_ur) .* solver.zu_r .- solver.mu
+
 end
 # function set_aug_rhs!(solver::MadNLPSolver, kkt::AbstractKKTSystem, c)
 #     px = primal(solver.p)
@@ -142,7 +143,8 @@ end
 #         pzu[i] = (solver.xu_r[i] -solver.x_ur[i]) * solver.zu_r[i] - solver.mu 
 #     end
 # return
-# end
+# end 
+
 function set_aug_rhs!(solver::MadNLPSolver, kkt::SparseUnreducedKKTSystem, c)
     f = primal(solver.f)
     zl = primal(solver.zl)
@@ -331,29 +333,29 @@ end
 is_valid(args...) = all(is_valid(arg) for arg in args)
 
 # temporaily commented out
-# function get_varphi(obj_val, x_lr, xl_r, xu_r, x_ur, mu)
-#     varphi = obj_val
-#     @inbounds @simd for i=1:length(x_lr)
-#         xll = x_lr[i]-xl_r[i]
-#         xll < 0 && return Inf
-#         varphi -= mu*log(xll)
-#     end
-#     @inbounds @simd for i=1:length(x_ur)
-#         xuu = xu_r[i]-x_ur[i]
-#         xuu < 0 && return Inf
-#         varphi -= mu*log(xuu)
-#     end
-#     return varphi
-# end
-
 function get_varphi(obj_val, x_lr, xl_r, xu_r, x_ur, mu)
-    
-    return obj_val + mapreduce(
-        (x1,x2) -> _get_varphi(x1,x2,mu), +, x_lr, xl_r
-    ) + mapreduce(
-        (x1,x2) -> _get_varphi(x1,x2,mu), +, xu_r, x_ur
-    )
+    varphi = obj_val
+    @inbounds @simd for i=1:length(x_lr)
+        xll = x_lr[i]-xl_r[i]
+        xll < 0 && return Inf
+        varphi -= mu*log(xll)
+    end
+    @inbounds @simd for i=1:length(x_ur)
+        xuu = xu_r[i]-x_ur[i]
+        xuu < 0 && return Inf
+        varphi -= mu*log(xuu)
+    end
+    return varphi
 end
+
+# function get_varphi(obj_val, x_lr, xl_r, xu_r, x_ur, mu)
+    
+#     return obj_val + mapreduce(
+#         (x1,x2) -> _get_varphi(x1,x2,mu), +, x_lr, xl_r
+#     ) + mapreduce(
+#         (x1,x2) -> _get_varphi(x1,x2,mu), +, xu_r, x_ur
+#     )
+# end
 function _get_varphi(x1,x2,mu)
     x = x1 - x2
     if x < 0
@@ -366,116 +368,116 @@ end
 @inline get_inf_pr(c) = norm(c, Inf)
 
 # temporarily commented out
-# function get_inf_du(f, zl, zu, jacl, sd)
-#     inf_du = 0.0
-#     @inbounds @simd for i=1:length(f)
-#         inf_du = max(inf_du,abs(f[i]-zl[i]+zu[i]+jacl[i]))
-#     end
-#     return inf_du/sd
-# end
 function get_inf_du(f, zl, zu, jacl, sd)
-    return mapreduce((f,zl,zu,jacl) -> abs(f-zl+zu+jacl), max, f, zl, zu, jacl; init = zero(eltype(f))) / sd
+    inf_du = 0.0
+    @inbounds @simd for i=1:length(f)
+        inf_du = max(inf_du,abs(f[i]-zl[i]+zu[i]+jacl[i]))
+    end
+    return inf_du/sd
 end
+# function get_inf_du(f, zl, zu, jacl, sd)
+#     return mapreduce((f,zl,zu,jacl) -> abs(f-zl+zu+jacl), max, f, zl, zu, jacl; init = zero(eltype(f))) / sd
+# end
 
 # temporarily commented out
-# function get_inf_compl(x_lr, xl_r, zl_r, xu_r, x_ur, zu_r, mu, sc)
-#     inf_compl = 0.0
-#     @inbounds @simd for i=1:length(x_lr)
-#         inf_compl = max(inf_compl,abs((x_lr[i]-xl_r[i])*zl_r[i]-mu))
-#     end
-#     @inbounds @simd for i=1:length(x_ur)
-#         inf_compl = max(inf_compl,abs((xu_r[i]-x_ur[i])*zu_r[i]-mu))
-#     end
-#     return inf_compl/sc
-# end
 function get_inf_compl(x_lr, xl_r, zl_r, xu_r, x_ur, zu_r, mu, sc)
-    return max(
-        mapreduce(
-            (x_lr, xl_r, zl_r) -> abs((x_lr-xl_r)*zl_r-mu),
-            max,
-            x_lr, xl_r, zl_r;
-            init = zero(eltype(x_lr))
-        ),
-        mapreduce(
-            (xu_r, x_ur, zu_r) -> abs((xu_r-x_ur)*zu_r-mu),
-            max,
-            xu_r, x_ur, zu_r;
-            init = zero(eltype(x_lr))
-        )
-    ) / sc
+    inf_compl = 0.0
+    @inbounds @simd for i=1:length(x_lr)
+        inf_compl = max(inf_compl,abs((x_lr[i]-xl_r[i])*zl_r[i]-mu))
+    end
+    @inbounds @simd for i=1:length(x_ur)
+        inf_compl = max(inf_compl,abs((xu_r[i]-x_ur[i])*zu_r[i]-mu))
+    end
+    return inf_compl/sc
 end
+# function get_inf_compl(x_lr, xl_r, zl_r, xu_r, x_ur, zu_r, mu, sc)
+#     return max(
+#         mapreduce(
+#             (x_lr, xl_r, zl_r) -> abs((x_lr-xl_r)*zl_r-mu),
+#             max,
+#             x_lr, xl_r, zl_r;
+#             init = zero(eltype(x_lr))
+#         ),
+#         mapreduce(
+#             (xu_r, x_ur, zu_r) -> abs((xu_r-x_ur)*zu_r-mu),
+#             max,
+#             xu_r, x_ur, zu_r;
+#             init = zero(eltype(x_lr))
+#         )
+#     ) / sc
+# end
 
 # temporarily commented out
-# function get_varphi_d(f, x, xl, xu, dx, mu)
-#     varphi_d = 0.0
-#     @inbounds @simd for i=1:length(f)
-#         varphi_d += (f[i] - mu/(x[i]-xl[i]) + mu/(xu[i]-x[i])) * dx[i]
-#     end
-#     return varphi_d
-# end
 function get_varphi_d(f, x, xl, xu, dx, mu)
-    return mapreduce(
-        (f,x,xl,xu,dx)-> (f - mu/(x-xl) + mu/(xu-x)) * dx,
-        +,
-        f, x, xl, xu, dx;
-        init = zero(eltype(f))
-    )
+    varphi_d = 0.0
+    @inbounds @simd for i=1:length(f)
+        varphi_d += (f[i] - mu/(x[i]-xl[i]) + mu/(xu[i]-x[i])) * dx[i]
+    end
+    return varphi_d
 end
+# function get_varphi_d(f, x, xl, xu, dx, mu)
+#     return mapreduce(
+#         (f,x,xl,xu,dx)-> (f - mu/(x-xl) + mu/(xu-x)) * dx,
+#         +,
+#         f, x, xl, xu, dx;
+#         init = zero(eltype(f))
+#     )
+# end
 
 # temporarily commented out
-# function get_alpha_max(x, xl, xu, dx, tau)
-#     alpha_max = 1.0
-#     @inbounds @simd for i=1:length(x)
-#         dx[i]<0 && (alpha_max=min(alpha_max,(-x[i]+xl[i])*tau/dx[i]))
-#         dx[i]>0 && (alpha_max=min(alpha_max,(-x[i]+xu[i])*tau/dx[i]))
-#     end
-#     return alpha_max
-# end
 function get_alpha_max(x, xl, xu, dx, tau)
-    return min(
-        mapreduce(
-            (x, xl, dx) -> dx < 0 ? (-x+xl)*tau/dx : Inf,
-            min,
-            x, xl, dx,
-            init = one(eltype(x))
-        ),
-        mapreduce(
-            (x, xu, dx) -> dx > 0 ? (-x+xu)*tau/dx : Inf,
-            min,
-            x, xu, dx,
-            init = one(eltype(x))
-        )
-    )
+    alpha_max = 1.0
+    @inbounds @simd for i=1:length(x)
+        dx[i]<0 && (alpha_max=min(alpha_max,(-x[i]+xl[i])*tau/dx[i]))
+        dx[i]>0 && (alpha_max=min(alpha_max,(-x[i]+xu[i])*tau/dx[i]))
+    end
+    return alpha_max
 end
+# function get_alpha_max(x, xl, xu, dx, tau)
+#     return min(
+#         mapreduce(
+#             (x, xl, dx) -> dx < 0 ? (-x+xl)*tau/dx : Inf,
+#             min,
+#             x, xl, dx,
+#             init = one(eltype(x))
+#         ),
+#         mapreduce(
+#             (x, xu, dx) -> dx > 0 ? (-x+xu)*tau/dx : Inf,
+#             min,
+#             x, xu, dx,
+#             init = one(eltype(x))
+#         )
+#     )
+# end
 
 
 # temporarily commented out
-# function get_alpha_z(zl_r, zu_r, dzl, dzu, tau)
-#     alpha_z = 1.0
-#     @inbounds @simd for i=1:length(zl_r)
-#         dzl[i] < 0 && (alpha_z=min(alpha_z,-zl_r[i]*tau/dzl[i]))
-#      end
-#     @inbounds @simd for i=1:length(zu_r)
-#         dzu[i] < 0 && (alpha_z=min(alpha_z,-zu_r[i]*tau/dzu[i]))
-#     end
-#     return alpha_z
-# end
 function get_alpha_z(zl_r, zu_r, dzl, dzu, tau)
-    return min(
-        mapreduce(
-            (zl_r, dzl) -> dzl < 0 ? (-zl_r)*tau/dzl : Inf,
-            min,
-            zl_r, dzl,
-            init = one(eltype(dzl))
-        ),
-        mapreduce(
-            (zu_r, dzu) -> dzu < 0 ? (-zu_r)*tau/dzu : Inf,
-            min,
-            zu_r, dzu,
-            init = one(eltype(dzl))
-        )
-    )
+    alpha_z = 1.0
+    @inbounds @simd for i=1:length(zl_r)
+        dzl[i] < 0 && (alpha_z=min(alpha_z,-zl_r[i]*tau/dzl[i]))
+     end
+    @inbounds @simd for i=1:length(zu_r)
+        dzu[i] < 0 && (alpha_z=min(alpha_z,-zu_r[i]*tau/dzu[i]))
+    end
+    return alpha_z
 end
+# function get_alpha_z(zl_r, zu_r, dzl, dzu, tau)
+#     return min(
+#         mapreduce(
+#             (zl_r, dzl) -> dzl < 0 ? (-zl_r)*tau/dzl : Inf,
+#             min,
+#             zl_r, dzl,
+#             init = one(eltype(dzl))
+#         ),
+#         mapreduce(
+#             (zu_r, dzu) -> dzu < 0 ? (-zu_r)*tau/dzu : Inf,
+#             min,
+#             zu_r, dzu,
+#             init = one(eltype(dzl))
+#         )
+#     )
+# end
 
 function get_obj_val_R(p, n, D_R, x, x_ref, rho, zeta)
     obj_val_R = 0.
@@ -695,23 +697,23 @@ function adjust_boundary!(x_lr::VT, xl_r, x_ur, xu_r, mu) where {T, VT <: Abstra
 end
 
 # temporarily commented out
-# function get_rel_search_norm(x, dx)
-#     rel_search_norm = 0.0
-#     @inbounds @simd for i=1:length(x)
-#         rel_search_norm = max(
-#             rel_search_norm,
-#             abs(dx[i]) / (1.0 + abs(x[i])),
-#         )
-#     end
-#     return rel_search_norm
-# end
 function get_rel_search_norm(x, dx)
-    return mapreduce(
-        (x,dx) -> abs(dx) / (1.0 + abs(x)),
-        max,
-        x, dx
-    )
+    rel_search_norm = 0.0
+    @inbounds @simd for i=1:length(x)
+        rel_search_norm = max(
+            rel_search_norm,
+            abs(dx[i]) / (1.0 + abs(x[i])),
+        )
+    end
+    return rel_search_norm
 end
+# function get_rel_search_norm(x, dx)
+#     return mapreduce(
+#         (x,dx) -> abs(dx) / (1.0 + abs(x)),
+#         max,
+#         x, dx
+#     )
+# end
 
 # Utility functions
 function get_sd(l, zl_r, zu_r, s_max)
@@ -791,35 +793,35 @@ function is_barr_obj_rapid_increase(varphi, varphi_trial, obj_max_inc)
 end
 
 # temporarily commented out
-# function reset_bound_dual!(z, x, mu, kappa_sigma)
-#     @inbounds @simd for i in eachindex(z)
-#         z[i] = max(min(z[i], (kappa_sigma*mu)/x[i]), (mu/kappa_sigma)/x[i])
-#     end
-#     return
-# end
 function reset_bound_dual!(z, x, mu, kappa_sigma)
-    map!(
-        (z, x) -> max(min(z, (kappa_sigma*mu)/x), (mu/kappa_sigma)/x),
-        z, z, x
-    )
+    @inbounds @simd for i in eachindex(z)
+        z[i] = max(min(z[i], (kappa_sigma*mu)/x[i]), (mu/kappa_sigma)/x[i])
+    end
     return
 end
+# function reset_bound_dual!(z, x, mu, kappa_sigma)
+#     map!(
+#         (z, x) -> max(min(z, (kappa_sigma*mu)/x), (mu/kappa_sigma)/x),
+#         z, z, x
+#     )
+#     return
+# end
 
 # temporarily commented out
-# function reset_bound_dual!(z, x1, x2, mu, kappa_sigma)
-#     @inbounds @simd for i in eachindex(z)
-#         z[i] = max(min(z[i], (kappa_sigma*mu)/(x1[i]-x2[i])), (mu/kappa_sigma)/(x1[i]-x2[i]))
-#     end
-#     return
-# end
-
-function reset_bound_dual!(z, x1, x2, mu, kappa_sigma)
-    map!(
-        (z,x1,x2) -> max(min(z, (kappa_sigma*mu)/(x1-x2)), (mu/kappa_sigma)/(x1-x2)),
-        z,z,x1,x2
-    )
+@inline function reset_bound_dual!(z, x1, x2, mu, kappa_sigma)
+    @inbounds @simd for i in eachindex(z)
+        z[i] = max(min(z[i], (kappa_sigma*mu)/(x1[i]-x2[i])), (mu/kappa_sigma)/(x1[i]-x2[i]))
+    end
     return
 end
+
+# function reset_bound_dual!(z, x1, x2, mu, kappa_sigma)
+#     map!(
+#         (z,x1,x2) -> max(min(z, (kappa_sigma*mu)/(x1-x2)), (mu/kappa_sigma)/(x1-x2)),
+#         z,z,x1,x2
+#     )
+#     return
+# end
 
 
 function get_ftype(filter,theta,theta_trial,varphi,varphi_trial,switching_condition,armijo_condition,
