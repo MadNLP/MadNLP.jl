@@ -4,7 +4,7 @@
 Implement the [`AbstractReducedKKTSystem`](@ref) in sparse COO format.
 
 """
-mutable struct SparseKKTSystem{T, VT, MT, QN, VI, VI32} <: AbstractReducedKKTSystem{T, VT, MT, QN}
+mutable struct SparseKKTSystem{T, VT, MT, QN, LS, VI, VI32} <: AbstractReducedKKTSystem{T, VT, MT, QN}
     hess::VT
     jac_callback::VT
     jac::VT
@@ -32,7 +32,7 @@ mutable struct SparseKKTSystem{T, VT, MT, QN, VI, VI32} <: AbstractReducedKKTSys
     del_w_last::T
     del_c::T
     # LinearSolver
-    linear_solver
+    linear_solver::LS
     # Info
     ind_ineq::VI
 end
@@ -71,7 +71,7 @@ end
 Implement the [`AbstractCondensedKKTSystem`](@ref) in sparse COO format.
 
 """
-mutable struct SparseCondensedKKTSystem{T, VT, MT, QN, VI, VI32, VTu1, VTu2, EXT} <: AbstractCondensedKKTSystem{T, VT, MT, QN}
+mutable struct SparseCondensedKKTSystem{T, VT, MT, QN, LS, VI, VI32, VTu1, VTu2, EXT} <: AbstractCondensedKKTSystem{T, VT, MT, QN}
     # Hessian
     hess::VT
     hess_raw::SparseMatrixCOO{T,Int32,VT, VI32}
@@ -113,7 +113,7 @@ mutable struct SparseCondensedKKTSystem{T, VT, MT, QN, VI, VI32, VTu1, VTu2, EXT
     del_c::T
     
     # LinearSolver
-    linear_solver
+    linear_solver::LS
 
     # Info
     ind_ineq::VI

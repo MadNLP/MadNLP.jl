@@ -29,24 +29,23 @@ function solve_refine!(
     x::UnreducedKKTVector{T, VT},
     iterator::RichardsonIterator{T},
     b::UnreducedKKTVector{T, VT},
-) where {T, VT}
+    ) where {T, VT}
     @debug(iterator.logger, "Iterative solver initiated")
 
-        kkt = iterator.kkt
-        norm_b = norm(full(b), Inf)
-        residual_ratio = 0.0
+    kkt = iterator.kkt
+    norm_b = norm(full(b), Inf)
+    residual_ratio = 0.0
 
-        w = iterator.residual
-        fill!(full(x), 0)
-        copyto!(full(w), full(b))
-        iter = 0
+    w = iterator.residual
+    fill!(full(x), 0)
+    copyto!(full(w), full(b))
+    iter = 0
 
     while true
         solve!(kkt,w,iterator.cnt)
         axpy!(1., full(w), full(x))
         copyto!(full(w), full(b))
         mul_subtract!(w, kkt, x)
-
         
         norm_w = norm(full(w), Inf)
         norm_x = norm(full(x), Inf)

@@ -371,20 +371,20 @@ function regular!(solver::AbstractMadNLPSolver{T}) where T
         if (solver.cnt.k!=0 && !solver.opt.jacobian_constant)
             eval_jac_wrapper!(solver, solver.kkt, solver.x)
         end
-            jtprod!(solver.jacl, solver.kkt, solver.y)
-            sd = get_sd(solver.y,solver.zl_r,solver.zu_r,solver.opt.s_max)
-            sc = get_sc(solver.zl_r,solver.zu_r,solver.opt.s_max)
+        jtprod!(solver.jacl, solver.kkt, solver.y)
+        sd = get_sd(solver.y,solver.zl_r,solver.zu_r,solver.opt.s_max)
+        sc = get_sc(solver.zl_r,solver.zu_r,solver.opt.s_max)
 
-            solver.inf_pr = get_inf_pr(solver.c)
-            solver.inf_du = get_inf_du(
-                full(solver.f),
-                full(solver.zl),
-                full(solver.zu),
-                solver.jacl,
-                sd,
-            )
-            solver.inf_compl = get_inf_compl(solver.x_lr,solver.xl_r,solver.zl_r,solver.xu_r,solver.x_ur,solver.zu_r,0.,sc)
-            inf_compl_mu = get_inf_compl(solver.x_lr,solver.xl_r,solver.zl_r,solver.xu_r,solver.x_ur,solver.zu_r,solver.mu,sc)
+        solver.inf_pr = get_inf_pr(solver.c)
+        solver.inf_du = get_inf_du(
+            full(solver.f),
+            full(solver.zl),
+            full(solver.zu),
+            solver.jacl,
+            sd,
+        )
+        solver.inf_compl = get_inf_compl(solver.x_lr,solver.xl_r,solver.zl_r,solver.xu_r,solver.x_ur,solver.zu_r,0.,sc)
+        inf_compl_mu = get_inf_compl(solver.x_lr,solver.xl_r,solver.zl_r,solver.xu_r,solver.x_ur,solver.zu_r,solver.mu,sc)
 
         print_iter(solver)
 
@@ -873,16 +873,14 @@ function robust!(solver::MadNLPSolver{T}) where T
 end
 
 function inertia_based_reg(solver::MadNLPSolver)
-        n_trial = 0
-        solver.kkt.del_w = del_w_prev = 0.0
+    n_trial = 0
+    solver.kkt.del_w = del_w_prev = 0.0
 
-        @trace(solver.logger,"Inertia-based regularization started.")
+    @trace(solver.logger,"Inertia-based regularization started.")
 
-        factorize_wrapper!(solver)
-    @time begin
-        num_pos,num_zero,num_neg = inertia(solver.kkt.linear_solver)
-    end
-        solve_status = num_zero!= 0 ? false : solve_refine!(solver.d, solver.iterator, solver.p)
+    factorize_wrapper!(solver)
+    num_pos,num_zero,num_neg = inertia(solver.kkt.linear_solver)
+    solve_status = num_zero!= 0 ? false : solve_refine!(solver.d, solver.iterator, solver.p)
 
     while !is_inertia_correct(solver.kkt, num_pos, num_zero, num_neg) || !solve_status
         @debug(solver.logger,"Primal-dual perturbed.")
