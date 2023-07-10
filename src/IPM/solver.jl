@@ -173,7 +173,9 @@ function solve!(
         end
     finally
         solver.cnt.total_time = time() - solver.cnt.start_time
-        !(solver.status < SOLVE_SUCCEEDED) && (print_summary_1(solver);print_summary_2(solver))
+        if !(solver.status < SOLVE_SUCCEEDED)
+            print_summary(solver)
+        end
         # Unscale once the summary has been printed out
         unscale!(solver)
         @notice(solver.logger,"EXIT: $(STATUS_OUTPUT_DICT[solver.status])")

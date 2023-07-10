@@ -40,7 +40,8 @@ end
 
     # NLP options
     kappa_d::Float64 = 1e-5
-    fixed_variable_treatment::FixedVariableTreatments = MAKE_PARAMETER
+    fixed_variable_treatment::Type = MakeParameter
+    boudn_relax_factor::Float64 = 1e-8
     jacobian_constant::Bool = false
     hessian_constant::Bool = false
     kkt_system::Type = SparseKKTSystem

@@ -8,29 +8,28 @@ mutable struct MadNLPExecutionStats{T, VT} <: AbstractExecutionStats
     multipliers::VT
     multipliers_L::VT
     multipliers_U::VT
-    iter::Int
-    counters
-    elapsed_time::Real
+    counters::MadNLPCounters
 end
 
 MadNLPExecutionStats(solver::MadNLPSolver) =MadNLPExecutionStats(
     solver.status,
     primal(solver.x),
-    solver.obj_val,solver.c,
-    solver.inf_du, solver.inf_pr,
+    solver.obj_val / solver.nlp.obj_scale,
+    solver.c ./ solver.nlp.con_scale,
+    solver.inf_du,
+    solver.inf_pr,
     solver.y,
     primal(solver.zl),
     primal(solver.zu),
-    solver.cnt.k, get_counters(solver.nlp),solver.cnt.total_time
+    solver.cnt,
 )
 
 function update!(stats::MadNLPExecutionStats, solver::MadNLPSolver)
     stats.status = solver.status
-    stats.objective = solver.obj_val
+    stats.objective = solver.obj_val / solver.nlp.obj_scale
+    stats.constraints .= solver.c ./ solver.nlp.con_scale
     stats.dual_feas = solver.inf_du
     stats.primal_feas = solver.inf_pr
-    stats.iter = solver.cnt.k
-    stats.elapsed_time = solver.cnt.total_time
     return stats
 end
 
@@ -110,8 +109,7 @@ function print_init(solver::AbstractMadNLPSolver)
 end
 
 function print_iter(solver::AbstractMadNLPSolver;is_resto=false)
-    # TODO inquire this from nlpmodel wrapper
-    obj_scale = 1
+    obj_scale = solver.nlp.obj_scale
     mod(solver.cnt.k,10)==0&& @info(solver.logger,@sprintf(
         "iter    objective    inf_pr   inf_du lg(mu)  ||d||  lg(rg) alpha_du alpha_pr  ls"))
     if is_resto
@@ -134,9 +132,11 @@ function print_iter(solver::AbstractMadNLPSolver;is_resto=false)
     return
 end
 
-function print_summary_1(solver::AbstractMadNLPSolver)
+function print_summary(solver::AbstractMadNLPSolver)
     # TODO inquire this from nlpmodel wrapper
-    obj_scale = 1
+    obj_scale = solver.nlp.obj_scale
+    solver.cnt.solver_time = solver.cnt.total_time-solver.cnt.linear_solver_time-solver.cnt.eval_function_time
+    
     @notice(solver.logger,"")
     @notice(solver.logger,"Number of Iterations....: $(solver.cnt.k)\n")
     @notice(solver.logger,"                                   (scaled)                 (unscaled)")
@@ -148,11 +148,7 @@ function print_summary_1(solver::AbstractMadNLPSolver)
     @notice(solver.logger,@sprintf("Overall NLP error.......:   %1.16e    %1.16e\n",
                                 max(solver.inf_du*obj_scale,norm(solver.c,Inf),solver.inf_compl),
                                 max(solver.inf_du,solver.inf_pr,solver.inf_compl)))
-    return
-end
-
-function print_summary_2(solver::AbstractMadNLPSolver)
-    solver.cnt.solver_time = solver.cnt.total_time-solver.cnt.linear_solver_time-solver.cnt.eval_function_time
+    
     @notice(solver.logger,"Number of objective function evaluations             = $(solver.cnt.obj_cnt)")
     @notice(solver.logger,"Number of objective gradient evaluations             = $(solver.cnt.obj_grad_cnt)")
     @notice(solver.logger,"Number of constraint evaluations                     = $(solver.cnt.con_cnt)")

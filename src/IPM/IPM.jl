@@ -10,7 +10,7 @@ mutable struct MadNLPSolver{
     VT <: AbstractVector{T},
     VI <: AbstractVector{Int},
     KKTSystem <: AbstractKKTSystem{T},
-    Model <: AbstractNLPModel,
+    Model <: NLPModelWrapper{T},
     Iterator <: AbstractIterator{T},
     KKTVec <: AbstractKKTVector{T, VT}
     } <: AbstractMadNLPSolver{T}
@@ -100,12 +100,13 @@ mutable struct MadNLPSolver{
     output::Dict
 end
 
-function MadNLPSolver(nlp::AbstractNLPModel{T,VT}; kwargs...) where {T, VT}
+function MadNLPSolver(m::AbstractNLPModel{T,VT}; kwargs...) where {T, VT}
     
     opt, opt_linear_solver, logger = load_options(; kwargs...)
     @assert is_supported(opt.linear_solver, T)
 
     cnt = MadNLPCounters(start_time=time())
+    nlp = NLPModelWrapper(m; opt = opt)
 
     # generic options
     opt.disable_garbage_collector &&

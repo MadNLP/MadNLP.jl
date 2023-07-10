@@ -310,7 +310,6 @@ end
 # Scaling
 function unscale!(solver::AbstractMadNLPSolver)
     #  TODO: do this with NLPModel wrapper
-    # obj_scale = 1
     # x_slk = slack(solver.x)
     # solver.obj_val /= solver.obj_scale
     # @inbounds @simd for i in eachindex(solver.c)
