@@ -9,6 +9,16 @@ import MadNLP:
     SymbolicException,FactorizationException,SolveException,InertiaException,
     AbstractOptions, AbstractLinearSolver, set_options!, input_type, default_options,
     introduce, factorize!, solve!, improve!, is_inertia, is_supported, inertia, findIJ, nnz
+import LinearAlgebra, OpenBLAS32_jll
+
+function __init__()
+    if VERSION ≥ v"1.9"
+        config = LinearAlgebra.BLAS.lbt_get_config()
+        if !any(lib -> lib.interface == :lp64, config.loaded_libs)
+            LinearAlgebra.BLAS.lbt_forward(OpenBLAS32_jll.libopenblas_path)
+        end
+    end
+end
 
 const version = parsefile(joinpath(dirname(pathof(MUMPS_seq_jll)),"..","Project.toml"))["version"]
 
@@ -22,7 +32,7 @@ const version = parsefile(joinpath(dirname(pathof(MUMPS_seq_jll)),"..","Project.
     mumps_scaling::Int = 77
 end
 
-if version == "5.3.5+0"
+if version in ["5.3.5+0", "500.600.0+0"] 
     @kwdef mutable struct Struc{T}
         sym::Cint = 0
         par::Cint = 0
@@ -127,7 +137,7 @@ if version == "5.3.5+0"
 
         metis_options::SVector{40,Cint} = zeros(40)
     end
-elseif version == "5.2.1+4"
+elseif version in ["5.2.1+4"]
     @kwdef mutable struct Struc{T}
         sym::Cint = 0
         par::Cint = 0
