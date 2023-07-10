@@ -1,7 +1,7 @@
 using MadNLP, MadNLPHSL, MadNLPGPU, SIMDiffExamples, CUDA
 using JuMP, Ipopt
 using StatsPlots, LaTeXStrings
-pgfplotsx()
+# pgfplotsx()
 
 SIMDiffExamples.silence()
 CUDA.allowscalar(false)
@@ -57,8 +57,8 @@ end
 
 
 
-stime = vcat([[t11-t21, t13-t23] for (casename, t11, t12, t21, t22) in save]...)
-ftime = vcat([[t21, t23] for (casename, t11, t12, t21, t22) in save]...)
+stime = vcat([[t11-t21, t12-t22] for (casename, t11, t12, t21, t22) in save]...)
+ftime = vcat([[t21, t22] for (casename, t11, t12, t21, t22) in save]...)
 ticks = vcat([["SIMDiff + MadNLP (GPU)", "JuMP + Ipopt (CPU)"] for (casename, t11, t12, t21, t22) in save]...)
 
 plt = groupedbar(
