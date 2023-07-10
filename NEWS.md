@@ -1,5 +1,15 @@
 # Release notes
 
+## v0.7.0 (June 123th, 2023)
+
+### Performance and maintenance
+- CompatHelper: bump compat for NLPModels to 0.20, (keep existing compat) (#252)
+- CompatHelper: bump compat for NLPModels to 0.20 for package MadNLPTests, (keep existing compat) (#253)
+- [MadNLPGPU] Migrate to KernelAbstractions 0.9 (#258)
+- [MadNLPTests] Remove ADNLPModels in deps (#259)
+- Update README.md for JuMP documentation (#260)
+- Update for julia v1.9 (#261)
+
 ## v0.6.0 (March 23th, 2023)
 
 ### New features
