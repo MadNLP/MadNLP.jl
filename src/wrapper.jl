@@ -53,59 +53,57 @@ end
 
 function create_fixed_handler(
     fixed_variable_treatment::Type{MakeParameter},
-    meta,
+    lvar,
+    uvar,
+    nnzj,
+    nnzh,
     jac_I,
     jac_J,
     hess_I,
     hess_J;
     opt
     )
-    isfixed  = (meta.lvar .== meta.uvar)
+    isfixed  = (lvar .== uvar)
     
     fixed  = findall(isfixed)
     fixedj = findall(@view(isfixed[jac_J]))
     fixedh = findall(@view(isfixed[hess_I]) .|| @view(isfixed[hess_J]))
     nfixed = length(fixed)
 
-    lvar = copy(meta.lvar)
-    uvar = copy(meta.uvar)
     fill!(@view(lvar[fixed]), -Inf)
     fill!(@view(uvar[fixed]),  Inf)
 
-    nnzj = meta.nnzj
-    nnzh = meta.nnzh + nfixed
+    nnzh = nnzh + nfixed
 
     fixed_handler = MakeParameter(fixed,fixedj,fixedh)
 
     
-    return fixed_handler, lvar, uvar, nnzj, nnzh
+    return fixed_handler, nnzj, nnzh
 end
 
 function create_fixed_handler(
     fixed_variable_treatment::Type{RelaxBound},
-    meta,
+    lvar,
+    uvar,
+    nnzj,
+    nnzh,
     jac_I,
     jac_J,
     hess_I,
     hess_J;
     opt
     )
-    isfixed  = (meta.lvar .== meta.uvar)
+    isfixed  = (lvar .== uvar)
     
     fixed  = findall(isfixed)
     
-    lvar = copy(meta.lvar)
-    uvar = copy(meta.uvar)
     lvar[fixed] .+= opt.boudn_relax_factor
     uvar[fixed] .+= opt.boudn_relax_factor
-
-    nnzj = meta.nnzj
-    nnzh = meta.nnzh
 
     fixed_handler = RelaxBound()
 
     
-    return fixed_handler, lvar, uvar, nnzj, nnzh
+    return fixed_handler, nnzj, nnzh
 end
 
 function NLPModelWrapper(
@@ -118,33 +116,68 @@ function NLPModelWrapper(
     nnzj = get_nnzj(nlp)
     nnzh = get_nnzh(nlp)
 
-    x_buffer    = copy(get_x0(nlp))
-    l_buffer = similar(x_buffer, m)
-    grad_buffer = similar(x_buffer, n)
-    jac_buffer = similar(x_buffer, nnzj)
-    hess_buffer = similar(x_buffer, nnzh)
+    x0    = copy(get_x0(nlp))
+    lvar = copy(nlp.meta.lvar)
+    uvar = copy(nlp.meta.uvar)
+    
+    l_buffer = similar(x0, m)
+    grad_buffer = similar(x0, n)
+    jac_buffer = similar(x0, nnzj)
+    hess_buffer = similar(x0, nnzh)
 
-    jac_I = similar(x_buffer, Int, nnzj)
-    jac_J = similar(x_buffer, Int, nnzj)
-    hess_I = similar(x_buffer, Int, nnzh)
-    hess_J = similar(x_buffer, Int, nnzh)
+    jac_I = similar(x0, Int, nnzj)
+    jac_J = similar(x0, Int, nnzj)
+    hess_I = similar(x0, Int, nnzh)
+    hess_J = similar(x0, Int, nnzh)
 
     NLPModels.jac_structure!(nlp,jac_I,jac_J)
     NLPModels.hess_structure!(nlp,hess_I,hess_J)
-    NLPModels.cons!(nlp,x_buffer,l_buffer)
-    NLPModels.jac_coord!(nlp,x_buffer,jac_buffer)
-    NLPModels.grad!(nlp,x_buffer,grad_buffer)
-    
+
+    fixed_handler, nnzj, nnzh = create_fixed_handler(
+        opt.fixed_variable_treatment,
+        lvar, uvar, nnzj, nnzh,
+        jac_I, jac_J, hess_I, hess_J;
+        opt = opt
+    )
+
+    set_initial_bounds!(
+        lvar,
+        uvar,
+        opt.tol
+    )
+    initialize_variables!(
+        x0,
+        lvar,
+        uvar,
+        opt.bound_push,
+        opt.bound_fac
+    )
+
+    NLPModels.cons!(nlp,x0,l_buffer)
+    NLPModels.jac_coord!(nlp,x0,jac_buffer)
+    NLPModels.grad!(nlp,x0,grad_buffer)
+
     con_scale, jac_scale = get_con_scale(jac_I, jac_buffer, get_ncon(nlp), get_nnzj(nlp), opt.nlp_scaling_max_gradient)
     obj_scale = get_obj_scale(grad_buffer, opt.nlp_scaling_max_gradient)
 
-    y0   = get_y0(nlp) .* con_scale
+    l_buffer .*= con_scale
+    y0   = get_y0(nlp) ./ con_scale
     lcon = get_lcon(nlp) .* con_scale
     ucon = get_ucon(nlp) .* con_scale
 
-    fixed_handler, lvar, uvar, nnzj, nnzh = create_fixed_handler(
-        opt.fixed_variable_treatment, nlp.meta, jac_I, jac_J, hess_I, hess_J;
-        opt = opt
+
+    is = findall(.!(lcon .== -Inf .&& ucon .== Inf) .&& (lcon .!= ucon))
+    set_initial_bounds!(
+        @view(lcon[is]),
+        @view(ucon[is]),
+        opt.tol
+    )
+    initialize_variables!(
+        @view(l_buffer[is]),
+        @view(lcon[is]),
+        @view(ucon[is]),
+        opt.bound_push,
+        opt.bound_fac
     )
     
     return NLPModelWrapper(
@@ -160,7 +193,7 @@ function NLPModelWrapper(
         fixed_handler,
         NLPModelMeta(
             n,
-            x0 = get_x0(nlp),
+            x0 = x0,
             lvar = lvar,
             uvar = uvar,
             ncon = m,
@@ -235,12 +268,14 @@ function NLPModels.grad!(
     
     NLPModels.grad!(nlp.inner, x, grad)
     grad .*= nlp.obj_scale
+    _treat_fixed_variable_grad!(nlp.fixed_handler, nlp, x, grad)
 end
 function _treat_fixed_variable_grad!(fixed_handler::RelaxBound, nlp, x, grad) end
 function _treat_fixed_variable_grad!(fixed_handler::MakeParameter, nlp::NLPModelWrapper{T}, x, grad) where T
     map!(
-        -,
+        (x,y)->x-y,
         @view(grad[fixed_handler.fixed]),
+        @view(x[nlp.fixed_handler.fixed]),
         @view(nlp.inner.meta.lvar[nlp.fixed_handler.fixed])
     )
 end

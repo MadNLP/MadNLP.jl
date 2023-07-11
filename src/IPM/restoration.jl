@@ -99,6 +99,6 @@ function initialize_robust_restorer!(solver::AbstractMadNLPSolver{T}) where T
     solver.cnt.t = 0
 
     # misc
-    solver.del_w = zero(T)
+    solver.kkt.del_w = zero(T)
 end
 

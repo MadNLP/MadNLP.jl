@@ -242,9 +242,15 @@ end
 #         solver.xu_r[i] += max(one(T),abs(solver.xu_r[i]))*solver.opt.tol
 #     end
 # end
-function set_initial_bounds!(solver::MadNLP.MadNLPSolver{T, VT}) where {T, VT}
-    solver.xl_r .-= max.(one(T), abs.(solver.xl_r)) .* solver.opt.tol
-    solver.xu_r .+= max.(one(T), abs.(solver.xu_r)) .* solver.opt.tol
+function set_initial_bounds!(xl::AbstractVector{T},xu,tol) where T
+    map!(
+        x->x - max(one(T), abs(x)) .* tol,
+        xl, xl
+    )
+    map!(
+        x->x + max(one(T), abs(x)) .* tol,
+        xu, xu
+    )
 end
 
 function set_initial_rhs!(solver::MadNLPSolver{T}, kkt::AbstractKKTSystem) where T

@@ -16,33 +16,26 @@ function initialize!(solver::AbstractMadNLPSolver{T}) where T
 
     # initializing slack variables
     @trace(solver.logger,"Initializing slack variables.")
-    cons!(solver.nlp,get_x0(solver.nlp),_madnlp_unsafe_wrap(solver.c,get_ncon(solver.nlp)))
-    solver.cnt.con_cnt += 1
-    copyto!(slack(solver.x), solver.c_slk)
+    # cons!(solver.nlp,get_x0(solver.nlp),_madnlp_unsafe_wrap(solver.c,get_ncon(solver.nlp)))
+    # solver.cnt.con_cnt += 1
+    copyto!(slack(solver.x), @view(solver.nlp.l_buffer[solver.ind_ineq]))
 
     # Initialization
     @trace(solver.logger,"Initializing primal and bound duals.")
     fill!(solver.zl_r, one(T))
     fill!(solver.zu_r, one(T))
-
-    set_initial_bounds!(solver)
-    initialize_variables!(
-        full(solver.x),
-        full(solver.xl),
-        full(solver.xu),
-        solver.opt.bound_push,solver.opt.bound_fac
-    )
+    
     # Automatic scaling (constraints)
     @trace(solver.logger,"Computing constraint scaling.")
     eval_jac_wrapper!(solver, solver.kkt, solver.x)
-    compress_jacobian!(solver.kkt)
+    # compress_jacobian!(solver.kkt)
     # if (solver.m > 0) 
     # jac = get_raw_jacobian(solver.kkt)
     # scale_constraints!(solver.nlp, solver.con_scale, jac; max_gradient=solver.opt.nlp_scaling_max_gradient)
     # set_jacobian_scaling!(solver.kkt, solver.con_scale)
     # solver.y ./= solver.con_scale
     # end
-    compress_jacobian!(solver.kkt)
+    # compress_jacobian!(solver.kkt)
 
     # Automatic scaling (objective)
     eval_grad_f_wrapper!(solver, solver.f,solver.x)
@@ -719,14 +712,20 @@ function robust!(solver::MadNLPSolver{T}) where T
             eval_lag_hess_wrapper!(solver, solver.kkt, solver.x, solver.y; is_resto=true)
         end
         set_aug_RR!(solver.kkt, solver, RR)
-        set_aug_rhs_RR!(solver, solver.kkt, RR, solver.opt.rho)
-
+        
         # without inertia correction,
         @trace(solver.logger,"Solving restoration phase primal-dual system.")
         factorize_wrapper!(solver)
-        error() # TODO
-        solve_refine!(solver.d, solver.iterator, solver.p)
-        finish_aug_solve_RR!(RR.dpp,RR.dnn,RR.dzp,RR.dzn,solver.y,dual(solver.d),RR.pp,RR.nn,RR.zp,RR.zn,RR.mu_R,solver.opt.rho)
+        
+        set_aug_rhs_RR!(solver, solver.kkt, RR, solver.opt.rho)
+        
+        ### temporary fix
+        # TODO: use solve_refine! here
+        copyto!(full(solver.d), full(solver.p))
+        solve!(solver.kkt.linear_solver, primal_dual(solver.d))
+        ###
+        
+        finish_aug_solve_RR!(RR.dpp,RR.dnn,RR.dzp,RR.dzn,solver.y,dual(solver.d),RR.pp,RR.nn,RR.zp,RR.zn,RR.mu_R,solver.opt.rho) 
 
         theta_R = get_theta_R(solver.c,RR.pp,RR.nn)
         varphi_R = get_varphi_R(RR.obj_val_R,solver.x_lr,solver.xl_r,solver.xu_r,solver.x_ur,RR.pp,RR.nn,RR.mu_R)

@@ -132,6 +132,7 @@ function MadNLPSolver(m::AbstractNLPModel{T,VT}; kwargs...) where {T, VT}
     xu = PrimalVector(VT,nx, ns, ind_cons)
     variable(xu) .= get_uvar(nlp)
     slack(xu) .= view(get_ucon(nlp), ind_cons.ind_ineq)
+    
     zl = PrimalVector(VT,nx, ns, ind_cons)
     zu = PrimalVector(VT,nx, ns, ind_cons)
     
