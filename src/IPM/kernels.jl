@@ -70,6 +70,12 @@ function set_aug_RR!(kkt::AbstractKKTSystem, solver::MadNLPSolver, RR::RobustRes
     @inbounds @simd for i in eachindex(kkt.du_diag)
         kkt.du_diag[i] = -RR.pp[i] /RR.zp[i] - RR.nn[i] /RR.zn[i]
     end
+
+    kkt.l_lower .= solver.zl_r
+    kkt.l_diag  .= solver.x_lr .- solver.xl_r
+    kkt.u_lower .= solver.zu_r
+    kkt.u_diag .= solver.x_ur .- solver.xu_r
+
     return
 end
 function set_aug_RR!(kkt::SparseUnreducedKKTSystem, solver::MadNLPSolver, RR::RobustRestorer)
@@ -163,7 +169,7 @@ function set_aug_rhs!(solver::MadNLPSolver, kkt::SparseUnreducedKKTSystem, c)
     end
     pzu = dual_ub(solver.p)
     @inbounds @simd for i in eachindex(pzu)
-        pzu[i] = (solver.xu_r[i] -solver.x_ur[i]) * kkt.u_lower[i] - solver.mu / kkt.u_lower[i]
+        pzu[i] = (solver.xu_r[i] - solver.x_ur[i]) * kkt.u_lower[i] - solver.mu / kkt.u_lower[i]
     end
     return
 end
@@ -197,6 +203,26 @@ function set_aug_rhs_RR!(
     end
     return
 end
+
+# solving KKT system
+@inbounds function _kktmul!(w,x,del_w,du_diag,l_lower,u_lower,l_diag,u_diag, alpha, beta)
+    primal(w) .+= alpha .* del_w .* primal(x)
+    dual(w) .+= alpha .* du_diag .* dual(x)
+    w.xp_lr .-= alpha .* dual_lb(x)
+    w.xp_ur .+= alpha .* dual_ub(x)
+    
+    dual_lb(w) .= beta .* dual_lb(w) .+ alpha .* (x.xp_lr .* l_lower .+ dual_lb(x) .* l_diag)
+    dual_ub(w) .= beta .* dual_ub(w) .+ alpha .* (x.xp_ur .* u_lower .+ dual_ub(x) .* u_diag)
+end
+
+@inbounds function aug_rhs_prep(
+    xp_lr,wl,l_diag,
+    xp_ur,wu,u_diag,
+    )
+    xp_lr .+= wl ./ l_diag
+    xp_ur .-= wu ./ u_diag
+end
+
 
 # Finish
 # temporaily commented out

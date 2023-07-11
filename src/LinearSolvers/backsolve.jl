@@ -1,8 +1,4 @@
-# MadNLP.jl
-# Created by Sungho Shin (sungho.shin@wisc.edu)
-
-struct RichardsonIterator{T, VT, KKT} <: AbstractIterator{T}
-    kkt::KKT
+struct RichardsonIterator{T, VT} <: AbstractIterator{T}
     residual::VT
     max_iter::Int
     tol::T
@@ -12,7 +8,6 @@ struct RichardsonIterator{T, VT, KKT} <: AbstractIterator{T}
 end
 
 function RichardsonIterator(
-    kkt::AbstractKKTSystem{T},
     residual::UnreducedKKTVector{T};
     max_iter=10,
     tol=T(1e-10),
@@ -21,41 +16,44 @@ function RichardsonIterator(
     cnt=MadNLPCounters()
 ) where T
     return RichardsonIterator(
-        kkt, residual, max_iter, tol, acceptable_tol, cnt, logger
+        residual, max_iter, tol, acceptable_tol, cnt, logger
     )
 end
 
 function solve_refine!(
-    x::UnreducedKKTVector{T, VT},
-    iterator::RichardsonIterator{T},
-    b::UnreducedKKTVector{T, VT},
-    ) where {T, VT}
+    x::VT,
+    iterator::R,
+    b::VT,
+    solve!,
+    mul!,
+    ) where {T, VT, R <: RichardsonIterator{T, VT}}
     @debug(iterator.logger, "Iterative solver initiated")
 
-    kkt = iterator.kkt
     norm_b = norm(full(b), Inf)
-    residual_ratio = 0.0
+    residual_ratio = zero(T)
 
     w = iterator.residual
-    fill!(full(x), 0)
+    fill!(full(x), zero(T))
     copyto!(full(w), full(b))
     iter = 0
 
     while true
-        solve!(kkt,w,iterator.cnt)
+        iterator.cnt.linear_solver_time += @elapsed solve!(w)  # TODO this includes some extra time. Ideally, LinearSolver should count the time
         axpy!(1., full(w), full(x))
         copyto!(full(w), full(b))
-        mul_subtract!(w, kkt, x)
+        mul!(w, x, -one(T), one(T))
         
         norm_w = norm(full(w), Inf)
         norm_x = norm(full(x), Inf)
         residual_ratio = norm_w / (min(norm_x, 1e6 * norm_b) + norm_b)
         
-        mod(iter, 10)==0 &&
+        if mod(iter, 10)==0 
             @debug(iterator.logger,"iter ||res||")
+        end
         @debug(iterator.logger, @sprintf("%4i %6.2e", iter, residual_ratio))
         iter += 1
-        if (iter > iterator.max_iter) || (residual_ratio < iterator.tol)
+        
+        if (iter >= iterator.max_iter) || (residual_ratio < iterator.tol)
             break
         end
     end

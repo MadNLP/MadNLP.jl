@@ -89,10 +89,6 @@ mutable struct MadNLPSolver{
     alpha_z::T
     ftype::String
 
-    # del_w::T
-    # del_c::T
-    # del_w_last::T
-
     filter::Vector{Tuple{T,T}}
 
     RR::Union{Nothing,RobustRestorer{T}}
@@ -176,7 +172,7 @@ function MadNLPSolver(m::AbstractNLPModel{T,VT}; kwargs...) where {T, VT}
     n_kkt = size(kkt, 1)
     @trace(logger,"Initializing iterative solver.")
     residual = UnreducedKKTVector(VT, n, m, nlb, nub, ind_cons)
-    iterator = opt.iterator(kkt, residual; cnt = cnt, logger = logger)
+    iterator = opt.iterator(residual; cnt = cnt, logger = logger)
 
 
     @trace(logger,"Initializing fixed variable treatment scheme.")
@@ -184,7 +180,6 @@ function MadNLPSolver(m::AbstractNLPModel{T,VT}; kwargs...) where {T, VT}
     if opt.inertia_correction_method == INERTIA_AUTO
         opt.inertia_correction_method = is_inertia(kkt.linear_solver)::Bool ? INERTIA_BASED : INERTIA_FREE
     end
-
 
     return MadNLPSolver(
         nlp,kkt,opt,cnt,logger,

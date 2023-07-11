@@ -7,7 +7,7 @@ function get_index_constraints(nlp::AbstractNLPModel; fixed_variable_treatment=M
         ind_lb = findall((xl .!= -Inf) .* (xl .!= xu))
         ind_ub = findall((xu .!=  Inf) .* (xl .!= xu))
     else
-        ind_fixed = Int[]
+        ind_fixed = similar(xl, Int, 0)
         ind_lb = findall(xl .!=-Inf)
         ind_ub = findall(xu .!= Inf)
     end

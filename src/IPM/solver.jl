@@ -51,7 +51,11 @@ function initialize!(solver::AbstractMadNLPSolver{T}) where T
         set_initial_rhs!(solver, solver.kkt)
         # initialize!(solver.kkt)
         factorize_wrapper!(solver)
-        is_solved = solve_refine!(solver.d, solver.iterator, solver.p)
+        is_solved = solve_refine!(
+            solver.d, solver.iterator, solver.p,
+            x -> solve!(solver.kkt, x),
+            (y,x,alpha,beta) -> mul!(y, solver.kkt, x, alpha, beta)
+        )
         
         if !is_solved || (norm(dual(solver.d), Inf) > solver.opt.constr_mult_init_max)
             fill!(solver.y, zero(T))
@@ -640,7 +644,12 @@ function restore!(solver::AbstractMadNLPSolver)
 
         dual_inf_perturbation!(primal(solver.p),solver.ind_llb,solver.ind_uub,solver.mu,solver.opt.kappa_d)
         factorize_wrapper!(solver)
-        solve_refine!(solver.d, solver.iterator, solver.p)
+        # TODO check this
+        solve_refine!(
+            solver.d, solver.iterator, solver.p,
+            x -> solve!(solver.kkt, x),
+            (y,x,alpha,beta) -> mul!(y, solver.kkt, x, alpha, beta)
+        )
 
         solver.ftype = "f"
     end
@@ -717,14 +726,23 @@ function robust!(solver::MadNLPSolver{T}) where T
         @trace(solver.logger,"Solving restoration phase primal-dual system.")
         factorize_wrapper!(solver)
         
-        set_aug_rhs_RR!(solver, solver.kkt, RR, solver.opt.rho)
         
         ### temporary fix
         # TODO: use solve_refine! here
+        set_aug_rhs_RR!(solver, solver.kkt, RR, solver.opt.rho)
+
+        
         copyto!(full(solver.d), full(solver.p))
+
+        w = solver.d
+        kkt = solver.kkt
+        aug_rhs_prep(w.xp_lr, dual_lb(w), kkt.l_diag, w.xp_ur, dual_ub(w), kkt.u_diag)
         solve!(solver.kkt.linear_solver, primal_dual(solver.d))
-        ###
+
+        
         finish_aug_solve_old!(solver, solver.kkt, RR.mu_R)
+        ###
+        
         finish_aug_solve_RR!(
             RR.dpp,RR.dnn,RR.dzp,RR.dzn,solver.y,dual(solver.d),
             RR.pp,RR.nn,RR.zp,RR.zn,RR.mu_R,solver.opt.rho) 
@@ -854,7 +872,11 @@ function robust!(solver::MadNLPSolver{T}) where T
             initialize!(solver.kkt)
 
             factorize_wrapper!(solver)
-            solve_refine!(solver.d, solver.iterator, solver.p)
+            solve_refine!(
+                solver.d, solver.iterator, solver.p,
+                x -> solve!(solver.kkt, x),
+                (y,x,alpha,beta) -> mul!(y, solver.kkt, x, alpha, beta)
+            )
             
             if norm(dual(solver.d), Inf)>solver.opt.constr_mult_init_max
                 fill!(solver.y, 0.0)
@@ -883,7 +905,11 @@ function inertia_based_reg(solver::MadNLPSolver)
 
     factorize_wrapper!(solver)
     num_pos,num_zero,num_neg = inertia(solver.kkt.linear_solver)
-    solve_status = num_zero!= 0 ? false : solve_refine!(solver.d, solver.iterator, solver.p)
+    solve_status = num_zero!= 0 ? false : solve_refine!(
+        solver.d, solver.iterator, solver.p,
+        x -> solve!(solver.kkt, x),
+        (y,x,alpha,beta) -> mul!(y, solver.kkt, x, alpha, beta)
+    )
 
     while !is_inertia_correct(solver.kkt, num_pos, num_zero, num_neg) || !solve_status
         @debug(solver.logger,"Primal-dual perturbed.")
@@ -904,7 +930,11 @@ function inertia_based_reg(solver::MadNLPSolver)
 
         factorize_wrapper!(solver)
         num_pos,num_zero,num_neg = inertia(solver.kkt.linear_solver)
-        solve_status = num_zero!= 0 ? false : solve_refine!(solver.d, solver.iterator, solver.p)
+        solve_status = num_zero!= 0 ? false : solve_refine!(
+            solver.d, solver.iterator, solver.p,
+            x -> solve!(solver.kkt, x),
+            (y,x,alpha,beta) -> mul!(y, solver.kkt, x, alpha, beta)
+        )
         n_trial += 1
     end
     solver.kkt.del_w != 0 && (solver.kkt.del_w_last = solver.kkt.del_w)
@@ -933,7 +963,15 @@ function inertia_free_reg(solver::MadNLPSolver)
     fixed_variable_treatment_vec!(g, solver.ind_fixed)
 
     factorize_wrapper!(solver)
-    solve_status = (solve_refine!(d0, solver.iterator, p0) && solve_refine!(solver.d, solver.iterator, solver.p))
+    solve_status = solve_refine!(
+        solver.d0, solver.iterator, solver.p0,
+        x -> solve!(solver.kkt, x),
+        (y,x,alpha,beta) -> mul!(y, solver.kkt, x, alpha, beta)
+    ) && solve_refine!(
+        solver.d, solver.iterator, solver.p,
+        x -> solve!(solver.kkt, x),
+        (y,x,alpha,beta) -> mul!(y, solver.kkt, x, alpha, beta)
+    )
     copyto!(t,dx)
     axpy!(-1.,n,t)
     mul!(solver._w4, solver.kkt, solver._w3) # prepartation for curv_test
@@ -952,11 +990,19 @@ function inertia_free_reg(solver::MadNLPSolver)
         end
         solver.kkt.del_c = !solve_status ?
             solver.opt.jacobian_regularization_value * solver.mu^(solver.opt.jacobian_regularization_exponent) : 0.
-        regularize_diagonal!(solver.kkt, solver.kkt.del_w - del_w_prev, solver.kkt.del_c)
+            regularize_diagonal!(solver.kkt, solver.kkt.del_w - del_w_prev, solver.kkt.del_c)
         del_w_prev = solver.kkt.del_w
 
         factorize_wrapper!(solver)
-        solve_status = (solve_refine!(d0, solver.iterator, p0) && solve_refine!(solver.d, solver.iterator, solver.p))
+        solve_status = solve_refine!(
+            solver.d0, solver.iterator, solver.p0,
+            x -> solve!(solver.kkt, x),
+            (y,x,alpha,beta) -> mul!(y, solver.kkt, x, alpha, beta)
+        ) && solve_refine!(
+            solver.d, solver.iterator, solver.p,
+            x -> solve!(solver.kkt, x),
+            (y,x,alpha,beta) -> mul!(y, solver.kkt, x, alpha, beta)
+        )
         copyto!(t,dx)
         axpy!(-1.,n,t)
 
@@ -987,12 +1033,17 @@ function second_order_correction(solver::AbstractMadNLPSolver,alpha_max,theta,va
             primal(solver.p),
             solver.ind_llb,solver.ind_uub,solver.mu,solver.opt.kappa_d,
         )
-        solve_refine!(solver._w1,solver.iterator,solver.p)
+        solve_refine!(
+            solver._w1, solver.iterator, solver.p,
+            x -> solve!(solver.kkt, x),
+            (y,x,alpha,beta) -> mul!(y, solver.kkt, x, alpha, beta)
+        )
         alpha_soc = get_alpha_max(
             primal(solver.x),
             primal(solver.xl),
             primal(solver.xu),
-            wx,solver.tau)
+            wx,solver.tau
+        )
 
         copyto!(primal(solver.x_trial), primal(solver.x))
         axpy!(alpha_soc, wx, primal(solver.x_trial))

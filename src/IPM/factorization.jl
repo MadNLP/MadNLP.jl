@@ -5,35 +5,18 @@ function factorize_wrapper!(solver::MadNLPSolver)
     solver.cnt.linear_solver_time += @elapsed factorize!(solver.kkt.linear_solver)
 end
 
-@inbounds function _kktmul!(w,x,del_w,du_diag,l_lower,u_lower,l_diag,u_diag)
-    primal(w) .-= del_w .* primal(x)
-    dual(w) .-= du_diag .* dual(x)
-    w.xp_lr .+= dual_lb(x)
-    w.xp_ur .-= dual_ub(x)            
-    dual_lb(w) .-= x.xp_lr .* l_lower .+ dual_lb(x) .* l_diag
-    dual_ub(w) .-= x.xp_ur .* u_lower .+ dual_ub(x) .* u_diag
-end
 
-@inbounds function aug_rhs_prep(
-    xp_lr,wl,l_diag,
-    xp_ur,wu,u_diag,
-    )
-    xp_lr .+= wl ./ l_diag
-    xp_ur .-= wu ./ u_diag
-end
-
-
-function solve!(kkt::SparseKKTSystem, w::AbstractKKTVector, cnt)  #TODO cnt goes into linear solver
-    aug_rhs_prep(w.xp_lr, dual_lb(w), kkt.l_diag,w.xp_ur, dual_ub(w), kkt.u_diag)
-    cnt.linear_solver_time += @elapsed solve!(kkt.linear_solver, primal_dual(w))
+function solve!(kkt::SparseKKTSystem, w::AbstractKKTVector)
+    aug_rhs_prep(w.xp_lr, dual_lb(w), kkt.l_diag, w.xp_ur, dual_ub(w), kkt.u_diag)
+    solve!(kkt.linear_solver, primal_dual(w))
     finish_aug_solve!(kkt, w)
 end
 
-function mul_subtract!(w::AbstractKKTVector, kkt::SparseKKTSystem, x::AbstractKKTVector)
-    mul!(primal(w), Symmetric(kkt.hess_com, :L), primal(x), -1., 1.)
-    mul!(primal(w), kkt.jac_com', dual(x), -1., 1.)
-    mul!(dual(w), kkt.jac_com,  primal(x), -1., 1.)
-    _kktmul!(w,x,kkt.del_w,kkt.du_diag,kkt.l_lower,kkt.u_lower,kkt.l_diag,kkt.u_diag)
+function mul!(w::AbstractKKTVector{T}, kkt::SparseKKTSystem, x::AbstractKKTVector, alpha = one(T), beta = zero(T)) where T
+    mul!(primal(w), Symmetric(kkt.hess_com, :L), primal(x), alpha, beta)
+    mul!(primal(w), kkt.jac_com', dual(x), alpha, one(T))
+    mul!(dual(w), kkt.jac_com,  primal(x), alpha, beta)
+    _kktmul!(w,x,kkt.del_w,kkt.du_diag,kkt.l_lower,kkt.u_lower,kkt.l_diag,kkt.u_diag, alpha, beta)
 end
 
 function solve_refine_wrapper!(
@@ -170,7 +153,7 @@ function solve_refine_wrapper!(
 end
 
 
-function solve!(kkt::SparseCondensedKKTSystem, w::AbstractKKTVector, cnt)  #TODO cnt goes into linear solver
+function solve!(kkt::SparseCondensedKKTSystem, w::AbstractKKTVector) 
 
     n = size(kkt.hess_com, 1)
     m = size(kkt.jt_csc, 2)
@@ -188,7 +171,7 @@ function solve!(kkt::SparseCondensedKKTSystem, w::AbstractKKTVector, cnt)  #TODO
     kkt.buffer .= kkt.diag_buffer .* (wz .+ ws ./ Σs) 
     
     mul!(wx, kkt.jt_csc, kkt.buffer, 1., 1.)
-    cnt.linear_solver_time += @elapsed solve!(kkt.linear_solver, wx)
+    solve!(kkt.linear_solver, wx)
 
     mul!(wz, kkt.jt_csc', wx)
     wz .= .- kkt.buffer .+ kkt.diag_buffer .* wz
@@ -198,7 +181,7 @@ function solve!(kkt::SparseCondensedKKTSystem, w::AbstractKKTVector, cnt)  #TODO
 
 end
 
-function mul_subtract!(w::AbstractKKTVector, kkt::SparseCondensedKKTSystem, x::AbstractKKTVector)
+function mul!(w::AbstractKKTVector{T}, kkt::SparseCondensedKKTSystem, x::AbstractKKTVector, alpha, beta) where T
     n = size(kkt.hess_com, 1)
     m = size(kkt.jt_csc, 2)
 
@@ -212,12 +195,12 @@ function mul_subtract!(w::AbstractKKTVector, kkt::SparseCondensedKKTSystem, x::A
     ws = view(full(w), n+1:n+m)
     wz = view(full(w), n+m+1:n+2*m)
 
-    mul!(wx, Symmetric(kkt.hess_com, :L), xx, -1., 1.) # TODO: make this symmetric
+    mul!(wx, Symmetric(kkt.hess_com, :L), xx, alpha, beta) # TODO: make this symmetric
 
-    mul!(wx, kkt.jt_csc,  xz, -1., 1.)
-    mul!(wz, kkt.jt_csc', xx, -1., 1.)
-    axpy!(1, xz, ws)
-    axpy!(1, xs, wz)
+    mul!(wx, kkt.jt_csc,  xz, alpha, beta)
+    mul!(wz, kkt.jt_csc', xx, alpha, one(T))
+    axpy!(-alpha, xz, ws)
+    axpy!(-alpha, xs, wz)
     
-    _kktmul!(w,x,kkt.del_w,kkt.du_diag,kkt.l_lower,kkt.u_lower,kkt.l_diag,kkt.u_diag)
+    _kktmul!(w,x,kkt.del_w,kkt.du_diag,kkt.l_lower,kkt.u_lower,kkt.l_diag,kkt.u_diag, alpha, beta)
 end
