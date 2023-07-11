@@ -724,8 +724,10 @@ function robust!(solver::MadNLPSolver{T}) where T
         copyto!(full(solver.d), full(solver.p))
         solve!(solver.kkt.linear_solver, primal_dual(solver.d))
         ###
-        
-        finish_aug_solve_RR!(RR.dpp,RR.dnn,RR.dzp,RR.dzn,solver.y,dual(solver.d),RR.pp,RR.nn,RR.zp,RR.zn,RR.mu_R,solver.opt.rho) 
+        finish_aug_solve_old!(solver, solver.kkt, RR.mu_R)
+        finish_aug_solve_RR!(
+            RR.dpp,RR.dnn,RR.dzp,RR.dzn,solver.y,dual(solver.d),
+            RR.pp,RR.nn,RR.zp,RR.zn,RR.mu_R,solver.opt.rho) 
 
         theta_R = get_theta_R(solver.c,RR.pp,RR.nn)
         varphi_R = get_varphi_R(RR.obj_val_R,solver.x_lr,solver.xl_r,solver.xu_r,solver.x_ur,RR.pp,RR.nn,RR.mu_R)

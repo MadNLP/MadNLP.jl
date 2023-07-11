@@ -303,7 +303,19 @@ end
 
 
 # Finish RR
-function finish_aug_solve_RR!(dpp, dnn, dzp, dzn, l, dl, pp, nn, zp, zn, mu_R, rho)
+
+function finish_aug_solve_old!(solver::MadNLPSolver, kkt::AbstractKKTSystem, mu)
+    dlb = dual_lb(solver.d)
+    @inbounds @simd for i in eachindex(dlb)
+        dlb[i] = (mu-solver.zl_r[i]*solver.dx_lr[i])/(solver.x_lr[i]-solver.xl_r[i])-solver.zl_r[i]
+    end
+    dub = dual_ub(solver.d)
+    @inbounds @simd for i in eachindex(dub)
+        dub[i] = (mu+solver.zu_r[i]*solver.dx_ur[i])/(solver.xu_r[i]-solver.x_ur[i])-solver.zu_r[i]
+    end
+    return
+end
+function finish_aug_solve_RR!(dpp, dnn, dzp, dzn, l, dl, pp, nn, zp, zn, mu_R, rho)    
     @inbounds @simd for i in eachindex(dpp)
         dpp[i] = (mu_R + pp[i] * dl[i] - (rho - l[i]) * pp[i]) / zp[i]
         dnn[i] = (mu_R - nn[i] * dl[i] - (rho + l[i]) * nn[i]) / zn[i]
