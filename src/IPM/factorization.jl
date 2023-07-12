@@ -19,6 +19,13 @@ function mul!(w::AbstractKKTVector{T}, kkt::SparseKKTSystem, x::AbstractKKTVecto
     _kktmul!(w,x,kkt.del_w,kkt.du_diag,kkt.l_lower,kkt.u_lower,kkt.l_diag,kkt.u_diag, alpha, beta)
 end
 
+function mul_hess_blk!(wx, kkt::Union{SparseKKTSystem,SparseCondensedKKTSystem}, t)
+    n = size(kkt.hess_com, 1)
+    mul!(@view(wx[1:n]), Symmetric(kkt.hess_com, :L), @view(t[1:n]))
+    fill!(@view(wx[n+1:end]), 0)
+    wx .+= t .* kkt.pr_diag
+end
+
 function solve_refine_wrapper!(
     solver::MadNLPSolver{T,<:DenseCondensedKKTSystem},
     x::AbstractKKTVector,

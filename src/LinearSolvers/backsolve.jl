@@ -34,6 +34,18 @@ function solve_refine!(
 
     w = iterator.residual
     fill!(full(x), zero(T))
+
+    if norm_b == zero(T)
+        @debug(
+            iterator.logger,
+            @sprintf(
+                "Iterative solver terminated with %4i refinement steps and residual = %6.2e",
+                0, 0
+            ),
+        )
+        return true
+    end
+    
     copyto!(full(w), full(b))
     iter = 0
 
@@ -58,10 +70,13 @@ function solve_refine!(
         end
     end
 
-    @debug(iterator.logger, @sprintf(
-        "Iterative solver terminated with %4i refinement steps and residual = %6.2e",
-        iter, residual_ratio),
-           )
+    @debug(
+        iterator.logger,
+        @sprintf(
+            "Iterative solver terminated with %4i refinement steps and residual = %6.2e",
+            iter, residual_ratio
+        ),
+    )
 
     if residual_ratio < iterator.acceptable_tol
         return true
