@@ -208,6 +208,7 @@ get_jacobian(kkt::AbstractKKTSystem) = kkt.jac
 get_hessian(kkt::AbstractKKTSystem) = kkt.hess
 get_raw_jacobian(kkt::AbstractKKTSystem) = kkt.jac_raw
 
+
 function is_inertia_correct(kkt::AbstractKKTSystem, num_pos, num_zero, num_neg)
     return (num_zero == 0) && (num_pos == num_variables(kkt))
 end

@@ -79,8 +79,11 @@ mutable struct SparseUnreducedKKTSystem{T, VT, MT, QN, LS, VI, VI32} <: Abstract
     del_c::T
     # LinearSolver
     linear_solver::LS
+    
     # Info
     ind_ineq::VI
+    ind_lb::VI
+    ind_ub::VI
 end
 
 """
@@ -418,7 +421,7 @@ function create_kkt_system(
         jac_raw, jac_com, jac_csc_map,
         del_w, del_w_last, del_c,
         linear_solver,
-        ind_ineq,
+        ind_ineq, ind_lb, ind_ub
     )
 end
 
@@ -748,9 +751,14 @@ function build_kkt!(kkt::SparseCondensedKKTSystem)
     Σx = view(kkt.pr_diag, 1:n)
     Σs = view(kkt.pr_diag, n+1:n+m)
     Σd = kkt.du_diag
-
+    
     kkt.diag_buffer .= Σs ./ ( 1 .- Σd .* Σs)
     build_condensed_aug_coord!(kkt)
 end
 
 get_jacobian(kkt::SparseCondensedKKTSystem) = kkt.jac
+
+# TODO
+# function is_inertia_correct(kkt::SparseUnreducedKKTSystem, num_pos, num_zero, num_neg)
+#     true
+# end

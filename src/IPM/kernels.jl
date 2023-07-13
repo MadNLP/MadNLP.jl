@@ -33,7 +33,7 @@ function set_aug_diagonal!(kkt::AbstractKKTSystem{T}, solver::MadNLPSolver{T}) w
     
     kkt.pr_diag .= zl ./(x .- xl) .+ zu ./(xu .- x)
     fill!(kkt.du_diag, zero(T))
-    kkt.l_diag  .= solver.x_lr .- solver.xl_r
+    kkt.l_diag .= solver.xl_r .- solver.x_lr
     kkt.u_diag .= solver.x_ur .- solver.xu_r
     kkt.l_lower .= solver.zl_r
     kkt.u_lower .= solver.zu_r
@@ -44,12 +44,12 @@ end
 function set_aug_diagonal!(kkt::SparseUnreducedKKTSystem{T}, solver::MadNLPSolver{T}) where T
     fill!(kkt.pr_diag, zero(T))
     fill!(kkt.du_diag, zero(T))
-    kkt.l_diag  .= solver.x_lr .- solver.xl_r
+    kkt.l_diag .= solver.xl_r .- solver.x_lr
     kkt.u_diag .= solver.x_ur .- solver.xu_r
     kkt.l_lower .= solver.zl_r
     kkt.u_lower .= solver.zu_r
-    kkt.l_lower_aug .= .-sqrt.(solver.zl_r)
-    kkt.u_lower_aug .= .-sqrt.(solver.zu_r)
+    kkt.l_lower_aug .= sqrt.(solver.zl_r)
+    kkt.u_lower_aug .= sqrt.(solver.zu_r)
     return
 end
 
@@ -62,10 +62,10 @@ function set_aug_RR!(kkt::AbstractKKTSystem, solver::MadNLPSolver, RR::RobustRes
     zu = full(solver.zu)
     kkt.pr_diag .= zl ./(x .- xl) .+ zu ./(xu .- x) .+ RR.zeta .* RR.D_R .^ 2
     kkt.du_diag .= .- RR.pp ./ RR.zp .- RR.nn ./ RR.zn
-    kkt.l_lower .= solver.zl_r
-    kkt.l_diag  .= solver.x_lr .- solver.xl_r
-    kkt.u_lower .= solver.zu_r
+    kkt.l_diag  .= solver.xl_r .- solver.x_lr
     kkt.u_diag .= solver.x_ur .- solver.xu_r
+    kkt.l_lower .= solver.zl_r
+    kkt.u_lower .= solver.zu_r
 
     return
 end
@@ -73,7 +73,7 @@ function set_aug_RR!(kkt::SparseUnreducedKKTSystem, solver::MadNLPSolver, RR::Ro
     kkt.pr_diag .= RR.zeta .* RR.D_R.^2
     kkt.du_diag .= .-RR.pp ./ RR.zp .- RR.nn ./ RR.zn
     kkt.l_diag  .= solver.xl_r .- solver.x_lr
-    kkt.u_diag  .= solver.x_ur .- solver.xu_r
+    kkt.u_diag .= solver.x_ur .- solver.xu_r
     kkt.l_lower .= solver.zl_r
     kkt.u_lower .= solver.zu_r
     kkt.l_lower .= .-sqrt.(solver.zl_r)
@@ -192,7 +192,7 @@ end
     dual(w) .+= alpha .* du_diag .* dual(x)
     w.xp_lr .-= alpha .* dual_lb(x)
     w.xp_ur .+= alpha .* dual_ub(x)
-    dual_lb(w) .= beta .* dual_lb(w) .+ alpha .* (x.xp_lr .* l_lower .+ dual_lb(x) .* l_diag)
+    dual_lb(w) .= beta .* dual_lb(w) .+ alpha .* (x.xp_lr .* l_lower .- dual_lb(x) .* l_diag)
     dual_ub(w) .= beta .* dual_ub(w) .+ alpha .* (x.xp_ur .* u_lower .+ dual_ub(x) .* u_diag)
 end
 
@@ -200,7 +200,7 @@ end
     xp_lr,wl,l_diag,
     xp_ur,wu,u_diag,
     )
-    xp_lr .+= wl ./ l_diag
+    xp_lr .-= wl ./ l_diag
     xp_ur .-= wu ./ u_diag
 end
 
@@ -223,8 +223,8 @@ end
 function finish_aug_solve!(kkt::AbstractKKTSystem, d)
     dlb = dual_lb(d)
     dub = dual_ub(d)
-    dlb .= (dlb .- kkt.l_lower .* d.xp_lr) ./ kkt.l_diag
-    dub .= (dub .- kkt.u_lower .* d.xp_ur) ./ kkt.u_diag
+    dlb .= (.-dlb .+ kkt.l_lower .* d.xp_lr) ./ kkt.l_diag
+    dub .= (  dub .- kkt.u_lower .* d.xp_ur) ./ kkt.u_diag
     return
 end
 # function finish_aug_solve!(solver::MadNLPSolver, kkt::SparseUnreducedKKTSystem, mu)

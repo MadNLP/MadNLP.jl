@@ -8,11 +8,11 @@ end
 function solve!(kkt::SparseUnreducedKKTSystem, w::AbstractKKTVector)
     wzl = dual_lb(w) 
     wzu = dual_ub(w)
-    f(x,y) = iszero(y) ? 0 : x/y
+    f(x,y) = iszero(y) ? x : x/y
     wzl .= f.(wzl, kkt.l_lower_aug)
     wzu .= f.(wzu, kkt.u_lower_aug)
     solve!(kkt.linear_solver, full(w))
-    wzl .*= kkt.l_lower_aug
+    wzl .*= .-kkt.l_lower_aug
     wzu .*= kkt.u_lower_aug
 end
 
@@ -34,6 +34,17 @@ function mul_hess_blk!(wx, kkt::Union{SparseKKTSystem,SparseCondensedKKTSystem},
     mul!(@view(wx[1:n]), Symmetric(kkt.hess_com, :L), @view(t[1:n]))
     fill!(@view(wx[n+1:end]), 0)
     wx .+= t .* kkt.pr_diag
+end
+function mul_hess_blk!(wx, kkt::SparseUnreducedKKTSystem, t)
+    ind_lb = kkt.ind_lb
+    ind_ub = kkt.ind_ub
+    
+    n = size(kkt.hess_com, 1)
+    mul!(@view(wx[1:n]), Symmetric(kkt.hess_com, :L), @view(t[1:n]))
+    fill!(@view(wx[n+1:end]), 0)
+    wx .+= t .* kkt.pr_diag
+    wx[ind_lb] .-= @view(t[ind_lb]) .* (kkt.l_lower ./ kkt.l_diag)
+    wx[ind_ub] .-= @view(t[ind_ub]) .* (kkt.u_lower ./ kkt.u_diag)
 end
 
 function solve_refine_wrapper!(
