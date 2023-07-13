@@ -24,7 +24,7 @@
 
 #     return
 # end
-function set_aug_diagonal!(kkt::AbstractKKTSystem, solver::MadNLPSolver{T}) where T
+function set_aug_diagonal!(kkt::AbstractKKTSystem{T}, solver::MadNLPSolver{T}) where T
     x = full(solver.x)
     xl = full(solver.xl)
     xu = full(solver.xu)
@@ -33,25 +33,23 @@ function set_aug_diagonal!(kkt::AbstractKKTSystem, solver::MadNLPSolver{T}) wher
     
     kkt.pr_diag .= zl ./(x .- xl) .+ zu ./(xu .- x)
     fill!(kkt.du_diag, zero(T))
-    kkt.l_lower .= solver.zl_r
     kkt.l_diag  .= solver.x_lr .- solver.xl_r
-    kkt.u_lower .= solver.zu_r
     kkt.u_diag .= solver.x_ur .- solver.xu_r
+    kkt.l_lower .= solver.zl_r
+    kkt.u_lower .= solver.zu_r
 
     return
 end
 
-function set_aug_diagonal!(kkt::SparseUnreducedKKTSystem, solver::MadNLPSolver{T}) where T
+function set_aug_diagonal!(kkt::SparseUnreducedKKTSystem{T}, solver::MadNLPSolver{T}) where T
     fill!(kkt.pr_diag, zero(T))
     fill!(kkt.du_diag, zero(T))
-    @inbounds @simd for i in eachindex(kkt.l_lower)
-        kkt.l_lower[i] = -sqrt(solver.zl_r[i])
-        kkt.l_diag[i]  = solver.xl_r[i] - solver.x_lr[i]
-    end
-    @inbounds @simd for i in eachindex(kkt.u_lower)
-        kkt.u_lower[i] = -sqrt(solver.zu_r[i])
-        kkt.u_diag[i] = solver.x_ur[i] - solver.xu_r[i]
-    end
+    kkt.l_diag  .= solver.x_lr .- solver.xl_r
+    kkt.u_diag .= solver.x_ur .- solver.xu_r
+    kkt.l_lower .= solver.zl_r
+    kkt.u_lower .= solver.zu_r
+    kkt.l_lower_aug .= .-sqrt.(solver.zl_r)
+    kkt.u_lower_aug .= .-sqrt.(solver.zu_r)
     return
 end
 
@@ -72,20 +70,14 @@ function set_aug_RR!(kkt::AbstractKKTSystem, solver::MadNLPSolver, RR::RobustRes
     return
 end
 function set_aug_RR!(kkt::SparseUnreducedKKTSystem, solver::MadNLPSolver, RR::RobustRestorer)
-    @inbounds @simd for i in eachindex(kkt.pr_diag)
-        kkt.pr_diag[i] = RR.zeta * RR.D_R[i]^2
-    end
-    @inbounds @simd for i in eachindex(kkt.du_diag)
-        kkt.du_diag[i] = -RR.pp[i] / RR.zp[i] - RR.nn[i] / RR.zn[i]
-    end
-    @inbounds @simd for i in eachindex(kkt.l_lower)
-        kkt.l_lower[i] = -sqrt(solver.zl_r[i])
-        kkt.l_diag[i]  = solver.xl_r[i] - solver.x_lr[i]
-    end
-    @inbounds @simd for i in eachindex(kkt.u_lower)
-        kkt.u_lower[i] = -sqrt(solver.zu_r[i])
-        kkt.u_diag[i]  = solver.x_ur[i] - solver.xu_r[i]
-    end
+    kkt.pr_diag .= RR.zeta .* RR.D_R.^2
+    kkt.du_diag .= .-RR.pp ./ RR.zp .- RR.nn ./ RR.zn
+    kkt.l_diag  .= solver.xl_r .- solver.x_lr
+    kkt.u_diag  .= solver.x_ur .- solver.xu_r
+    kkt.l_lower .= solver.zl_r
+    kkt.u_lower .= solver.zu_r
+    kkt.l_lower .= .-sqrt.(solver.zl_r)
+    kkt.u_lower .= .-sqrt.(solver.zu_r)
     return
 end
 function set_f_RR!(solver::MadNLPSolver, RR::RobustRestorer)
@@ -142,28 +134,28 @@ end
 # return
 # end 
 
-function set_aug_rhs!(solver::MadNLPSolver, kkt::SparseUnreducedKKTSystem, c)
-    f = primal(solver.f)
-    zl = primal(solver.zl)
-    zu = primal(solver.zu)
-    px = primal(solver.p)
-    @inbounds @simd for i in eachindex(px)
-        px[i] = -f[i] + zl[i] - zu[i] - solver.jacl[i]
-    end
-    py = dual(solver.p)
-    @inbounds @simd for i in eachindex(py)
-        py[i] = -c[i]
-    end
-    pzl = dual_lb(solver.p)
-    @inbounds @simd for i in eachindex(pzl)
-        pzl[i] = (solver.xl_r[i] - solver.x_lr[i]) * kkt.l_lower[i] + solver.mu / kkt.l_lower[i]
-    end
-    pzu = dual_ub(solver.p)
-    @inbounds @simd for i in eachindex(pzu)
-        pzu[i] = (solver.xu_r[i] - solver.x_ur[i]) * kkt.u_lower[i] - solver.mu / kkt.u_lower[i]
-    end
-    return
-end
+# function set_aug_rhs!(solver::MadNLPSolver, kkt::SparseUnreducedKKTSystem, c)
+#     f = primal(solver.f)
+#     zl = primal(solver.zl)
+#     zu = primal(solver.zu)
+#     px = primal(solver.p)
+#     @inbounds @simd for i in eachindex(px)
+#         px[i] = -f[i] + zl[i] - zu[i] - solver.jacl[i]
+#     end
+#     py = dual(solver.p)
+#     @inbounds @simd for i in eachindex(py)
+#         py[i] = -c[i]
+#     end
+#     pzl = dual_lb(solver.p)
+#     @inbounds @simd for i in eachindex(pzl)
+#         pzl[i] = (solver.xl_r[i] - solver.x_lr[i]) * kkt.l_lower[i] + solver.mu / kkt.l_lower[i]
+#     end
+#     pzu = dual_ub(solver.p)
+#     @inbounds @simd for i in eachindex(pzu)
+#         pzu[i] = (solver.xu_r[i] - solver.x_ur[i]) * kkt.u_lower[i] - solver.mu / kkt.u_lower[i]
+#     end
+#     return
+# end
 
 
 # Set RHS RR
@@ -200,12 +192,11 @@ end
     dual(w) .+= alpha .* du_diag .* dual(x)
     w.xp_lr .-= alpha .* dual_lb(x)
     w.xp_ur .+= alpha .* dual_ub(x)
-    
     dual_lb(w) .= beta .* dual_lb(w) .+ alpha .* (x.xp_lr .* l_lower .+ dual_lb(x) .* l_diag)
     dual_ub(w) .= beta .* dual_ub(w) .+ alpha .* (x.xp_ur .* u_lower .+ dual_ub(x) .* u_diag)
 end
 
-@inbounds function aug_rhs_prep(
+@inbounds function reduce_rhs!(
     xp_lr,wl,l_diag,
     xp_ur,wu,u_diag,
     )
@@ -236,17 +227,17 @@ function finish_aug_solve!(kkt::AbstractKKTSystem, d)
     dub .= (dub .- kkt.u_lower .* d.xp_ur) ./ kkt.u_diag
     return
 end
-function finish_aug_solve!(solver::MadNLPSolver, kkt::SparseUnreducedKKTSystem, mu)
-    dlb = dual_lb(solver.d)
-    @inbounds @simd for i in eachindex(dlb)
-        dlb[i] = (mu-solver.zl_r[i]*solver.dx_lr[i]) / (solver.x_lr[i]-solver.xl_r[i]) - solver.zl_r[i]
-    end
-    dub = dual_ub(solver.d)
-    @inbounds @simd for i in eachindex(dub)
-        dub[i] = (mu+solver.zu_r[i]*solver.dx_ur[i]) / (solver.xu_r[i]-solver.x_ur[i]) - solver.zu_r[i]
-    end
-    return
-end
+# function finish_aug_solve!(solver::MadNLPSolver, kkt::SparseUnreducedKKTSystem, mu)
+#     dlb = dual_lb(solver.d)
+#     @inbounds @simd for i in eachindex(dlb)
+#         dlb[i] = (mu-solver.zl_r[i]*solver.dx_lr[i]) / (solver.x_lr[i]-solver.xl_r[i]) - solver.zl_r[i]
+#     end
+#     dub = dual_ub(solver.d)
+#     @inbounds @simd for i in eachindex(dub)
+#         dub[i] = (mu+solver.zu_r[i]*solver.dx_ur[i]) / (solver.xu_r[i]-solver.x_ur[i]) - solver.zu_r[i]
+#     end
+#     return
+# end
 
 # Initial
 # temporaily commented out
@@ -280,30 +271,9 @@ function set_initial_rhs!(solver::MadNLPSolver{T}, kkt::AbstractKKTSystem) where
     fill!(dual_ub(solver.p), zero(T))
     return
 end
-function set_initial_rhs!(solver::MadNLPSolver{T}, kkt::SparseUnreducedKKTSystem) where T
-    f = primal(solver.f)
-    zl = primal(solver.zl)
-    zu = primal(solver.zu)
-    px = primal(solver.p)
-    @inbounds @simd for i in eachindex(px)
-        px[i] = -f[i] + zl[i] - zu[i]
-    end
-    fill!(dual(solver.p), zero(T))
-    fill!(dual_lb(solver.p), zero(T))
-    fill!(dual_ub(solver.p), zero(T))
-    return
-end
 
 # Set ifr
 function set_aug_rhs_ifr!(solver::MadNLPSolver{T}, kkt::AbstractKKTSystem) where T
-    fill!(primal(solver._w1), zero(T))
-    fill!(dual_lb(solver._w1), zero(T))
-    fill!(dual_ub(solver._w1), zero(T))
-    wy = dual(solver._w1)
-    wy .= .- solver.c
-    return
-end
-function set_aug_rhs_ifr!(solver::MadNLPSolver{T}, kkt::SparseUnreducedKKTSystem) where T
     fill!(primal(solver._w1), zero(T))
     fill!(dual_lb(solver._w1), zero(T))
     fill!(dual_ub(solver._w1), zero(T))

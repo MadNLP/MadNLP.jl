@@ -64,6 +64,7 @@ function initialize!(solver::AbstractMadNLPSolver{T}) where T
         end
     end
 
+
     # Initializing
     solver.obj_val = eval_f_wrapper(solver, solver.x)
     eval_cons_wrapper!(solver, solver.c, solver.x)
@@ -503,17 +504,13 @@ function robust!(solver::MadNLPSolver{T}) where T
 
         print_iter(solver;is_resto=true)
 
-
-        println(RR.inf_pr_R)
-        println(RR.inf_du_R)
-        println(RR.inf_compl_R)
         max(RR.inf_pr_R,RR.inf_du_R,RR.inf_compl_R) <= solver.opt.tol && return INFEASIBLE_PROBLEM_DETECTED
         solver.cnt.k>=solver.opt.max_iter && return MAXIMUM_ITERATIONS_EXCEEDED
         time()-solver.cnt.start_time>=solver.opt.max_wall_time && return MAXIMUM_WALLTIME_EXCEEDED
 
         # update the barrier parameter
         @trace(solver.logger,"Updating restoration phase barrier parameter.")
-        while RR.mu_R >= solver.opt.mu_min*100 &&
+        while RR.mu_R >= solver.opt.mu_min &&
             max(RR.inf_pr_R,RR.inf_du_R,inf_compl_mu_R) <= solver.opt.barrier_tol_factor*RR.mu_R
             RR.mu_R = get_mu(RR.mu_R,solver.opt.mu_min,
                             solver.opt.mu_linear_decrease_factor,solver.opt.mu_superlinear_decrease_power,solver.opt.tol)
@@ -706,6 +703,7 @@ function inertia_based_reg(solver::MadNLPSolver)
     @trace(solver.logger,"Inertia-based regularization started.")
 
     factorize_wrapper!(solver)
+
     num_pos,num_zero,num_neg = inertia(solver.kkt.linear_solver)
     solve_status = num_zero!= 0 ? false : solve_refine!(
         solver.d, solver.iterator, solver.p,

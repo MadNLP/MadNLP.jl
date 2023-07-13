@@ -5,14 +5,24 @@ function factorize_wrapper!(solver::MadNLPSolver)
     solver.cnt.linear_solver_time += @elapsed factorize!(solver.kkt.linear_solver)
 end
 
+function solve!(kkt::SparseUnreducedKKTSystem, w::AbstractKKTVector)
+    wzl = dual_lb(w) 
+    wzu = dual_ub(w)
+    f(x,y) = iszero(y) ? 0 : x/y
+    wzl .= f.(wzl, kkt.l_lower_aug)
+    wzu .= f.(wzu, kkt.u_lower_aug)
+    solve!(kkt.linear_solver, full(w))
+    wzl .*= kkt.l_lower_aug
+    wzu .*= kkt.u_lower_aug
+end
 
 function solve!(kkt::SparseKKTSystem, w::AbstractKKTVector)
-    aug_rhs_prep(w.xp_lr, dual_lb(w), kkt.l_diag, w.xp_ur, dual_ub(w), kkt.u_diag)
+    reduce_rhs!(w.xp_lr, dual_lb(w), kkt.l_diag, w.xp_ur, dual_ub(w), kkt.u_diag)
     solve!(kkt.linear_solver, primal_dual(w))
     finish_aug_solve!(kkt, w)
 end
 
-function mul!(w::AbstractKKTVector{T}, kkt::SparseKKTSystem, x::AbstractKKTVector, alpha = one(T), beta = zero(T)) where T
+function mul!(w::AbstractKKTVector{T}, kkt::Union{SparseKKTSystem,SparseUnreducedKKTSystem}, x::AbstractKKTVector, alpha = one(T), beta = zero(T)) where T
     mul!(primal(w), Symmetric(kkt.hess_com, :L), primal(x), alpha, beta)
     mul!(primal(w), kkt.jac_com', dual(x), alpha, one(T))
     mul!(dual(w), kkt.jac_com,  primal(x), alpha, beta)
@@ -171,7 +181,7 @@ function solve!(kkt::SparseCondensedKKTSystem, w::AbstractKKTVector)
     wz = view(full(w), n+m+1:n+2*m)
     Σs = view(kkt.pr_diag, n+1:n+m)
 
-    aug_rhs_prep(w.xp_lr, dual_lb(w), kkt.l_diag, w.xp_ur, dual_ub(w), kkt.u_diag)
+    reduce_rhs!(w.xp_lr, dual_lb(w), kkt.l_diag, w.xp_ur, dual_ub(w), kkt.u_diag)
 
 
 
