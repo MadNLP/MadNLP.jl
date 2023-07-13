@@ -53,6 +53,7 @@ end
 
 function create_fixed_handler(
     fixed_variable_treatment::Type{MakeParameter},
+    x0,
     lvar,
     uvar,
     nnzj,
@@ -70,6 +71,7 @@ function create_fixed_handler(
     fixedh = findall(@view(isfixed[hess_I]) .|| @view(isfixed[hess_J]))
     nfixed = length(fixed)
 
+    copyto!(@view(x0[fixed]), @view(lvar[fixed]))
     fill!(@view(lvar[fixed]), -Inf)
     fill!(@view(uvar[fixed]),  Inf)
 
@@ -83,6 +85,7 @@ end
 
 function create_fixed_handler(
     fixed_variable_treatment::Type{RelaxBound},
+    x0,
     lvar,
     uvar,
     nnzj,
@@ -135,7 +138,7 @@ function NLPModelWrapper(
 
     fixed_handler, nnzj, nnzh = create_fixed_handler(
         opt.fixed_variable_treatment,
-        lvar, uvar, nnzj, nnzh,
+        x0, lvar, uvar, nnzj, nnzh,
         jac_I, jac_J, hess_I, hess_J;
         opt = opt
     )

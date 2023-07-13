@@ -1,6 +1,5 @@
 function madnlp(model::AbstractNLPModel; kwargs...)
     solver = MadNLPSolver(model;kwargs...)
-    initialize!(solver.kkt)
     return solve!(solver)
 end
 
@@ -13,7 +12,8 @@ solve!(solver::AbstractMadNLPSolver; kwargs...) = solve!(
 
 
 function initialize!(solver::AbstractMadNLPSolver{T}) where T
-
+    initialize!(solver.kkt)
+    
     # initializing slack variables
     @trace(solver.logger,"Initializing slack variables.")
     # cons!(solver.nlp,get_x0(solver.nlp),_madnlp_unsafe_wrap(solver.c,get_ncon(solver.nlp)))
@@ -173,8 +173,6 @@ function solve!(
         if !(solver.status < SOLVE_SUCCEEDED)
             print_summary(solver)
         end
-        # Unscale once the summary has been printed out
-        unscale!(solver)
         @notice(solver.logger,"EXIT: $(STATUS_OUTPUT_DICT[solver.status])")
         solver.opt.disable_garbage_collector &&
             (GC.enable(true); @warn(solver.logger,"Julia garbage collector is turned back on"))
@@ -380,7 +378,6 @@ function restore!(solver::AbstractMadNLPSolver)
     solver.cnt.t = 0
     solver.alpha_z = 0.0
     solver.ftype = "R"
-
     while true
         alpha_max = get_alpha_max(
             primal(solver.x),
@@ -506,10 +503,13 @@ function robust!(solver::MadNLPSolver{T}) where T
 
         print_iter(solver;is_resto=true)
 
+
+        println(RR.inf_pr_R)
+        println(RR.inf_du_R)
+        println(RR.inf_compl_R)
         max(RR.inf_pr_R,RR.inf_du_R,RR.inf_compl_R) <= solver.opt.tol && return INFEASIBLE_PROBLEM_DETECTED
         solver.cnt.k>=solver.opt.max_iter && return MAXIMUM_ITERATIONS_EXCEEDED
         time()-solver.cnt.start_time>=solver.opt.max_wall_time && return MAXIMUM_WALLTIME_EXCEEDED
-
 
         # update the barrier parameter
         @trace(solver.logger,"Updating restoration phase barrier parameter.")
@@ -534,17 +534,21 @@ function robust!(solver::MadNLPSolver{T}) where T
         
         # without inertia correction,
         @trace(solver.logger,"Solving restoration phase primal-dual system.")
-        factorize_wrapper!(solver)
         set_aug_rhs_RR!(solver, solver.kkt, RR, solver.opt.rho)
+        factorize_wrapper!(solver)
         solve_refine!(
             solver.d, solver.iterator, solver.p,
             x -> solve!(solver.kkt, x),
-            (y,x,alpha,beta) -> mul!(y, solver.kkt, x, alpha, beta)
+            (y,x,alpha,beta) -> begin
+                mul!(y, solver.kkt, x, alpha, beta)
+                primal(y) .+= alpha .* RR.zeta .* RR.D_R .^ 2 .* primal(x) 
+            end
         )
+
         finish_aug_solve_RR!(
             RR.dpp,RR.dnn,RR.dzp,RR.dzn,solver.y,dual(solver.d),
             RR.pp,RR.nn,RR.zp,RR.zn,RR.mu_R,solver.opt.rho
-        ) 
+        )
         
         
         theta_R = get_theta_R(solver.c,RR.pp,RR.nn)
@@ -716,7 +720,8 @@ function inertia_based_reg(solver::MadNLPSolver)
                 max(solver.opt.min_hessian_perturbation,solver.opt.perturb_dec_fact*solver.kkt.del_w_last)
         else
             solver.kkt.del_w*= solver.kkt.del_w_last==0. ? solver.opt.perturb_inc_fact_first : solver.opt.perturb_inc_fact
-            if solver.kkt.del_w>solver.opt.max_hessian_perturbation solver.cnt.k+=1
+            if solver.kkt.del_w>solver.opt.max_hessian_perturbation
+                solver.cnt.k+=1
                 @debug(solver.logger,"Primal regularization is too big. Switching to restoration phase.")
                 return false
             end
@@ -776,7 +781,8 @@ function inertia_free_reg(solver::MadNLPSolver)
                 max(solver.opt.min_hessian_perturbation,solver.opt.perturb_dec_fact*solver.kkt.del_w_last)
         else
             solver.kkt.del_w*= solver.kkt.del_w_last==.0 ? solver.opt.perturb_inc_fact_first : solver.opt.perturb_inc_fact
-            if solver.kkt.del_w>solver.opt.max_hessian_perturbation solver.cnt.k+=1
+            if solver.kkt.del_w>solver.opt.max_hessian_perturbation
+                solver.cnt.k+=1
                 @debug(solver.logger,"Primal regularization is too big. Switching to restoration phase.")
                 return false
             end
