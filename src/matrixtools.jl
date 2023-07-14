@@ -52,6 +52,10 @@ function tril_to_full!(dense::Matrix{T}) where T
     end
 end
 
+function coo_to_com(coo)
+    
+end
+
 function coo_to_csc(coo) 
     cscind = sparse(
         coo.I,

@@ -25,6 +25,7 @@ function eval_grad_f_wrapper!(solver::MadNLPSolver, f::PrimalVector{T}, x::Prima
     )
     variable(f) .*= obj_scaling
     cnt.obj_grad_cnt+=1
+
     if cnt.obj_grad_cnt == 1 && !is_valid(full(f))
         throw(InvalidNumberException(:grad))
     end

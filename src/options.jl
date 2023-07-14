@@ -46,6 +46,7 @@ end
     hessian_constant::Bool = false
     kkt_system::Type = SparseKKTSystem
     hessian_approximation::Type = ExactHessian
+    callback::Type = SparseCallback
 
     # initialization options
     dual_initialized::Bool = false

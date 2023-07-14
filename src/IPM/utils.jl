@@ -14,7 +14,7 @@ end
 MadNLPExecutionStats(solver::MadNLPSolver) =MadNLPExecutionStats(
     solver.status,
     primal(solver.x),
-    solver.obj_val / solver.nlp.obj_scale,
+    solver.obj_val / solver.nlp.obj_scale[],
     solver.c ./ solver.nlp.con_scale,
     solver.inf_du,
     solver.inf_pr,
@@ -26,7 +26,7 @@ MadNLPExecutionStats(solver::MadNLPSolver) =MadNLPExecutionStats(
 
 function update!(stats::MadNLPExecutionStats, solver::MadNLPSolver)
     stats.status = solver.status
-    stats.objective = solver.obj_val / solver.nlp.obj_scale
+    stats.objective = solver.obj_val / solver.nlp.obj_scale[]
     stats.constraints .= solver.c ./ solver.nlp.con_scale .+ solver.rhs
     stats.constraints[solver.ind_ineq] .+= slack(solver.x)
     stats.dual_feas = solver.inf_du
@@ -48,10 +48,12 @@ struct NotEnoughDegreesOfFreedomException <: Exception end
 has_constraints(solver) = solver.m != 0
 
 function get_vars_info(solver)
-    x_lb = get_lvar(solver.nlp)
-    x_ub = get_uvar(solver.nlp)
+    nlp = solver.nlp.inner
+
+    x_lb = get_lvar(nlp)
+    x_ub = get_uvar(nlp)
     num_fixed = length(solver.ind_fixed)
-    num_var = get_nvar(solver.nlp) - num_fixed
+    num_var = get_nvar(nlp) - num_fixed
     num_llb_vars = length(solver.ind_llb)
     
     # TODO make this non-allocating
@@ -67,8 +69,10 @@ function get_vars_info(solver)
 end
 
 function get_cons_info(solver)
-    g_lb = get_lcon(solver.nlp)
-    g_ub = get_ucon(solver.nlp)
+    nlp = solver.nlp.inner
+    
+    g_lb = get_lcon(nlp)
+    g_ub = get_ucon(nlp)
 
     # TODO make this non-allocating
     num_eq_cons = sum(g_lb .== g_ub)
@@ -110,7 +114,7 @@ function print_init(solver::AbstractMadNLPSolver)
 end
 
 function print_iter(solver::AbstractMadNLPSolver;is_resto=false)
-    obj_scale = solver.nlp.obj_scale
+    obj_scale = solver.nlp.obj_scale[]
     mod(solver.cnt.k,10)==0&& @info(solver.logger,@sprintf(
         "iter    objective    inf_pr   inf_du lg(mu)  ||d||  lg(rg) alpha_du alpha_pr  ls"))
     if is_resto
@@ -135,7 +139,7 @@ end
 
 function print_summary(solver::AbstractMadNLPSolver)
     # TODO inquire this from nlpmodel wrapper
-    obj_scale = solver.nlp.obj_scale
+    obj_scale = solver.nlp.obj_scale[]
     solver.cnt.solver_time = solver.cnt.total_time-solver.cnt.linear_solver_time-solver.cnt.eval_function_time
     
     @notice(solver.logger,"")

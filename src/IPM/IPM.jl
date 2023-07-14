@@ -102,14 +102,19 @@ function MadNLPSolver(m::AbstractNLPModel{T,VT}; kwargs...) where {T, VT}
     @assert is_supported(opt.linear_solver, T)
 
     cnt = MadNLPCounters(start_time=time())
-    nlp = NLPModelWrapper(m; opt = opt)
-
+    nlp = create_model_wrapper(opt.callback, m, opt)
+    
     # generic options
     opt.disable_garbage_collector &&
         (GC.enable(false); @warn(logger,"Julia garbage collector is temporarily disabled"))
     set_blas_num_threads(opt.blas_num_threads; permanent=true)
     @trace(logger,"Initializing variables.")
-    ind_cons = get_index_constraints(nlp; fixed_variable_treatment=opt.fixed_variable_treatment)
+    ind_cons = get_index_constraints(
+        get_lvar(m), get_uvar(m),
+        get_lcon(m), get_ucon(m),
+        opt.fixed_variable_treatment
+    )
+    
     ns = length(ind_cons.ind_ineq)
     nx = get_nvar(nlp)
     n = nx+ns
@@ -120,32 +125,25 @@ function MadNLPSolver(m::AbstractNLPModel{T,VT}; kwargs...) where {T, VT}
 
     # Primal variable
     x = PrimalVector(VT,nx, ns, ind_cons)
-    variable(x) .= get_x0(nlp)
     # Bounds
     xl = PrimalVector(VT,nx, ns, ind_cons)
-    variable(xl) .= get_lvar(nlp)
-    slack(xl) .= view(get_lcon(nlp), ind_cons.ind_ineq)
-    xu = PrimalVector(VT,nx, ns, ind_cons)
-    variable(xu) .= get_uvar(nlp)
-    slack(xu) .= view(get_ucon(nlp), ind_cons.ind_ineq)
-    
+    xu = PrimalVector(VT,nx, ns, ind_cons)    
     zl = PrimalVector(VT,nx, ns, ind_cons)
     zu = PrimalVector(VT,nx, ns, ind_cons)
     
     # Gradient
     f = PrimalVector(VT,nx, ns, ind_cons)
 
-    y = copy(get_y0(nlp))
+    y = VT(undef, m)
     c = VT(undef, m)
+    rhs = VT(undef, m)
 
     nlb = length(ind_cons.ind_lb)
     nub = length(ind_cons.ind_ub)
 
     x_trial = PrimalVector(VT,nx, ns, ind_cons)
     c_trial = VT(undef, m)
-
     c_slk = view(c,ind_cons.ind_ineq)
-    rhs = (get_lcon(nlp).==get_ucon(nlp)).*get_lcon(nlp)
 
     x_lr = view(full(x), ind_cons.ind_lb)
     x_ur = view(full(x), ind_cons.ind_ub)
@@ -161,7 +159,8 @@ function MadNLPSolver(m::AbstractNLPModel{T,VT}; kwargs...) where {T, VT}
     _w3 = UnreducedKKTVector(VT, n, m, nlb, nub, ind_cons)
     _w4 = UnreducedKKTVector(VT, n, m, nlb, nub, ind_cons)
 
-    jacl = fill!(VT(undef,n), zero(T)) # spblas may throw an error if not initialized to zero
+    jacl = VT(undef,n) 
+
 
     d = UnreducedKKTVector(VT, n, m, nlb, nub, ind_cons)
     dx_lr = view(d.xp, ind_cons.ind_lb) # TODO
@@ -169,13 +168,9 @@ function MadNLPSolver(m::AbstractNLPModel{T,VT}; kwargs...) where {T, VT}
 
     p = UnreducedKKTVector(VT, n, m, nlb, nub, ind_cons)
 
-    n_kkt = size(kkt, 1)
     @trace(logger,"Initializing iterative solver.")
     residual = UnreducedKKTVector(VT, n, m, nlb, nub, ind_cons)
     iterator = opt.iterator(residual; cnt = cnt, logger = logger)
-
-
-    @trace(logger,"Initializing fixed variable treatment scheme.")
 
     if opt.inertia_correction_method == INERTIA_AUTO
         opt.inertia_correction_method = is_inertia(kkt.linear_solver)::Bool ? INERTIA_BASED : INERTIA_FREE

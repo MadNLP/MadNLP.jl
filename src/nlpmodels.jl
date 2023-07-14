@@ -1,8 +1,8 @@
-function get_index_constraints(nlp::AbstractNLPModel; fixed_variable_treatment=MAKE_PARAMETER)
-    ind_ineq = findall(get_lcon(nlp) .!= get_ucon(nlp))
-    xl = [get_lvar(nlp);view(get_lcon(nlp),ind_ineq)]
-    xu = [get_uvar(nlp);view(get_ucon(nlp),ind_ineq)]
-    if fixed_variable_treatment == MAKE_PARAMETER
+function get_index_constraints(lvar, uvar, lcon, ucon, fixed_variable_treatment)
+    ind_ineq = findall(lcon .!= ucon)
+    xl = [lvar;view(lcon,ind_ineq)]
+    xu = [uvar;view(ucon,ind_ineq)]
+    if fixed_variable_treatment == MakeParameter
         ind_fixed = findall(xl .== xu)
         ind_lb = findall((xl .!= -Inf) .* (xl .!= xu))
         ind_ub = findall((xu .!=  Inf) .* (xl .!= xu))
@@ -12,8 +12,8 @@ function get_index_constraints(nlp::AbstractNLPModel; fixed_variable_treatment=M
         ind_ub = findall(xu .!= Inf)
     end
 
-    ind_llb = findall((get_lvar(nlp) .!= -Inf).*(get_uvar(nlp) .== Inf))
-    ind_uub = findall((get_lvar(nlp) .== -Inf).*(get_uvar(nlp) .!= Inf))
+    ind_llb = findall((lvar .!= -Inf).*(uvar .== Inf))
+    ind_uub = findall((lvar .== -Inf).*(uvar .!= Inf))
 
     # Return named tuple
     return (
