@@ -1,3 +1,42 @@
+function solve!( 
+    kkt::DenseCondensedKKTSystem,
+    w::AbstractKKTVector{T},
+    ) where T
+
+    n = num_variables(kkt)
+    n_eq, ns = kkt.n_eq, kkt.n_ineq
+    n_condensed = n + n_eq
+    
+    # Decompose rhs
+    wx = view(full(w), 1:n)
+    ws = view(full(w), n+1:n+ns)
+    wy = view(full(w), kkt.ind_eq_shifted)
+    wz = view(full(w), kkt.ind_ineq_shifted)
+
+    x = kkt.pd_buffer
+    xx = view(x, 1:n)
+    xy = view(x, n+1:n+n_eq)
+
+    Σs = get_slack_regularization(kkt)
+
+    reduce_rhs!(w.xp_lr, dual_lb(w), kkt.l_diag, w.xp_ur, dual_ub(w), kkt.u_diag)
+
+    fill!(kkt.buffer, zero(T))
+    kkt.buffer[kkt.ind_ineq] .= kkt.diag_buffer .* (wz .+ ws ./ Σs) 
+    mul!(xx, kkt.jac', kkt.buffer)
+    xx .+= wx
+    xy .= wy
+    solve!(kkt.linear_solver, x)
+
+    wx .= xx
+    mul!(dual(w), kkt.jac, wx)
+    wy .= xy
+    wz .*= kkt.diag_buffer
+    dual(w) .-= kkt.buffer
+    ws .= (ws .+ wz) ./ Σs
+    
+    finish_aug_solve!(kkt, w)
+end
 
 function factorize_wrapper!(solver::MadNLPSolver)
     @trace(solver.logger,"Factorization started.")
@@ -16,7 +55,7 @@ function solve!(kkt::SparseUnreducedKKTSystem, w::AbstractKKTVector)
     wzu .*= kkt.u_lower_aug
 end
 
-function solve!(kkt::SparseKKTSystem, w::AbstractKKTVector)
+function solve!(kkt::AbstractReducedKKTSystem, w::AbstractKKTVector)
     reduce_rhs!(w.xp_lr, dual_lb(w), kkt.l_diag, w.xp_ur, dual_ub(w), kkt.u_diag)
     solve!(kkt.linear_solver, primal_dual(w))
     finish_aug_solve!(kkt, w)
@@ -26,6 +65,26 @@ function mul!(w::AbstractKKTVector{T}, kkt::Union{SparseKKTSystem,SparseUnreduce
     mul!(primal(w), Symmetric(kkt.hess_com, :L), primal(x), alpha, beta)
     mul!(primal(w), kkt.jac_com', dual(x), alpha, one(T))
     mul!(dual(w), kkt.jac_com,  primal(x), alpha, beta)
+    _kktmul!(w,x,kkt.del_w,kkt.du_diag,kkt.l_lower,kkt.u_lower,kkt.l_diag,kkt.u_diag, alpha, beta)
+end
+
+function mul!(w::AbstractKKTVector{T}, kkt::AbstractDenseKKTSystem, x::AbstractKKTVector, alpha = one(T), beta = zero(T)) where T
+    n0 = size(kkt.hess,1)
+    wx = @view(primal(w)[1:n0])
+    ws = @view(primal(w)[n0+1:end])
+    wy = dual(w)
+    wz = @view(dual(w)[kkt.ind_ineq])
+    
+    xx = @view(primal(x)[1:n0])
+    xs = @view(primal(x)[n0+1:end])
+    xy = dual(x)
+    xz = @view(dual(x)[kkt.ind_ineq])
+    
+    mul!(wx, Symmetric(kkt.hess, :L), xx, alpha, beta)
+    mul!(wx, kkt.jac', dual(x), alpha, one(T))
+    mul!(wy, kkt.jac,  xx, alpha, beta)
+    ws .= beta.*ws .- alpha.* xz
+    wz .= beta.*wz .- alpha.* xs
     _kktmul!(w,x,kkt.del_w,kkt.du_diag,kkt.l_lower,kkt.u_lower,kkt.l_diag,kkt.u_diag, alpha, beta)
 end
 

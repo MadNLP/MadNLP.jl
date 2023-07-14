@@ -6,11 +6,28 @@ struct MakeParameter{VI} <: AbstractFixedVariableHandler
 end
 struct RelaxBound <: AbstractFixedVariableHandler end
 
+abstract type AbstractMatrixBuffer end
+struct NullMatrixBuffer <: AbstractMatrixBuffer end
+struct DenseMatrixBuffer{VT} <: AbstractMatrixBuffer
+    jac_buffer::VT
+    hess_buffer::VT
+end
+    
+create_matrix_buffer(::AbstractNLPModel,::Type) = NullMatrixBuffer()
+function create_matrix_buffer(nlp::AbstractNLPModel,::Type{T}) where T <: AbstractDenseKKTSystem
+    return DenseMatrixBuffer(
+        similar(get_x0(nlp), nlp.meta.nnzj),
+        similar(get_x0(nlp), nlp.meta.nnzh)
+    )
+end
+
 struct NLPModelWrapper{
-    T, VT <: AbstractVector{T},
+    T,
+    VT <: AbstractVector{T},
     VI <: AbstractVector{Int},
     I <: AbstractNLPModel{T, VT},
-    FH <: AbstractFixedVariableHandler
+    FH <: AbstractFixedVariableHandler,
+    MB <: AbstractMatrixBuffer,
     } <: AbstractNLPModel{T, VT}
     
     inner::I
@@ -27,6 +44,7 @@ struct NLPModelWrapper{
     jac_scale::VT
 
     fixed_handler::FH
+    matrix_buffer::MB
     
     meta::NLPModelMeta{T, VT}
     counters::NLPModels.Counters
@@ -182,6 +200,8 @@ function NLPModelWrapper(
         opt.bound_push,
         opt.bound_fac
     )
+
+    matrix_buffer = create_matrix_buffer(nlp, opt.kkt_system)
     
     return NLPModelWrapper(
         nlp,
@@ -194,6 +214,7 @@ function NLPModelWrapper(
         con_scale,
         jac_scale,
         fixed_handler,
+        matrix_buffer,
         NLPModelMeta(
             n,
             x0 = x0,
@@ -310,4 +331,51 @@ function _treat_fixed_variable_hess_coord!(fixed_handler::MakeParameter, nlp::NL
     nnzh_orig = nlp.inner.meta.nnzh
     fill!(@view(hess[fixed_handler.fixedh]), zero(T))
     fill!(@view(hess[nnzh_orig+1:end]), one(T))
+end
+
+function jac_dense!(
+    nlp::NLPModelWrapper{T},
+    x::AbstractVector,
+    jac
+    ) where T
+    jac_buffer = nlp.matrix_buffer.jac_buffer
+    NLPModels.jac_coord!(nlp.inner, x, jac_buffer)
+    fill!(jac, zero(T))
+    @inbounds @simd for k=1:length(nlp.jac_I)
+        i,j = nlp.jac_I[k], nlp.jac_J[k]
+        jac[i,j] += jac_buffer[k]
+    end
+    _treat_fixed_variable_jac_dense!(nlp.fixed_handler, nlp, jac)
+end
+function _treat_fixed_variable_jac_dense!(fixed_handler::RelaxBound, nlp, jac) end
+function _treat_fixed_variable_jac_dense!(fixed_handler::MakeParameter, nlp::NLPModelWrapper{T}, jac) where T
+    for i in fixed_handler.fixed
+        jac[:,i] .= zero(T)
+    end
+end
+
+function hess_dense!(
+    nlp::NLPModelWrapper{T},
+    x::AbstractVector,
+    y::AbstractVector,
+    hess;
+    obj_weight = one(T)
+    ) where T
+    
+    hess_buffer = nlp.matrix_buffer.hess_buffer
+    NLPModels.hess_coord!(nlp.inner, x, y, hess_buffer; obj_weight=obj_weight)
+    fill!(hess, zero(T))
+    @inbounds @simd for k=1:length(nlp.hess_I)
+        i,j = nlp.hess_I[k], nlp.hess_J[k]
+        hess[i,j] += hess_buffer[k]
+    end
+    _treat_fixed_variable_hess_dense!(nlp.fixed_handler, nlp, hess)
+end
+function _treat_fixed_variable_hess_dense!(fixed_handler::RelaxBound, nlp, hess) end
+function _treat_fixed_variable_hess_dense!(fixed_handler::MakeParameter, nlp::NLPModelWrapper{T}, hess) where T
+    for i in fixed_handler.fixed
+        hess[i,:] .= zero(T)
+        hess[:,i] .= zero(T)
+        hess[i,i] = one(T)
+    end        
 end
