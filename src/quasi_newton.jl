@@ -303,4 +303,4 @@ end
 
 
 struct ExactHessian{T, VT} <: AbstractHessian{T, VT} end
-create_quasi_newton(::Type{ExactHessian}, nlp::AbstractNLPModel{T,VT}, n) where {T,VT} = ExactHessian{T, VT}()
+create_quasi_newton(::Type{ExactHessian}, nlp::AbstractCallback{T,VT}, n) where {T,VT} = ExactHessian{T, VT}()

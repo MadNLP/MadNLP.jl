@@ -42,24 +42,24 @@ end
 
 function create_kkt_system(
     ::Type{DenseKKTSystem},
-    nlp::AbstractNLPModel{T,VT}, opt, cnt, ind_cons) where {T,VT}
+    cb::DenseCallback{T,VT}, opt, cnt, ind_cons) where {T,VT}
     
     ind_ineq = ind_cons.ind_ineq
     ind_lb = ind_cons.ind_lb
     ind_ub = ind_cons.ind_ub
     
-    n = get_nvar(nlp)
-    m = get_ncon(nlp)
+    n = cb.nvar
+    m = cb.ncon
     ns = length(ind_ineq)
     nlb = length(ind_cons.ind_lb)
     nub = length(ind_cons.ind_ub)
     
-    hess = similar(get_x0(nlp), n, n)
-    jac = similar(get_x0(nlp), m, n)
-    aug_com = similar(get_x0(nlp), n+ns+m, n+ns+m)
-    pr_diag = similar(get_x0(nlp), n+ns)
-    du_diag = similar(get_x0(nlp), m)
-    diag_hess = similar(get_x0(nlp), n)
+    hess = create_array(cb, n, n)
+    jac = create_array(cb, m, n)
+    aug_com = create_array(cb, n+ns+m, n+ns+m)
+    pr_diag = create_array(cb, n+ns)
+    du_diag = create_array(cb, m)
+    diag_hess = create_array(cb, n)
     
     l_diag = fill!(VT(undef, nlb), one(T))
     u_diag = fill!(VT(undef, nub), one(T))
@@ -74,7 +74,7 @@ function create_kkt_system(
     fill!(du_diag, zero(T))
     fill!(diag_hess, zero(T))
 
-    quasi_newton = create_quasi_newton(opt.hessian_approximation, nlp, n)
+    quasi_newton = create_quasi_newton(opt.hessian_approximation, cb, n)
     cnt.linear_solver_time += @elapsed linear_solver = opt.linear_solver(aug_com)
     
     del_w = 1.
@@ -144,19 +144,19 @@ end
 
 function create_kkt_system(
     ::Type{DenseCondensedKKTSystem},
-    nlp::AbstractNLPModel{T,VT}, opt, cnt, ind_cons) where {T,VT}
+    cb::DenseCallback{T,VT}, opt, cnt, ind_cons) where {T,VT}
     
-    n = get_nvar(nlp)
-    m = get_ncon(nlp)
+    n = cb.nvar
+    m = cb.ncon
     ns = length(ind_cons.ind_ineq)
     n_eq = m - ns
     nlb = length(ind_cons.ind_lb)
     nub = length(ind_cons.ind_ub)
 
-    aug_com  = similar(get_x0(nlp), n+m-ns, n+m-ns)
-    hess     = similar(get_x0(nlp), n, n)
-    jac      = similar(get_x0(nlp), m, n)
-    jac_ineq = similar(get_x0(nlp), ns, n)
+    aug_com  = create_array(cb, n+m-ns, n+m-ns)
+    hess     = create_array(cb, n, n)
+    jac      = create_array(cb, m, n)
+    jac_ineq = create_array(cb, ns, n)
 
     pr_diag  = VT(undef, n+ns)
     du_diag  = VT(undef, m)
@@ -182,7 +182,7 @@ function create_kkt_system(
     ind_eq_shifted = ind_eq .+ n .+ ns
     ind_ineq_shifted = ind_cons.ind_ineq .+ n .+ ns
 
-    quasi_newton = create_quasi_newton(opt.hessian_approximation, nlp, n)
+    quasi_newton = create_quasi_newton(opt.hessian_approximation, cb, n)
     cnt.linear_solver_time += @elapsed linear_solver = opt.linear_solver(aug_com)
     
     del_w = 1.

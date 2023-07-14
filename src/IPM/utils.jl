@@ -14,8 +14,8 @@ end
 MadNLPExecutionStats(solver::MadNLPSolver) =MadNLPExecutionStats(
     solver.status,
     primal(solver.x),
-    solver.obj_val / solver.nlp.obj_scale[],
-    solver.c ./ solver.nlp.con_scale,
+    solver.obj_val / solver.cb.obj_scale[],
+    solver.c ./ solver.cb.con_scale,
     solver.inf_du,
     solver.inf_pr,
     solver.y,
@@ -26,8 +26,8 @@ MadNLPExecutionStats(solver::MadNLPSolver) =MadNLPExecutionStats(
 
 function update!(stats::MadNLPExecutionStats, solver::MadNLPSolver)
     stats.status = solver.status
-    stats.objective = solver.obj_val / solver.nlp.obj_scale[]
-    stats.constraints .= solver.c ./ solver.nlp.con_scale .+ solver.rhs
+    stats.objective = solver.obj_val / solver.cb.obj_scale[]
+    stats.constraints .= solver.c ./ solver.cb.con_scale .+ solver.rhs
     stats.constraints[solver.ind_ineq] .+= slack(solver.x)
     stats.dual_feas = solver.inf_du
     stats.primal_feas = solver.inf_pr
@@ -48,7 +48,7 @@ struct NotEnoughDegreesOfFreedomException <: Exception end
 has_constraints(solver) = solver.m != 0
 
 function get_vars_info(solver)
-    nlp = solver.nlp.inner
+    nlp = solver.nlp
 
     x_lb = get_lvar(nlp)
     x_ub = get_uvar(nlp)
@@ -69,7 +69,7 @@ function get_vars_info(solver)
 end
 
 function get_cons_info(solver)
-    nlp = solver.nlp.inner
+    nlp = solver.nlp
     
     g_lb = get_lcon(nlp)
     g_ub = get_ucon(nlp)
@@ -114,7 +114,7 @@ function print_init(solver::AbstractMadNLPSolver)
 end
 
 function print_iter(solver::AbstractMadNLPSolver;is_resto=false)
-    obj_scale = solver.nlp.obj_scale[]
+    obj_scale = solver.cb.obj_scale[]
     mod(solver.cnt.k,10)==0&& @info(solver.logger,@sprintf(
         "iter    objective    inf_pr   inf_du lg(mu)  ||d||  lg(rg) alpha_du alpha_pr  ls"))
     if is_resto
@@ -139,7 +139,7 @@ end
 
 function print_summary(solver::AbstractMadNLPSolver)
     # TODO inquire this from nlpmodel wrapper
-    obj_scale = solver.nlp.obj_scale[]
+    obj_scale = solver.cb.obj_scale[]
     solver.cnt.solver_time = solver.cnt.total_time-solver.cnt.linear_solver_time-solver.cnt.eval_function_time
     
     @notice(solver.logger,"")

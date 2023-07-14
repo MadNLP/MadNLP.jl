@@ -150,17 +150,17 @@ const AbstractSparseKKTSystem{T, VT, MT, QN} = Union{
 #=
     Generic sparse methods
 =#
-function build_hessian_structure(nlp::AbstractNLPModel, ::Type{<:ExactHessian})
-    hess_I = similar(get_x0(nlp), Int32, get_nnzh(nlp.meta))
-    hess_J = similar(get_x0(nlp), Int32, get_nnzh(nlp.meta))
-    hess_structure!(nlp,hess_I,hess_J)
+function build_hessian_structure(nlp::AbstractCallback, ::Type{<:ExactHessian})
+    hess_I = create_array(nlp, Int32, nlp.nnzh)
+    hess_J = create_array(nlp, Int32, nlp.nnzh)
+    _hess_sparsity_wrapper!(nlp,hess_I,hess_J)
     return hess_I, hess_J
 end
 # NB. Quasi-Newton methods require only the sparsity pattern
 #     of the diagonal term to store the term ξ I.
-function build_hessian_structure(nlp::AbstractNLPModel, ::Type{<:AbstractQuasiNewton})
-    hess_I = collect(Int32, 1:get_nvar(nlp))
-    hess_J = collect(Int32, 1:get_nvar(nlp))
+function build_hessian_structure(nlp::AbstractCallback, ::Type{<:AbstractQuasiNewton})
+    hess_I = collect(Int32, 1:nlp.nvar)
+    hess_J = collect(Int32, 1:nlp.nvar)
     return hess_I, hess_J
 end
 
@@ -201,19 +201,19 @@ end
     SparseKKTSystem
 =#
 
-# Build KKT system directly from AbstractNLPModel
+# Build KKT system directly from AbstractCallback
 function create_kkt_system(
     ::Type{SparseKKTSystem},
-    nlp::AbstractNLPModel{T,VT}, opt, cnt, ind_cons) where {T,VT}
+    nlp::AbstractCallback{T,VT}, opt, cnt, ind_cons) where {T,VT}
     n_slack = length(ind_cons.ind_ineq)
     # Deduce KKT size.
 
-    n = get_nvar(nlp)
-    m = get_ncon(nlp)
+    n = nlp.nvar
+    m = nlp.ncon
     # Evaluate sparsity pattern
-    jac_sparsity_I = similar(get_x0(nlp), Int32, get_nnzj(nlp.meta))
-    jac_sparsity_J = similar(get_x0(nlp), Int32, get_nnzj(nlp.meta))
-    jac_structure!(nlp,jac_sparsity_I, jac_sparsity_J)
+    jac_sparsity_I = create_array(nlp, Int32, nlp.nnzj)
+    jac_sparsity_J = create_array(nlp, Int32, nlp.nnzj)
+    _jac_sparsity_wrapper!(nlp,jac_sparsity_I, jac_sparsity_J)
 
     quasi_newton = create_quasi_newton(opt.hessian_approximation, nlp, n)
     hess_sparsity_I, hess_sparsity_J = build_hessian_structure(nlp, opt.hessian_approximation)
@@ -235,8 +235,8 @@ function create_kkt_system(
     aug_vec_length = n_tot+m
     aug_mat_length = n_tot+m+n_hess+n_jac+n_slack
 
-    I = similar(get_x0(nlp), Int32, aug_mat_length)
-    J = similar(get_x0(nlp), Int32, aug_mat_length)
+    I = create_array(nlp, Int32, aug_mat_length)
+    J = create_array(nlp, Int32, aug_mat_length)
     V = VT(undef, aug_mat_length)
     fill!(V, 0.0)  # Need to initiate V to avoid NaN
 
@@ -313,7 +313,7 @@ num_variables(kkt::SparseKKTSystem) = length(kkt.pr_diag)
 
 function create_kkt_system(
     ::Type{SparseUnreducedKKTSystem},
-    nlp::AbstractNLPModel{T,VT}, opt, cnt, ind_cons
+    nlp::AbstractCallback{T,VT}, opt, cnt, ind_cons
     ) where {T, VT}
     ind_ineq = ind_cons.ind_ineq
     ind_lb = ind_cons.ind_lb
@@ -323,20 +323,20 @@ function create_kkt_system(
     nlb = length(ind_cons.ind_lb)
     nub = length(ind_cons.ind_ub)
     # Deduce KKT size.
-    n = get_nvar(nlp)
-    m = get_ncon(nlp)
+    n = nlp.nvar
+    m = nlp.ncon
 
     # Quasi-newton
     quasi_newton = create_quasi_newton(opt.hessian_approximation, nlp, n)
     
     # Evaluate sparsity pattern
-    jac_sparsity_I = similar(get_x0(nlp), Int32, get_nnzj(nlp.meta))
-    jac_sparsity_J = similar(get_x0(nlp), Int32, get_nnzj(nlp.meta))
-    jac_structure!(nlp,jac_sparsity_I, jac_sparsity_J)
+    jac_sparsity_I = create_array(nlp, Int32, nlp.nnzj)
+    jac_sparsity_J = create_array(nlp, Int32, nlp.nnzj)
+    _jac_sparsity_wrapper!(nlp,jac_sparsity_I, jac_sparsity_J)
 
-    hess_sparsity_I = similar(get_x0(nlp), Int32, get_nnzh(nlp.meta))
-    hess_sparsity_J = similar(get_x0(nlp), Int32, get_nnzh(nlp.meta))
-    hess_structure!(nlp,hess_sparsity_I,hess_sparsity_J)
+    hess_sparsity_I = create_array(nlp, Int32, nlp.nnzh)
+    hess_sparsity_J = create_array(nlp, Int32, nlp.nnzh)
+    _hess_sparsity_wrapper!(nlp,hess_sparsity_I,hess_sparsity_J)
 
     force_lower_triangular!(hess_sparsity_I,hess_sparsity_J)
     
@@ -348,8 +348,8 @@ function create_kkt_system(
     aug_mat_length = n_tot + m + n_hess + n_jac + n_slack + 2*nlb + 2*nub
     aug_vec_length = n_tot + m + nlb + nub
 
-    I = similar(get_x0(nlp), Int32, aug_mat_length)
-    J = similar(get_x0(nlp), Int32, aug_mat_length)
+    I = create_array(nlp, Int32, aug_mat_length)
+    J = create_array(nlp, Int32, aug_mat_length)
     V = zeros(aug_mat_length)
 
     offset = n_tot + n_jac + n_slack + n_hess + m
@@ -457,15 +457,15 @@ num_variables(kkt::SparseUnreducedKKTSystem) = length(kkt.pr_diag)
     SparseCondensedKKTSystem
 =#
 
-# Build KKT system directly from AbstractNLPModel
+# Build KKT system directly from AbstractCallback
 function create_kkt_system(
     ::Type{SparseCondensedKKTSystem},
-    nlp::AbstractNLPModel{T,VT}, opt, cnt, ind_cons
+    nlp::AbstractCallback{T,VT}, opt, cnt, ind_cons
     ) where {T, VT}
 
     ind_ineq = ind_cons.ind_ineq
-    n = get_nvar(nlp)
-    m = get_ncon(nlp)
+    n = nlp.nvar
+    m = nlp.ncon
     n_slack = length(ind_ineq)
     
     if n_slack != m
@@ -473,9 +473,9 @@ function create_kkt_system(
     end
 
     # Evaluate sparsity pattern
-    jac_sparsity_I = similar(get_x0(nlp), Int32, get_nnzj(nlp.meta))
-    jac_sparsity_J = similar(get_x0(nlp), Int32, get_nnzj(nlp.meta))
-    jac_structure!(nlp,jac_sparsity_I, jac_sparsity_J)
+    jac_sparsity_I = create_array(nlp, Int32, nlp.nnzj)
+    jac_sparsity_J = create_array(nlp, Int32, nlp.nnzj)
+    _jac_sparsity_wrapper!(nlp,jac_sparsity_I, jac_sparsity_J)
 
     quasi_newton = create_quasi_newton(opt.hessian_approximation, nlp, n)
     hess_sparsity_I, hess_sparsity_J = build_hessian_structure(nlp, opt.hessian_approximation)

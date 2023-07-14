@@ -10,12 +10,14 @@ mutable struct MadNLPSolver{
     VT <: AbstractVector{T},
     VI <: AbstractVector{Int},
     KKTSystem <: AbstractKKTSystem{T},
-    Model <: NLPModelWrapper{T},
+    Model <: AbstractNLPModel{T,VT},
+    CB <: AbstractCallback{T},
     Iterator <: AbstractIterator{T},
     KKTVec <: AbstractKKTVector{T, VT}
     } <: AbstractMadNLPSolver{T}
     
     nlp::Model
+    cb::CB
     kkt::KKTSystem
 
     opt::MadNLPOptions
@@ -67,13 +69,11 @@ mutable struct MadNLPSolver{
     xu_r::SubVector{T,VT,VI}
     zl_r::SubVector{T,VT,VI}
     zu_r::SubVector{T,VT,VI}
-
     dx_lr::SubVector{T,VT,VI}
     dx_ur::SubVector{T,VT,VI}
     x_trial_lr::SubVector{T,VT,VI}
     x_trial_ur::SubVector{T,VT,VI}
 
-    # linear_solver::LinSolver
     iterator::Iterator
 
     inf_pr::T
@@ -96,13 +96,13 @@ mutable struct MadNLPSolver{
     output::Dict
 end
 
-function MadNLPSolver(m::AbstractNLPModel{T,VT}; kwargs...) where {T, VT}
+function MadNLPSolver(nlp::AbstractNLPModel{T,VT}; kwargs...) where {T, VT}
     
     opt, opt_linear_solver, logger = load_options(; kwargs...)
     @assert is_supported(opt.linear_solver, T)
 
     cnt = MadNLPCounters(start_time=time())
-    nlp = create_model_wrapper(opt.callback, m, opt)
+    cb = create_callback(opt.callback, nlp, opt)
     
     # generic options
     opt.disable_garbage_collector &&
@@ -110,8 +110,8 @@ function MadNLPSolver(m::AbstractNLPModel{T,VT}; kwargs...) where {T, VT}
     set_blas_num_threads(opt.blas_num_threads; permanent=true)
     @trace(logger,"Initializing variables.")
     ind_cons = get_index_constraints(
-        get_lvar(m), get_uvar(m),
-        get_lcon(m), get_ucon(m),
+        get_lvar(nlp), get_uvar(nlp),
+        get_lcon(nlp), get_ucon(nlp),
         opt.fixed_variable_treatment
     )
     
@@ -121,7 +121,7 @@ function MadNLPSolver(m::AbstractNLPModel{T,VT}; kwargs...) where {T, VT}
     m = get_ncon(nlp)
 
     # Initialize KKT
-    kkt = create_kkt_system(opt.kkt_system, nlp, opt, cnt, ind_cons)
+    kkt = create_kkt_system(opt.kkt_system, cb, opt, cnt, ind_cons)
 
     # Primal variable
     x = PrimalVector(VT,nx, ns, ind_cons)
@@ -177,7 +177,7 @@ function MadNLPSolver(m::AbstractNLPModel{T,VT}; kwargs...) where {T, VT}
     end
 
     return MadNLPSolver(
-        nlp,kkt,opt,cnt,logger,
+        nlp,cb,kkt,opt,cnt,logger,
         n,m,nlb,nub,x,y,zl,zu,xl,xu,0.,f,c,
         jacl,
         d, p,

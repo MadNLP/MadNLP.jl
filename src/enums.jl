@@ -10,10 +10,6 @@
       WARN   = 5,
       ERROR  = 6)
 
-@enum(FixedVariableTreatments::Int,
-      RELAX_BOUND = 1,
-      MAKE_PARAMETER = 2)
-
 @enum(InertiaCorrectionMethod::Int,
       INERTIA_AUTO = 1,
       INERTIA_BASED = 2,

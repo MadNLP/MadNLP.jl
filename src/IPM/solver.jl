@@ -18,7 +18,7 @@ function initialize!(solver::AbstractMadNLPSolver{T}) where T
     # Initializing variables 
     @trace(solver.logger,"Initializing variables.")
     initialize!(
-        nlp,
+        solver.cb,
         solver.x,
         solver.xl,
         solver.xu,
@@ -33,7 +33,7 @@ function initialize!(solver::AbstractMadNLPSolver{T}) where T
     
     # Initializing scaling factors
     set_scaling!(
-        nlp,
+        solver.cb,
         solver.x,
         solver.y,
         solver.rhs,
