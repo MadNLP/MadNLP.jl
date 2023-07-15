@@ -1,4 +1,5 @@
 const OPTIMIZER = ()->MadNLP.Optimizer(
+    kkt_system=MadNLP.DenseKKTSystem,
     linear_solver=MadNLP.LapackCPUSolver,
     print_level=MadNLP.ERROR
 )

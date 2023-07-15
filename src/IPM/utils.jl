@@ -31,6 +31,7 @@ function update!(stats::MadNLPExecutionStats, solver::MadNLPSolver)
     stats.constraints[solver.ind_ineq] .+= slack(solver.x)
     stats.dual_feas = solver.inf_du
     stats.primal_feas = solver.inf_pr
+    update_z!(solver.cb, stats.multipliers_L, stats.multipliers_U, solver.jacl)
     return stats
 end
 

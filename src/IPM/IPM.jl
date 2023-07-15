@@ -121,7 +121,14 @@ function MadNLPSolver(nlp::AbstractNLPModel{T,VT}; kwargs...) where {T, VT}
     m = get_ncon(nlp)
 
     # Initialize KKT
-    kkt = create_kkt_system(opt.kkt_system, cb, opt, cnt, ind_cons)
+    kkt = create_kkt_system(
+        opt.kkt_system,
+        cb,
+        opt,
+        opt_linear_solver,
+        cnt,
+        ind_cons
+    )
 
     # Primal variable
     x = PrimalVector(VT,nx, ns, ind_cons)
@@ -177,17 +184,21 @@ function MadNLPSolver(nlp::AbstractNLPModel{T,VT}; kwargs...) where {T, VT}
     end
 
     return MadNLPSolver(
-        nlp,cb,kkt,opt,cnt,logger,
-        n,m,nlb,nub,x,y,zl,zu,xl,xu,0.,f,c,
-        jacl,
-        d, p,
-        _w1, _w2, _w3, _w4,
-        x_trial,c_trial,0.,c_slk,rhs,
-        ind_cons.ind_ineq,ind_cons.ind_fixed,ind_cons.ind_llb,ind_cons.ind_uub,
-        x_lr,x_ur,xl_r,xu_r,zl_r,zu_r,dx_lr,dx_ur,x_trial_lr,x_trial_ur,
-        iterator,
-        0.,0.,0.,0.,0.,0.,0.,0.,0.," ",
-        Tuple{T,T}[],nothing,INITIAL,Dict(),
+        nlp, cb, kkt,
+        opt, cnt, logger, 
+        n, m, nlb, nub,
+        x, y, zl, zu, xl, xu,
+        zero(T), f, c, 
+        jacl, 
+        d,  p, 
+        _w1,  _w2,  _w3,  _w4, 
+        x_trial, c_trial, zero(T), c_slk, rhs, 
+        ind_cons.ind_ineq, ind_cons.ind_fixed, ind_cons.ind_llb, ind_cons.ind_uub, 
+        x_lr, x_ur, xl_r, xu_r, zl_r, zu_r, dx_lr, dx_ur, x_trial_lr, x_trial_ur, 
+        iterator, 
+        zero(T), zero(T), zero(T), zero(T), zero(T), zero(T), zero(T), zero(T), zero(T),
+        " ", 
+        Tuple{T, T}[], nothing, INITIAL, Dict(), 
     )
 
 end

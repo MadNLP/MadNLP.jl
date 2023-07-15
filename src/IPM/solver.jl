@@ -35,8 +35,11 @@ function initialize!(solver::AbstractMadNLPSolver{T}) where T
     set_scaling!(
         solver.cb,
         solver.x,
+        solver.xl,
+        solver.xu,
         solver.y,
         solver.rhs,
+        solver.ind_ineq,
         opt.nlp_scaling_max_gradient
     )
 

@@ -9,6 +9,7 @@ testset = [
     [
         "LapackCPU-BUNCHKAUFMAN",
         ()->MadNLP.Optimizer(
+            kkt_system=MadNLP.DenseKKTSystem,
             linear_solver=MadNLP.LapackCPUSolver,
             lapack_algorithm=MadNLP.BUNCHKAUFMAN,
             print_level=MadNLP.ERROR),
@@ -17,6 +18,7 @@ testset = [
     [
         "LapackCPU-LU",
         ()->MadNLP.Optimizer(
+            kkt_system=MadNLP.DenseKKTSystem,
             linear_solver=MadNLP.LapackCPUSolver,
             lapack_algorithm=MadNLP.LU,
             print_level=MadNLP.ERROR),
@@ -25,6 +27,7 @@ testset = [
     [
         "LapackCPU-QR",
         ()->MadNLP.Optimizer(
+            kkt_system=MadNLP.DenseKKTSystem,
             linear_solver=MadNLP.LapackCPUSolver,
             lapack_algorithm=MadNLP.QR,
             print_level=MadNLP.ERROR),
@@ -33,6 +36,7 @@ testset = [
     [
         "LapackCPU-CHOLESKY",
         ()->MadNLP.Optimizer(
+            kkt_system=MadNLP.DenseKKTSystem,
             linear_solver=MadNLP.LapackCPUSolver,
             lapack_algorithm=MadNLP.CHOLESKY,
             print_level=MadNLP.ERROR),
@@ -41,7 +45,7 @@ testset = [
     [
         "Option: RELAX_BOUND",
         ()->MadNLP.Optimizer(
-            fixed_variable_treatment=MadNLP.RELAX_BOUND,
+            fixed_variable_treatment=MadNLP.RelaxBound,
             print_level=MadNLP.ERROR),
         [],
         true
@@ -49,7 +53,7 @@ testset = [
     [
         "Option: AUGMENTED KKT SYSTEM",
         ()->MadNLP.Optimizer(
-            kkt_system=MadNLP.SPARSE_UNREDUCED_KKT_SYSTEM,
+            kkt_system=MadNLP.SparseUnreducedKKTSystem,
             print_level=MadNLP.ERROR),
         ["infeasible","eigmina"] # numerical errors
     ],
@@ -57,7 +61,7 @@ testset = [
         "Option: INERTIA_FREE & AUGMENTED KKT SYSTEM",
         ()->MadNLP.Optimizer(
             inertia_correction_method=MadNLP.INERTIA_FREE,
-            kkt_system=MadNLP.SPARSE_UNREDUCED_KKT_SYSTEM,
+            kkt_system=MadNLP.SparseUnreducedKKTSystem,
             print_level=MadNLP.ERROR),
         ["infeasible","eigmina"] # numerical errors
     ],
@@ -121,6 +125,7 @@ end
 @testset "MadNLP callback allocations" begin
     nlp = MadNLPTests.HS15Model()
     solver = MadNLPSolver(nlp)
+    MadNLP.initialize!(solver)
     kkt = solver.kkt
     x, f, c = solver.x, solver.f, solver.c
     # Precompile
@@ -145,6 +150,7 @@ end
 @testset "MadNLP timings" begin
     nlp = MadNLPTests.HS15Model()
     solver = MadNLPSolver(nlp)
+    MadNLP.initialize!(solver)
     time_callbacks = MadNLP.timing_callbacks(solver)
     @test isa(time_callbacks, NamedTuple)
     time_linear_solver = MadNLP.timing_linear_solver(solver)

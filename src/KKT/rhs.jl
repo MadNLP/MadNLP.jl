@@ -78,48 +78,6 @@ function axpy!(a::Number, X::AbstractKKTVector, Y::AbstractKKTVector)
 end
 
 #=
-    ReducedKKTVector
-=#
-
-"""
-    ReducedKKTVector{T, VT<:AbstractVector{T}} <: AbstractKKTVector{T, VT}
-
-KKT vector ``(x, s, y, z)``, associated to a [`AbstractReducedKKTSystem`](@ref).
-
-Compared to [`UnreducedKKTVector`](@ref), it does not store
-the dual values associated to the primal's lower and upper bounds.
-"""
-struct ReducedKKTVector{T, VT<:AbstractVector{T}, VI} <: AbstractKKTVector{T, VT}
-    values::VT
-    xp::VT # unsafe view
-    xp_lr::SubVector{T, VT, VI}
-    xp_ur::SubVector{T, VT, VI}
-    xl::VT # unsafe view
-end
-
-ReducedKKTVector{T,VT}(n::Int, m::Int, nlb::Int, nub::Int) where {T, VT <: AbstractVector{T}} = ReducedKKTVector{T,VT}(n, m)
-function ReducedKKTVector(::Type{VT}, n::Int, m::Int, ind_cons) where {T, VT <: AbstractVector{T}}
-    x = VT(undef, n + m)
-    fill!(x, 0.0)
-    # Wrap directly array x to avoid dealing with views
-    xp = _madnlp_unsafe_wrap(x, n)
-    xl = _madnlp_unsafe_wrap(x, m, n+1)
-    xp_lr = view(xp, ind_cons.ind_lb)
-    xp_ur = view(xp, ind_cons.ind_ub)
-
-    return ReducedKKTVector(x, xp, xp_lr, xp_ur, xl)
-end
-function ReducedKKTVector(rhs::AbstractKKTVector, ind_cons)
-    return ReducedKKTVector(number_primal(rhs), number_dual(rhs))
-end
-
-full(rhs::ReducedKKTVector) = rhs.values
-primal(rhs::ReducedKKTVector) = rhs.xp
-dual(rhs::ReducedKKTVector) = rhs.xl
-primal_dual(rhs::ReducedKKTVector) = rhs.values
-
-
-#=
     UnreducedKKTVector
 =#
 

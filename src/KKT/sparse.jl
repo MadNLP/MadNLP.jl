@@ -150,7 +150,7 @@ const AbstractSparseKKTSystem{T, VT, MT, QN} = Union{
 #=
     Generic sparse methods
 =#
-function build_hessian_structure(nlp::AbstractCallback, ::Type{<:ExactHessian})
+function build_hessian_structure(nlp::SparseCallback, ::Type{<:ExactHessian})
     hess_I = create_array(nlp, Int32, nlp.nnzh)
     hess_J = create_array(nlp, Int32, nlp.nnzh)
     _hess_sparsity_wrapper!(nlp,hess_I,hess_J)
@@ -158,7 +158,7 @@ function build_hessian_structure(nlp::AbstractCallback, ::Type{<:ExactHessian})
 end
 # NB. Quasi-Newton methods require only the sparsity pattern
 #     of the diagonal term to store the term ξ I.
-function build_hessian_structure(nlp::AbstractCallback, ::Type{<:AbstractQuasiNewton})
+function build_hessian_structure(nlp::SparseCallback, ::Type{<:AbstractQuasiNewton})
     hess_I = collect(Int32, 1:nlp.nvar)
     hess_J = collect(Int32, 1:nlp.nvar)
     return hess_I, hess_J
@@ -201,10 +201,13 @@ end
     SparseKKTSystem
 =#
 
-# Build KKT system directly from AbstractCallback
+# Build KKT system directly from SparseCallback
 function create_kkt_system(
     ::Type{SparseKKTSystem},
-    nlp::AbstractCallback{T,VT}, opt, cnt, ind_cons) where {T,VT}
+    nlp::SparseCallback{T,VT}, opt, 
+    opt_linear_solver,cnt, ind_cons
+    ) where {T,VT}
+    
     n_slack = length(ind_cons.ind_ineq)
     # Deduce KKT size.
 
@@ -284,11 +287,13 @@ function create_kkt_system(
     jac_com, jac_csc_map = coo_to_csc(jac_raw)
     hess_com, hess_csc_map = coo_to_csc(hess_raw)
 
-    del_w = 1.
-    del_w_last = 0.
-    del_c = 0.
+    del_w = one(T)
+    del_w_last = zero(T)
+    del_c = zero(T)
 
-    cnt.linear_solver_time += @elapsed linear_solver = opt.linear_solver(aug_com)
+    cnt.linear_solver_time += @elapsed linear_solver = opt.linear_solver(
+        aug_com; opt = opt_linear_solver
+    )
 
     return SparseKKTSystem(
         hess, jac_callback, jac, quasi_newton, pr_diag, du_diag,
@@ -313,7 +318,8 @@ num_variables(kkt::SparseKKTSystem) = length(kkt.pr_diag)
 
 function create_kkt_system(
     ::Type{SparseUnreducedKKTSystem},
-    nlp::AbstractCallback{T,VT}, opt, cnt, ind_cons
+    nlp::SparseCallback{T,VT}, opt, 
+    opt_linear_solver,cnt, ind_cons
     ) where {T, VT}
     ind_ineq = ind_cons.ind_ineq
     ind_lb = ind_cons.ind_lb
@@ -407,12 +413,14 @@ function create_kkt_system(
     jac_com, jac_csc_map = coo_to_csc(jac_raw)
     hess_com, hess_csc_map = coo_to_csc(hess_raw)
 
-    del_w = 1.
-    del_w_last = 0.
-    del_c = 0.
+    del_w = one(T)
+    del_w_last = zero(T)
+    del_c = zero(T)
 
-    cnt.linear_solver_time += @elapsed linear_solver = opt.linear_solver(aug_com)
-
+    cnt.linear_solver_time += @elapsed linear_solver = opt.linear_solver(aug_com; opt = opt_linear_solver)
+opt.linear_solver(
+        aug_com; opt = opt_linear_solver
+    )
     return SparseUnreducedKKTSystem(
         hess, jac_callback, jac, quasi_newton, pr_diag, du_diag,
         l_diag, u_diag, l_lower, u_lower, l_lower_aug, u_lower_aug,
@@ -457,10 +465,14 @@ num_variables(kkt::SparseUnreducedKKTSystem) = length(kkt.pr_diag)
     SparseCondensedKKTSystem
 =#
 
-# Build KKT system directly from AbstractCallback
+# Build KKT system directly from SparseCallback
 function create_kkt_system(
     ::Type{SparseCondensedKKTSystem},
-    nlp::AbstractCallback{T,VT}, opt, cnt, ind_cons
+    nlp::SparseCallback{T,VT},
+    opt, 
+    opt_linear_solver,
+    cnt,
+    ind_cons
     ) where {T, VT}
 
     ind_ineq = ind_cons.ind_ineq
@@ -521,18 +533,11 @@ function create_kkt_system(
 
     buffer = VT(undef, m)
 
-    del_w = 1.
-    del_w_last = 0.
-    del_c = 0.
+    del_w = one(T)
+    del_w_last = zero(T)
+    del_c = zero(T)
 
-    cnt.linear_solver_time += @elapsed linear_solver = opt.linear_solver(aug_com)
-
-    ext = get_sparse_condensed_ext(
-        VT,
-        jptr,
-        jt_csc_map,
-        hess_csc_map,
-    )
+    cnt.linear_solver_time += @elapsed linear_solver = opt.linear_solver(aug_com; opt = opt_linear_solver)
     
 
     return SparseCondensedKKTSystem( 

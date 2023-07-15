@@ -42,7 +42,8 @@ end
 
 function create_kkt_system(
     ::Type{DenseKKTSystem},
-    cb::DenseCallback{T,VT}, opt, cnt, ind_cons) where {T,VT}
+    cb::AbstractCallback{T,VT}, opt, 
+    opt_linear_solver, cnt, ind_cons) where {T,VT}
     
     ind_ineq = ind_cons.ind_ineq
     ind_lb = ind_cons.ind_lb
@@ -75,11 +76,11 @@ function create_kkt_system(
     fill!(diag_hess, zero(T))
 
     quasi_newton = create_quasi_newton(opt.hessian_approximation, cb, n)
-    cnt.linear_solver_time += @elapsed linear_solver = opt.linear_solver(aug_com)
+    cnt.linear_solver_time += @elapsed linear_solver = opt.linear_solver(aug_com; opt = opt_linear_solver)
     
-    del_w = 1.
-    del_w_last = 0.
-    del_c = 0.
+    del_w = one(T)
+    del_w_last = zero(T)
+    del_c = zero(T)
 
     return DenseKKTSystem(
         hess, jac, quasi_newton,
@@ -144,7 +145,8 @@ end
 
 function create_kkt_system(
     ::Type{DenseCondensedKKTSystem},
-    cb::DenseCallback{T,VT}, opt, cnt, ind_cons) where {T,VT}
+    cb::AbstractCallback{T,VT}, opt, 
+    opt_linear_solver, cnt, ind_cons) where {T,VT}
     
     n = cb.nvar
     m = cb.ncon
@@ -183,11 +185,11 @@ function create_kkt_system(
     ind_ineq_shifted = ind_cons.ind_ineq .+ n .+ ns
 
     quasi_newton = create_quasi_newton(opt.hessian_approximation, cb, n)
-    cnt.linear_solver_time += @elapsed linear_solver = opt.linear_solver(aug_com)
+    cnt.linear_solver_time += @elapsed linear_solver = opt.linear_solver(aug_com; opt = opt_linear_solver)
     
-    del_w = 1.
-    del_w_last = 0.
-    del_c = 0.
+    del_w = one(T)
+    del_w_last = zero(T)
+    del_c = zero(T)
 
     return DenseCondensedKKTSystem(
         hess, jac, quasi_newton, jac_ineq,
@@ -241,9 +243,6 @@ num_variables(kkt::DenseKKTSystem) = length(kkt.pr_diag)
 
 function mul!(y::AbstractVector, kkt::DenseKKTSystem, x::AbstractVector)
     symul!(y, kkt.aug_com, x)
-end
-function mul!(y::ReducedKKTVector, kkt::DenseKKTSystem, x::ReducedKKTVector)
-    mul!(full(y), kkt.aug_com, full(x))
 end
 
 # Special getters for Jacobian
@@ -433,10 +432,6 @@ function mul!(y::AbstractVector, kkt::DenseCondensedKKTSystem, x::AbstractVector
     else
         _mul_expanded!(y, kkt, x)
     end
-end
-
-function mul!(y::ReducedKKTVector, kkt::DenseCondensedKKTSystem, x::ReducedKKTVector)
-    mul!(full(y), kkt, full(x))
 end
 
 function jprod_ineq!(y::AbstractVector, kkt::DenseCondensedKKTSystem, x::AbstractVector)

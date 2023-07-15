@@ -37,12 +37,12 @@ function diag!(dest::AbstractVector{T}, src::AbstractMatrix{T}) where T
         dest[i] = src[i, i]
     end
 end
-
-function get_tril_to_full(csc::SparseMatrixCSC{Tv,Ti}) where {Tv,Ti<:Integer}
+get_tril_to_full(csc::SparseMatrixCSC{Tv,Ti}) where {Tv, Ti} = get_tril_to_full(Tv,csc)
+function get_tril_to_full(T,csc::SparseMatrixCSC{Tv,Ti}) where {Tv,Ti<:Integer}
     cscind = SparseMatrixCSC{Int,Ti}(Symmetric(
         SparseMatrixCSC{Int,Ti}(csc.m,csc.n,csc.colptr,csc.rowval,collect(1:nnz(csc))),:L))
-    return SparseMatrixCSC{Tv,Ti}(
-        csc.m,csc.n,cscind.colptr,cscind.rowval,Vector{Tv}(undef,nnz(cscind))),view(csc.nzval,cscind.nzval)
+    return SparseMatrixCSC{T,Ti}(
+        csc.m,csc.n,cscind.colptr,cscind.rowval,Vector{T}(undef,nnz(cscind))),view(csc.nzval,cscind.nzval)
 end
 function tril_to_full!(dense::Matrix{T}) where T
     for i=1:size(dense,1)
