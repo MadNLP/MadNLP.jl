@@ -1,6 +1,6 @@
 @testset "MadNLP: $QN + $KKT" for QN in [
-    MadNLP.DENSE_BFGS,
-    MadNLP.DENSE_DAMPED_BFGS,
+    MadNLP.BFGS,
+    MadNLP.DampedBFGS,
 ], KKT in [
     MadNLP.DenseKKTSystem,
     MadNLP.DenseCondensedKKTSystem,
@@ -38,7 +38,7 @@ end
         nlp = MadNLPTests.HS15Model()
         solver_qn = MadNLP.MadNLPSolver(
             nlp;
-            hessian_approximation=MadNLP.SPARSE_COMPACT_LBFGS,
+            hessian_approximation=MadNLP.CompactLBFGS,
             print_level=MadNLP.ERROR,
         )
         results_qn = MadNLP.solve!(solver_qn)
@@ -56,7 +56,7 @@ end
         # LBFGS solve
         solver_qn = MadNLP.MadNLPSolver(
             nlp;
-            hessian_approximation=MadNLP.SPARSE_COMPACT_LBFGS,
+            hessian_approximation=MadNLP.CompactLBFGS,
             print_level=MadNLP.ERROR,
         )
         results_qn = MadNLP.solve!(solver_qn)

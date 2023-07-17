@@ -10,7 +10,7 @@ ma27_default_cntl(T)  = T[.1,1.0,0.,0.,0.]
     ma27_meminc_factor::Float64 =2.
 end
 
-struct Ma27Solver{T} <: AbstractLinearSolver{T}
+mutable struct Ma27Solver{T} <: AbstractLinearSolver{T}
     csc::SparseMatrixCSC{T,Int32}
     I::Vector{Int32}
     J::Vector{Int32}

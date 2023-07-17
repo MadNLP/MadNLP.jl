@@ -179,7 +179,7 @@ get_jacobian(kkt::AbstractSparseKKTSystem) = kkt.jac_callback
 
 nnz_jacobian(kkt::AbstractSparseKKTSystem) = nnz(kkt.jac_raw)
 
-function compress_jacobian!(kkt::AbstractSparseKKTSystem{T, VT, MT}) where {T, VT, MT<:SparseMatrixCSC{T, Int32}}
+function compress_jacobian!(kkt::AbstractSparseKKTSystem)
     ns = length(kkt.ind_ineq)
     kkt.jac[end-ns+1:end] .= -1.0
     transfer!(kkt.jac_com, kkt.jac_raw, kkt.jac_csc_map)
@@ -191,7 +191,7 @@ function compress_jacobian!(kkt::AbstractSparseKKTSystem{T, VT, MT}) where {T, V
     copyto!(kkt.jac_com, kkt.jac_raw)
 end
 
-function compress_hessian!(kkt::AbstractSparseKKTSystem{T, VT, MT}) where {T, VT, MT<:SparseMatrixCSC{T, Int32}}
+function compress_hessian!(kkt::AbstractSparseKKTSystem)
     transfer!(kkt.hess_com, kkt.hess_raw, kkt.hess_csc_map)
 end
 
@@ -344,7 +344,8 @@ function create_kkt_system(
     hess_sparsity_J = create_array(nlp, Int32, nlp.nnzh)
     _hess_sparsity_wrapper!(nlp,hess_sparsity_I,hess_sparsity_J)
 
-    force_lower_triangular!(hess_sparsity_I,hess_sparsity_J)
+    # TODO make this work on GPU
+    # force_lower_triangular!(hess_sparsity_I,hess_sparsity_J)
     
     n_slack = length(ind_ineq)
     n_jac = length(jac_sparsity_I)
@@ -492,7 +493,8 @@ function create_kkt_system(
     quasi_newton = create_quasi_newton(opt.hessian_approximation, nlp, n)
     hess_sparsity_I, hess_sparsity_J = build_hessian_structure(nlp, opt.hessian_approximation)
 
-    force_lower_triangular!(hess_sparsity_I,hess_sparsity_J)
+    # TODO make this work on GPU
+    # force_lower_triangular!(hess_sparsity_I,hess_sparsity_J)
 
     n_jac = length(jac_sparsity_I)
     n_hess = length(hess_sparsity_I)
@@ -538,7 +540,8 @@ function create_kkt_system(
     del_c = zero(T)
 
     cnt.linear_solver_time += @elapsed linear_solver = opt.linear_solver(aug_com; opt = opt_linear_solver)
-    
+
+    ext = get_sparse_condensed_ext(VT, jptr, jt_csc_map, hess_csc_map)
 
     return SparseCondensedKKTSystem( 
         hess, hess_raw,hess_com,hess_csc_map,
@@ -762,8 +765,3 @@ function build_kkt!(kkt::SparseCondensedKKTSystem)
 end
 
 get_jacobian(kkt::SparseCondensedKKTSystem) = kkt.jac
-
-# TODO
-# function is_inertia_correct(kkt::SparseUnreducedKKTSystem, num_pos, num_zero, num_neg)
-#     true
-# end

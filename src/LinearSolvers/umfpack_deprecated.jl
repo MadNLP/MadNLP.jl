@@ -93,7 +93,7 @@ function solve!(M::UmfpackSolver{T},rhs::Vector{T}) where T
     rhs .= M.p
     return rhs
 end
-is_inertia(::UmfpackSolver) = false
+is_inertia(::Type{UmfpackSolver}) = false
 inertia(M::UmfpackSolver) = throw(InertiaException())
 input_type(::Type{UmfpackSolver}) = :csc
 default_options(::Type{UmfpackSolver}) = UmfpackOptions()

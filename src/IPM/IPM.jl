@@ -98,7 +98,7 @@ end
 
 function MadNLPSolver(nlp::AbstractNLPModel{T,VT}; kwargs...) where {T, VT}
     
-    opt, opt_linear_solver, logger = load_options(; kwargs...)
+    opt, opt_linear_solver, logger = load_options(nlp; kwargs...)
     @assert is_supported(opt.linear_solver, T)
 
     cnt = MadNLPCounters(start_time=time())
@@ -109,10 +109,12 @@ function MadNLPSolver(nlp::AbstractNLPModel{T,VT}; kwargs...) where {T, VT}
         (GC.enable(false); @warn(logger,"Julia garbage collector is temporarily disabled"))
     set_blas_num_threads(opt.blas_num_threads; permanent=true)
     @trace(logger,"Initializing variables.")
+    
     ind_cons = get_index_constraints(
         get_lvar(nlp), get_uvar(nlp),
         get_lcon(nlp), get_ucon(nlp),
-        opt.fixed_variable_treatment
+        opt.fixed_variable_treatment,
+        opt.equality_treatment
     )
     
     ns = length(ind_cons.ind_ineq)

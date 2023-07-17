@@ -184,6 +184,7 @@ end
 
 is_inertia(M::LapackCPUSolver) =
     M.opt.lapack_algorithm == BUNCHKAUFMAN || M.opt.lapack_algorithm == CHOLESKY
+
 function inertia(M::LapackCPUSolver)
     if M.opt.lapack_algorithm == BUNCHKAUFMAN
         inertia(M.fact,M.etc[:ipiv],M.info[])

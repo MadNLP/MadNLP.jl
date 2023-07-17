@@ -1,4 +1,5 @@
 mutable struct MadNLPExecutionStats{T, VT} <: AbstractExecutionStats
+    options::MadNLPOptions
     status::Status
     solution::VT
     objective::T
@@ -12,6 +13,7 @@ mutable struct MadNLPExecutionStats{T, VT} <: AbstractExecutionStats
 end
 
 MadNLPExecutionStats(solver::MadNLPSolver) =MadNLPExecutionStats(
+    solver.opt,
     solver.status,
     primal(solver.x),
     solver.obj_val / solver.cb.obj_scale[],
@@ -37,7 +39,7 @@ end
 
 get_counters(nlp::NLPModels.AbstractNLPModel) = nlp.counters
 get_counters(nlp::NLPModels.AbstractNLSModel) = nlp.counters.counters
-getStatus(result::MadNLPExecutionStats) = STATUS_OUTPUT_DICT[result.status]
+getStatus(result::MadNLPExecutionStats) = get_status_output(result.status, result.options)
 
 # Exceptions
 struct InvalidNumberException <: Exception

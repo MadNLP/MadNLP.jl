@@ -1,17 +1,5 @@
 abstract type AbstractOptions end
 
-# Build info
-function default_linear_solver()
-    if isdefined(Main, :MadNLPHSL)
-        Main.MadNLPHSL.Ma27Solver
-    elseif isdefined(Main, :MadNLPMumps)
-        Main.MadNLPMumps.MumpsSolver
-    else
-        UmfpackSolver
-    end
-end
-default_dense_solver() = LapackCPUSolver
-
 # MadNLPLogger
 @kwdef mutable struct MadNLPLogger
     print_level::LogLevels = INFO

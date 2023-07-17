@@ -129,8 +129,8 @@ for (sytrf,sytrf_buffer,getrf,getrf_buffer,getrs,geqrf,geqrf_buffer,ormqr,ormqr_
 
         function factorize_lu!(M::LapackGPUSolver{$typ})
             haskey(M.etc,:ipiv) || (M.etc[:ipiv] = CuVector{Int32}(undef,size(M.dense,1)))
-            tril_to_full!(M.dense)
             copyto!(M.fact,M.dense)
+            tril_to_full!(M.fact)
             CUSOLVER.$getrf_buffer(
                 dense_handle(),Int32(size(M.fact,1)),Int32(size(M.fact,2)),
                 M.fact,Int32(size(M.fact,2)),M.lwork)
@@ -154,8 +154,8 @@ for (sytrf,sytrf_buffer,getrf,getrf_buffer,getrs,geqrf,geqrf_buffer,ormqr,ormqr_
         function factorize_qr!(M::LapackGPUSolver{$typ})
             haskey(M.etc,:tau) || (M.etc[:tau] = CuVector{$typ}(undef,size(M.dense,1)))
             haskey(M.etc,:one) || (M.etc[:one] = ones($typ,1))
-            tril_to_full!(M.dense)
             copyto!(M.fact,M.dense)
+            tril_to_full!(M.fact)
             CUSOLVER.$geqrf_buffer(dense_handle(),Int32(size(M.fact,1)),Int32(size(M.fact,2)),M.fact,Int32(size(M.fact,2)),M.lwork)
             length(M.work) < M.lwork[] && resize!(M.work,Int(M.lwork[]))
             CUSOLVER.$geqrf(dense_handle(),Int32(size(M.fact,1)),Int32(size(M.fact,2)),M.fact,Int32(size(M.fact,2)),M.etc[:tau],M.work,M.lwork[],M.info)

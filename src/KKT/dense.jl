@@ -178,10 +178,8 @@ function create_kkt_system(
     fill!(pr_diag, zero(T))
     fill!(du_diag, zero(T))
 
-    ind_eq = setdiff(1:m, ind_cons.ind_ineq)
-
     # Shift indexes to avoid additional allocation in views
-    ind_eq_shifted = ind_eq .+ n .+ ns
+    ind_eq_shifted = ind_cons.ind_eq .+ n .+ ns
     ind_ineq_shifted = ind_cons.ind_ineq .+ n .+ ns
 
     quasi_newton = create_quasi_newton(opt.hessian_approximation, cb, n)
@@ -196,7 +194,7 @@ function create_kkt_system(
         pr_diag, du_diag, l_diag, u_diag, l_lower, u_lower,
         pd_buffer, diag_buffer, buffer,
         aug_com, 
-        n_eq, ind_eq, ind_eq_shifted,
+        n_eq, ind_cons.ind_eq, ind_eq_shifted,
         ns, ind_cons.ind_ineq, ind_ineq_shifted,
         del_w, del_w_last, del_c,
         linear_solver,
@@ -214,7 +212,7 @@ const AbstractDenseKKTSystem{T, VT, MT, QN} = Union{
     Generic functions
 =#
 
-function jtprod!(y::AbstractVector, kkt::AbstractDenseKKTSystem, x::AbstractVector)
+@views function jtprod!(y::AbstractVector, kkt::AbstractDenseKKTSystem, x::AbstractVector)
     nx = size(kkt.hess, 1)
     ind_ineq = kkt.ind_ineq
     ns = length(ind_ineq)
@@ -376,6 +374,7 @@ function build_kkt!(kkt::DenseCondensedKKTSystem{T, VT, MT}) where {T, VT, MT}
     end
     # Build J' * Σₛ * J
     mul!(W, kkt.jac_ineq', kkt.jac_ineq)
+
 
     _build_condensed_kkt_system!(
         kkt.aug_com, kkt.hess, kkt.jac,

@@ -4,36 +4,35 @@ using MadNLPTests
 
 function _compare_gpu_with_cpu(KKTSystem, n, m, ind_fixed)
 
-    opt_kkt = if (KKTSystem == MadNLP.DenseKKTSystem)
-        MadNLP.DENSE_KKT_SYSTEM
-    elseif (KKTSystem == MadNLP.DenseCondensedKKTSystem)
-        MadNLP.DENSE_CONDENSED_KKT_SYSTEM
-    end
-
-    for (T,tol,atol) in [(Float32,1e-3,1e-1), (Float64,1e-8,1e-6)]
+    for (T,tol,atol) in [
+        (Float32,1e-3,1e-1),
+        (Float64,1e-8,1e-6)
+        ]
         madnlp_options = Dict{Symbol, Any}(
-            :kkt_system=>opt_kkt,
+            :callback=>MadNLP.DenseCallback,
+            :kkt_system=>KKTSystem,
             :linear_solver=>LapackGPUSolver,
             :print_level=>MadNLP.ERROR,
             :tol=>tol
         )
 
-        nlp = MadNLPTests.DenseDummyQP{T}(; n=n, m=m, fixed_variables=ind_fixed)
+        nlp = MadNLPTests.DenseDummyQP(zeros(T,n); m=m, fixed_variables=ind_fixed)
 
         # Solve on CPU
-        h_solver = MadNLP.MadNLPSolver(nlp; madnlp_options...)
+        h_solver = MadNLPSolver(nlp; madnlp_options...)
         results_cpu = MadNLP.solve!(h_solver)
 
+        nlp = MadNLPTests.DenseDummyQP(CUDA.zeros(T,n); m=m, fixed_variables=CuArray(ind_fixed))
         # Solve on GPU
-        d_solver = MadNLPGPU.CuMadNLPSolver(nlp; madnlp_options...)
+        d_solver = MadNLPSolver(nlp; madnlp_options...)
         results_gpu = MadNLP.solve!(d_solver)
 
-        @test isa(d_solver.kkt, KKTSystem{T, CuVector{T}, CuMatrix{T}})
+        @test isa(d_solver.kkt, KKTSystem{T})
         # # Check that both results match exactly
         @test h_solver.cnt.k == d_solver.cnt.k
         @test results_cpu.objective ≈ results_gpu.objective
-        @test results_cpu.solution ≈ results_gpu.solution atol=atol
-        @test results_cpu.multipliers ≈ results_gpu.multipliers atol=atol
+        @test results_cpu.solution ≈ Array(results_gpu.solution) atol=atol
+        @test results_cpu.multipliers ≈ Array(results_gpu.multipliers) atol=atol
     end
 end
 
@@ -51,24 +50,27 @@ end
 end
 
 @testset "MadNLP: $QN + $KKT" for QN in [
-    MadNLP.DENSE_BFGS,
-    MadNLP.DENSE_DAMPED_BFGS,
+    MadNLP.BFGS,
+    MadNLP.DampedBFGS,
 ], KKT in [
-    MadNLP.DENSE_KKT_SYSTEM,
-    MadNLP.DENSE_CONDENSED_KKT_SYSTEM,
+    MadNLP.DenseKKTSystem,
+    MadNLP.DenseCondensedKKTSystem,
 ]
     @testset "Size: ($n, $m)" for (n, m) in [(10, 0), (10, 5), (50, 10)]
-        nlp = MadNLPTests.DenseDummyQP{Float64}(; n=n, m=m)
-        solver_exact = MadNLP.MadNLPSolver(
+        nlp = MadNLPTests.DenseDummyQP(zeros(Float64, n); m=m)
+        solver_exact = MadNLPSolver(
             nlp;
+            callback=MadNLP.DenseCallback,
             print_level=MadNLP.ERROR,
             kkt_system=KKT,
             linear_solver=LapackGPUSolver,
         )
         results_ref = MadNLP.solve!(solver_exact)
 
-        solver_qn = MadNLPGPU.CuMadNLPSolver(
+        nlp = MadNLPTests.DenseDummyQP(CUDA.zeros(Float64, n); m=m)
+        solver_qn = MadNLPSolver(
             nlp;
+            callback=MadNLP.DenseCallback,
             print_level=MadNLP.ERROR,
             kkt_system=KKT,
             hessian_approximation=QN,
@@ -78,7 +80,7 @@ end
 
         @test results_qn.status == MadNLP.SOLVE_SUCCEEDED
         @test results_qn.objective ≈ results_ref.objective atol=1e-6
-        @test results_qn.solution ≈ results_ref.solution atol=1e-6
+        @test Array(results_qn.solution) ≈ Array(results_ref.solution) atol=1e-6
         @test solver_qn.cnt.lag_hess_cnt == 0
     end
 end

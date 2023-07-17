@@ -315,12 +315,12 @@ function get_varphi(obj_val, x_lr::SubVector{T,Vector{T},VI}, xl_r, xu_r, x_ur, 
     varphi = obj_val
     @inbounds @simd for i=1:length(x_lr)
         xll = x_lr[i]-xl_r[i]
-        xll < 0 && return Inf
+        xll < 0 && return T(Inf)
         varphi -= mu*log(xll)
     end
     @inbounds @simd for i=1:length(x_ur)
         xuu = xu_r[i]-x_ur[i]
-        xuu < 0 && return Inf
+        xuu < 0 && return T(Inf)
         varphi -= mu*log(xuu)
     end
     return varphi
@@ -334,10 +334,10 @@ function get_varphi(obj_val, x_lr, xl_r, xu_r, x_ur, mu)
     )
 end
 
-function _get_varphi(x1,x2,mu)
+function _get_varphi(x1::T,x2,mu) where T
     x = x1 - x2
     if x < 0
-        return Inf
+        return T(Inf)
     else
         return -mu * log(x)
     end
@@ -411,16 +411,17 @@ function get_alpha_max(x::Vector{T}, xl, xu, dx, tau) where T
     end
     return alpha_max
 end
-function get_alpha_max(x, xl, xu, dx, tau)
+function get_alpha_max(x::VT, xl, xu, dx, tau) where {T, VT <: AbstractVector{T}}
     return min(
         mapreduce(
-            (x, xl, dx) -> dx < 0 ? (-x+xl)*tau/dx : Inf,
+            (x, xl, dx) -> dx < 0 ? (-x+xl)*tau/dx : T(Inf),
             min,
+            
             x, xl, dx,
             init = one(eltype(x))
         ),
         mapreduce(
-            (x, xu, dx) -> dx > 0 ? (-x+xu)*tau/dx : Inf,
+            (x, xu, dx) -> dx > 0 ? (-x+xu)*tau/dx : T(Inf),
             min,
             x, xu, dx,
             init = one(eltype(x))
@@ -443,13 +444,13 @@ end
 function get_alpha_z(zl_r::VT, zu_r, dzl, dzu, tau)  where {T, VT <: AbstractVector{T}}
     return min(
         mapreduce(
-            (zl_r, dzl) -> dzl < 0 ? (-zl_r)*tau/dzl : Inf,
+            (zl_r, dzl) -> dzl < 0 ? (-zl_r)*tau/dzl : T(Inf),
             min,
             zl_r, dzl,
             init = one(T)
         ),
         mapreduce(
-            (zu_r, dzu) -> dzu < 0 ? (-zu_r)*tau/dzu : Inf,
+            (zu_r, dzu) -> dzu < 0 ? (-zu_r)*tau/dzu : T(Inf),
             min,
             zu_r, dzu,
             init = one(T)
@@ -617,7 +618,7 @@ function get_alpha_max_R(x::VT, xl, xu, dx, pp, dpp, nn, dnn, tau_R) where {T, V
             elseif dx > 0
                 (-x+xu)*tau_R/dx
             else
-                Inf
+                T(Inf)
             end,
             min,
             x,xl,xu,dx;
@@ -627,7 +628,7 @@ function get_alpha_max_R(x::VT, xl, xu, dx, pp, dpp, nn, dnn, tau_R) where {T, V
             (pp, dpp)-> if dpp < 0
                 -pp*tau_R/dpp
             else
-                Inf
+                T(Inf)
             end,
             min,
             pp, dpp;
@@ -637,7 +638,7 @@ function get_alpha_max_R(x::VT, xl, xu, dx, pp, dpp, nn, dnn, tau_R) where {T, V
             (nn, dnn)-> if dnn < 0
                 -nn*tau_R/dnn
             else
-                Inf
+                T(Inf)
             end,
             min,
             nn, dnn;
@@ -669,7 +670,7 @@ function get_alpha_z_R(
     zl_r::SubVector{T,VT,VI}, zu_r, dzl, dzu, zp, dzp, zn, dzn, tau_R
     ) where {T, VT <: AbstractVector{T}, VI}
     
-    f(d,z) = d < 0 ? -z*tau_R/d : Inf
+    f(d,z) = d < 0 ? -z*tau_R/d : T(Inf)
     return min(
         mapreduce(
             f,
@@ -706,20 +707,20 @@ function get_varphi_R(
     varphi_R = obj_val
     @inbounds @simd for i=1:length(x_lr)
         xll = x_lr[i]-xl_r[i]
-        xll < 0 && return Inf
+        xll < 0 && return T(Inf)
         varphi_R -= mu_R*log(xll)
     end
     @inbounds @simd for i=1:length(x_ur)
         xuu = xu_r[i]-x_ur[i]
-        xuu < 0 && return Inf
+        xuu < 0 && return T(Inf)
         varphi_R -= mu_R*log(xuu)
     end
     @inbounds @simd for i=1:length(pp)
-        pp[i] < 0 && return Inf
+        pp[i] < 0 && return T(Inf)
         varphi_R -= mu_R*log(pp[i])
     end
     @inbounds @simd for i=1:length(pp)
-        nn[i] < 0 && return Inf
+        nn[i] < 0 && return T(Inf)
         varphi_R -= mu_R*log(nn[i])
     end
     return varphi_R
@@ -729,10 +730,10 @@ function get_varphi_R(
     )  where {T, VT <: AbstractVector{T}, VI}
     
     varphi_R = obj_val
-    f1(x) = x < 0 ? Inf : mu_R*log(x)
+    f1(x) = x < 0 ? T(Inf) : mu_R*log(x)
     function f2(x,y)
         d = x - y
-        d < 0 ? Inf : mu_R * log(d)
+        d < 0 ? T(Inf) : mu_R * log(d)
     end
 
     return obj_val - +(
@@ -773,13 +774,13 @@ function get_F(c::Vector{T}, f, zl, zu, jacl, x_lr, xl_r, zl_r, xu_r, x_ur, zu_r
         F += abs(f[i]-zl[i]+zu[i]+jacl[i])
     end
     @inbounds @simd for i=1:length(x_lr)
-        x_lr[i] >= xl_r[i] || return Inf
-        zl_r[i] >= 0       || return Inf
+        x_lr[i] >= xl_r[i] || return T(Inf)
+        zl_r[i] >= 0       || return T(Inf)
         F += abs((x_lr[i]-xl_r[i])*zl_r[i]-mu)
     end
     @inbounds @simd for i=1:length(x_ur)
-        xu_r[i] >= x_ur[i] || return Inf
-        zu_r[i] >= 0       || return Inf
+        xu_r[i] >= x_ur[i] || return T(Inf)
+        zu_r[i] >= 0       || return T(Inf)
         F += abs((xu_r[i]-xu_r[i])*zu_r[i]-mu)
     end
     return F
@@ -798,13 +799,13 @@ function get_F(c::AbstractVector{T}, f, zl, zu, jacl, x_lr, xl_r, zl_r, xu_r, x_
         init = zero(T)
     )
     F3 = mapreduce(
-        (x_lr,xl_r,zl_r) -> (x_lr >= xl_r && zl_r >= 0) ? abs((x_lr-xl_r)*zl_r-mu) : Inf,
+        (x_lr,xl_r,zl_r) -> (x_lr >= xl_r && zl_r >= 0) ? abs((x_lr-xl_r)*zl_r-mu) : T(Inf),
         +,
         x_lr,xl_r,zl_r;
         init = zero(T)
     )
     F4 = mapreduce(
-        (xu_r,x_ur,zu_r) -> (xu_r >= x_ur && zu_r >= 0) ? abs((xu_r-xu_r)*zu_r-mu) : Inf,
+        (xu_r,x_ur,zu_r) -> (xu_r >= x_ur && zu_r >= 0) ? abs((xu_r-xu_r)*zu_r-mu) : T(Inf),
         +,
         xu_r,xu_r,zu_r;
         init = zero(T)
@@ -870,15 +871,15 @@ function initialize_variables!(x, xl, xu, bound_push, bound_fac)
     map!((x,l,u) -> _initialize_variables!(x,l,u, bound_push, bound_fac), x, x, xl, xu)
 end
 
-function _initialize_variables!(x, xl, xu, bound_push, bound_fac)
-    if xl!=-Inf && xu!=Inf
+function _initialize_variables!(x::T, xl, xu, bound_push, bound_fac) where T
+    if xl!=-T(Inf) && xu!=T(Inf)
         return min(
             xu-min(bound_push*max(1,abs(xu)), bound_fac*(xu-xl)),
             max(xl+min(bound_push*max(1,abs(xl)),bound_fac*(xu-xl)),x),
         )
-    elseif xl!=-Inf && xu==Inf
+    elseif xl!=-T(Inf) && xu==T(Inf)
         return max(xl+bound_push*max(1,abs(xl)), x)
-    elseif xl==-Inf && xu!=Inf
+    elseif xl==-T(Inf) && xu!=T(Inf)
         return min(xu-bound_push*max(1,abs(xu)), x)
     end
     return x
