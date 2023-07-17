@@ -115,6 +115,7 @@ mutable struct SparseCondensedKKTSystem{T, VT, MT, QN, LS, VI, VI32, VTu1, VTu2,
 
     # buffer
     buffer::VT
+    buffer2::VT
 
     # Augmented system
     aug_com::MT
@@ -534,6 +535,7 @@ function create_kkt_system(
     )
 
     buffer = VT(undef, m)
+    buffer2= VT(undef, m)
 
     del_w = one(T)
     del_w_last = zero(T)
@@ -548,7 +550,7 @@ function create_kkt_system(
         jac, jt_coo,jt_csc,jt_csc_map,
         quasi_newton, pr_diag, du_diag,
         l_diag, u_diag, l_lower, u_lower,
-        buffer,
+        buffer, buffer2,
         aug_com, diag_buffer, dptr, hptr, jptr,
         del_w, del_w_last, del_c,
         linear_solver,

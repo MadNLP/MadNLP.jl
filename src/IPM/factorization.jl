@@ -92,9 +92,9 @@ function solve!(kkt::SparseCondensedKKTSystem{T}, w::AbstractKKTVector)  where T
     mul!(wx, kkt.jt_csc, kkt.buffer, one(T), one(T))
     solve!(kkt.linear_solver, wx)
 
-    mul!(wz, kkt.jt_csc', wx) 
+    mul!(kkt.buffer2, kkt.jt_csc', wx) # TODO: investigate why directly using wz here is causing an error
 
-    wz .= .- kkt.buffer .+ kkt.diag_buffer .* wz
+    wz .= .- kkt.buffer .+ kkt.diag_buffer .* kkt.buffer2
     ws .= (ws .+ wz) ./ Σs
 
     finish_aug_solve!(kkt, w)
