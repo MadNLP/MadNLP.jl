@@ -1,22 +1,24 @@
-struct RichardsonIterator{T, VT} <: AbstractIterator{T}
+@kwdef struct RichardsonOptions
+    max_iter::Int = 10
+    tol::Float64 = 1e-10
+    acceptable_tol::Float64 = 1e-5
+end
+
+struct RichardsonIterator{T, VT <: UnreducedKKTVector{T}} <: AbstractIterator{T}
     residual::VT
-    max_iter::Int
-    tol::T
-    acceptable_tol::T
+    opt::RichardsonOptions
     cnt::MadNLPCounters
     logger::MadNLPLogger
 end
 
 function RichardsonIterator(
     residual::UnreducedKKTVector{T};
-    max_iter=10,
-    tol=T(1e-10),
-    acceptable_tol=T(1e-5),
-    logger=MadNLPLogger(),
-    cnt=MadNLPCounters()
+    opt = RichardsonOptions(),
+    logger = MadNLPLogger(),
+    cnt = MadNLPCounters()
 ) where T
     return RichardsonIterator(
-        residual, max_iter, tol, acceptable_tol, cnt, logger
+        residual, opt, cnt, logger
     )
 end
 
@@ -66,7 +68,7 @@ function solve_refine!(
         @debug(iterator.logger, @sprintf("%4i %6.2e", iter, residual_ratio))
         iter += 1
         
-        if (iter >= iterator.max_iter) || (residual_ratio < iterator.tol)
+        if (iter >= iterator.opt.max_iter) || (residual_ratio < iterator.opt.tol)
             break
         end
     end
@@ -79,7 +81,7 @@ function solve_refine!(
         ),
     )
 
-    if residual_ratio < iterator.acceptable_tol
+    if residual_ratio < iterator.opt.acceptable_tol
         return true
     else
         return false

@@ -38,6 +38,8 @@ end
         nlp = MadNLPTests.HS15Model()
         solver_qn = MadNLP.MadNLPSolver(
             nlp;
+            callback = MadNLP.SparseCallback,
+            kkt_system = MadNLP.SparseKKTSystem,
             hessian_approximation=MadNLP.CompactLBFGS,
             print_level=MadNLP.ERROR,
         )
@@ -49,6 +51,8 @@ end
         # Reference solve with exact Hessian
         solver_exact = MadNLP.MadNLPSolver(
             nlp;
+            callback = MadNLP.SparseCallback,
+            kkt_system = MadNLP.SparseKKTSystem,
             print_level=MadNLP.ERROR,
         )
         results_ref = MadNLP.solve!(solver_exact)
@@ -56,6 +60,8 @@ end
         # LBFGS solve
         solver_qn = MadNLP.MadNLPSolver(
             nlp;
+            callback = MadNLP.SparseCallback,
+            kkt_system = MadNLP.SparseKKTSystem,
             hessian_approximation=MadNLP.CompactLBFGS,
             print_level=MadNLP.ERROR,
         )
