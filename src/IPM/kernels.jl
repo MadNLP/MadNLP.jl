@@ -48,8 +48,8 @@ function set_aug_diagonal!(kkt::SparseUnreducedKKTSystem{T}, solver::MadNLPSolve
     kkt.u_diag .= solver.x_ur .- solver.xu_r
     kkt.l_lower .= solver.zl_r
     kkt.u_lower .= solver.zu_r
-    kkt.l_lower_aug .= sqrt.(solver.zl_r)
-    kkt.u_lower_aug .= sqrt.(solver.zu_r)
+    kkt.l_lower_aug .= sqrt.(kkt.l_lower)
+    kkt.u_lower_aug .= sqrt.(kkt.u_lower)
     return
 end
 
@@ -64,8 +64,8 @@ function set_aug_RR!(kkt::AbstractKKTSystem, solver::MadNLPSolver, RR::RobustRes
     kkt.du_diag .= .- RR.pp ./ RR.zp .- RR.nn ./ RR.zn
     kkt.l_diag  .= solver.xl_r .- solver.x_lr
     kkt.u_diag .= solver.x_ur .- solver.xu_r
-    kkt.l_lower .= solver.zl_r
-    kkt.u_lower .= solver.zu_r
+    kkt.l_lower_aug .= sqrt.(kkt.l_lower)
+    kkt.u_lower_aug .= sqrt.(kkt.u_lower)
 
     return
 end
@@ -76,8 +76,8 @@ function set_aug_RR!(kkt::SparseUnreducedKKTSystem, solver::MadNLPSolver, RR::Ro
     kkt.u_diag .= solver.x_ur .- solver.xu_r
     kkt.l_lower .= solver.zl_r
     kkt.u_lower .= solver.zu_r
-    kkt.l_lower .= .-sqrt.(solver.zl_r)
-    kkt.u_lower .= .-sqrt.(solver.zu_r)
+    kkt.l_lower_aug .= sqrt.(kkt.l_lower)
+    kkt.u_lower_aug .= sqrt.(kkt.u_lower)
     return
 end
 function set_f_RR!(solver::MadNLPSolver, RR::RobustRestorer)
