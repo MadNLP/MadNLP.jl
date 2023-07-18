@@ -738,11 +738,7 @@ function MOI.get(model::Optimizer, ::MOI.RawStatusString)
     elseif model.solver === nothing
         return "Optimize not called"
     end
-    return get(
-        STATUS_OUTPUT_DICT,
-        model.result.status,
-        "Unknown result status: $(model.result.status)",
-    )
+    return get_status_output(model.result.status, model.result.options)
 end
 
 ### MOI.TerminationStatus

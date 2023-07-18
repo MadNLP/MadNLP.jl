@@ -15,8 +15,9 @@ function _compare_dense_with_sparse(
 
         sparse_options = Dict{Symbol, Any}(
             :kkt_system=>MadNLP.SparseKKTSystem,
-            :linear_solver=>MadNLP.LapackCPUSolver,
+            :callback=>MadNLP.SparseCallback,
             :inertia_correction_method=>inertia,
+            :linear_solver=>MadNLP.LapackCPUSolver,
             :print_level=>MadNLP.ERROR,
             :tol=>tol
         )
@@ -29,7 +30,7 @@ function _compare_dense_with_sparse(
             :tol=>tol
         )
 
-        nlp = MadNLPTests.DenseDummyQP{T}(; n=n, m=m, fixed_variables=ind_fixed, equality_cons=ind_eq)
+        nlp = MadNLPTests.DenseDummyQP(zeros(T,n), m=m, fixed_variables=ind_fixed, equality_cons=ind_eq)
 
         solver = MadNLPSolver(nlp; sparse_options...)
         solverd = MadNLPSolver(nlp; dense_options...)
@@ -62,7 +63,7 @@ end
             :linear_solver=>MadNLP.LapackCPUSolver,
         )
         m = 0
-        nlp = MadNLPTests.DenseDummyQP(; n=n, m=m)
+        nlp = MadNLPTests.DenseDummyQP(zeros(n); m=m)
         solverd = MadNLPSolver(nlp; dense_options...)
 
         kkt = solverd.kkt
@@ -85,7 +86,7 @@ end
             :linear_solver=>MadNLP.LapackCPUSolver,
         )
         m = 5
-        nlp = MadNLPTests.DenseDummyQP(; n=n, m=m)
+        nlp = MadNLPTests.DenseDummyQP(zeros(n); m=m)
         solverd = MadNLPSolver(nlp; dense_options...)
         ns = length(solverd.ind_ineq)
 
@@ -126,9 +127,10 @@ end
 
 @testset "MadNLP: restart (PR #113)" begin
     n, m = 10, 5
-    nlp = MadNLPTests.DenseDummyQP(; n=n, m=m)
+    nlp = MadNLPTests.DenseDummyQP(zeros(n); m=m)
     sparse_options = Dict{Symbol, Any}(
         :kkt_system=>MadNLP.SparseKKTSystem,
+        :callback=>MadNLP.SparseCallback,
         :print_level=>MadNLP.ERROR,
     )
 

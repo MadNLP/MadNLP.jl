@@ -98,7 +98,7 @@ end
 
 function MadNLPSolver(nlp::AbstractNLPModel{T,VT}; kwargs...) where {T, VT}
     
-    opt, opt_linear_solver, logger = load_options(nlp; kwargs...)
+    opt, logger = load_options(nlp; kwargs...)
     @assert is_supported(opt.linear_solver, T)
 
     cnt = MadNLPCounters(start_time=time())

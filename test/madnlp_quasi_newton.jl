@@ -6,7 +6,7 @@
     MadNLP.DenseCondensedKKTSystem,
 ]
     @testset "Size: ($n, $m)" for (n, m) in [(10, 0), (10, 5), (50, 10)]
-        nlp = MadNLPTests.DenseDummyQP{Float64}(; n=n, m=m)
+        nlp = MadNLPTests.DenseDummyQP(zeros(Float64,n);  m=m)
         solver_exact = MadNLP.MadNLPSolver(
             nlp;
             print_level=MadNLP.ERROR,
@@ -45,7 +45,7 @@ end
         @test results_qn.status == MadNLP.SOLVE_SUCCEEDED
     end
     @testset "Size: ($n, $m)" for (n, m) in [(10, 0), (10, 5), (50, 10)]
-        nlp = MadNLPTests.DenseDummyQP{Float64}(; )
+        nlp = MadNLPTests.DenseDummyQP(zeros(100); )
         # Reference solve with exact Hessian
         solver_exact = MadNLP.MadNLPSolver(
             nlp;
