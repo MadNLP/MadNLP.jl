@@ -4,7 +4,8 @@
     acceptable_tol::Float64 = 1e-5
 end
 
-struct RichardsonIterator{T, VT <: UnreducedKKTVector{T}} <: AbstractIterator{T}
+struct RichardsonIterator{T, VT <: UnreducedKKTVector{T}, KKT <: AbstractKKTSystem{T}} <: AbstractIterator{T}
+    kkt::KKT
     residual::VT
     opt::RichardsonOptions
     cnt::MadNLPCounters
@@ -12,13 +13,14 @@ struct RichardsonIterator{T, VT <: UnreducedKKTVector{T}} <: AbstractIterator{T}
 end
 
 function RichardsonIterator(
-    residual::UnreducedKKTVector{T};
+    kkt,
+    residual;
     opt = RichardsonOptions(),
     logger = MadNLPLogger(),
     cnt = MadNLPCounters()
-) where T
+)
     return RichardsonIterator(
-        residual, opt, cnt, logger
+        kkt, residual, opt, cnt, logger
     )
 end
 
@@ -26,8 +28,6 @@ function solve_refine!(
     x::VT,
     iterator::R,
     b::VT,
-    solve!,
-    mul!,
     ) where {T, VT, R <: RichardsonIterator{T, VT}}
     @debug(iterator.logger, "Iterative solver initiated")
 
@@ -53,10 +53,10 @@ function solve_refine!(
     iter = 0
 
     while true
-        iterator.cnt.linear_solver_time += @elapsed solve!(w)  # TODO this includes some extra time. Ideally, LinearSolver should count the time
+        iterator.cnt.linear_solver_time += @elapsed solve!(iterator.kkt, w)  # TODO this includes some extra time. Ideally, LinearSolver should count the time
         axpy!(1., full(w), full(x))
         copyto!(full(w), full(b))
-        mul!(w, x, -one(T), one(T))
+        mul!(w, iterator.kkt, x, -one(T), one(T))
         
         norm_w = norm(full(w), Inf)
         norm_x = norm(full(x), Inf)

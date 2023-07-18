@@ -179,7 +179,7 @@ function MadNLPSolver(nlp::AbstractNLPModel{T,VT}; kwargs...) where {T, VT}
 
     @trace(logger,"Initializing iterative solver.")
     residual = UnreducedKKTVector(VT, n, m, nlb, nub, ind_cons)
-    iterator = opt.iterator(residual; cnt = cnt, logger = logger)
+    iterator = opt.iterator(kkt, residual; cnt = cnt, logger = logger)
 
     if opt.inertia_correction_method == INERTIA_AUTO
         opt.inertia_correction_method = is_inertia(kkt.linear_solver)::Bool ? INERTIA_BASED : INERTIA_FREE

@@ -9,6 +9,7 @@ mutable struct SparseKKTSystem{T, VT, MT, QN, LS, VI, VI32} <: AbstractReducedKK
     jac_callback::VT
     jac::VT
     quasi_newton::QN
+    reg::VT
     pr_diag::VT
     du_diag::VT
     l_diag::VT
@@ -35,6 +36,8 @@ mutable struct SparseKKTSystem{T, VT, MT, QN, LS, VI, VI32} <: AbstractReducedKK
     linear_solver::LS
     # Info
     ind_ineq::VI
+    ind_lb::VI
+    ind_ub::VI
 end
 
 
@@ -49,6 +52,7 @@ mutable struct SparseUnreducedKKTSystem{T, VT, MT, QN, LS, VI, VI32} <: Abstract
     jac_callback::VT
     jac::VT
     quasi_newton::QN
+    reg::VT
     pr_diag::VT
     du_diag::VT
     l_diag::VT
@@ -106,6 +110,7 @@ mutable struct SparseCondensedKKTSystem{T, VT, MT, QN, LS, VI, VI32, VTu1, VTu2,
     jt_csc_map::Union{Nothing, VI}
     
     quasi_newton::QN
+    reg::VT
     pr_diag::VT
     du_diag::VT
     l_diag::VT
@@ -136,6 +141,8 @@ mutable struct SparseCondensedKKTSystem{T, VT, MT, QN, LS, VI, VI32, VTu1, VTu2,
 
     # Info
     ind_ineq::VI
+    ind_lb::VI
+    ind_ub::VI
 
     # extra
     ext::EXT
@@ -260,7 +267,8 @@ function create_kkt_system(
 
     pr_diag = _madnlp_unsafe_wrap(V, n_tot)
     du_diag = _madnlp_unsafe_wrap(V, m, n_jac+n_slack+n_hess+n_tot+1)
-    
+
+    reg = VT(undef, n_tot)
     l_diag = VT(undef, nlb)
     u_diag = VT(undef, nub)
     l_lower = VT(undef, nlb)
@@ -297,14 +305,14 @@ function create_kkt_system(
     )
 
     return SparseKKTSystem(
-        hess, jac_callback, jac, quasi_newton, pr_diag, du_diag,
+        hess, jac_callback, jac, quasi_newton, reg, pr_diag, du_diag,
         l_diag, u_diag, l_lower, u_lower, 
         aug_raw, aug_com, aug_csc_map,
         hess_raw, hess_com, hess_csc_map,
         jac_raw, jac_com, jac_csc_map,
         del_w, del_w_last, del_c,
         linear_solver,
-        ind_ineq
+        ind_ineq, ind_cons.ind_lb, ind_cons.ind_ub,
     )
 
 end
@@ -390,6 +398,7 @@ function create_kkt_system(
     u_diag = _madnlp_unsafe_wrap(V, nub, offset+2nlb+1)
     l_lower_aug = _madnlp_unsafe_wrap(V, nlb, offset+nlb+1)
     u_lower_aug = _madnlp_unsafe_wrap(V, nub, offset+2nlb+nub+1)
+    reg = VT(undef, n_tot)
     l_lower = VT(undef, nlb)
     u_lower = VT(undef, nub)
 
@@ -424,19 +433,19 @@ opt.linear_solver(
         aug_com; opt = opt_linear_solver
     )
     return SparseUnreducedKKTSystem(
-        hess, jac_callback, jac, quasi_newton, pr_diag, du_diag,
+        hess, jac_callback, jac, quasi_newton, reg, pr_diag, du_diag,
         l_diag, u_diag, l_lower, u_lower, l_lower_aug, u_lower_aug,
         aug_raw, aug_com, aug_csc_map,
         hess_raw, hess_com, hess_csc_map,
         jac_raw, jac_com, jac_csc_map,
         del_w, del_w_last, del_c,
         linear_solver,
-        ind_ineq, ind_lb, ind_ub
+        ind_ineq, ind_lb, ind_ub,
     )
 end
 
 function initialize!(kkt::AbstractSparseKKTSystem)
-    fill!(kkt.pr_diag, 1.0)
+    fill!(kkt.reg, 1.0)
     fill!(kkt.du_diag, 0.0)
     fill!(kkt.hess, 0.0)
     fill!(kkt.l_lower, 0.0)
@@ -447,7 +456,7 @@ function initialize!(kkt::AbstractSparseKKTSystem)
 end
 
 function initialize!(kkt::SparseUnreducedKKTSystem) 
-    fill!(kkt.pr_diag, 1.0)
+    fill!(kkt.reg, 1.0)
     fill!(kkt.du_diag, 0.0)
     fill!(kkt.hess, 0.0)
     fill!(kkt.l_lower, 0.0)
@@ -504,6 +513,7 @@ function create_kkt_system(
     nub = length(ind_cons.ind_ub)
 
 
+    reg = VT(undef, n_tot)
     pr_diag = fill!(VT(undef, n_tot), one(T))
     du_diag = fill!(VT(undef, m), one(T))
     l_diag = VT(undef, nlb)
@@ -546,15 +556,16 @@ function create_kkt_system(
     ext = get_sparse_condensed_ext(VT, jptr, jt_csc_map, hess_csc_map)
 
     return SparseCondensedKKTSystem( 
-        hess, hess_raw,hess_com,hess_csc_map,
-        jac, jt_coo,jt_csc,jt_csc_map,
-        quasi_newton, pr_diag, du_diag,
+        hess, hess_raw, hess_com, hess_csc_map,
+        jac, jt_coo, jt_csc, jt_csc_map, 
+        quasi_newton,
+        reg, pr_diag, du_diag,
         l_diag, u_diag, l_lower, u_lower,
         buffer, buffer2,
         aug_com, diag_buffer, dptr, hptr, jptr,
         del_w, del_w_last, del_c,
         linear_solver,
-        ind_ineq,
+        ind_ineq, ind_cons.ind_lb, ind_cons.ind_ub,
         ext
     )
 end
@@ -751,6 +762,21 @@ function build_condensed_aug_coord!(kkt::SparseCondensedKKTSystem{T,VT,MT}) wher
     )
 end
 
+function build_kkt!(kkt::SparseKKTSystem)
+    kkt.pr_diag .= kkt.reg
+    kkt.pr_diag[kkt.ind_lb] .-= kkt.l_lower ./ kkt.l_diag
+    kkt.pr_diag[kkt.ind_ub] .-= kkt.u_lower ./ kkt.u_diag
+
+    transfer!(kkt.aug_com, kkt.aug_raw, kkt.aug_csc_map)
+end
+
+function build_kkt!(kkt::SparseUnreducedKKTSystem)
+    kkt.pr_diag .= kkt.reg
+    kkt.l_lower_aug .= sqrt.(kkt.l_lower)
+    kkt.u_lower_aug .= sqrt.(kkt.u_lower)
+    
+    transfer!(kkt.aug_com, kkt.aug_raw, kkt.aug_csc_map)
+end
 
 function build_kkt!(kkt::SparseCondensedKKTSystem)
 
@@ -761,6 +787,10 @@ function build_kkt!(kkt::SparseCondensedKKTSystem)
     Σx = view(kkt.pr_diag, 1:n)
     Σs = view(kkt.pr_diag, n+1:n+m)
     Σd = kkt.du_diag
+    
+    kkt.pr_diag .= kkt.reg
+    kkt.pr_diag[kkt.ind_lb] .-= kkt.l_lower ./ kkt.l_diag
+    kkt.pr_diag[kkt.ind_ub] .-= kkt.u_lower ./ kkt.u_diag
     
     kkt.diag_buffer .= Σs ./ ( 1 .- Σd .* Σs)
     build_condensed_aug_coord!(kkt)

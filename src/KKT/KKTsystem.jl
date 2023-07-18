@@ -189,13 +189,13 @@ function hess_dense! end
     Generic functions
 =#
 function initialize!(kkt::AbstractKKTSystem)
-    fill!(kkt.pr_diag, 1.0)
+    fill!(kkt.reg, 1.0)
     fill!(kkt.du_diag, 0.0)
     fill!(kkt.hess, 0.0)
 end
 
 function regularize_diagonal!(kkt::AbstractKKTSystem, primal, dual)
-    kkt.pr_diag .+= primal
+    kkt.reg .+= primal
     kkt.du_diag .= .-dual
 end
 
@@ -213,15 +213,7 @@ function is_inertia_correct(kkt::AbstractKKTSystem, num_pos, num_zero, num_neg)
     return (num_zero == 0) && (num_pos == num_variables(kkt))
 end
 
-function build_kkt!(kkt::AbstractKKTSystem{T, VT, MT}) where {T, VT, MT<:Matrix{T}}
-    copyto!(kkt.aug_com, kkt.aug_raw)
-end
-
-function build_kkt!(kkt::AbstractKKTSystem{T, VT, MT}) where {T, VT, MT<:AbstractSparseMatrix{T}}
-    transfer!(kkt.aug_com, kkt.aug_raw, kkt.aug_csc_map)
-end
-
-compress_hessian!(kkt::AbstractKKTSystem) = nothing
+compress_hessian!(kkt::AbstractKKTSystem) = nothing 
 
 
 include("rhs.jl")

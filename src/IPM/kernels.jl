@@ -31,25 +31,12 @@ function set_aug_diagonal!(kkt::AbstractKKTSystem{T}, solver::MadNLPSolver{T}) w
     zl = full(solver.zl)
     zu = full(solver.zu)
     
-    kkt.pr_diag .= zl ./(x .- xl) .+ zu ./(xu .- x)
+    fill!(kkt.reg, zero(T))
     fill!(kkt.du_diag, zero(T))
     kkt.l_diag .= solver.xl_r .- solver.x_lr
     kkt.u_diag .= solver.x_ur .- solver.xu_r
     kkt.l_lower .= solver.zl_r
     kkt.u_lower .= solver.zu_r
-
-    return
-end
-
-function set_aug_diagonal!(kkt::SparseUnreducedKKTSystem{T}, solver::MadNLPSolver{T}) where T
-    fill!(kkt.pr_diag, zero(T))
-    fill!(kkt.du_diag, zero(T))
-    kkt.l_diag .= solver.xl_r .- solver.x_lr
-    kkt.u_diag .= solver.x_ur .- solver.xu_r
-    kkt.l_lower .= solver.zl_r
-    kkt.u_lower .= solver.zu_r
-    kkt.l_lower_aug .= sqrt.(kkt.l_lower)
-    kkt.u_lower_aug .= sqrt.(kkt.u_lower)
     return
 end
 
@@ -60,26 +47,15 @@ function set_aug_RR!(kkt::AbstractKKTSystem, solver::MadNLPSolver, RR::RobustRes
     xu = full(solver.xu)
     zl = full(solver.zl)
     zu = full(solver.zu)
-    kkt.pr_diag .= zl ./(x .- xl) .+ zu ./(xu .- x) .+ RR.zeta .* RR.D_R .^ 2
+    kkt.reg .= RR.zeta .* RR.D_R .^ 2
     kkt.du_diag .= .- RR.pp ./ RR.zp .- RR.nn ./ RR.zn
-    kkt.l_diag  .= solver.xl_r .- solver.x_lr
-    kkt.u_diag .= solver.x_ur .- solver.xu_r
-    kkt.l_lower_aug .= sqrt.(kkt.l_lower)
-    kkt.u_lower_aug .= sqrt.(kkt.u_lower)
-
-    return
-end
-function set_aug_RR!(kkt::SparseUnreducedKKTSystem, solver::MadNLPSolver, RR::RobustRestorer)
-    kkt.pr_diag .= RR.zeta .* RR.D_R.^2
-    kkt.du_diag .= .-RR.pp ./ RR.zp .- RR.nn ./ RR.zn
-    kkt.l_diag  .= solver.xl_r .- solver.x_lr
-    kkt.u_diag .= solver.x_ur .- solver.xu_r
     kkt.l_lower .= solver.zl_r
     kkt.u_lower .= solver.zu_r
-    kkt.l_lower_aug .= sqrt.(kkt.l_lower)
-    kkt.u_lower_aug .= sqrt.(kkt.u_lower)
+    kkt.l_diag  .= solver.xl_r .- solver.x_lr
+    kkt.u_diag .= solver.x_ur .- solver.xu_r
     return
 end
+
 function set_f_RR!(solver::MadNLPSolver, RR::RobustRestorer)
     x = full(solver.x)
     RR.f_R .= RR.zeta .* RR.D_R .^ 2 .* (x .- RR.x_ref)
@@ -187,8 +163,8 @@ function set_aug_rhs_RR!(
 end
 
 # solving KKT system
-@inbounds function _kktmul!(w,x,del_w,du_diag,l_lower,u_lower,l_diag,u_diag, alpha, beta)
-    primal(w) .+= alpha .* del_w .* primal(x)
+@inbounds function _kktmul!(w,x,reg,du_diag,l_lower,u_lower,l_diag,u_diag, alpha, beta)
+    primal(w) .+= alpha .* reg .* primal(x)
     dual(w) .+= alpha .* du_diag .* dual(x)
     w.xp_lr .-= alpha .* dual_lb(x)
     w.xp_ur .+= alpha .* dual_ub(x)
@@ -227,28 +203,7 @@ function finish_aug_solve!(kkt::AbstractKKTSystem, d)
     dub .= (  dub .- kkt.u_lower .* d.xp_ur) ./ kkt.u_diag
     return
 end
-# function finish_aug_solve!(solver::MadNLPSolver, kkt::SparseUnreducedKKTSystem, mu)
-#     dlb = dual_lb(solver.d)
-#     @inbounds @simd for i in eachindex(dlb)
-#         dlb[i] = (mu-solver.zl_r[i]*solver.dx_lr[i]) / (solver.x_lr[i]-solver.xl_r[i]) - solver.zl_r[i]
-#     end
-#     dub = dual_ub(solver.d)
-#     @inbounds @simd for i in eachindex(dub)
-#         dub[i] = (mu+solver.zu_r[i]*solver.dx_ur[i]) / (solver.xu_r[i]-solver.x_ur[i]) - solver.zu_r[i]
-#     end
-#     return
-# end
 
-# Initial
-# temporaily commented out
-# function set_initial_bounds!(solver::MadNLPSolver{T}) where T
-#     @inbounds @simd for i in eachindex(solver.xl_r)
-#         solver.xl_r[i] -= max(one(T),abs(solver.xl_r[i]))*solver.opt.tol
-#     end
-#     @inbounds @simd for i in eachindex(solver.xu_r)
-#         solver.xu_r[i] += max(one(T),abs(solver.xu_r[i]))*solver.opt.tol
-#     end
-# end
 function set_initial_bounds!(xl::AbstractVector{T},xu,tol) where T
     map!(
         x->x - max(one(T), abs(x)) .* tol,

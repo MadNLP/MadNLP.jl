@@ -77,8 +77,7 @@ function solve!(kkt::SparseCondensedKKTSystem{T}, w::AbstractKKTVector)  where T
     (n,m) = size(kkt.jt_csc)
 
     # Decompose buffers
-    # wx = _madnlp_unsafe_wrap(full(w), n)
-    wx = view(full(w), 1:n)
+    wx = _madnlp_unsafe_wrap(full(w), n)
     ws = view(full(w), n+1:n+m)
     wz = view(full(w), n+m+1:n+2*m)
     Σs = view(kkt.pr_diag, n+1:n+m)
@@ -145,7 +144,7 @@ function mul!(w::AbstractKKTVector{T}, kkt::Union{SparseKKTSystem,SparseUnreduce
     mul!(primal(w), Symmetric(kkt.hess_com, :L), primal(x), alpha, beta)
     mul!(primal(w), kkt.jac_com', dual(x), alpha, one(T))
     mul!(dual(w), kkt.jac_com,  primal(x), alpha, beta)
-    _kktmul!(w,x,kkt.del_w,kkt.du_diag,kkt.l_lower,kkt.u_lower,kkt.l_diag,kkt.u_diag, alpha, beta)
+    _kktmul!(w,x,kkt.reg,kkt.du_diag,kkt.l_lower,kkt.u_lower,kkt.l_diag,kkt.u_diag, alpha, beta)
 end
 
 function mul!(w::AbstractKKTVector{T}, kkt::SparseCondensedKKTSystem, x::AbstractKKTVector, alpha, beta) where T
@@ -169,7 +168,7 @@ function mul!(w::AbstractKKTVector{T}, kkt::SparseCondensedKKTSystem, x::Abstrac
     axpy!(-alpha, xz, ws)
     axpy!(-alpha, xs, wz)
     
-    _kktmul!(w,x,kkt.del_w,kkt.du_diag,kkt.l_lower,kkt.u_lower,kkt.l_diag,kkt.u_diag, alpha, beta)
+    _kktmul!(w,x,kkt.reg,kkt.du_diag,kkt.l_lower,kkt.u_lower,kkt.l_diag,kkt.u_diag, alpha, beta)
 end
 
 function mul!(w::AbstractKKTVector{T}, kkt::AbstractDenseKKTSystem, x::AbstractKKTVector, alpha = one(T), beta = zero(T)) where T
@@ -191,7 +190,7 @@ function mul!(w::AbstractKKTVector{T}, kkt::AbstractDenseKKTSystem, x::AbstractK
     end
     ws .= beta.*ws .- alpha.* xz
     wz .= beta.*wz .- alpha.* xs
-    _kktmul!(w,x,kkt.del_w,kkt.du_diag,kkt.l_lower,kkt.u_lower,kkt.l_diag,kkt.u_diag, alpha, beta)
+    _kktmul!(w,x,kkt.reg,kkt.du_diag,kkt.l_lower,kkt.u_lower,kkt.l_diag,kkt.u_diag, alpha, beta)
 end
 
 function mul_hess_blk!(wx, kkt::Union{DenseKKTSystem,DenseCondensedKKTSystem}, t)

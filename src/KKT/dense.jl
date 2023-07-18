@@ -19,6 +19,7 @@ mutable struct DenseKKTSystem{
     hess::MT
     jac::MT
     quasi_newton::QN
+    reg::VT
     pr_diag::VT
     du_diag::VT
     l_diag::VT
@@ -30,6 +31,8 @@ mutable struct DenseKKTSystem{
     aug_com::MT
     # Info
     ind_ineq::VI
+    ind_lb::VI
+    ind_ub::VI
     # Regularization
     del_w::T
     del_w_last::T
@@ -58,6 +61,7 @@ function create_kkt_system(
     hess = create_array(cb, n, n)
     jac = create_array(cb, m, n)
     aug_com = create_array(cb, n+ns+m, n+ns+m)
+    reg = create_array(cb, n+ns)
     pr_diag = create_array(cb, n+ns)
     du_diag = create_array(cb, m)
     diag_hess = create_array(cb, n)
@@ -84,9 +88,9 @@ function create_kkt_system(
 
     return DenseKKTSystem(
         hess, jac, quasi_newton,
-        pr_diag, du_diag, l_diag, u_diag, l_lower, u_lower,
+        reg, pr_diag, du_diag, l_diag, u_diag, l_lower, u_lower,
         diag_hess, aug_com,
-        ind_ineq,
+        ind_ineq, ind_cons.ind_lb, ind_cons.ind_ub,
         del_w, del_w_last, del_c,
         linear_solver,
         Dict{Symbol, Any}(), 
@@ -114,6 +118,8 @@ mutable struct DenseCondensedKKTSystem{
     jac::MT
     quasi_newton::QN
     jac_ineq::MT
+
+    reg::VT
     pr_diag::VT
     du_diag::VT
     l_diag::VT
@@ -132,6 +138,8 @@ mutable struct DenseCondensedKKTSystem{
     ind_eq_shifted::VI
     n_ineq::Int
     ind_ineq::VI
+    ind_lb::VI
+    ind_ub::VI
     ind_ineq_shifted::VI
     # Regularization
     del_w::T
@@ -160,6 +168,7 @@ function create_kkt_system(
     jac      = create_array(cb, m, n)
     jac_ineq = create_array(cb, ns, n)
 
+    reg  = VT(undef, n+ns)
     pr_diag  = VT(undef, n+ns)
     du_diag  = VT(undef, m)
     l_diag = fill!(VT(undef, nlb), one(T))
@@ -191,11 +200,13 @@ function create_kkt_system(
 
     return DenseCondensedKKTSystem(
         hess, jac, quasi_newton, jac_ineq,
-        pr_diag, du_diag, l_diag, u_diag, l_lower, u_lower,
+        reg, pr_diag, du_diag, l_diag, u_diag, l_lower, u_lower,
         pd_buffer, diag_buffer, buffer,
         aug_com, 
         n_eq, ind_cons.ind_eq, ind_eq_shifted,
-        ns, ind_cons.ind_ineq, ind_ineq_shifted,
+        ns,
+        ind_cons.ind_ineq, ind_cons.ind_lb, ind_cons.ind_ub,
+        ind_ineq_shifted,
         del_w, del_w_last, del_c,
         linear_solver,
         Dict{Symbol, Any}(),
@@ -292,6 +303,11 @@ function build_kkt!(kkt::DenseKKTSystem{T, VT, MT}) where {T, VT, MT}
     n = size(kkt.hess, 1)
     m = size(kkt.jac, 1)
     ns = length(kkt.ind_ineq)
+    
+    kkt.pr_diag .= kkt.reg
+    kkt.pr_diag[kkt.ind_lb] .-= kkt.l_lower ./ kkt.l_diag
+    kkt.pr_diag[kkt.ind_ub] .-= kkt.u_lower ./ kkt.u_diag
+
     _build_dense_kkt_system!(kkt.aug_com, kkt.hess, kkt.jac,
                                 kkt.pr_diag, kkt.du_diag, kkt.diag_hess,
                                 kkt.ind_ineq, 
@@ -357,6 +373,10 @@ function build_kkt!(kkt::DenseCondensedKKTSystem{T, VT, MT}) where {T, VT, MT}
     ns = kkt.n_ineq
     n_eq = length(kkt.ind_eq)
     m = size(kkt.jac, 1)
+
+    kkt.pr_diag .= kkt.reg
+    kkt.pr_diag[kkt.ind_lb] .-= kkt.l_lower ./ kkt.l_diag
+    kkt.pr_diag[kkt.ind_ub] .-= kkt.u_lower ./ kkt.u_diag
 
     fill!(kkt.aug_com, zero(T))
 
