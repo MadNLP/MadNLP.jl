@@ -28,10 +28,6 @@ mutable struct SparseKKTSystem{T, VT, MT, QN, LS, VI, VI32} <: AbstractReducedKK
     jac_raw::SparseMatrixCOO{T,Int32,VT, VI32}
     jac_com::MT
     jac_csc_map::Union{Nothing, VI}
-    # Regularization
-    del_w::T
-    del_w_last::T
-    del_c::T
     # LinearSolver
     linear_solver::LS
     # Info
@@ -77,10 +73,6 @@ mutable struct SparseUnreducedKKTSystem{T, VT, MT, QN, LS, VI, VI32} <: Abstract
     jac_com::MT
     jac_csc_map::Union{Nothing, VI}
     
-    # Regularization
-    del_w::T
-    del_w_last::T
-    del_c::T
     # LinearSolver
     linear_solver::LS
     
@@ -130,11 +122,6 @@ mutable struct SparseCondensedKKTSystem{T, VT, MT, QN, LS, VI, VI32, VTu1, VTu2,
     dptr::VTu1
     hptr::VTu1
     jptr::VTu2
-
-    # Regularization
-    del_w::T
-    del_w_last::T
-    del_c::T
     
     # LinearSolver
     linear_solver::LS
@@ -296,10 +283,6 @@ function create_kkt_system(
     jac_com, jac_csc_map = coo_to_csc(jac_raw)
     hess_com, hess_csc_map = coo_to_csc(hess_raw)
 
-    del_w = one(T)
-    del_w_last = zero(T)
-    del_c = zero(T)
-
     cnt.linear_solver_time += @elapsed linear_solver = opt.linear_solver(
         aug_com; opt = opt_linear_solver
     )
@@ -310,7 +293,6 @@ function create_kkt_system(
         aug_raw, aug_com, aug_csc_map,
         hess_raw, hess_com, hess_csc_map,
         jac_raw, jac_com, jac_csc_map,
-        del_w, del_w_last, del_c,
         linear_solver,
         ind_ineq, ind_cons.ind_lb, ind_cons.ind_ub,
     )
@@ -424,10 +406,6 @@ function create_kkt_system(
     jac_com, jac_csc_map = coo_to_csc(jac_raw)
     hess_com, hess_csc_map = coo_to_csc(hess_raw)
 
-    del_w = one(T)
-    del_w_last = zero(T)
-    del_c = zero(T)
-
     cnt.linear_solver_time += @elapsed linear_solver = opt.linear_solver(aug_com; opt = opt_linear_solver)
 opt.linear_solver(
         aug_com; opt = opt_linear_solver
@@ -438,7 +416,6 @@ opt.linear_solver(
         aug_raw, aug_com, aug_csc_map,
         hess_raw, hess_com, hess_csc_map,
         jac_raw, jac_com, jac_csc_map,
-        del_w, del_w_last, del_c,
         linear_solver,
         ind_ineq, ind_lb, ind_ub,
     )
@@ -547,10 +524,6 @@ function create_kkt_system(
     buffer = VT(undef, m)
     buffer2= VT(undef, m)
 
-    del_w = one(T)
-    del_w_last = zero(T)
-    del_c = zero(T)
-
     cnt.linear_solver_time += @elapsed linear_solver = opt.linear_solver(aug_com; opt = opt_linear_solver)
 
     ext = get_sparse_condensed_ext(VT, jptr, jt_csc_map, hess_csc_map)
@@ -563,7 +536,6 @@ function create_kkt_system(
         l_diag, u_diag, l_lower, u_lower,
         buffer, buffer2,
         aug_com, diag_buffer, dptr, hptr, jptr,
-        del_w, del_w_last, del_c,
         linear_solver,
         ind_ineq, ind_cons.ind_lb, ind_cons.ind_ub,
         ext

@@ -135,7 +135,7 @@ function print_iter(solver::AbstractMadNLPSolver;is_resto=false)
         solver.cnt.k,is_resto ? "r" : " ",solver.obj_val/obj_scale,
         inf_pr, inf_du, mu,
         solver.cnt.k == 0 ? 0. : norm(primal(solver.d),Inf),
-        solver.kkt.del_w == 0 ? "   - " : @sprintf("%5.1f",log(10,solver.kkt.del_w)),
+        solver.del_w == 0 ? "   - " : @sprintf("%5.1f",log(10,solver.del_w)),
         solver.alpha_z,solver.alpha,solver.ftype,solver.cnt.l))
     return
 end

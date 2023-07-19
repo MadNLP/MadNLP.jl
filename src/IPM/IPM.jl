@@ -89,6 +89,10 @@ mutable struct MadNLPSolver{
     alpha_z::T
     ftype::String
 
+    del_w::T
+    del_w_last::T
+    del_c::T
+
     filter::Vector{Tuple{T,T}}
 
     RR::Union{Nothing,RobustRestorer{T}}
@@ -116,6 +120,9 @@ function MadNLPSolver(nlp::AbstractNLPModel{T,VT}; kwargs...) where {T, VT}
         opt.fixed_variable_treatment,
         opt.equality_treatment
     )
+
+    ind_lb = ind_cons.ind_lb
+    ind_ub = ind_cons.ind_ub
     
     ns = length(ind_cons.ind_ineq)
     nx = get_nvar(nlp)
@@ -133,15 +140,15 @@ function MadNLPSolver(nlp::AbstractNLPModel{T,VT}; kwargs...) where {T, VT}
     )
 
     # Primal variable
-    x = PrimalVector(VT,nx, ns, ind_cons)
+    x = PrimalVector(VT,nx, ns, ind_lb, ind_ub)
     # Bounds
-    xl = PrimalVector(VT,nx, ns, ind_cons)
-    xu = PrimalVector(VT,nx, ns, ind_cons)    
-    zl = PrimalVector(VT,nx, ns, ind_cons)
-    zu = PrimalVector(VT,nx, ns, ind_cons)
+    xl = PrimalVector(VT,nx, ns, ind_lb, ind_ub)
+    xu = PrimalVector(VT,nx, ns, ind_lb, ind_ub)    
+    zl = PrimalVector(VT,nx, ns, ind_lb, ind_ub)
+    zu = PrimalVector(VT,nx, ns, ind_lb, ind_ub)
     
     # Gradient
-    f = PrimalVector(VT,nx, ns, ind_cons)
+    f = PrimalVector(VT,nx, ns, ind_lb, ind_ub)
 
     y = VT(undef, m)
     c = VT(undef, m)
@@ -150,7 +157,7 @@ function MadNLPSolver(nlp::AbstractNLPModel{T,VT}; kwargs...) where {T, VT}
     nlb = length(ind_cons.ind_lb)
     nub = length(ind_cons.ind_ub)
 
-    x_trial = PrimalVector(VT,nx, ns, ind_cons)
+    x_trial = PrimalVector(VT, nx, ns, ind_lb, ind_ub)
     c_trial = VT(undef, m)
     c_slk = view(c,ind_cons.ind_ineq)
 
@@ -163,22 +170,22 @@ function MadNLPSolver(nlp::AbstractNLPModel{T,VT}; kwargs...) where {T, VT}
     x_trial_lr = view(full(x_trial), ind_cons.ind_lb)
     x_trial_ur = view(full(x_trial), ind_cons.ind_ub)
 
-    _w1 = UnreducedKKTVector(VT, n, m, nlb, nub, ind_cons)
-    _w2 = UnreducedKKTVector(VT, n, m, nlb, nub, ind_cons)
-    _w3 = UnreducedKKTVector(VT, n, m, nlb, nub, ind_cons)
-    _w4 = UnreducedKKTVector(VT, n, m, nlb, nub, ind_cons)
+    _w1 = UnreducedKKTVector(VT, n, m, nlb, nub, ind_lb, ind_ub)
+    _w2 = UnreducedKKTVector(VT, n, m, nlb, nub, ind_lb, ind_ub)
+    _w3 = UnreducedKKTVector(VT, n, m, nlb, nub, ind_lb, ind_ub)
+    _w4 = UnreducedKKTVector(VT, n, m, nlb, nub, ind_lb, ind_ub)
 
     jacl = VT(undef,n) 
 
 
-    d = UnreducedKKTVector(VT, n, m, nlb, nub, ind_cons)
+    d = UnreducedKKTVector(VT, n, m, nlb, nub, ind_lb, ind_ub)
     dx_lr = view(d.xp, ind_cons.ind_lb) # TODO
     dx_ur = view(d.xp, ind_cons.ind_ub) # TODO
 
-    p = UnreducedKKTVector(VT, n, m, nlb, nub, ind_cons)
+    p = UnreducedKKTVector(VT, n, m, nlb, nub, ind_lb, ind_ub)
 
     @trace(logger,"Initializing iterative solver.")
-    residual = UnreducedKKTVector(VT, n, m, nlb, nub, ind_cons)
+    residual = UnreducedKKTVector(VT, n, m, nlb, nub, ind_lb, ind_ub)
     iterator = opt.iterator(kkt, residual; cnt = cnt, logger = logger)
 
     if opt.inertia_correction_method == INERTIA_AUTO
@@ -199,7 +206,8 @@ function MadNLPSolver(nlp::AbstractNLPModel{T,VT}; kwargs...) where {T, VT}
         x_lr, x_ur, xl_r, xu_r, zl_r, zu_r, dx_lr, dx_ur, x_trial_lr, x_trial_ur, 
         iterator, 
         zero(T), zero(T), zero(T), zero(T), zero(T), zero(T), zero(T), zero(T), zero(T),
-        " ", 
+        " ",
+        zero(T), zero(T), zero(T),
         Tuple{T, T}[], nothing, INITIAL, Dict(), 
     )
 
