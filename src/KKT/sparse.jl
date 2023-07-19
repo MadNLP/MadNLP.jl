@@ -423,6 +423,7 @@ end
 
 function initialize!(kkt::AbstractSparseKKTSystem)
     fill!(kkt.reg, 1.0)
+    fill!(kkt.pr_diag, 1.0)
     fill!(kkt.du_diag, 0.0)
     fill!(kkt.hess, 0.0)
     fill!(kkt.l_lower, 0.0)
@@ -434,6 +435,7 @@ end
 
 function initialize!(kkt::SparseUnreducedKKTSystem) 
     fill!(kkt.reg, 1.0)
+    fill!(kkt.pr_diag, 1.0)
     fill!(kkt.du_diag, 0.0)
     fill!(kkt.hess, 0.0)
     fill!(kkt.l_lower, 0.0)
@@ -526,7 +528,7 @@ function create_kkt_system(
 
     cnt.linear_solver_time += @elapsed linear_solver = opt.linear_solver(aug_com; opt = opt_linear_solver)
 
-    ext = get_sparse_condensed_ext(VT, jptr, jt_csc_map, hess_csc_map)
+    ext = get_sparse_condensed_ext(VT, hess_com, jptr, jt_csc_map, hess_csc_map)
 
     return SparseCondensedKKTSystem( 
         hess, hess_raw, hess_com, hess_csc_map,
@@ -549,8 +551,10 @@ get_sparse_condensed_ext(::Type{Vector{T}},args...) where T = nothing
 is_reduced(::SparseCondensedKKTSystem) = true
 num_variables(kkt::SparseCondensedKKTSystem) = length(kkt.pr_diag)
 function is_inertia_correct(kkt::SparseCondensedKKTSystem, num_pos, num_zero, num_neg)
-    return (num_zero == 0)
+    return (num_zero == 0) && (num_pos == num_variables(kkt))
 end
+
+
 Base.size(kkt::SparseCondensedKKTSystem,n::Int) = size(kkt.aug_com,n)
 # nnz_jacobian(kkt::SparseCondensedKKTSystem) = nnz(kkt.jac_raw)
 

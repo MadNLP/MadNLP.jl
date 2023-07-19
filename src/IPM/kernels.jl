@@ -35,8 +35,8 @@ function set_aug_diagonal!(kkt::AbstractKKTSystem{T}, solver::MadNLPSolver{T}) w
     fill!(kkt.du_diag, zero(T))
     kkt.l_diag .= solver.xl_r .- solver.x_lr
     kkt.u_diag .= solver.x_ur .- solver.xu_r
-    kkt.l_lower .= solver.zl_r
-    kkt.u_lower .= solver.zu_r
+    copyto!(kkt.l_lower, solver.zl_r)
+    copyto!(kkt.u_lower, solver.zu_r)
 
     _set_aug_diagonal!(kkt)
     
@@ -44,13 +44,13 @@ function set_aug_diagonal!(kkt::AbstractKKTSystem{T}, solver::MadNLPSolver{T}) w
 end
 
 function _set_aug_diagonal!(kkt::AbstractKKTSystem)
-    kkt.pr_diag .= kkt.reg
+    copyto!(kkt.pr_diag, kkt.reg)
     kkt.pr_diag[kkt.ind_lb] .-= kkt.l_lower ./ kkt.l_diag
     kkt.pr_diag[kkt.ind_ub] .-= kkt.u_lower ./ kkt.u_diag
 end
 
 function _set_aug_diagonal!(kkt::AbstractUnreducedKKTSystem)
-    kkt.pr_diag .= kkt.reg
+    copyto!(kkt.pr_diag, kkt.reg)
     kkt.l_lower_aug .= sqrt.(kkt.l_lower)
     kkt.u_lower_aug .= sqrt.(kkt.u_lower)
 end
@@ -64,9 +64,9 @@ function set_aug_RR!(kkt::AbstractKKTSystem, solver::MadNLPSolver, RR::RobustRes
     zu = full(solver.zu)
     kkt.reg .= RR.zeta .* RR.D_R .^ 2
     kkt.du_diag .= .- RR.pp ./ RR.zp .- RR.nn ./ RR.zn
-    kkt.l_lower .= solver.zl_r
-    kkt.u_lower .= solver.zu_r
-    kkt.l_diag  .= solver.xl_r .- solver.x_lr
+    copyto!(kkt.l_lower, solver.zl_r)
+    copyto!(kkt.u_lower, solver.zu_r)
+    kkt.l_diag .= solver.xl_r .- solver.x_lr
     kkt.u_diag .= solver.x_ur .- solver.xu_r
     
     _set_aug_diagonal!(kkt)

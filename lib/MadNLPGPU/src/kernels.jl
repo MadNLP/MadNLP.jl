@@ -170,6 +170,7 @@ function MadNLP._set_diag!(A::CuMatrix, inds, a)
             A, inds, a;
             ndrange = length(inds)
         )
+        synchronize(CUDABackend())
     end
 end
 

@@ -56,8 +56,9 @@ function solve_refine!(
         iterator.cnt.linear_solver_time += @elapsed solve!(iterator.kkt, w)  # TODO this includes some extra time. Ideally, LinearSolver should count the time
         axpy!(1., full(w), full(x))
         copyto!(full(w), full(b))
-        mul!(w, iterator.kkt, x, -one(T), one(T))
         
+        mul!(w, iterator.kkt, x, -one(T), one(T))
+
         norm_w = norm(full(w), Inf)
         norm_x = norm(full(x), Inf)
         residual_ratio = norm_w / (min(norm_x, 1e6 * norm_b) + norm_b)
