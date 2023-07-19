@@ -196,6 +196,7 @@ end
 
 function regularize_diagonal!(kkt::AbstractKKTSystem, primal, dual)
     kkt.reg .+= primal
+    kkt.pr_diag .+= primal
     kkt.du_diag .= .-dual
 end
 
