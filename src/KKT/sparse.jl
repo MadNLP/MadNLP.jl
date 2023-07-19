@@ -473,7 +473,7 @@ function create_kkt_system(
     if n_slack != m
         error("SparseCondensedKKTSystem does not support equality constrained NLPs.")
     end
-
+    
     # Evaluate sparsity pattern
     jac_sparsity_I = create_array(nlp, Int32, nlp.nnzj)
     jac_sparsity_J = create_array(nlp, Int32, nlp.nnzj)
@@ -493,20 +493,20 @@ function create_kkt_system(
 
 
     reg = VT(undef, n_tot)
-    pr_diag = fill!(VT(undef, n_tot), one(T))
-    du_diag = fill!(VT(undef, m), one(T))
+    pr_diag = VT(undef, n_tot)
+    du_diag = VT(undef, m)
     l_diag = VT(undef, nlb)
     u_diag = VT(undef, nub)
     l_lower = VT(undef, nlb)
     u_lower = VT(undef, nub)
-
-    hess = fill!(VT(undef, n_hess), one(T))
-    jac = fill!(VT(undef, n_jac), one(T))
-
-    diag_buffer = VT(undef,m) 
+    buffer = VT(undef, m)
+    buffer2= VT(undef, m)
+    hess = VT(undef, n_hess)
+    jac = VT(undef, n_jac)
+    diag_buffer = VT(undef, m)
+    
     hess_raw = SparseMatrixCOO(n, n, hess_sparsity_I, hess_sparsity_J, hess)
     
-
     jt_coo = SparseMatrixCOO(
         n, m, 
         jac_sparsity_J,
@@ -516,15 +516,12 @@ function create_kkt_system(
     
     jt_csc, jt_csc_map = coo_to_csc(jt_coo)
     hess_com, hess_csc_map = coo_to_csc(hess_raw)
-
     
     aug_com, dptr, hptr, jptr = build_condensed_aug_symbolic(
         hess_com,
         jt_csc
     )
 
-    buffer = VT(undef, m)
-    buffer2= VT(undef, m)
 
     cnt.linear_solver_time += @elapsed linear_solver = opt.linear_solver(aug_com; opt = opt_linear_solver)
 
@@ -637,17 +634,44 @@ end
         undef,
         size(H,2) + nnz(H) + nnzjtsj
     )
+    dptr = Vector{Tuple{Ti,Ti}}(
+        undef,
+        size(H,2)
+    )
+    hptr = Vector{Tuple{Ti,Ti}}(
+        undef,
+        nnz(H)
+    )
+    jptr = Vector{Tuple{Ti,Tuple{Ti,Ti,Ti}}}(
+        undef,
+        nnzjtsj
+    )
+    colptr = fill!(
+        Vector{Ti}(undef,size(H,1)+1),
+        one(Tv)
+    )
+    rowval = Ti[]
+    
+    n = size(H,2)
+    
+    map!(
+        i->(-1,i,0),
+        @view(sym[1:n]),
+        1:size(H,2)
+    )
+    map!(
+        i->(i,i),
+        @view(sym2[1:n]),
+        1:size(H,2)
+    )
 
-    cnt = 0
-    for i in 1:size(H,2)
-        sym[cnt+=1] = (-1,i,0)
-        sym2[cnt] = (i,i)
-    end
+    cnt = n
     
     for i in 1:size(H,2)
         for j in H.colptr[i]:H.colptr[i+1]-1
+            c = H.rowval[j]
             sym[cnt+=1] = (0,j,0)
-            sym2[cnt] = (H.rowval[j],i)
+            sym2[cnt] = (c,i)
         end
     end
 
@@ -664,13 +688,6 @@ end
     p = sortperm(sym2; by = ((i,j),) -> (j,i), alg=Base.Sort.MergeSort)
     permute!(sym, p)
     permute!(sym2, p)
-
-    dptr = Vector{Tuple{Ti,Ti}}(undef,size(H,2))
-    hptr = Vector{Tuple{Ti,Ti}}(undef,nnz(H))
-    jptr = Vector{Tuple{Ti,Tuple{Ti,Ti,Ti}}}(undef,nnzjtsj)
-
-    colptr = ones(Ti,size(H,1)+1)
-    rowval = Ti[]
 
     a = (0,0)
     cnt = 0
@@ -702,7 +719,10 @@ end
         end
     end
 
-    fill!(@view(colptr[prevcol+1:end]), cnt+1)
+    fill!(
+        @view(colptr[prevcol+1:end]),
+        cnt+1
+    )
 
     aug_com = SparseMatrixCSC{Tv,Ti}(
         size(H)...,

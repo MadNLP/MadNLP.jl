@@ -4,23 +4,21 @@
     acceptable_tol::Float64 = 1e-5
 end
 
-struct RichardsonIterator{T, VT <: UnreducedKKTVector{T}, KKT <: AbstractKKTSystem{T}} <: AbstractIterator{T}
+struct RichardsonIterator{T, KKT <: AbstractKKTSystem{T}} <: AbstractIterator{T}
     kkt::KKT
-    residual::VT
     opt::RichardsonOptions
     cnt::MadNLPCounters
     logger::MadNLPLogger
 end
 
 function RichardsonIterator(
-    kkt,
-    residual;
+    kkt;
     opt = RichardsonOptions(),
     logger = MadNLPLogger(),
     cnt = MadNLPCounters()
 )
     return RichardsonIterator(
-        kkt, residual, opt, cnt, logger
+        kkt, opt, cnt, logger
     )
 end
 
@@ -28,13 +26,13 @@ function solve_refine!(
     x::VT,
     iterator::R,
     b::VT,
-    ) where {T, VT, R <: RichardsonIterator{T, VT}}
+    w::VT
+    ) where {T, VT, R <: RichardsonIterator{T}}
     @debug(iterator.logger, "Iterative solver initiated")
 
     norm_b = norm(full(b), Inf)
     residual_ratio = zero(T)
 
-    w = iterator.residual
     fill!(full(x), zero(T))
 
     

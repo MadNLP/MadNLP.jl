@@ -13,7 +13,8 @@
 @enum(InertiaCorrectionMethod::Int,
       INERTIA_AUTO = 1,
       INERTIA_BASED = 2,
-      INERTIA_FREE = 3)
+      INERTIA_FREE = 3,
+      INERTIA_IGNORE = 4)
 
 @enum(KKTLinearSystem::Int,
       SPARSE_KKT_SYSTEM = 1,

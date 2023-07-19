@@ -74,6 +74,10 @@ end
 
 function MadNLP.solve!(M::RFSolver{Float64}, x)
     CUSOLVERRF.rf_solve!(M.inner, x)
+    
+    # this is necessary to not distort the timing in MadNLP
+    synchronize(CUDABackend())
+    # -----------------------------------------------------
     return x
 end
 

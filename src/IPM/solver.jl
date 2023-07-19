@@ -58,7 +58,7 @@ function initialize!(solver::AbstractMadNLPSolver{T}) where T
         # initialize!(solver.kkt)
         factorize_wrapper!(solver)
         is_solved = solve_refine!(
-            solver.d, solver.iterator, solver.p
+            solver.d, solver.iterator, solver.p, solver._w5
         )
 
         if !is_solved || (norm(dual(solver.d), Inf) > solver.opt.constr_mult_init_max)
@@ -252,6 +252,8 @@ function regular!(solver::AbstractMadNLPSolver{T}) where T
             inertia_free_reg(solver) || return ROBUST
         elseif solver.opt.inertia_correction_method == INERTIA_BASED
             inertia_based_reg(solver) || return ROBUST
+        elseif solver.opt.inertia_correction_method == INERTIA_IGNORE
+            inertia_ignore_reg(solver) || return ROBUST
         end
         # filter start
         @trace(solver.logger,"Backtracking line search initiated.")
@@ -463,7 +465,7 @@ function restore!(solver::AbstractMadNLPSolver{T}) where T
         factorize_wrapper!(solver)
         # TODO check this
         solve_refine!(
-            solver.d, solver.iterator, solver.p
+            solver.d, solver.iterator, solver.p, solver._w5
         )
 
         solver.ftype = "f"
@@ -533,7 +535,7 @@ function robust!(solver::MadNLPSolver{T}) where T
         set_aug_rhs_RR!(solver, solver.kkt, RR, solver.opt.rho)
         factorize_wrapper!(solver)
         solve_refine!(
-            solver.d, solver.iterator, solver.p
+            solver.d, solver.iterator, solver.p, solver._w5
         )
 
         finish_aug_solve_RR!(
@@ -666,7 +668,7 @@ function robust!(solver::MadNLPSolver{T}) where T
 
             factorize_wrapper!(solver)
             solve_refine!(
-                solver.d, solver.iterator, solver.p
+                solver.d, solver.iterator, solver.p, solver._w5
             )
             
             if norm(dual(solver.d), Inf)>solver.opt.constr_mult_init_max
@@ -688,6 +690,46 @@ function robust!(solver::MadNLPSolver{T}) where T
     end
 end
 
+function inertia_ignore_reg(solver::MadNLPSolver{T}) where T
+    n_trial = 0
+    solver.del_w = del_w_prev = zero(T)
+
+    @trace(solver.logger,"Inertia-based regularization started.")
+
+    factorize_wrapper!(solver)
+
+    solve_status = solve_refine!(
+        solver.d, solver.iterator, solver.p, solver._w5,
+    )
+
+    while !solve_status
+        @debug(solver.logger,"Primal-dual perturbed.")
+        if solver.del_w == zero(T)
+            solver.del_w = solver.del_w_last==zero(T) ? solver.opt.first_hessian_perturbation :
+                max(solver.opt.min_hessian_perturbation,solver.opt.perturb_dec_fact*solver.del_w_last)
+        else
+            solver.del_w*= solver.del_w_last==zero(T) ? solver.opt.perturb_inc_fact_first : solver.opt.perturb_inc_fact
+            if solver.del_w>solver.opt.max_hessian_perturbation
+                solver.cnt.k+=1
+                @debug(solver.logger,"Primal regularization is too big. Switching to restoration phase.")
+                return false
+            end
+        end
+        solver.del_c = !solve_status ?
+            solver.opt.jacobian_regularization_value * solver.mu^(solver.opt.jacobian_regularization_exponent) : zero(T)
+            regularize_diagonal!(solver.kkt, solver.del_w - del_w_prev, solver.del_c)
+        del_w_prev = solver.del_w
+
+        factorize_wrapper!(solver)
+        solve_status = solve_refine!(
+            solver.d, solver.iterator, solver.p, solver._w5
+        )
+        n_trial += 1
+    end
+    solver.del_w != 0 && (solver.del_w_last = solver.del_w)
+    return true
+end
+
 function inertia_based_reg(solver::MadNLPSolver{T}) where T
     n_trial = 0
     solver.del_w = del_w_prev = zero(T)
@@ -698,7 +740,7 @@ function inertia_based_reg(solver::MadNLPSolver{T}) where T
 
     num_pos,num_zero,num_neg = inertia(solver.kkt.linear_solver)
     solve_status = num_zero!= 0 ? false : solve_refine!(
-        solver.d, solver.iterator, solver.p,
+        solver.d, solver.iterator, solver.p, solver._w5,
     )
 
     while !is_inertia_correct(solver.kkt, num_pos, num_zero, num_neg) || !solve_status
@@ -722,7 +764,7 @@ function inertia_based_reg(solver::MadNLPSolver{T}) where T
         factorize_wrapper!(solver)
         num_pos,num_zero,num_neg = inertia(solver.kkt.linear_solver)
         solve_status = num_zero!= 0 ? false : solve_refine!(
-            solver.d, solver.iterator, solver.p
+            solver.d, solver.iterator, solver.p, solver._w5
         )
         n_trial += 1
     end
@@ -748,10 +790,11 @@ function inertia_free_reg(solver::MadNLPSolver{T}) where T
     set_g_ifr!(solver,g)
 
     factorize_wrapper!(solver)
+    
     solve_status = solve_refine!(
-        d0, solver.iterator, p0,
+        d0, solver.iterator, p0, solver._w3,
     ) && solve_refine!(
-        solver.d, solver.iterator, solver.p,
+        solver.d, solver.iterator, solver.p, solver._w5,
     )
     copyto!(t,dx)
     axpy!(-1.,n,t)
@@ -776,9 +819,9 @@ function inertia_free_reg(solver::MadNLPSolver{T}) where T
 
         factorize_wrapper!(solver)
         solve_status = solve_refine!(
-            d0, solver.iterator, p0
+            d0, solver.iterator, p0, solver._w5
         ) && solve_refine!(
-            solver.d, solver.iterator, solver.p
+            solver.d, solver.iterator, solver.p, solver._w6
         )
         copyto!(t,dx)
         axpy!(-1.,n,t)
@@ -813,7 +856,7 @@ function second_order_correction(solver::AbstractMadNLPSolver,alpha_max,theta,va
             solver.ind_llb,solver.ind_uub,solver.mu,solver.opt.kappa_d,
         )
         solve_refine!(
-            solver._w1, solver.iterator, solver.p
+            solver._w1, solver.iterator, solver.p, solver._w5
         )
         alpha_soc = get_alpha_max(
             primal(solver.x),

@@ -160,33 +160,6 @@ function MadNLP.mul!(
     
 end
 
-function MadNLP.solve!(kkt::MadNLP.SparseCondensedKKTSystem{T, VT}, w::MadNLP.AbstractKKTVector)  where {T, VT <: CuVector{T}}
-
-    (n,m) = size(kkt.jt_csc)
-
-    # Decompose buffers
-    wx = view(MadNLP.full(w), 1:n)
-    ws = view(MadNLP.full(w), n+1:n+m)
-    wz = view(MadNLP.full(w), n+m+1:n+2*m)
-    Σs = view(kkt.pr_diag, n+1:n+m)
-
-    MadNLP.reduce_rhs!(w.xp_lr, MadNLP.dual_lb(w), kkt.l_diag, w.xp_ur, MadNLP.dual_ub(w), kkt.u_diag)
-
-    kkt.buffer .= kkt.diag_buffer .* (wz .+ ws ./ Σs) 
-    
-    MadNLP.mul!(wx, kkt.jt_csc, kkt.buffer, one(T), one(T))
-    MadNLP.solve!(kkt.linear_solver, wx)
-    MadNLP.mul!(kkt.buffer2, kkt.jt_csc', wx, one(T), zero(T)) # TODO: investigate why directly using kkt.buffer2 here is causing an error
-    synchronize(CUDABackend()) # Some weird behavior observed. Seems that calling solve! causes some delay. But not sure why
-    
-    wz .= .- kkt.buffer .+ kkt.diag_buffer .* kkt.buffer2
-    ws .= (ws .+ wz) ./ Σs
-
-    MadNLP.finish_aug_solve!(kkt, w)
-
-end
-
-
 @kernel function diag_operation(y,@Const(A),@Const(x),@Const(alpha),@Const(idx))
     i = @index(Global)
     to,fr = idx[i]

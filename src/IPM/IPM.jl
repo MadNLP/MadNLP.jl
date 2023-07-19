@@ -47,9 +47,10 @@ mutable struct MadNLPSolver{
 
     _w1::KKTVec
     _w2::KKTVec
-
     _w3::KKTVec
     _w4::KKTVec
+    _w5::KKTVec
+    _w6::KKTVec
 
     x_trial::PrimalVector{T, VT, VI}
     c_trial::VT
@@ -128,8 +129,10 @@ function MadNLPSolver(nlp::AbstractNLPModel{T,VT}; kwargs...) where {T, VT}
     nx = get_nvar(nlp)
     n = nx+ns
     m = get_ncon(nlp)
+    nlb = length(ind_lb)
+    nub = length(ind_ub)
 
-    # Initialize KKT
+    @trace(logger,"Initializing KKT system.")
     kkt = create_kkt_system(
         opt.kkt_system,
         cb,
@@ -139,28 +142,33 @@ function MadNLPSolver(nlp::AbstractNLPModel{T,VT}; kwargs...) where {T, VT}
         ind_cons
     )
 
-    # Primal variable
-    x = PrimalVector(VT,nx, ns, ind_lb, ind_ub)
-    # Bounds
-    xl = PrimalVector(VT,nx, ns, ind_lb, ind_ub)
-    xu = PrimalVector(VT,nx, ns, ind_lb, ind_ub)    
-    zl = PrimalVector(VT,nx, ns, ind_lb, ind_ub)
-    zu = PrimalVector(VT,nx, ns, ind_lb, ind_ub)
-    
-    # Gradient
-    f = PrimalVector(VT,nx, ns, ind_lb, ind_ub)
+    @trace(logger,"Initializing iterative solver.")
+    iterator = opt.iterator(kkt; cnt = cnt, logger = logger)
 
+    x = PrimalVector(VT, nx, ns, ind_lb, ind_ub)
+    xl = PrimalVector(VT, nx, ns, ind_lb, ind_ub)
+    xu = PrimalVector(VT, nx, ns, ind_lb, ind_ub)  
+    zl = PrimalVector(VT, nx, ns, ind_lb, ind_ub)
+    zu = PrimalVector(VT, nx, ns, ind_lb, ind_ub)
+    f = PrimalVector(VT, nx, ns, ind_lb, ind_ub)
+    x_trial = PrimalVector(VT, nx, ns, ind_lb, ind_ub)
+    
+    d = UnreducedKKTVector(VT, n, m, nlb, nub, ind_lb, ind_ub)
+    p = UnreducedKKTVector(VT, n, m, nlb, nub, ind_lb, ind_ub)
+    _w1 = UnreducedKKTVector(VT, n, m, nlb, nub, ind_lb, ind_ub)
+    _w2 = UnreducedKKTVector(VT, n, m, nlb, nub, ind_lb, ind_ub)
+    _w3 = UnreducedKKTVector(VT, n, m, nlb, nub, ind_lb, ind_ub)
+    _w4 = UnreducedKKTVector(VT, n, m, nlb, nub, ind_lb, ind_ub)
+    _w5 = UnreducedKKTVector(VT, n, m, nlb, nub, ind_lb, ind_ub)
+    _w6 = UnreducedKKTVector(VT, n, m, nlb, nub, ind_lb, ind_ub)
+
+    jacl = VT(undef,n) 
+    c_trial = VT(undef, m)
     y = VT(undef, m)
     c = VT(undef, m)
     rhs = VT(undef, m)
 
-    nlb = length(ind_cons.ind_lb)
-    nub = length(ind_cons.ind_ub)
-
-    x_trial = PrimalVector(VT, nx, ns, ind_lb, ind_ub)
-    c_trial = VT(undef, m)
     c_slk = view(c,ind_cons.ind_ineq)
-
     x_lr = view(full(x), ind_cons.ind_lb)
     x_ur = view(full(x), ind_cons.ind_ub)
     xl_r = view(full(xl), ind_cons.ind_lb)
@@ -169,24 +177,8 @@ function MadNLPSolver(nlp::AbstractNLPModel{T,VT}; kwargs...) where {T, VT}
     zu_r = view(full(zu), ind_cons.ind_ub)
     x_trial_lr = view(full(x_trial), ind_cons.ind_lb)
     x_trial_ur = view(full(x_trial), ind_cons.ind_ub)
-
-    _w1 = UnreducedKKTVector(VT, n, m, nlb, nub, ind_lb, ind_ub)
-    _w2 = UnreducedKKTVector(VT, n, m, nlb, nub, ind_lb, ind_ub)
-    _w3 = UnreducedKKTVector(VT, n, m, nlb, nub, ind_lb, ind_ub)
-    _w4 = UnreducedKKTVector(VT, n, m, nlb, nub, ind_lb, ind_ub)
-
-    jacl = VT(undef,n) 
-
-
-    d = UnreducedKKTVector(VT, n, m, nlb, nub, ind_lb, ind_ub)
     dx_lr = view(d.xp, ind_cons.ind_lb) # TODO
     dx_ur = view(d.xp, ind_cons.ind_ub) # TODO
-
-    p = UnreducedKKTVector(VT, n, m, nlb, nub, ind_lb, ind_ub)
-
-    @trace(logger,"Initializing iterative solver.")
-    residual = UnreducedKKTVector(VT, n, m, nlb, nub, ind_lb, ind_ub)
-    iterator = opt.iterator(kkt, residual; cnt = cnt, logger = logger)
 
     if opt.inertia_correction_method == INERTIA_AUTO
         opt.inertia_correction_method = is_inertia(kkt.linear_solver)::Bool ? INERTIA_BASED : INERTIA_FREE
@@ -199,8 +191,8 @@ function MadNLPSolver(nlp::AbstractNLPModel{T,VT}; kwargs...) where {T, VT}
         x, y, zl, zu, xl, xu,
         zero(T), f, c, 
         jacl, 
-        d,  p, 
-        _w1,  _w2,  _w3,  _w4, 
+        d, p, 
+        _w1, _w2, _w3, _w4, _w5, _w6, 
         x_trial, c_trial, zero(T), c_slk, rhs, 
         ind_cons.ind_ineq, ind_cons.ind_fixed, ind_cons.ind_llb, ind_cons.ind_uub, 
         x_lr, x_ur, xl_r, xu_r, zl_r, zu_r, dx_lr, dx_ur, x_trial_lr, x_trial_ur, 
