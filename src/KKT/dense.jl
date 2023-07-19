@@ -304,10 +304,6 @@ function build_kkt!(kkt::DenseKKTSystem{T, VT, MT}) where {T, VT, MT}
     m = size(kkt.jac, 1)
     ns = length(kkt.ind_ineq)
     
-    kkt.pr_diag .= kkt.reg
-    kkt.pr_diag[kkt.ind_lb] .-= kkt.l_lower ./ kkt.l_diag
-    kkt.pr_diag[kkt.ind_ub] .-= kkt.u_lower ./ kkt.u_diag
-
     _build_dense_kkt_system!(kkt.aug_com, kkt.hess, kkt.jac,
                                 kkt.pr_diag, kkt.du_diag, kkt.diag_hess,
                                 kkt.ind_ineq, 
@@ -373,10 +369,6 @@ function build_kkt!(kkt::DenseCondensedKKTSystem{T, VT, MT}) where {T, VT, MT}
     ns = kkt.n_ineq
     n_eq = length(kkt.ind_eq)
     m = size(kkt.jac, 1)
-
-    kkt.pr_diag .= kkt.reg
-    kkt.pr_diag[kkt.ind_lb] .-= kkt.l_lower ./ kkt.l_diag
-    kkt.pr_diag[kkt.ind_ub] .-= kkt.u_lower ./ kkt.u_diag
 
     fill!(kkt.aug_com, zero(T))
 

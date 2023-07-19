@@ -734,18 +734,13 @@ function build_condensed_aug_coord!(kkt::SparseCondensedKKTSystem{T,VT,MT}) wher
     )
 end
 
+
 function build_kkt!(kkt::SparseKKTSystem)
-    kkt.pr_diag .= kkt.reg
-    kkt.pr_diag[kkt.ind_lb] .-= kkt.l_lower ./ kkt.l_diag
-    kkt.pr_diag[kkt.ind_ub] .-= kkt.u_lower ./ kkt.u_diag
 
     transfer!(kkt.aug_com, kkt.aug_raw, kkt.aug_csc_map)
 end
 
 function build_kkt!(kkt::SparseUnreducedKKTSystem)
-    kkt.pr_diag .= kkt.reg
-    kkt.l_lower_aug .= sqrt.(kkt.l_lower)
-    kkt.u_lower_aug .= sqrt.(kkt.u_lower)
     
     transfer!(kkt.aug_com, kkt.aug_raw, kkt.aug_csc_map)
 end
@@ -759,11 +754,7 @@ function build_kkt!(kkt::SparseCondensedKKTSystem)
     Σx = view(kkt.pr_diag, 1:n)
     Σs = view(kkt.pr_diag, n+1:n+m)
     Σd = kkt.du_diag
-    
-    kkt.pr_diag .= kkt.reg
-    kkt.pr_diag[kkt.ind_lb] .-= kkt.l_lower ./ kkt.l_diag
-    kkt.pr_diag[kkt.ind_ub] .-= kkt.u_lower ./ kkt.u_diag
-    
+        
     kkt.diag_buffer .= Σs ./ ( 1 .- Σd .* Σs)
     build_condensed_aug_coord!(kkt)
 end

@@ -37,7 +37,22 @@ function set_aug_diagonal!(kkt::AbstractKKTSystem{T}, solver::MadNLPSolver{T}) w
     kkt.u_diag .= solver.x_ur .- solver.xu_r
     kkt.l_lower .= solver.zl_r
     kkt.u_lower .= solver.zu_r
+
+    _set_aug_diagonal!(kkt)
+    
     return
+end
+
+function _set_aug_diagonal!(kkt::AbstractKKTSystem)
+    kkt.pr_diag .= kkt.reg
+    kkt.pr_diag[kkt.ind_lb] .-= kkt.l_lower ./ kkt.l_diag
+    kkt.pr_diag[kkt.ind_ub] .-= kkt.u_lower ./ kkt.u_diag
+end
+
+function _set_aug_diagonal!(kkt::AbstractUnreducedKKTSystem)
+    kkt.pr_diag .= kkt.reg
+    kkt.l_lower_aug .= sqrt.(kkt.l_lower)
+    kkt.u_lower_aug .= sqrt.(kkt.u_lower)
 end
 
 # Robust restoration
@@ -53,6 +68,9 @@ function set_aug_RR!(kkt::AbstractKKTSystem, solver::MadNLPSolver, RR::RobustRes
     kkt.u_lower .= solver.zu_r
     kkt.l_diag  .= solver.xl_r .- solver.x_lr
     kkt.u_diag .= solver.x_ur .- solver.xu_r
+    
+    _set_aug_diagonal!(kkt)
+    
     return
 end
 
