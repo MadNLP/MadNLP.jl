@@ -42,7 +42,7 @@ mutable struct RFSolver{T} <: MadNLP.AbstractLinearSolver{T}
 end
 
 function RFSolver(
-    csc::CUSPARSE.CuSparseMatrixCSC{Float64};
+    csc::CUSPARSE.CuSparseMatrixCSC;
     opt=RFSolverOptions(),
     logger=MadNLP.MadNLPLogger(),
 )
@@ -50,8 +50,15 @@ function RFSolver(
     @assert n == m
 
     full,tril_to_full_view = MadNLP.get_tril_to_full(csc)
+
+    full = CUSPARSE.CuSparseMatrixCSR(
+        full.colPtr,
+        full.rowVal,
+        full.nzVal,
+        full.dims
+    )
     
-    return RFSolver{Float64}(
+    return RFSolver(
         nothing, csc, full, tril_to_full_view,
         opt, logger
     )
@@ -72,7 +79,7 @@ function MadNLP.factorize!(M::RFSolver)
     return M
 end
 
-function MadNLP.solve!(M::RFSolver{Float64}, x)
+function MadNLP.solve!(M::RFSolver{T}, x) where T
     CUSOLVERRF.rf_solve!(M.inner, x)
     
     # this is necessary to not distort the timing in MadNLP
@@ -85,6 +92,6 @@ MadNLP.input_type(::Type{RFSolver}) = :csc
 MadNLP.default_options(::Type{RFSolver}) = RFSolverOptions()
 MadNLP.is_inertia(M::RFSolver) = false
 MadNLP.improve!(M::RFSolver) = false
-MadNLP.is_supported(::Type{RFSolver},::Type{Float32}) = false
+MadNLP.is_supported(::Type{RFSolver},::Type{Float32}) = true
 MadNLP.is_supported(::Type{RFSolver},::Type{Float64}) = true
 MadNLP.introduce(M::RFSolver) = "cuSolverRF"

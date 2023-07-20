@@ -52,10 +52,6 @@ function tril_to_full!(dense::Matrix{T}) where T
     end
 end
 
-function coo_to_com(coo)
-    
-end
-
 function coo_to_csc(coo) 
     cscind = sparse(
         coo.I,
@@ -92,7 +88,7 @@ function transfer!(dest::SparseMatrixCSC, src::SparseMatrixCOO, map::Vector{Int}
 end
 
 function get_mapping(dest::SparseMatrixCSC{Tv1,Ti1}, src::SparseMatrixCOO{Tv2,Ti2}) where {Tv1,Tv2,Ti1,Ti2}
-    map = Vector{Int}(undef,nnz(src))
+    map = similar(src.V, Int, nnz(src))
     dest.nzval .= 1:nnz(dest)
     _get_coo_to_csc(src.I, src.J, dest, map)
     return map

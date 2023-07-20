@@ -513,16 +513,14 @@ function create_kkt_system(
         jac_sparsity_I,
         jac,
     )
-    
+
     jt_csc, jt_csc_map = coo_to_csc(jt_coo)
     hess_com, hess_csc_map = coo_to_csc(hess_raw)
-    
     aug_com, dptr, hptr, jptr = build_condensed_aug_symbolic(
         hess_com,
         jt_csc
-    )
-
-
+        )
+    
     cnt.linear_solver_time += @elapsed linear_solver = opt.linear_solver(aug_com; opt = opt_linear_solver)
 
     ext = get_sparse_condensed_ext(VT, hess_com, jptr, jt_csc_map, hess_csc_map)
@@ -623,31 +621,60 @@ function _sym_length(Jt)
     return len
 end
 
-@inbounds function build_condensed_aug_symbolic(H::SparseMatrixCSC{Tv,Ti}, Jt::SparseMatrixCSC{Tv,Ti}) where {Tv, Ti}
+function _build_condensed_aug_symbolic_hess(H, sym, sym2)
+    for i in 1:size(H,2)
+        for j in H.colptr[i]:H.colptr[i+1]-1
+            c = H.rowval[j]
+            sym[j] = (0,j,0)
+            sym2[j] = (c,i)
+        end
+    end
+end
+
+function _build_condensed_aug_symbolic_jt(Jt, sym, sym2)
+
+    cnt = 0
+    for i in 1:size(Jt,2)
+        for j in Jt.colptr[i]:Jt.colptr[i+1]-1
+            for k in j:Jt.colptr[i+1]-1
+                c1 = Jt.rowval[j]
+                c2 = Jt.rowval[k]
+                sym[cnt+=1] = (i,j,k)
+                sym2[cnt] = (c2,c1)
+            end
+        end
+    end
+end
+
+function getptr(array; by = (x,y)->x != y)
+    bitarray = similar(array, Bool, length(array)+1)
+    fill!(bitarray, true)
+    bitarray[2:end-1] .= by.(@view(array[1:end-1]),  @view(array[2:end]))
+    findall(bitarray)
+end
+
+nzval(H) = H.nzval
+ 
+@inbounds function build_condensed_aug_symbolic(H::AbstractSparseMatrix{Tv,Ti}, Jt) where {Tv, Ti}
     nnzjtsj = _sym_length(Jt)
     
-    sym = Vector{Tuple{Int,Int,Int}}(
-        undef,
+    sym = similar(nzval(H), Tuple{Int,Int,Int},
         size(H,2) + nnz(H) + nnzjtsj
     )
-    sym2 = Vector{Tuple{Int,Int}}(
-        undef,
+    sym2 = similar(nzval(H), Tuple{Int,Int},
         size(H,2) + nnz(H) + nnzjtsj
     )
-    dptr = Vector{Tuple{Ti,Ti}}(
-        undef,
+    dptr = similar(nzval(H), Tuple{Ti,Ti},
         size(H,2)
     )
-    hptr = Vector{Tuple{Ti,Ti}}(
-        undef,
+    hptr = similar(nzval(H), Tuple{Ti,Ti},
         nnz(H)
     )
-    jptr = Vector{Tuple{Ti,Tuple{Ti,Ti,Ti}}}(
-        undef,
+    jptr = similar(nzval(H), Tuple{Ti,Tuple{Ti,Ti,Ti}},
         nnzjtsj
     )
     colptr = fill!(
-        Vector{Ti}(undef,size(H,1)+1),
+        similar(nzval(H), Ti, size(H,1)+1),
         one(Tv)
     )
     rowval = Ti[]
@@ -665,71 +692,93 @@ end
         1:size(H,2)
     )
 
-    cnt = n
-    
-    for i in 1:size(H,2)
-        for j in H.colptr[i]:H.colptr[i+1]-1
-            c = H.rowval[j]
-            sym[cnt+=1] = (0,j,0)
-            sym2[cnt] = (c,i)
-        end
-    end
 
-    for i in 1:size(Jt,2)
-        for j in Jt.colptr[i]:Jt.colptr[i+1]-1
-            for k in j:Jt.colptr[i+1]-1
-                c1 = Jt.rowval[j]
-                c2 = Jt.rowval[k]
-                sym[cnt+=1] = (i,j,k)
-                sym2[cnt] = (c2,c1)
-            end
-        end
-    end
-    p = sortperm(sym2; by = ((i,j),) -> (j,i), alg=Base.Sort.MergeSort)
-    permute!(sym, p)
-    permute!(sym2, p)
-
-    a = (0,0)
-    cnt = 0
-    dcnt = 0
-    hcnt = 0
-    jcnt = 0
-    prevcol = 0
-    
-    for (new, tuple) in zip(sym2,sym)
-
-        if new != a
-            cnt += 1
-            
-            (row,col) = new
-            push!(rowval, row)
-            a = new
-            if prevcol != col
-                fill!(@view(colptr[prevcol+1:col]), cnt)
-                prevcol = col
-            end
-        end
-
-        if tuple[1] == -1
-            dptr[dcnt += 1] = (cnt, tuple[2])
-        elseif tuple[1] == 0
-            hptr[hcnt += 1] = (cnt, tuple[2])
-        else
-            jptr[jcnt += 1] = (cnt, tuple)
-        end
-    end
-
-    fill!(
-        @view(colptr[prevcol+1:end]),
-        cnt+1
+    _build_condensed_aug_symbolic_hess(
+        H,
+        @view(sym[n+1:n+nnz(H)]),
+        @view(sym2[n+1:n+nnz(H)])
+    )
+    _build_condensed_aug_symbolic_jt(
+        Jt,
+        @view(sym[n+nnz(H)+1:n+nnz(H) + nnzjtsj]),
+        @view(sym2[n+nnz(H)+1:n+nnz(H)+nnzjtsj])
     )
 
-    aug_com = SparseMatrixCSC{Tv,Ti}(
-        size(H)...,
-        colptr, rowval, zeros(cnt)
+    p = sortperm(sym2; by = ((i,j),) -> (j,i))
+    permute!(sym, p)
+    permute!(sym2, p)
+    
+    by(x,y) = x != y
+    
+    bitarray = similar(sym2, Bool, length(sym2))
+    fill!(bitarray, true)
+    bitarray[2:end] .= by.(@view(sym2[1:end-1]),  @view(sym2[2:end]))
+    guide = cumsum(bitarray)
+
+    b = findall(x->x[1] == -1, sym)
+    dptr = map((x,y)->(Int32(x),Int32(y[2])), @view(guide[b]), @view(sym[b]))
+
+    b = findall(x->x[1] == 0, sym)
+    hptr = map((x,y)->(Int32(x),Int32(y[2])), @view(guide[b]), @view(sym[b]))
+
+    b = findall(x->x[1] != -1 && x[1] != 0, sym)
+    jptr = map((x,y)->(Int32(x),y), @view(guide[b]), @view(sym[b]))
+
+    
+    ptr = findall(bitarray)
+    rowval = map(((row,col),)->Int32(row), @view(sym2[ptr]))
+    
+    by2(x,y) = x[2] != y[2]
+    bitarray[2:end] .= by2.(@view(sym2[1:end-1]),  @view(sym2[2:end]))
+    ptr2 = findall(bitarray)
+
+    first, last = _first_and_last_col(sym2,ptr2)
+
+    fill!(
+        @view(colptr[1:first]),
+        1
+    )
+
+    _set_colptr!(colptr, ptr2, sym2, guide)
+
+    fill!(
+        @view(colptr[last+1:end]),
+        length(ptr)+1
+    )
+
+    aug_com = _get_sparse_csc(
+        size(H),
+        colptr,
+        rowval,
+        similar(nzval(H), length(ptr))
     )
 
     return aug_com, dptr, hptr, jptr
+end
+
+function _get_sparse_csc(dims, colptr, rowval, nzval)
+    SparseMatrixCSC(
+        dims...,
+        colptr,
+        rowval,
+        nzval
+    )
+end
+
+function _first_and_last_col(sym2,ptr2)
+    first= sym2[1][2]
+    last = sym2[ptr2[end]][2]
+    return (first, last)    
+end
+
+function _set_colptr!(colptr, ptr2, sym2, guide)
+    for i in @view(ptr2[2:end])
+
+        (~,prevcol) = sym2[i-1]
+        (row,col) = sym2[i]
+        
+        fill!(@view(colptr[prevcol+1:col]), guide[i])
+    end
 end
 
 @inbounds function _build_condensed_aug_coord!(aug_com::SparseMatrixCSC{Tv,Ti}, pr_diag, H, Jt, diag_buffer, dptr, hptr, jptr) where {Tv, Ti}
