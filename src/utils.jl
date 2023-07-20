@@ -93,6 +93,7 @@ const SubVector{Tv,VT, VI} = SubArray{Tv, 1, VT, Tuple{VI}, false}
     eval_function_time::Float64 = 0.
     solver_time::Float64 = 0.
     total_time::Float64 = 0.
+    init_time::Float64 = 0.
 
     obj_cnt::Int = 0
     obj_grad_cnt::Int = 0

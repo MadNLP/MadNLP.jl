@@ -184,6 +184,8 @@ function MadNLPSolver(nlp::AbstractNLPModel{T,VT}; kwargs...) where {T, VT}
         opt.inertia_correction_method = is_inertia(kkt.linear_solver)::Bool ? INERTIA_BASED : INERTIA_FREE
     end
 
+    cnt.init_time = time() - cnt.start_time
+
     return MadNLPSolver(
         nlp, cb, kkt,
         opt, cnt, logger, 
