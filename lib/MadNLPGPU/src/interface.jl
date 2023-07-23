@@ -96,7 +96,7 @@ function MadNLP.get_sparse_condensed_ext(
     hess_com_ptrptr = MadNLP.getptr(hess_com_ptr, by = by)
     jt_csc_ptrptr = MadNLP.getptr(jt_csc_ptr, by = by)
 
-    diag_map = get_diagonal_mapping(hess_com.colPtr, hess_com.rowVal)
+    diag_map_to, diag_map_fr = get_diagonal_mapping(hess_com.colPtr, hess_com.rowVal)
     
     return (
         jptrptr = jptrptr,
@@ -104,7 +104,8 @@ function MadNLP.get_sparse_condensed_ext(
         hess_com_ptrptr = hess_com_ptrptr,
         jt_csc_ptr = jt_csc_ptr,
         jt_csc_ptrptr = jt_csc_ptrptr,
-        diag_map = diag_map,
+        diag_map_to = diag_map_to,
+        diag_map_fr = diag_map_fr,
     )
 end
 
@@ -176,13 +177,15 @@ function MadNLP.mul!(
     
     MadNLP.mul!(wx, kkt.hess_com , xx, alpha, beta)
     MadNLP.mul!(wx, kkt.hess_com', xx, alpha, one(T))
+    MadNLP.mul!(wx, kkt.jt_csc,  xz, alpha, beta)
     diag_operation(CUDABackend())(
         wx, kkt.hess_com.nzVal, xx, alpha,
-        kkt.ext.diag_map;
-        ndrange = length(kkt.ext.diag_map)
+        kkt.ext.diag_map_to,
+        kkt.ext.diag_map_fr;
+        ndrange = length(kkt.ext.diag_map_to)
     )
     synchronize(CUDABackend())
-    MadNLP.mul!(wx, kkt.jt_csc,  xz, alpha, beta)
+
     MadNLP.mul!(wz, kkt.jt_csc', xx, alpha, one(T))
     MadNLP.axpy!(-alpha, xz, ws)
     MadNLP.axpy!(-alpha, xs, wz)    
@@ -190,10 +193,10 @@ function MadNLP.mul!(
     MadNLP._kktmul!(w,x,kkt.reg,kkt.du_diag,kkt.l_lower,kkt.u_lower,kkt.l_diag,kkt.u_diag, alpha, beta)
     
 end
-
-@kernel function diag_operation(y,@Const(A),@Const(x),@Const(alpha),@Const(idx))
+@kernel function diag_operation(y,@Const(A),@Const(x),@Const(alpha),@Const(idx_to),@Const(idx_fr))
     i = @index(Global)
-    to,fr = idx[i]
+    to = idx_to[i]
+    fr = idx_fr[i]
     y[to] -= alpha * A[fr] * x[to]
 end
 
@@ -211,8 +214,9 @@ function MadNLP.mul_hess_blk!(
     MadNLP.mul!(wxx, kkt.hess_com', tx, one(T), one(T))
     diag_operation(CUDABackend())(
         wxx, kkt.hess_com.nzVal, tx, one(T),
-        kkt.ext.diag_map;
-        ndrange = length(kkt.ext.diag_map)
+        kkt.ext.diag_map_to,
+        kkt.ext.diag_map_fr;
+        ndrange = length(kkt.ext.diag_map_to)
     )
     synchronize(CUDABackend())
     
@@ -229,10 +233,11 @@ function get_diagonal_mapping(colptr, rowval)
     rows = rowval[ptrs]
     inds2 = findall(inds1 .== rows)
     
-    return map((x,y)->(x,y), rows[inds2], ptrs[inds2])
+    return rows[inds2], ptrs[inds2]
 end
 
 function MadNLP.initialize!(kkt::MadNLP.AbstractSparseKKTSystem{T,VT}) where {T, VT <: CuVector{T}}
+    fill!(kkt.reg, 1.0)
     fill!(kkt.pr_diag, 1.0)
     fill!(kkt.du_diag, 0.0)
     fill!(kkt.hess, 0.0)
@@ -286,6 +291,7 @@ function MadNLP._build_condensed_aug_symbolic_hess(H::CUDA.CUSPARSE.CuSparseMatr
         sym, sym2, H.colPtr, H.rowVal;
         ndrange = size(H,2)
     )
+    synchronize(CUDABackend())
 end
 
 @kernel function ker_build_condensed_aug_symbolic_hess(sym, sym2, @Const(colptr), @Const(rowval))
@@ -340,6 +346,7 @@ function MadNLP._set_colptr!(colptr::CuVector, ptr2, sym2, guide)
         guide;
         ndrange = length(ptr2)-1
     )
+    synchronize(CUDABackend())
 end
 
 

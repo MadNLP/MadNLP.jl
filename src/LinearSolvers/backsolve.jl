@@ -51,10 +51,10 @@ function solve_refine!(
     iter = 0
 
     while true
-        iterator.cnt.linear_solver_time += @elapsed solve!(iterator.kkt, w)  # TODO this includes some extra time. Ideally, LinearSolver should count the time
+        solve!(iterator.kkt, w)  # TODO this includes some extra time. Ideally, LinearSolver should count the time
         axpy!(1., full(w), full(x))
         copyto!(full(w), full(b))
-        
+
         mul!(w, iterator.kkt, x, -one(T), one(T))
 
         norm_w = norm(full(w), Inf)

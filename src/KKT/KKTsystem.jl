@@ -190,6 +190,7 @@ function hess_dense! end
 =#
 function initialize!(kkt::AbstractKKTSystem)
     fill!(kkt.reg, 1.0)
+    fill!(kkt.pr_diag, 1.0)
     fill!(kkt.du_diag, 0.0)
     fill!(kkt.hess, 0.0)
 end

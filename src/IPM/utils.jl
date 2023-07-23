@@ -15,19 +15,20 @@ end
 MadNLPExecutionStats(solver::MadNLPSolver) =MadNLPExecutionStats(
     solver.opt,
     solver.status,
-    primal(solver.x),
+    primal(solver.x)[1:get_nvar(solver.nlp)],
     solver.obj_val / solver.cb.obj_scale[],
     solver.c ./ solver.cb.con_scale,
     solver.inf_du,
     solver.inf_pr,
-    solver.y,
-    primal(solver.zl),
-    primal(solver.zu),
+    copy(solver.y),
+    copy(primal(solver.zl)),
+    copy(primal(solver.zu)),
     solver.cnt,
 )
 
 function update!(stats::MadNLPExecutionStats, solver::MadNLPSolver)
     stats.status = solver.status
+    stats.solution .= @view primal(solver.x)[1:get_nvar(solver.nlp)]
     stats.objective = solver.obj_val / solver.cb.obj_scale[]
     stats.constraints .= solver.c ./ solver.cb.con_scale .+ solver.rhs
     stats.constraints[solver.ind_ineq] .+= slack(solver.x)

@@ -36,6 +36,7 @@ mutable struct RFSolver{T} <: MadNLP.AbstractLinearSolver{T}
     tril::CUSPARSE.CuSparseMatrixCSC{T}
     full::CUSPARSE.CuSparseMatrixCSR{T}
     tril_to_full_view::CuSubVector{T}
+    dummy::CUDA.CuVector{T}
 
     opt::RFSolverOptions
     logger::MadNLP.MadNLPLogger
@@ -59,7 +60,7 @@ function RFSolver(
     )
     
     return RFSolver(
-        nothing, csc, full, tril_to_full_view,
+        nothing, csc, full, tril_to_full_view, similar(csc.nzVal,1),
         opt, logger
     )
 end
@@ -81,12 +82,12 @@ end
 
 function MadNLP.solve!(M::RFSolver{T}, x) where T
     CUSOLVERRF.rf_solve!(M.inner, x)
-    
     # this is necessary to not distort the timing in MadNLP
+    copyto!(M.dummy, M.dummy)
     synchronize(CUDABackend())
     # -----------------------------------------------------
     return x
-end
+end 
 
 MadNLP.input_type(::Type{RFSolver}) = :csc
 MadNLP.default_options(::Type{RFSolver}) = RFSolverOptions()
