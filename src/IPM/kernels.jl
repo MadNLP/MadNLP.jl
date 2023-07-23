@@ -224,12 +224,11 @@ end
 
 function set_initial_bounds!(xl::AbstractVector{T},xu,tol) where T
     map!(
-        x->x - max(one(T), abs(x)) .* tol,
-        xl, xl
-    )
-    map!(
-        x->x + max(one(T), abs(x)) .* tol,
-        xu, xu
+        (xl, xu) -> begin
+            a = max(one(T), abs(xl)) .* tol
+            (xu-xl) > a ? xl : xl - a
+        end,
+        xl, xl, xu
     )
 end
 
