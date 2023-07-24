@@ -301,15 +301,13 @@ function initialize!(
     con_buffer =cb.con_buffer
     grad_buffer =cb.grad_buffer
 
-    lcon = get_lcon(nlp)
-    ucon = get_ucon(nlp)
     
     x0   .= get_x0(nlp)
     y0   .= get_y0(nlp) 
     lvar .= get_lvar(nlp)
     uvar .= get_uvar(nlp)
-    lcon .= get_lcon(nlp) 
-    ucon .= get_ucon(nlp)
+    lcon = copy(get_lcon(nlp))
+    ucon = copy(get_ucon(nlp))
     
     _treat_fixed_variable_initialize!(fixed_handler, x0, lvar, uvar)
     _treat_equality_initialize!(cb.equality_handler, lcon, ucon, opt.tol)
@@ -359,8 +357,6 @@ function set_scaling!(
     x0= variable(x)
 
     nlp = cb.nlp
-    lcon = get_lcon(nlp)
-    ucon = get_ucon(nlp)
     obj_scale = cb.obj_scale
     con_scale = cb.con_scale
     jac_scale = cb.jac_scale    
@@ -394,8 +390,6 @@ function set_scaling!(
     x0= variable(x)
 
     nlp = cb.nlp
-    lcon = get_lcon(nlp)
-    ucon = get_ucon(nlp)
     obj_scale = cb.obj_scale
     con_scale = cb.con_scale
     con_buffer =cb.con_buffer
