@@ -55,7 +55,6 @@ function initialize!(solver::AbstractMadNLPSolver{T}) where T
     @trace(solver.logger,"Initializing constraint duals.")
     if !solver.opt.dual_initialized
         set_initial_rhs!(solver, solver.kkt)
-        n = size(solver.kkt.hess_com,1) 
         factorize_wrapper!(solver)
         solver.cnt.linear_solver_time += @elapsed begin
             is_solved = solve_refine!(

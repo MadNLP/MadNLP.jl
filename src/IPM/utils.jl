@@ -21,14 +21,17 @@ MadNLPExecutionStats(solver::MadNLPSolver) =MadNLPExecutionStats(
     solver.inf_du,
     solver.inf_pr,
     copy(solver.y),
-    copy(primal(solver.zl)),
-    copy(primal(solver.zu)),
+    primal(solver.zl)[1:get_nvar(solver.nlp)],
+    primal(solver.zu)[1:get_nvar(solver.nlp)],
     solver.cnt,
 )
 
 function update!(stats::MadNLPExecutionStats, solver::MadNLPSolver)
     stats.status = solver.status
     stats.solution .= @view(primal(solver.x)[1:get_nvar(solver.nlp)])
+    stats.multipliers .= solver.y
+    stats.multipliers_L .= @view(primal(solver.zl)[1:get_nvar(solver.nlp)])
+    stats.multipliers_U .= @view(primal(solver.zu)[1:get_nvar(solver.nlp)])
     # stats.solution .= min.(
     #     max.(
     #         @view(primal(solver.x)[1:get_nvar(solver.nlp)]),
