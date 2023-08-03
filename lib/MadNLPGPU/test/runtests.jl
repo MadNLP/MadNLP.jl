@@ -1,4 +1,4 @@
-using Test, MadNLP, MadNLPGPU, MadNLPTests
+using Test, CUDA, MadNLP, MadNLPGPU, MadNLPTests
 
 
 # Test DenseKKTSystem on GPU

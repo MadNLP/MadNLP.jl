@@ -1,5 +1,5 @@
 mutable struct LapackGPUSolver{T} <: AbstractLinearSolver{T}
-    dense::AbstractMatrix{T}
+    A::AbstractMatrix{T}
     fact::CuMatrix{T}
     rhs::CuVector{T}
     work::CuVector{T}
@@ -14,14 +14,14 @@ end
 
 
 function LapackGPUSolver(
-    dense::MT;
+    A::MT;
     option_dict::Dict{Symbol,Any}=Dict{Symbol,Any}(),
     opt=LapackOptions(),logger=MadNLPLogger(),
     kwargs...) where {T,MT <: AbstractMatrix{T}}
 
     set_options!(opt,option_dict,kwargs...)
-    fact = CuMatrix{T}(undef,size(dense))
-    rhs = CuVector{T}(undef,size(dense,1))
+    fact = CuMatrix{T}(undef,size(A))
+    rhs = CuVector{T}(undef,size(A,1))
     work  = CuVector{T}(undef, 1)
     lwork = Int32[1]
     work_host  = Vector{T}(undef, 1)
@@ -30,7 +30,7 @@ function LapackGPUSolver(
     etc = Dict{Symbol,Any}()
 
 
-    return LapackGPUSolver{T}(dense,fact,rhs,work,lwork,work_host,lwork_host,info,etc,opt,logger)
+    return LapackGPUSolver{T}(A,fact,rhs,work,lwork,work_host,lwork_host,info,etc,opt,logger)
 end
 
 function factorize!(M::LapackGPUSolver)
@@ -87,10 +87,10 @@ for (sytrf,sytrf_buffer,getrf,getrf_buffer,getrs,geqrf,geqrf_buffer,ormqr,ormqr_
     )
     @eval begin
         function factorize_bunchkaufman!(M::LapackGPUSolver{$typ})
-            haskey(M.etc,:ipiv) || (M.etc[:ipiv] = CuVector{Int32}(undef,size(M.dense,1)))
+            haskey(M.etc,:ipiv) || (M.etc[:ipiv] = CuVector{Int32}(undef,size(M.A,1)))
             haskey(M.etc,:ipiv64) || (M.etc[:ipiv64] = CuVector{Int64}(undef,length(M.etc[:ipiv])))
 
-            copyto!(M.fact,M.dense)
+            _copyto!(M.fact,M.A)
             CUSOLVER.$sytrf_buffer(
                 dense_handle(),Int32(size(M.fact,1)),M.fact,Int32(size(M.fact,2)),M.lwork)
             length(M.work) < M.lwork[] && resize!(M.work,Int(M.lwork[]))
@@ -128,8 +128,8 @@ for (sytrf,sytrf_buffer,getrf,getrf_buffer,getrs,geqrf,geqrf_buffer,ormqr,ormqr_
         end
 
         function factorize_lu!(M::LapackGPUSolver{$typ})
-            haskey(M.etc,:ipiv) || (M.etc[:ipiv] = CuVector{Int32}(undef,size(M.dense,1)))
-            copyto!(M.fact,M.dense)
+            haskey(M.etc,:ipiv) || (M.etc[:ipiv] = CuVector{Int32}(undef,size(M.A,1)))
+            _copyto!(M.fact,M.A)
             tril_to_full!(M.fact)
             CUSOLVER.$getrf_buffer(
                 dense_handle(),Int32(size(M.fact,1)),Int32(size(M.fact,2)),
@@ -152,9 +152,9 @@ for (sytrf,sytrf_buffer,getrf,getrf_buffer,getrs,geqrf,geqrf_buffer,ormqr,ormqr_
         end
 
         function factorize_qr!(M::LapackGPUSolver{$typ})
-            haskey(M.etc,:tau) || (M.etc[:tau] = CuVector{$typ}(undef,size(M.dense,1)))
+            haskey(M.etc,:tau) || (M.etc[:tau] = CuVector{$typ}(undef,size(M.A,1)))
             haskey(M.etc,:one) || (M.etc[:one] = ones($typ,1))
-            copyto!(M.fact,M.dense)
+            _copyto!(M.fact,M.A)
             tril_to_full!(M.fact)
             CUSOLVER.$geqrf_buffer(dense_handle(),Int32(size(M.fact,1)),Int32(size(M.fact,2)),M.fact,Int32(size(M.fact,2)),M.lwork)
             length(M.work) < M.lwork[] && resize!(M.work,Int(M.lwork[]))
@@ -176,7 +176,7 @@ for (sytrf,sytrf_buffer,getrf,getrf_buffer,getrs,geqrf,geqrf_buffer,ormqr,ormqr_
         end
 
         function factorize_cholesky!(M::LapackGPUSolver{$typ})
-            copyto!(M.fact,M.dense)
+            _copyto!(M.fact,M.A)
             CUSOLVER.$potrf_buffer(
                 dense_handle(),CUBLAS_FILL_MODE_LOWER,
                 Int32(size(M.fact,1)),M.fact,Int32(size(M.fact,2)),M.lwork)
@@ -216,3 +216,16 @@ MadNLP.default_options(::Type{LapackGPUSolver}) = LapackOptions()
 is_supported(::Type{LapackGPUSolver},::Type{Float32}) = true
 is_supported(::Type{LapackGPUSolver},::Type{Float64}) = true
 
+_copyto!(y,x) = copyto!(y,x)
+function _copyto!(y, x::CUSPARSE.CuSparseMatrixCSC{T}) where T
+    n = size(y,2)
+    fill!(y, zero(T))
+    kernel_copyto!(CUDABackend())(y, x.colPtr, x.rowVal, x.nzVal, ndrange=n)
+end
+@kernel function kernel_copyto!(y, @Const(colptr), @Const(rowval), @Const(nzval))
+    col = @index(Global)
+    @inbounds for ptr in colptr[col]:colptr[col+1]-1
+        row = rowval[ptr]
+        y[row,col] = nzval[ptr]
+    end
+end

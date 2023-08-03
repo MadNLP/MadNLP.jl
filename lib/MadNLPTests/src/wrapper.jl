@@ -64,7 +64,7 @@ function DenseWrapperModel(Arr, m::NLPModels.AbstractNLPModel)
             ucon = Arr(m.meta.ucon),
             nnzj = m.meta.nnzj,
             nnzh = m.meta.nnzh,
-            minimize = true
+            minimize = m.meta.minimize
         ),
         NLPModels.Counters()
     )
@@ -101,7 +101,7 @@ function SparseWrapperModel(Arr, m::NLPModels.AbstractNLPModel)
             ucon = Arr(m.meta.ucon),
             nnzj = m.meta.nnzj,
             nnzh = m.meta.nnzh,
-            minimize = true
+            minimize = m.meta.minimize
         ),
         NLPModels.Counters()
     )
@@ -172,11 +172,11 @@ function NLPModels.jac_coord!(
 end
 function NLPModels.hess_coord!(
     m::M,
-    x::V,
-    y::V,
-    hess::V;
+    x::AbstractVector,
+    y::AbstractVector,
+    hess::AbstractVector;
     obj_weight = one(eltype(x))
-    ) where {M <: SparseWrapperModel, V <: AbstractVector}
+    ) where {M <: SparseWrapperModel}
 
     copyto!(m.x, x)
     copyto!(m.y, y)

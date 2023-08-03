@@ -36,35 +36,15 @@ function MadNLP.transfer!(dest::CUDA.CUSPARSE.CuSparseMatrixCSC, src::MadNLP.Spa
     copyto!(view(dest.nzVal, map), src.V)
 end
 
-# function MadNLP.get_con_scale(jac_I,jac_buffer::VT, ncon, nnzj, max_gradient) where {T, VT <: CuVector{T}}
-#     con_scale_cpu, jac_scale_cpu = MadNLP.get_con_scale(
-#         Array(jac_I),
-#         Array(jac_buffer),
-#         ncon, nnzj,
-#         max_gradient
-#     )
-#     return CuArray(con_scale_cpu), CuArray(jac_scale_cpu)
-# end
-
-# function MadNLP.build_condensed_aug_symbolic(
-#     hess_com::CUDA.CUSPARSE.CuSparseMatrixCSC,
-#     jt_csc
-#     )
-#     aug_com, dptr, hptr, jptr = MadNLP.build_condensed_aug_symbolic(
-#         MadNLP.SparseMatrixCSC(hess_com),
-#         MadNLP.SparseMatrixCSC(jt_csc)
-#     )
-
-#     return CUDA.CUSPARSE.CuSparseMatrixCSC(aug_com), CuArray(dptr), CuArray(hptr), CuArray(jptr)
-# end
-
 function MadNLP.build_condensed_aug_coord!(kkt::MadNLP.SparseCondensedKKTSystem{T,VT,MT}) where {T, VT, MT <: CUDA.CUSPARSE.CuSparseMatrixCSC{T}}
     fill!(kkt.aug_com.nzVal, zero(T))
     _transfer!(CUDABackend())(kkt.aug_com.nzVal, kkt.hptr, kkt.hess_com.nzVal; ndrange = length(kkt.hptr))
     synchronize(CUDABackend())
     _transfer!(CUDABackend())(kkt.aug_com.nzVal, kkt.dptr, kkt.pr_diag; ndrange = length(kkt.dptr))
     synchronize(CUDABackend())
-    _jtsj!(CUDABackend())(kkt.aug_com.nzVal, kkt.jptr, kkt.ext.jptrptr, kkt.jt_csc.nzVal, kkt.diag_buffer; ndrange = length(kkt.ext.jptrptr)-1)
+    if length(kkt.ext.jptrptr) > 1 # otherwise error is thrown
+        _jtsj!(CUDABackend())(kkt.aug_com.nzVal, kkt.jptr, kkt.ext.jptrptr, kkt.jt_csc.nzVal, kkt.diag_buffer; ndrange = length(kkt.ext.jptrptr)-1)
+    end
     synchronize(CUDABackend())
 end
 
@@ -87,9 +67,16 @@ function MadNLP.get_sparse_condensed_ext(
     ::Type{VT},
     hess_com, jptr, jt_map, hess_map, 
     ) where {T, VT <: CuVector{T}}
+
+    hess_com_ptr = map((i,j)->(i,j), hess_map, 1:length(hess_map))
+    if length(hess_map) > 0 # otherwise error is thrown
+        sort!(hess_com_ptr)
+    end
     
-    hess_com_ptr = sort!(map((i,j)->(i,j), hess_map, 1:length(hess_map)))
-    jt_csc_ptr = sort!(map((i,j)->(i,j), jt_map, 1:length(jt_map)))
+    jt_csc_ptr = map((i,j)->(i,j), jt_map, 1:length(jt_map))
+    if length(jt_map) > 0 # otherwise error is thrown
+        sort!(jt_csc_ptr)
+    end
 
     by = (i,j) -> i[1] != j[1]
     jptrptr = MadNLP.getptr(jptr, by = by)
@@ -108,49 +95,6 @@ function MadNLP.get_sparse_condensed_ext(
         diag_map_fr = diag_map_fr,
     )
 end
-
-# function getptr(array)
-#     bitarray = similar(array,Bool,length(array)+1)
-#     kergetptr(CUDABackend())(bitarray,array; ndrange=length(array)+1)
-#     synchronize(CUDABackend())
-
-#     return findall(identity, bitarray)
-# end
-
-# @kernel function kergetptr(bitarray,@Const(array))
-#     I = @index(Global)
-#     if I == 1
-#         bitarray[I] = true
-#     elseif I == length(array)+1
-#         bitarray[I] = true
-#     else
-#         i0,j0 = array[I-1]
-#         i1,j1 = array[I]
-        
-#         if i0 != i1
-#             bitarray[I] = true
-#         else
-#             bitarray[I] = false
-#         end
-#     end
-# end
-
-
-# function getptr(arr)
-#     ptr = similar(arr, Int, length(arr)+1)
-#     prev = 0
-#     cnt = 0
-#     for i=1:length(arr)
-#         cur = arr[i][1]
-#         if prev != cur
-#             ptr[cnt += 1] = i
-#             prev = cur
-#         end
-#     end
-#     ptr[cnt+=1] = length(arr)+1
-    
-#     return resize!(ptr, cnt)
-# end
 
 function MadNLP.mul!(
     w::MadNLP.AbstractKKTVector{T,VT},
@@ -255,7 +199,9 @@ function MadNLP.compress_hessian!(kkt::MadNLP.AbstractSparseKKTSystem{T, VT, MT}
 end
 function MadNLP.compress_jacobian!(kkt::MadNLP.SparseCondensedKKTSystem{T, VT, MT}) where {T, VT, MT<:CUDA.CUSOLVER.CuSparseMatrixCSC{T, Int32}}
     fill!(kkt.jt_csc.nzVal, zero(T))
-    _transfer!(CUDABackend())(kkt.jt_csc.nzVal, kkt.ext.jt_csc_ptr, kkt.ext.jt_csc_ptrptr, kkt.jt_coo.V; ndrange = length(kkt.ext.jt_csc_ptrptr)-1)
+    if length(kkt.ext.jt_csc_ptrptr) > 1 # otherwise error is thrown
+        _transfer!(CUDABackend())(kkt.jt_csc.nzVal, kkt.ext.jt_csc_ptr, kkt.ext.jt_csc_ptrptr, kkt.jt_coo.V; ndrange = length(kkt.ext.jt_csc_ptrptr)-1)
+    end
     synchronize(CUDABackend())    
 end
 
@@ -314,18 +260,6 @@ function MadNLP._build_condensed_aug_symbolic_jt(Jt::CUDA.CUSPARSE.CuSparseMatri
 
     copyto!(sym, sym_cpu)
     copyto!(sym2, sym2_cpu)
-    
-    # cnt = 0
-    # for i in 1:size(Jt,2)
-    #     for j in Jt.colPtr[i]:Jt.colPtr[i+1]-1
-    #         for k in j:Jt.colPtr[i+1]-1
-    #             c1 = Jt.rowVal[j]
-    #             c2 = Jt.rowVal[k]
-    #             sym[cnt+=1] = (i,j,k)
-    #             sym2[cnt] = (c2,c1)
-    #         end
-    #     end
-    # end
 end
 
 function MadNLP._first_and_last_col(sym2::CuVector,ptr2)
@@ -339,6 +273,10 @@ end
 MadNLP.nzval(H::CUDA.CUSPARSE.CuSparseMatrixCSC) = H.nzVal
 
 function MadNLP._set_colptr!(colptr::CuVector, ptr2, sym2, guide)
+    if length(ptr2) == 1 # otherwise error is thrown
+        return
+    end
+    
     ker_set_colptr(CUDABackend())(
         colptr,
         sym2,
@@ -347,6 +285,7 @@ function MadNLP._set_colptr!(colptr::CuVector, ptr2, sym2, guide)
         ndrange = length(ptr2)-1
     )
     synchronize(CUDABackend())
+    return
 end
 
 
@@ -369,4 +308,22 @@ function MadNLP._get_sparse_csc(dims, colptr::CuVector, rowval, nzval)
         nzval,
         dims,
     )
+end
+function MadNLP.tril_to_full!(dense::CuMatrix{T}) where T
+    n = size(dense,1)
+    _tril_to_full!(CUDABackend())(dense; ndrange = div(n^2 + n,2))
+end
+
+@kernel function _tril_to_full!(dense)
+    idx = @index(Global)
+    n = size(dense,1)
+    i,j = getij(idx,n)
+    
+    @inbounds dense[j,i] = dense[i,j]
+end
+
+function getij(idx,n) 
+    j = ceil(Int,((2n+1)-sqrt((2n+1)^2-8*idx))/2)
+    i = idx-div((j-1)*(2n-j),2)
+    return (i,j)
 end

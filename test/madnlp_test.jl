@@ -47,15 +47,31 @@ testset = [
         ()->MadNLP.Optimizer(
             fixed_variable_treatment=MadNLP.RelaxBound,
             print_level=MadNLP.ERROR),
-        [],
-        true
+        []
     ],
     [
         "Option: AUGMENTED KKT SYSTEM",
         ()->MadNLP.Optimizer(
             kkt_system=MadNLP.SparseUnreducedKKTSystem,
             print_level=MadNLP.ERROR),
-        ["infeasible","eigmina"] # numerical errors
+        []
+    ],
+    [
+        "Option: SPARSE CONDENSED KKT SYSTEM",
+        ()->MadNLP.Optimizer(
+            kkt_system=MadNLP.SparseCondensedKKTSystem,
+            equality_treatment = MadNLP.RelaxEquality,
+            fixed_variable_treatment = MadNLP.RelaxBound,
+            tol = 1e-4,
+            print_level=MadNLP.ERROR),
+        []
+    ],
+    [
+        "Option: INERTIA_FREE",
+        ()->MadNLP.Optimizer(
+            inertia_correction_method=MadNLP.INERTIA_FREE,
+            print_level=MadNLP.ERROR),
+        []
     ],
     [
         "Option: INERTIA_FREE & AUGMENTED KKT SYSTEM",
@@ -63,12 +79,16 @@ testset = [
             inertia_correction_method=MadNLP.INERTIA_FREE,
             kkt_system=MadNLP.SparseUnreducedKKTSystem,
             print_level=MadNLP.ERROR),
-        ["infeasible","eigmina"] # numerical errors
+        []
     ],
     [
-        "Option: INERTIA_FREE",
+        "Option: INERTIA_FREE & SPARSE CONDENSED KKT SYSTEM",
         ()->MadNLP.Optimizer(
             inertia_correction_method=MadNLP.INERTIA_FREE,
+            kkt_system=MadNLP.SparseCondensedKKTSystem,
+            equality_treatment = MadNLP.RelaxEquality,
+            fixed_variable_treatment = MadNLP.RelaxBound,
+            tol = 1e-4,
             print_level=MadNLP.ERROR),
         []
     ],

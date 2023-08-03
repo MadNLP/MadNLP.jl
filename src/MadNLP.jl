@@ -1,6 +1,3 @@
-# MadNLP.jl
-# Created by Sungho Shin (sungho.shin@wisc.edu)
-
 module MadNLP
 
 import Pkg.TOML: parsefile
@@ -30,7 +27,6 @@ include("enums.jl")
 include("utils.jl")
 include("matrixtools.jl")
 include("nlpmodels.jl")
-include("wrapper.jl")
 include("quasi_newton.jl")
 include(joinpath("KKT", "KKTsystem.jl"))
 include(joinpath("LinearSolvers","linearsolvers.jl"))
