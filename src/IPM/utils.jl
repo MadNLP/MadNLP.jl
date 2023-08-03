@@ -9,6 +9,7 @@ mutable struct MadNLPExecutionStats{T, VT} <: AbstractExecutionStats
     multipliers::VT
     multipliers_L::VT
     multipliers_U::VT
+    iter::Int
     counters::MadNLPCounters
 end
 
@@ -23,6 +24,7 @@ MadNLPExecutionStats(solver::MadNLPSolver) =MadNLPExecutionStats(
     copy(solver.y),
     primal(solver.zl)[1:get_nvar(solver.nlp)],
     primal(solver.zu)[1:get_nvar(solver.nlp)],
+    0,
     solver.cnt,
 )
 
@@ -45,6 +47,7 @@ function update!(stats::MadNLPExecutionStats, solver::MadNLPSolver)
     stats.dual_feas = solver.inf_du
     stats.primal_feas = solver.inf_pr
     update_z!(solver.cb, stats.multipliers_L, stats.multipliers_U, solver.jacl)
+    stats.iter = solver.cnt.k
     return stats
 end
 

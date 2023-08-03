@@ -1,12 +1,12 @@
 include("config.jl")
-Pkg.add(PackageSpec(name="CUTEst",rev="main")) # will be removed once the new CUTEst version is released
 
 @everywhere using CUTEst
 
 if SOLVER == "master" || SOLVER == "current"
     @everywhere begin
         using MadNLP, MadNLPHSL
-        solver = nlp -> madnlp(nlp,linear_solver=MadNLPMa57,max_wall_time=900., print_level=PRINT_LEVEL)
+        LinSol = @isdefined(MadNLPMa57) ? MadNLPMa57 : Ma57Solver
+        solver = nlp -> madnlp(nlp,linear_solver=LinSol,max_wall_time=900., print_level=PRINT_LEVEL)
         function get_status(code::MadNLP.Status)
             if code == MadNLP.SOLVE_SUCCEEDED
                 return 1
