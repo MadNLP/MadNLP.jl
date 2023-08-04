@@ -2,8 +2,11 @@ function solve_refine_wrapper!(d, solver, p, w)
     if solve_refine!(d, solver.iterator, p, w)
         return true
     else
-        improve!(solver.kkt.linear_solver)
-        return solve_refine!(d, solver.iterator, p, w)
+        if improve!(solver.kkt.linear_solver)
+            return solve_refine!(d, solver.iterator, p, w)
+        else
+            return false
+        end
     end
 end
 function factorize_wrapper!(solver::MadNLPSolver)

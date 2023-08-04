@@ -80,10 +80,6 @@ function solve_refine!(
         ),
     )
 
-    if residual_ratio < iterator.opt.acceptable_tol
-        return true
-    else
-        return false
-    end
+    return residual_ratio < iterator.opt.acceptable_tol
 end
 
