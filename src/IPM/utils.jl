@@ -74,7 +74,7 @@ function get_vars_info(solver)
     num_llb_vars = length(solver.ind_llb)
     
     # TODO make this non-allocating
-    num_lu_vars = sum((x_lb .==-Inf) .& (x_ub .== Inf)) - num_fixed
+    num_lu_vars = sum((x_lb .!=-Inf) .& (x_ub .!= Inf)) - num_fixed
     num_uub_vars = length(solver.ind_uub)
     return (
         n_free=num_var,
@@ -94,8 +94,8 @@ function get_cons_info(solver)
     # TODO make this non-allocating
     num_eq_cons = sum(g_lb .== g_ub)
     num_ineq_cons = length(g_lb) - num_eq_cons
-    num_le_cons = sum(g_lb .== -Inf)
-    num_ue_cons = sum(g_ub .==  Inf)
+    num_le_cons = sum((g_lb .!= -Inf) .& (g_ub .==  Inf))
+    num_ue_cons = sum((g_ub .!=  Inf) .& (g_lb .== -Inf))
     num_lu_cons = num_ineq_cons - num_le_cons - num_ue_cons
                            
     return (
