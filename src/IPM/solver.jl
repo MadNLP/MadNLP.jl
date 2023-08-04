@@ -57,8 +57,8 @@ function initialize!(solver::AbstractMadNLPSolver{T}) where T
         set_initial_rhs!(solver, solver.kkt)
         factorize_wrapper!(solver)
         solver.cnt.linear_solver_time += @elapsed begin
-            is_solved = solve_refine!(
-                solver.d, solver.iterator, solver.p, solver._w5
+            is_solved = solve_refine_wrapper!(
+                solver.d, solver, solver.p, solver._w5
             )
         end
         if !is_solved || (norm(dual(solver.d), Inf) > solver.opt.constr_mult_init_max)
@@ -346,6 +346,7 @@ function regular!(solver::AbstractMadNLPSolver{T}) where T
             primal(solver.x),
             solver.mu,solver.opt.kappa_sigma,
         )
+        
         eval_grad_f_wrapper!(solver, solver.f,solver.x)
 
         if !switching_condition || !armijo_condition
@@ -465,8 +466,8 @@ function restore!(solver::AbstractMadNLPSolver{T}) where T
         factorize_wrapper!(solver)
         # TODO check this
         solver.cnt.linear_solver_time += @elapsed begin
-            solve_refine!(
-                solver.d, solver.iterator, solver.p, solver._w5
+            solve_refine_wrapper!(
+                solver.d, solver, solver.p, solver._w5
             )
         end
 
@@ -537,8 +538,8 @@ function robust!(solver::MadNLPSolver{T}) where T
         set_aug_rhs_RR!(solver, solver.kkt, RR, solver.opt.rho)
         factorize_wrapper!(solver)
         solver.cnt.linear_solver_time += @elapsed begin
-            solve_refine!(
-                solver.d, solver.iterator, solver.p, solver._w5
+            solve_refine_wrapper!(
+                solver.d, solver, solver.p, solver._w5
             )
         end
         finish_aug_solve_RR!(
@@ -671,8 +672,8 @@ function robust!(solver::MadNLPSolver{T}) where T
 
             factorize_wrapper!(solver)
             solver.cnt.linear_solver_time += @elapsed begin
-                solve_refine!(
-                    solver.d, solver.iterator, solver.p, solver._w5
+                solve_refine_wrapper!(
+                    solver.d, solver, solver.p, solver._w5
                 )
             end
             if norm(dual(solver.d), Inf)>solver.opt.constr_mult_init_max
@@ -705,8 +706,8 @@ function inertia_based_reg(solver::MadNLPSolver{T}) where T
 
     num_pos,num_zero,num_neg = inertia(solver.kkt.linear_solver)
     solver.cnt.linear_solver_time += @elapsed begin
-        solve_status = num_zero!= 0 ? false : solve_refine!(
-            solver.d, solver.iterator, solver.p, solver._w5,
+        solve_status = num_zero!= 0 ? false : solve_refine_wrapper!(
+            solver.d, solver, solver.p, solver._w5,
         )
     end
     while !is_inertia_correct(solver.kkt, num_pos, num_zero, num_neg) || !solve_status
@@ -730,8 +731,8 @@ function inertia_based_reg(solver::MadNLPSolver{T}) where T
         factorize_wrapper!(solver)
         num_pos,num_zero,num_neg = inertia(solver.kkt.linear_solver)
         solver.cnt.linear_solver_time += @elapsed begin
-            solve_status = num_zero!= 0 ? false : solve_refine!(
-            solver.d, solver.iterator, solver.p, solver._w5
+            solve_status = num_zero!= 0 ? false : solve_refine_wrapper!(
+            solver.d, solver, solver.p, solver._w5
             )
         end
         n_trial += 1
@@ -760,10 +761,10 @@ function inertia_free_reg(solver::MadNLPSolver{T}) where T
     factorize_wrapper!(solver)
 
     solver.cnt.linear_solver_time += @elapsed begin
-        solve_status = solve_refine!(
-            d0, solver.iterator, p0, solver._w3,
-        ) && solve_refine!(
-            solver.d, solver.iterator, solver.p, solver._w5,
+        solve_status = solve_refine_wrapper!(
+            d0, solver, p0, solver._w3,
+        ) && solve_refine_wrapper!(
+            solver.d, solver, solver.p, solver._w5,
         )
     end
     copyto!(t,dx)
@@ -789,10 +790,10 @@ function inertia_free_reg(solver::MadNLPSolver{T}) where T
 
         factorize_wrapper!(solver)
         solver.cnt.linear_solver_time += @elapsed begin
-            solve_status = solve_refine!(
-                d0, solver.iterator, p0, solver._w5
-            ) && solve_refine!(
-                solver.d, solver.iterator, solver.p, solver._w6
+            solve_status = solve_refine_wrapper!(
+                d0, solver, p0, solver._w5
+            ) && solve_refine_wrapper!(
+                solver.d, solver, solver.p, solver._w6
             )
         end
         copyto!(t,dx)
@@ -814,8 +815,8 @@ function inertia_ignore_reg(solver::MadNLPSolver{T}) where T
     factorize_wrapper!(solver)
 
     solver.cnt.linear_solver_time += @elapsed begin
-        solve_status = solve_refine!(
-            solver.d, solver.iterator, solver.p, solver._w5,
+        solve_status = solve_refine_wrapper!(
+            solver.d, solver, solver.p, solver._w5,
         )
     end
     while !solve_status
@@ -838,8 +839,8 @@ function inertia_ignore_reg(solver::MadNLPSolver{T}) where T
 
         factorize_wrapper!(solver)
         solver.cnt.linear_solver_time += @elapsed begin
-            solve_status = solve_refine!(
-                solver.d, solver.iterator, solver.p, solver._w5
+            solve_status = solve_refine_wrapper!(
+                solver.d, solver, solver.p, solver._w5
             )
         end
         n_trial += 1
@@ -871,8 +872,8 @@ function second_order_correction(solver::AbstractMadNLPSolver,alpha_max,theta,va
             solver.ind_llb,solver.ind_uub,solver.mu,solver.opt.kappa_d,
         )
         solver.cnt.linear_solver_time += @elapsed begin
-            solve_refine!(
-                solver._w1, solver.iterator, solver.p, solver._w5
+            solve_refine_wrapper!(
+                solver._w1, solver, solver.p, solver._w5
             )
         end
         alpha_soc = get_alpha_max(

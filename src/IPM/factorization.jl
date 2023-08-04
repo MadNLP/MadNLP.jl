@@ -1,3 +1,11 @@
+function solve_refine_wrapper!(d, solver, p, w)
+    if solve_refine!(d, solver.iterator, p, w)
+        return true
+    else
+        improve!(solver.kkt.linear_solver)
+        return solve_refine!(d, solver.iterator, p, w)
+    end
+end
 function factorize_wrapper!(solver::MadNLPSolver)
     @trace(solver.logger,"Factorization started.")
     build_kkt!(solver.kkt)
