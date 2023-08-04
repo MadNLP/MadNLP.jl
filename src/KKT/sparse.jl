@@ -219,8 +219,7 @@ function create_kkt_system(
     nlb = length(ind_cons.ind_lb)
     nub = length(ind_cons.ind_ub)
 
-    # TODO make this work on GPU
-    # force_lower_triangular!(hess_sparsity_I,hess_sparsity_J)
+    force_lower_triangular!(hess_sparsity_I,hess_sparsity_J)
 
     ind_ineq = ind_cons.ind_ineq
     
@@ -335,8 +334,7 @@ function create_kkt_system(
     hess_sparsity_J = create_array(nlp, Int32, nlp.nnzh)
     _hess_sparsity_wrapper!(nlp,hess_sparsity_I,hess_sparsity_J)
 
-    # TODO make this work on GPU
-    # force_lower_triangular!(hess_sparsity_I,hess_sparsity_J)
+    force_lower_triangular!(hess_sparsity_I,hess_sparsity_J)
     
     n_slack = length(ind_ineq)
     n_jac = length(jac_sparsity_I)
@@ -482,8 +480,7 @@ function create_kkt_system(
     quasi_newton = create_quasi_newton(opt.hessian_approximation, nlp, n)
     hess_sparsity_I, hess_sparsity_J = build_hessian_structure(nlp, opt.hessian_approximation)
 
-    # TODO make this work on GPU
-    # force_lower_triangular!(hess_sparsity_I,hess_sparsity_J)
+    force_lower_triangular!(hess_sparsity_I,hess_sparsity_J)
 
     n_jac = length(jac_sparsity_I)
     n_hess = length(hess_sparsity_I)

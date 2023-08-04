@@ -327,3 +327,21 @@ function getij(idx,n)
     i = idx-div((j-1)*(2n-j),2)
     return (i,j)
 end
+
+
+
+function MadNLP.force_lower_triangular!(I::CuVector{T},J) where T
+    _force_lower_triangular!(CUDABackend())(I,J; ndrange=length(I))
+end
+
+@kernel function _force_lower_triangular!(I,J)
+    i = @index(Global)
+    
+    @inbounds if J[i] > I[i]
+        tmp=J[i]
+        J[i]=I[i]
+        I[i]=tmp
+    end
+end
+
+
