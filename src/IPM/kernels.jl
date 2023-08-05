@@ -342,7 +342,7 @@ end
 
 # temporarily commented out
 function get_inf_du(f::Vector{T}, zl, zu, jacl, sd) where T
-    inf_du = 0.0
+    inf_du = zero(T)
     @inbounds @simd for i=1:length(f)
         inf_du = max(inf_du,abs(f[i]-zl[i]+zu[i]+jacl[i]))
     end
@@ -354,7 +354,7 @@ end
 
 # temporarily commented out
 function get_inf_compl(x_lr::SubVector{T,Vector{T},VI}, xl_r, zl_r, xu_r, x_ur, zu_r, mu, sc) where {T, VI}
-    inf_compl = 0.0
+    inf_compl = zero(T)
     @inbounds @simd for i=1:length(x_lr)
         inf_compl = max(inf_compl,abs((x_lr[i]-xl_r[i])*zl_r[i]-mu))
     end
@@ -382,7 +382,7 @@ end
 
 # temporarily commented out
 function get_varphi_d(f::Vector{T}, x, xl, xu, dx, mu) where T
-    varphi_d = 0.0
+    varphi_d = zero(T)
     @inbounds @simd for i=1:length(f)
         varphi_d += (f[i] - mu/(x[i]-xl[i]) + mu/(xu[i]-x[i])) * dx[i]
     end
@@ -399,7 +399,7 @@ end
 
 # temporarily commented out
 function get_alpha_max(x::Vector{T}, xl, xu, dx, tau) where T
-    alpha_max = 1.0
+    alpha_max = one(T)
     @inbounds @simd for i=1:length(x)
         dx[i]<0 && (alpha_max=min(alpha_max,(-x[i]+xl[i])*tau/dx[i]))
         dx[i]>0 && (alpha_max=min(alpha_max,(-x[i]+xu[i])*tau/dx[i]))
@@ -427,7 +427,7 @@ end
 
 # temporarily commented out
 function get_alpha_z(zl_r::SubVector{T,Vector{T},VI}, zu_r, dzl, dzu, tau) where {T, VI}
-    alpha_z = 1.0
+    alpha_z = one(T)
     @inbounds @simd for i=1:length(zl_r)
         dzl[i] < 0 && (alpha_z=min(alpha_z,-zl_r[i]*tau/dzl[i]))
      end
@@ -472,7 +472,7 @@ end
 @inline get_theta(c) = norm(c, 1)
 
 function get_theta_R(c::Vector{T}, p, n) where T
-    theta_R = 0.0
+    theta_R = zero(T)
     @inbounds @simd for i=1:length(c)
         theta_R += abs(c[i]-p[i]+n[i])
     end
@@ -488,7 +488,7 @@ function get_theta_R(c::VT, p, n) where {T, VT <: AbstractVector{T}}
 end
 
 function get_inf_pr_R(c::Vector{T}, p, n) where T
-    inf_pr_R = 0.0
+    inf_pr_R = zero(T)
     @inbounds @simd for i=1:length(c)
         inf_pr_R = max(inf_pr_R,abs(c[i]-p[i]+n[i]))
     end
@@ -504,7 +504,7 @@ function get_inf_pr_R(c::VT, p, n) where {T, VT <: AbstractVector{T}}
 end
 
 function get_inf_du_R(f_R::Vector{T}, l, zl, zu, jacl, zp, zn, rho, sd) where T
-    inf_du_R = 0.0
+    inf_du_R = zero(T)
     @inbounds @simd for i=1:length(zl)
         inf_du_R = max(inf_du_R,abs(f_R[i]-zl[i]+zu[i]+jacl[i]))
     end
@@ -544,7 +544,7 @@ function get_inf_compl_R(
     x_lr::SubVector{T,Vector{T},VI}, xl_r, zl_r, xu_r, x_ur, zu_r, pp, zp, nn, zn, mu_R, sc
     ) where {T, VI}
     
-    inf_compl_R = 0.0
+    inf_compl_R = zero(T)
     @inbounds @simd for i=1:length(x_lr)
         inf_compl_R = max(inf_compl_R,abs((x_lr[i]-xl_r[i])*zl_r[i]-mu_R))
     end
@@ -592,7 +592,7 @@ function get_inf_compl_R(
 end
 
 function get_alpha_max_R(x::Vector{T}, xl, xu, dx, pp, dpp, nn, dnn, tau_R) where T
-    alpha_max_R = 1.0
+    alpha_max_R = one(T)
     @inbounds @simd for i=1:length(x)
         dx[i]<0 && (alpha_max_R=min(alpha_max_R,(-x[i]+xl[i])*tau_R/dx[i]))
         dx[i]>0 && (alpha_max_R=min(alpha_max_R,(-x[i]+xu[i])*tau_R/dx[i]))
@@ -646,7 +646,7 @@ function get_alpha_z_R(
     zl_r::SubVector{T,Vector{T},VI}, zu_r, dzl, dzu, zp, dzp, zn, dzn, tau_R
     ) where {T, VI}
     
-    alpha_z_R = 1.0
+    alpha_z_R = one(T)
     @inbounds @simd for i=1:length(zl_r)
         dzl[i]<0 && (alpha_z_R=min(alpha_z_R,-zl_r[i]*tau_R/dzl[i]))
     end
@@ -761,7 +761,7 @@ end
 
 
 function get_F(c::Vector{T}, f, zl, zu, jacl, x_lr, xl_r, zl_r, xu_r, x_ur, zu_r, mu) where T
-    F = 0.0
+    F = zero(T)
     @inbounds @simd for i=1:length(c)
         F += abs(c[i])
     end
@@ -810,7 +810,7 @@ end
 
 
 function get_varphi_d_R(f_R::Vector{T}, x, xl, xu, dx, pp, nn, dpp, dnn, mu_R, rho) where T
-    varphi_d = 0.0
+    varphi_d = zero(T)
     @inbounds @simd for i=1:length(x)
         varphi_d += (f_R[i] - mu_R/(x[i]-xl[i]) + mu_R/(xu[i]-x[i])) * dx[i]
     end
@@ -897,18 +897,18 @@ end
 
 # temporarily commented out
 function get_rel_search_norm(x::Vector{T}, dx) where T
-    rel_search_norm = 0.0
+    rel_search_norm = zero(T)
     @inbounds @simd for i=1:length(x)
         rel_search_norm = max(
             rel_search_norm,
-            abs(dx[i]) / (1.0 + abs(x[i])),
+            abs(dx[i]) / (one(T) + abs(x[i])),
         )
     end
     return rel_search_norm
 end
-function get_rel_search_norm(x, dx)
+function get_rel_search_norm(x::AbstractVector{T}, dx) where T
     return mapreduce(
-        (x,dx) -> abs(dx) / (1.0 + abs(x)),
+        (x,dx) -> abs(dx) / (one(T) + abs(x)),
         max,
         x, dx
     )

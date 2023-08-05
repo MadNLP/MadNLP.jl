@@ -78,7 +78,7 @@ function initialize!(solver::AbstractMadNLPSolver{T}) where T
     solver.theta_min = 1e-4*max(1,theta)
     solver.mu = solver.opt.mu_init
     solver.tau = max(solver.opt.tau_min,1-solver.opt.mu_init)
-    solver.filter = [(solver.theta_max,-Inf)]
+    push!(solver.filter, (solver.theta_max,-Inf))
 
     return REGULAR
 end
@@ -98,7 +98,8 @@ function reinitialize!(solver::AbstractMadNLPSolver)
     solver.theta_min=1e-4*max(1,theta)
     solver.mu=solver.opt.mu_init
     solver.tau=max(solver.opt.tau_min,1-solver.opt.mu_init)
-    solver.filter = [(solver.theta_max,-Inf)]
+    empty!(solver.filter)
+    push!(solver.filter, (solver.theta_max,-Inf))
 
     return REGULAR
 end
@@ -242,9 +243,6 @@ function regular!(solver::AbstractMadNLPSolver{T}) where T
 
         set_aug_diagonal!(solver.kkt,solver)
         set_aug_rhs!(solver, solver.kkt, solver.c)
-        if solver.opt.inertia_correction_method == INERTIA_FREE
-            set_aug_rhs_ifr!(solver, solver.kkt)
-        end
         dual_inf_perturbation!(primal(solver.p),solver.ind_llb,solver.ind_uub,solver.mu,solver.opt.kappa_d)
 
 
@@ -755,6 +753,7 @@ function inertia_free_reg(solver::MadNLPSolver{T}) where T
     wx= primal(solver._w4)
     g = full(solver.x_trial) # just to avoid new allocation
 
+    set_aug_rhs_ifr!(solver, solver.kkt)
     fill!(dual(solver._w3), 0)
     set_g_ifr!(solver,g)
 
