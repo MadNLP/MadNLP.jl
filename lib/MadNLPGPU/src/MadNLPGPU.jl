@@ -41,7 +41,7 @@ function MadNLP.MadNLPOptions(nlp::AbstractNLPModel{T,VT}) where {T, VT <: CuVec
     is_dense_callback =
         hasmethod(MadNLP.jac_dense!, Tuple{typeof(nlp), AbstractVector, AbstractMatrix}) &&
         hasmethod(MadNLP.hess_dense!, Tuple{typeof(nlp), AbstractVector, AbstractVector, AbstractMatrix})
-    
+
     callback = is_dense_callback ? MadNLP.DenseCallback : MadNLP.SparseCallback
 
     # if dense callback is used, we use dense condensed kkt system
@@ -49,13 +49,13 @@ function MadNLP.MadNLPOptions(nlp::AbstractNLPModel{T,VT}) where {T, VT <: CuVec
 
     # if dense kkt system, we use a dense linear solver
     linear_solver = is_dense_callback ? LapackGPUSolver : RFSolver
-    
+
     equality_treatment = is_dense_callback ? MadNLP.EnforceEquality : MadNLP.RelaxEquality
 
     fixed_variable_treatment = is_dense_callback ? MadNLP.MakeParameter : MadNLP.RelaxBound
 
     tol = MadNLP.get_tolerance(T,kkt_system)
-    
+
     return MadNLP.MadNLPOptions(
         callback = callback,
         kkt_system = kkt_system,
