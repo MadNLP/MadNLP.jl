@@ -268,11 +268,11 @@ function set_initial_rhs!(solver::MadNLPSolver{T}, kkt::AbstractKKTSystem) where
 end
 
 # Set ifr
-function set_aug_rhs_ifr!(solver::MadNLPSolver{T}, kkt::AbstractKKTSystem) where T
-    fill!(primal(solver._w1), zero(T))
-    fill!(dual_lb(solver._w1), zero(T))
-    fill!(dual_ub(solver._w1), zero(T))
-    wy = dual(solver._w1)
+function set_aug_rhs_ifr!(solver::MadNLPSolver{T}, kkt::AbstractKKTSystem, p0) where T
+    fill!(primal(p0), zero(T))
+    fill!(dual_lb(p0), zero(T))
+    fill!(dual_ub(p0), zero(T))
+    wy = dual(p0)
     wy .= .- solver.c
     return
 end

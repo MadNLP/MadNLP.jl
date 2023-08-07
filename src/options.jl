@@ -51,7 +51,7 @@ end
 
     # initialization options
     dual_initialized::Bool = false
-    inertia_correction_method::InertiaCorrectionMethod = INERTIA_AUTO
+    inertia_correction_method::Type = InertiaAuto
     constr_mult_init_max::Float64 = 1e3
     bound_push::Float64 = 1e-2
     bound_fac::Float64 = 1e-2

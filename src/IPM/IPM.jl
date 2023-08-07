@@ -4,6 +4,7 @@
 abstract type AbstractMadNLPSolver{T} end
 
 include("restoration.jl")
+include("inertiacorrector.jl")
 
 mutable struct MadNLPSolver{
     T,
@@ -13,6 +14,7 @@ mutable struct MadNLPSolver{
     Model <: AbstractNLPModel{T,VT},
     CB <: AbstractCallback{T},
     Iterator <: AbstractIterator{T},
+    IC <: AbstractInertiaCorrector,
     KKTVec <: AbstractKKTVector{T, VT}
     } <: AbstractMadNLPSolver{T}
     
@@ -96,6 +98,7 @@ mutable struct MadNLPSolver{
 
     filter::Vector{Tuple{T,T}}
 
+    inertia_corrector::IC
     RR::Union{Nothing,RobustRestorer{T}}
     status::Status
     output::Dict
@@ -180,10 +183,18 @@ function MadNLPSolver(nlp::AbstractNLPModel{T,VT}; kwargs...) where {T, VT}
     dx_lr = view(d.xp, ind_cons.ind_lb) # TODO
     dx_ur = view(d.xp, ind_cons.ind_ub) # TODO
 
-    if opt.inertia_correction_method == INERTIA_AUTO
-        opt.inertia_correction_method = is_inertia(kkt.linear_solver)::Bool ? INERTIA_BASED : INERTIA_FREE
+    inertia_correction_method = if opt.inertia_correction_method == InertiaAuto
+        is_inertia(kkt.linear_solver)::Bool ? InertiaBased : InertiaFree
+    else
+        opt.inertia_correction_method
     end
 
+    inertia_corrector = build_inertia_corrector(
+        inertia_correction_method,
+        VT,
+        n, m, nlb, nub, ind_lb, ind_ub
+    )
+    
     cnt.init_time = time() - cnt.start_time
 
     return MadNLPSolver(
@@ -202,7 +213,9 @@ function MadNLPSolver(nlp::AbstractNLPModel{T,VT}; kwargs...) where {T, VT}
         zero(T), zero(T), zero(T), zero(T), zero(T), zero(T), zero(T), zero(T), zero(T),
         " ",
         zero(T), zero(T), zero(T),
-        Tuple{T, T}[], nothing, INITIAL, Dict(), 
+        Tuple{T, T}[],
+        inertia_corrector, nothing,
+        INITIAL, Dict(), 
     )
 
 end

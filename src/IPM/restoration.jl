@@ -99,10 +99,10 @@ function initialize_robust_restorer!(solver::AbstractMadNLPSolver{T}) where T
     push!(RR.filter, (solver.theta_max,-Inf))
 
     fill!(solver.y, zero(T))
-    # solver.zl_r .= min.(solver.opt.rho, solver.zl_r)
-    # solver.zu_r .= min.(solver.opt.rho, solver.zu_r)
-    solver.zl_r .= one(T) # Experimental
-    solver.zu_r .= one(T) # Experimental
+    solver.zl_r .= min.(solver.opt.rho, solver.zl_r)
+    solver.zu_r .= min.(solver.opt.rho, solver.zu_r)
+    # fill!(solver.zl_r, one(T)) # Experimental
+    # fill!(solver.zu_r, one(T)) # Experimental
     
     solver.cnt.t = 0
 

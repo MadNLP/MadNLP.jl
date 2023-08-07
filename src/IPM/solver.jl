@@ -245,15 +245,7 @@ function regular!(solver::AbstractMadNLPSolver{T}) where T
         set_aug_rhs!(solver, solver.kkt, solver.c)
         dual_inf_perturbation!(primal(solver.p),solver.ind_llb,solver.ind_uub,solver.mu,solver.opt.kappa_d)
 
-
-        # start inertia conrrection
-        if solver.opt.inertia_correction_method == INERTIA_FREE
-            inertia_free_reg(solver) || return RESTORATION_FAILED
-        elseif solver.opt.inertia_correction_method == INERTIA_BASED
-            inertia_based_reg(solver) || return RESTORATION_FAILED
-        elseif solver.opt.inertia_correction_method == INERTIA_IGNORE
-            inertia_ignore_reg(solver) || return RESTORATION_FAILED
-        end
+        inertia_correction!(solver.inertia_corrector, solver) || return RESTORATION_FAILED
         
         # filter start
         @trace(solver.logger,"Backtracking line search initiated.")
@@ -495,16 +487,6 @@ function restore!(solver::AbstractMadNLPSolver{T}) where T
             )
         end
 
-        # seems that it is better not to do IC here.
-        # if solver.opt.inertia_correction_method == INERTIA_FREE
-        #     inertia_free_reg(solver) || return ROBUST
-        # elseif solver.opt.inertia_correction_method == INERTIA_BASED
-        #     inertia_based_reg(solver) || return ROBUST
-        # elseif solver.opt.inertia_correction_method == INERTIA_IGNORE
-        #     inertia_ignore_reg(solver) || return ROBUST
-        # end
-
-
         solver.ftype = "f"
     end
 end
@@ -579,13 +561,7 @@ function robust!(solver::MadNLPSolver{T}) where T
         #     )
         # end
         
-        if solver.opt.inertia_correction_method == INERTIA_FREE
-            inertia_free_reg(solver) || return ROBUST
-        elseif solver.opt.inertia_correction_method == INERTIA_BASED
-            inertia_based_reg(solver) || return ROBUST
-        elseif solver.opt.inertia_correction_method == INERTIA_IGNORE
-            inertia_ignore_reg(solver) || return ROBUST
-        end
+        inertia_correction!(solver.inertia_corrector, solver) || return ROBUST
 
         
         finish_aug_solve_RR!(
@@ -727,15 +703,15 @@ function robust!(solver::MadNLPSolver{T}) where T
             else
                 copyto!(solver.y, dual(solver.d))
             end
-            fill!(solver.zl_r, one(T)) # Experimental
-            fill!(solver.zu_r, one(T)) # Experimental
+            # fill!(solver.zl_r, one(T)) # Experimental
+            # fill!(solver.zu_r, one(T)) # Experimental
             
             solver.cnt.k+=1
             solver.cnt.t+=1
 
-            # Experimental: empty the filter before returning to regular phase
-            empty!(solver.filter)
-            push!(solver.filter,(solver.theta_max,-Inf))
+            # # Experimental: empty the filter before returning to regular phase
+            # empty!(solver.filter)
+            # push!(solver.filter,(solver.theta_max,-Inf))
 
             return REGULAR
         end
@@ -747,171 +723,6 @@ function robust!(solver::MadNLPSolver{T}) where T
         solver.cnt.k+=1
         solver.cnt.t+=1
     end
-end
-
-function inertia_based_reg(solver::MadNLPSolver{T}) where T
-    n_trial = 0
-    solver.del_w = del_w_prev = zero(T)
-
-    @trace(solver.logger,"Inertia-based regularization started.")
-
-    factorize_wrapper!(solver)
-
-    num_pos,num_zero,num_neg = inertia(solver.kkt.linear_solver)
-    
-    solver.cnt.linear_solver_time += @elapsed begin
-        solve_status = !is_inertia_correct(solver.kkt, num_pos, num_zero, num_neg) ?
-            false : solve_refine_wrapper!(
-                solver.d, solver, solver.p, solver._w5,
-            )
-    end
-    
-    
-    while !solve_status
-        @debug(solver.logger,"Primal-dual perturbed.")
-        if solver.del_w == zero(T)
-            solver.del_w = solver.del_w_last==zero(T) ? solver.opt.first_hessian_perturbation :
-                max(solver.opt.min_hessian_perturbation,solver.opt.perturb_dec_fact*solver.del_w_last)
-        else
-            solver.del_w*= solver.del_w_last==zero(T) ? solver.opt.perturb_inc_fact_first : solver.opt.perturb_inc_fact
-            if solver.del_w>solver.opt.max_hessian_perturbation
-                solver.cnt.k+=1
-                @debug(solver.logger,"Primal regularization is too big. Switching to restoration phase.")
-                return false
-            end
-        end
-        solver.del_c = num_zero == 0 ?
-            solver.opt.jacobian_regularization_value * solver.mu^(solver.opt.jacobian_regularization_exponent) : zero(T)
-        regularize_diagonal!(solver.kkt, solver.del_w - del_w_prev, solver.del_c)
-        del_w_prev = solver.del_w
-
-        factorize_wrapper!(solver)
-        num_pos,num_zero,num_neg = inertia(solver.kkt.linear_solver)
-
-        solver.cnt.linear_solver_time += @elapsed begin
-            solve_status = !is_inertia_correct(solver.kkt, num_pos, num_zero, num_neg) ?
-                false : solve_refine_wrapper!(
-                    solver.d, solver, solver.p, solver._w5
-                )
-        end
-        n_trial += 1
-    end
-    solver.del_w != 0 && (solver.del_w_last = solver.del_w)
-    return true
-end
-
-function inertia_free_reg(solver::MadNLPSolver{T}) where T # Need to fix the workspace issue
-
-    n_trial = 0
-    solver.del_w = del_w_prev = zero(T)
-
-    @trace(solver.logger,"Inertia-free regularization started.")
-    dx = primal(solver.d)
-    p0 = solver._w1
-    d0 = solver._w2
-    t = primal(solver._w3)
-    n = primal(solver._w2)
-    wx= primal(solver._w4)
-    g = full(solver.x_trial) # just to avoid new allocation
-
-    set_aug_rhs_ifr!(solver, solver.kkt)
-    fill!(dual(solver._w3), 0)
-    set_g_ifr!(solver,g)
-
-    factorize_wrapper!(solver)
-
-    solver.cnt.linear_solver_time += @elapsed begin
-        solve_status = solve_refine_wrapper!(
-            d0, solver, p0, solver._w3,
-        ) && solve_refine_wrapper!(
-            solver.d, solver, solver.p, solver._w5,
-        )
-    end
-    copyto!(t,dx)
-    axpy!(-1.,n,t)
-
-    while !curv_test(t,n,g,solver.kkt,wx,solver.opt.inertia_free_tol)  || !solve_status
-        @debug(solver.logger,"Primal-dual perturbed.")
-        if n_trial == 0
-            solver.del_w = solver.del_w_last==.0 ? solver.opt.first_hessian_perturbation :
-                max(solver.opt.min_hessian_perturbation,solver.opt.perturb_dec_fact*solver.del_w_last)
-        else
-            solver.del_w*= solver.del_w_last==.0 ? solver.opt.perturb_inc_fact_first : solver.opt.perturb_inc_fact
-            if solver.del_w>solver.opt.max_hessian_perturbation
-                solver.cnt.k+=1
-                @debug(solver.logger,"Primal regularization is too big. Switching to restoration phase.")
-                return false
-            end
-        end
-        solver.del_c = !solve_status ?
-            solver.opt.jacobian_regularization_value * solver.mu^(solver.opt.jacobian_regularization_exponent) : zero(T)
-        regularize_diagonal!(solver.kkt, solver.del_w - del_w_prev, solver.del_c)
-        del_w_prev = solver.del_w
-
-        factorize_wrapper!(solver)
-        solver.cnt.linear_solver_time += @elapsed begin
-            solve_status = solve_refine_wrapper!(
-                d0, solver, p0, solver._w5
-            ) && solve_refine_wrapper!(
-                solver.d, solver, solver.p, solver._w6
-            )
-        end
-        copyto!(t,dx)
-        axpy!(-1.,n,t)
-
-        n_trial += 1
-    end
-
-    solver.del_w != 0 && (solver.del_w_last = solver.del_w)
-    return true
-end
-
-function inertia_ignore_reg(solver::MadNLPSolver{T}) where T
-    n_trial = 0
-    solver.del_w = del_w_prev = zero(T)
-
-    @trace(solver.logger,"Inertia-based regularization started.")
-
-    factorize_wrapper!(solver)
-
-    solver.cnt.linear_solver_time += @elapsed begin
-        solve_status = solve_refine_wrapper!(
-            solver.d, solver, solver.p, solver._w5,
-        )
-    end
-    while !solve_status
-        @debug(solver.logger,"Primal-dual perturbed.")
-        if solver.del_w == zero(T)
-            solver.del_w = solver.del_w_last==zero(T) ? solver.opt.first_hessian_perturbation :
-                max(solver.opt.min_hessian_perturbation,solver.opt.perturb_dec_fact*solver.del_w_last)
-        else
-            solver.del_w*= solver.del_w_last==zero(T) ? solver.opt.perturb_inc_fact_first : solver.opt.perturb_inc_fact
-            if solver.del_w>solver.opt.max_hessian_perturbation
-                solver.cnt.k+=1
-                @debug(solver.logger,"Primal regularization is too big. Switching to restoration phase.")
-                return false
-            end
-        end
-        solver.del_c = !solve_status ?
-            solver.opt.jacobian_regularization_value * solver.mu^(solver.opt.jacobian_regularization_exponent) : zero(T)
-        regularize_diagonal!(solver.kkt, solver.del_w - del_w_prev, solver.del_c)
-        del_w_prev = solver.del_w
-
-        factorize_wrapper!(solver)
-        solver.cnt.linear_solver_time += @elapsed begin
-            solve_status = solve_refine_wrapper!(
-                solver.d, solver, solver.p, solver._w5
-            )
-        end
-        n_trial += 1
-    end
-    solver.del_w != 0 && (solver.del_w_last = solver.del_w)
-    return true
-end
-
-function curv_test(t,n,g,kkt,wx,inertia_free_tol)
-    mul_hess_blk!(wx, kkt, t)
-    dot(wx,t) + max(dot(wx,n)-dot(g,n),0) - inertia_free_tol*dot(t,t) >=0
 end
 
 function second_order_correction(solver::AbstractMadNLPSolver,alpha_max,theta,varphi,
@@ -980,3 +791,177 @@ function second_order_correction(solver::AbstractMadNLPSolver,alpha_max,theta,va
 end
 
 
+function inertia_correction!(
+    inertia_corrector::InertiaBased,
+    solver::MadNLPSolver{T}
+    ) where {T}
+    
+    n_trial = 0
+    solver.del_w = del_w_prev = zero(T)
+
+    @trace(solver.logger,"Inertia-based regularization started.")
+
+    factorize_wrapper!(solver)
+
+    num_pos,num_zero,num_neg = inertia(solver.kkt.linear_solver)
+    
+    solver.cnt.linear_solver_time += @elapsed begin
+        solve_status = !is_inertia_correct(solver.kkt, num_pos, num_zero, num_neg) ?
+            false : solve_refine_wrapper!(
+                solver.d, solver, solver.p, solver._w5,
+            )
+    end
+    
+    
+    while !solve_status
+        @debug(solver.logger,"Primal-dual perturbed.")
+        if solver.del_w == zero(T)
+            solver.del_w = solver.del_w_last==zero(T) ? solver.opt.first_hessian_perturbation :
+                max(solver.opt.min_hessian_perturbation,solver.opt.perturb_dec_fact*solver.del_w_last)
+        else
+            solver.del_w*= solver.del_w_last==zero(T) ? solver.opt.perturb_inc_fact_first : solver.opt.perturb_inc_fact
+            if solver.del_w>solver.opt.max_hessian_perturbation
+                solver.cnt.k+=1
+                @debug(solver.logger,"Primal regularization is too big. Switching to restoration phase.")
+                return false
+            end
+        end
+        solver.del_c = num_zero != 0 ?
+            solver.opt.jacobian_regularization_value * solver.mu^(solver.opt.jacobian_regularization_exponent) : zero(T)
+        regularize_diagonal!(solver.kkt, solver.del_w - del_w_prev, solver.del_c)
+        del_w_prev = solver.del_w
+
+        factorize_wrapper!(solver)
+        num_pos,num_zero,num_neg = inertia(solver.kkt.linear_solver)
+
+        solver.cnt.linear_solver_time += @elapsed begin
+            solve_status = !is_inertia_correct(solver.kkt, num_pos, num_zero, num_neg) ?
+                false : solve_refine_wrapper!(
+                    solver.d, solver, solver.p, solver._w5
+                )
+        end
+        n_trial += 1
+    end
+    solver.del_w != 0 && (solver.del_w_last = solver.del_w)
+    return true
+end
+
+function inertia_correction!(
+    inertia_corrector::InertiaFree,
+    solver::MadNLPSolver{T}
+    ) where T 
+
+    n_trial = 0
+    solver.del_w = del_w_prev = zero(T)
+
+    @trace(solver.logger,"Inertia-free regularization started.")
+    dx = primal(solver.d)
+    p0 = inertia_corrector.p0
+    d0 = inertia_corrector.d0
+    t = inertia_corrector.t
+    n = primal(p0)
+    wx= inertia_corrector.wx
+    g = inertia_corrector.g
+
+    set_g_ifr!(solver,g)
+    set_aug_rhs_ifr!(solver, solver.kkt, p0)
+
+    factorize_wrapper!(solver)
+
+    solver.cnt.linear_solver_time += @elapsed begin
+        solve_status = solve_refine_wrapper!(
+            d0, solver, p0, solver._w3,
+        ) && solve_refine_wrapper!(
+            solver.d, solver, solver.p, solver._w5,
+        )
+    end
+    copyto!(t,dx)
+    axpy!(-1.,n,t)
+
+    while !curv_test(t,n,g,solver.kkt,wx,solver.opt.inertia_free_tol)  || !solve_status
+        @debug(solver.logger,"Primal-dual perturbed.")
+        if n_trial == 0
+            solver.del_w = solver.del_w_last==.0 ? solver.opt.first_hessian_perturbation :
+                max(solver.opt.min_hessian_perturbation,solver.opt.perturb_dec_fact*solver.del_w_last)
+        else
+            solver.del_w*= solver.del_w_last==.0 ? solver.opt.perturb_inc_fact_first : solver.opt.perturb_inc_fact
+            if solver.del_w>solver.opt.max_hessian_perturbation
+                solver.cnt.k+=1
+                @debug(solver.logger,"Primal regularization is too big. Switching to restoration phase.")
+                return false
+            end
+        end
+        solver.del_c = !solve_status ?
+            solver.opt.jacobian_regularization_value * solver.mu^(solver.opt.jacobian_regularization_exponent) : zero(T)
+        regularize_diagonal!(solver.kkt, solver.del_w - del_w_prev, solver.del_c)
+        del_w_prev = solver.del_w
+
+        factorize_wrapper!(solver)
+        solver.cnt.linear_solver_time += @elapsed begin
+            solve_status = solve_refine_wrapper!(
+                d0, solver, p0, solver._w5
+            ) && solve_refine_wrapper!(
+                solver.d, solver, solver.p, solver._w6
+            )
+        end
+        copyto!(t,dx)
+        axpy!(-1.,n,t)
+
+        n_trial += 1
+    end
+
+    solver.del_w != 0 && (solver.del_w_last = solver.del_w)
+    return true
+end
+
+function inertia_correction!(
+    inertia_corrector::InertiaIgnore,
+    solver::MadNLPSolver{T}
+    ) where T
+    
+    n_trial = 0
+    solver.del_w = del_w_prev = zero(T)
+
+    @trace(solver.logger,"Inertia-based regularization started.")
+
+    factorize_wrapper!(solver)
+
+    solver.cnt.linear_solver_time += @elapsed begin
+        solve_status = solve_refine_wrapper!(
+            solver.d, solver, solver.p, solver._w5,
+        )
+    end
+    while !solve_status
+        @debug(solver.logger,"Primal-dual perturbed.")
+        if solver.del_w == zero(T)
+            solver.del_w = solver.del_w_last==zero(T) ? solver.opt.first_hessian_perturbation :
+                max(solver.opt.min_hessian_perturbation,solver.opt.perturb_dec_fact*solver.del_w_last)
+        else
+            solver.del_w*= solver.del_w_last==zero(T) ? solver.opt.perturb_inc_fact_first : solver.opt.perturb_inc_fact
+            if solver.del_w>solver.opt.max_hessian_perturbation
+                solver.cnt.k+=1
+                @debug(solver.logger,"Primal regularization is too big. Switching to restoration phase.")
+                return false
+            end
+        end
+        solver.del_c = !solve_status ?
+            solver.opt.jacobian_regularization_value * solver.mu^(solver.opt.jacobian_regularization_exponent) : zero(T)
+        regularize_diagonal!(solver.kkt, solver.del_w - del_w_prev, solver.del_c)
+        del_w_prev = solver.del_w
+
+        factorize_wrapper!(solver)
+        solver.cnt.linear_solver_time += @elapsed begin
+            solve_status = solve_refine_wrapper!(
+                solver.d, solver, solver.p, solver._w5
+            )
+        end
+        n_trial += 1
+    end
+    solver.del_w != 0 && (solver.del_w_last = solver.del_w)
+    return true
+end
+
+function curv_test(t,n,g,kkt,wx,inertia_free_tol)
+    mul_hess_blk!(wx, kkt, t)
+    dot(wx,t) + max(dot(wx,n)-dot(g,n),0) - inertia_free_tol*dot(t,t) >=0
+end
