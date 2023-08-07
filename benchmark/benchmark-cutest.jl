@@ -60,6 +60,7 @@ end
         finalize(nlp)
         throw(e)
     end
+    println("Solved $name")
 end
 
 function benchmark(solver,probs;warm_up_probs = [], decode = false)

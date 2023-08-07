@@ -59,7 +59,7 @@ function main()
         joinpath(PROJECT_PATH, "Project.toml"),
         force=true
     )
-
+    
     for class in CLASSES
         for solver in SOLVERS
             launch_script = joinpath(PROJECT_PATH, "benchmark-$class.jl")
