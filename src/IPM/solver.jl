@@ -248,12 +248,13 @@ function regular!(solver::AbstractMadNLPSolver{T}) where T
 
         # start inertia conrrection
         if solver.opt.inertia_correction_method == INERTIA_FREE
-            inertia_free_reg(solver) || return ROBUST
+            inertia_free_reg(solver) || return RESTORATION_FAILED
         elseif solver.opt.inertia_correction_method == INERTIA_BASED
-            inertia_based_reg(solver) || return ROBUST
+            inertia_based_reg(solver) || return RESTORATION_FAILED
         elseif solver.opt.inertia_correction_method == INERTIA_IGNORE
-            inertia_ignore_reg(solver) || return ROBUST
+            inertia_ignore_reg(solver) || return RESTORATION_FAILED
         end
+        
         # filter start
         @trace(solver.logger,"Backtracking line search initiated.")
         theta = get_theta(solver.c)
@@ -284,6 +285,7 @@ function regular!(solver::AbstractMadNLPSolver{T}) where T
         small_search_norm = get_rel_search_norm(primal(solver.x), primal(solver.d)) < 10*eps(T)
         switching_condition = is_switching(varphi_d,solver.alpha,solver.opt.s_phi,solver.opt.delta,2.,solver.opt.s_theta)
         armijo_condition = false
+        unsuccessful_iterate = false
 
         while true
             copyto!(full(solver.x_trial), full(solver.x))
@@ -301,11 +303,21 @@ function regular!(solver::AbstractMadNLPSolver{T}) where T
                 solver.filter,theta,theta_trial,varphi,varphi_trial,switching_condition,armijo_condition,
                 solver.theta_min,solver.opt.obj_max_inc,solver.opt.gamma_theta,solver.opt.gamma_phi,
                 has_constraints(solver))
-            solver.ftype in ["f","h"] && (@trace(solver.logger,"Step accepted with type $(solver.ftype)"); break)
+            
+            if solver.ftype in ["f","h"]
+                @trace(solver.logger,"Step accepted with type $(solver.ftype)")
+                break
+            end
 
-            solver.cnt.l==1 && theta_trial>=theta && second_order_correction(
-                solver,alpha_max,theta,varphi,theta_trial,varphi_d,switching_condition) && break
+            if solver.cnt.l==1 && theta_trial>=theta
+                if second_order_correction(
+                    solver,alpha_max,theta,varphi,theta_trial,varphi_d,switching_condition
+                    )
+                    break
+                end
+            end
 
+            unsuccessful_iterate = true            
             solver.alpha /= 2
             solver.cnt.l += 1
             if solver.alpha < alpha_min
@@ -321,6 +333,21 @@ function regular!(solver::AbstractMadNLPSolver{T}) where T
             end
         end
 
+        # this implements the heuristics in Section 3.2 of Ipopt paper.
+        # Case I is only implemented without crietria on \theta.
+        if unsuccessful_iterate
+            if (solver.cnt.unsuccessful_iterate += 1) >= 4
+                if solver.theta_max/10 > theta_trial
+                    @debug(solver.logger, "restarting filter")
+                    solver.theta_max /= 10
+                    empty!(solver.filter)
+                    push!(solver.filter,(solver.theta_max,-Inf))
+                end
+                solver.cnt.unsuccessful_iterate = 0
+            end
+        else
+            solver.cnt.unsuccessful_iterate = 0
+        end
 
         @trace(solver.logger,"Updating primal-dual variables.")
         copyto!(full(solver.x), full(solver.x_trial))
@@ -462,12 +489,21 @@ function restore!(solver::AbstractMadNLPSolver{T}) where T
 
         dual_inf_perturbation!(primal(solver.p),solver.ind_llb,solver.ind_uub,solver.mu,solver.opt.kappa_d)
         factorize_wrapper!(solver)
-        # TODO check this
         solver.cnt.linear_solver_time += @elapsed begin
             solve_refine_wrapper!(
                 solver.d, solver, solver.p, solver._w5
             )
         end
+
+        # seems that it is better not to do IC here.
+        # if solver.opt.inertia_correction_method == INERTIA_FREE
+        #     inertia_free_reg(solver) || return ROBUST
+        # elseif solver.opt.inertia_correction_method == INERTIA_BASED
+        #     inertia_based_reg(solver) || return ROBUST
+        # elseif solver.opt.inertia_correction_method == INERTIA_IGNORE
+        #     inertia_ignore_reg(solver) || return ROBUST
+        # end
+
 
         solver.ftype = "f"
     end
@@ -534,12 +570,24 @@ function robust!(solver::MadNLPSolver{T}) where T
         # without inertia correction,
         @trace(solver.logger,"Solving restoration phase primal-dual system.")
         set_aug_rhs_RR!(solver, solver.kkt, RR, solver.opt.rho)
-        factorize_wrapper!(solver)
-        solver.cnt.linear_solver_time += @elapsed begin
-            solve_refine_wrapper!(
-                solver.d, solver, solver.p, solver._w5
-            )
+        dual_inf_perturbation!(primal(solver.p),solver.ind_llb,solver.ind_uub,solver.mu,solver.opt.kappa_d)
+        
+        # factorize_wrapper!(solver)
+        # solver.cnt.linear_solver_time += @elapsed begin
+        #     solve_refine_wrapper!(
+        #         solver.d, solver, solver.p, solver._w5
+        #     )
+        # end
+        
+        if solver.opt.inertia_correction_method == INERTIA_FREE
+            inertia_free_reg(solver) || return ROBUST
+        elseif solver.opt.inertia_correction_method == INERTIA_BASED
+            inertia_based_reg(solver) || return ROBUST
+        elseif solver.opt.inertia_correction_method == INERTIA_IGNORE
+            inertia_ignore_reg(solver) || return ROBUST
         end
+
+        
         finish_aug_solve_RR!(
             RR.dpp,RR.dnn,RR.dzp,RR.dzn,solver.y,dual(solver.d),
             RR.pp,RR.nn,RR.zp,RR.zn,RR.mu_R,solver.opt.rho
@@ -594,7 +642,7 @@ function robust!(solver::MadNLPSolver{T}) where T
             varphi_R_trial = get_varphi_R(
                 RR.obj_val_R_trial,solver.x_trial_lr,solver.xl_r,solver.xu_r,solver.x_trial_ur,RR.pp_trial,RR.nn_trial,RR.mu_R)
 
-            armijo_condition = is_armijo(varphi_R_trial,varphi_R,zero(T),solver.alpha,varphi_d_R) #####
+            armijo_condition = is_armijo(varphi_R_trial,varphi_R,solver.opt.eta_phi,solver.alpha,varphi_d_R) 
 
             small_search_norm && break
             solver.ftype = get_ftype(
@@ -679,8 +727,15 @@ function robust!(solver::MadNLPSolver{T}) where T
             else
                 copyto!(solver.y, dual(solver.d))
             end
+            fill!(solver.zl_r, one(T)) # Experimental
+            fill!(solver.zu_r, one(T)) # Experimental
+            
             solver.cnt.k+=1
             solver.cnt.t+=1
+
+            # Experimental: empty the filter before returning to regular phase
+            empty!(solver.filter)
+            push!(solver.filter,(solver.theta_max,-Inf))
 
             return REGULAR
         end
@@ -703,12 +758,16 @@ function inertia_based_reg(solver::MadNLPSolver{T}) where T
     factorize_wrapper!(solver)
 
     num_pos,num_zero,num_neg = inertia(solver.kkt.linear_solver)
+    
     solver.cnt.linear_solver_time += @elapsed begin
-        solve_status = num_zero!= 0 ? false : solve_refine_wrapper!(
-            solver.d, solver, solver.p, solver._w5,
-        )
+        solve_status = !is_inertia_correct(solver.kkt, num_pos, num_zero, num_neg) ?
+            false : solve_refine_wrapper!(
+                solver.d, solver, solver.p, solver._w5,
+            )
     end
-    while !is_inertia_correct(solver.kkt, num_pos, num_zero, num_neg) || !solve_status
+    
+    
+    while !solve_status
         @debug(solver.logger,"Primal-dual perturbed.")
         if solver.del_w == zero(T)
             solver.del_w = solver.del_w_last==zero(T) ? solver.opt.first_hessian_perturbation :
@@ -721,17 +780,19 @@ function inertia_based_reg(solver::MadNLPSolver{T}) where T
                 return false
             end
         end
-        solver.del_c = (num_zero == 0 || !solve_status) ?
+        solver.del_c = num_zero == 0 ?
             solver.opt.jacobian_regularization_value * solver.mu^(solver.opt.jacobian_regularization_exponent) : zero(T)
-            regularize_diagonal!(solver.kkt, solver.del_w - del_w_prev, solver.del_c)
+        regularize_diagonal!(solver.kkt, solver.del_w - del_w_prev, solver.del_c)
         del_w_prev = solver.del_w
 
         factorize_wrapper!(solver)
         num_pos,num_zero,num_neg = inertia(solver.kkt.linear_solver)
+
         solver.cnt.linear_solver_time += @elapsed begin
-            solve_status = num_zero!= 0 ? false : solve_refine_wrapper!(
-            solver.d, solver, solver.p, solver._w5
-            )
+            solve_status = !is_inertia_correct(solver.kkt, num_pos, num_zero, num_neg) ?
+                false : solve_refine_wrapper!(
+                    solver.d, solver, solver.p, solver._w5
+                )
         end
         n_trial += 1
     end
@@ -739,7 +800,7 @@ function inertia_based_reg(solver::MadNLPSolver{T}) where T
     return true
 end
 
-function inertia_free_reg(solver::MadNLPSolver{T}) where T
+function inertia_free_reg(solver::MadNLPSolver{T}) where T # Need to fix the workspace issue
 
     n_trial = 0
     solver.del_w = del_w_prev = zero(T)

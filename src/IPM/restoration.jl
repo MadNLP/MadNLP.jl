@@ -33,6 +33,14 @@ end
 
 function RobustRestorer(solver::AbstractMadNLPSolver{T}) where {T}
 
+    f_R = similar(solver.y, solver.n)
+    x_ref = similar(solver.y, solver.n)
+    D_R = similar(solver.y, solver.n)
+    pp = similar(solver.y, solver.m)
+    nn = similar(solver.y, solver.m)
+    pp_trial = similar(solver.y, solver.m)
+    nn_trial = similar(solver.y, solver.m)
+
     nn = similar(solver.y, solver.m)
     zp = similar(solver.y, solver.m)
     zn = similar(solver.y, solver.m)
@@ -45,17 +53,17 @@ function RobustRestorer(solver::AbstractMadNLPSolver{T}) where {T}
 
     return RobustRestorer(
         0.,
-        primal(solver._w2),
-        primal(solver._w1),
+        f_R,
+        x_ref,
         0.,
-        primal(solver._w3),
+        D_R,
         0.,
-        dual(solver._w3),
-        dual(solver._w4),
+        pp,
+        nn,
         zp, zn,
         dpp, dnn, dzp, dzn,
-        dual(solver._w2),
-        dual(solver._w1),
+        pp_trial,
+        nn_trial,
         0.,0.,0.,0.,0.,0.,
         Tuple{T,T}[],
     )
@@ -91,8 +99,10 @@ function initialize_robust_restorer!(solver::AbstractMadNLPSolver{T}) where T
     push!(RR.filter, (solver.theta_max,-Inf))
 
     fill!(solver.y, zero(T))
-    solver.zl_r .= min.(solver.opt.rho, solver.zl_r)
-    solver.zu_r .= min.(solver.opt.rho, solver.zu_r)
+    # solver.zl_r .= min.(solver.opt.rho, solver.zl_r)
+    # solver.zu_r .= min.(solver.opt.rho, solver.zu_r)
+    solver.zl_r .= one(T) # Experimental
+    solver.zu_r .= one(T) # Experimental
     
     solver.cnt.t = 0
 
