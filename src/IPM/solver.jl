@@ -245,7 +245,7 @@ function regular!(solver::AbstractMadNLPSolver{T}) where T
         set_aug_rhs!(solver, solver.kkt, solver.c)
         dual_inf_perturbation!(primal(solver.p),solver.ind_llb,solver.ind_uub,solver.mu,solver.opt.kappa_d)
 
-        inertia_correction!(solver.inertia_corrector, solver) || return RESTORATION_FAILED
+        inertia_correction!(solver.inertia_corrector, solver) || return ROBUST
         
         # filter start
         @trace(solver.logger,"Backtracking line search initiated.")
@@ -280,6 +280,7 @@ function regular!(solver::AbstractMadNLPSolver{T}) where T
         unsuccessful_iterate = false
 
         while true
+            
             copyto!(full(solver.x_trial), full(solver.x))
             axpy!(solver.alpha, primal(solver.d), primal(solver.x_trial))
             solver.obj_val_trial = eval_f_wrapper(solver, solver.x_trial)
@@ -319,9 +320,21 @@ function regular!(solver::AbstractMadNLPSolver{T}) where T
                 return RESTORE
             else
                 @trace(solver.logger,"Step rejected; proceed with the next trial step.")
-                solver.alpha * norm(primal(solver.d)) < eps(T)*10 &&
-                    return solver.cnt.acceptable_cnt >0 ?
-                    SOLVED_TO_ACCEPTABLE_LEVEL : SEARCH_DIRECTION_BECOMES_TOO_SMALL
+                if solver.alpha * norm(primal(solver.d)) < eps(T)*10
+                    if (solver.cnt.restoration_fail_count += 1) >= 4
+                        return solver.cnt.acceptable_cnt >0 ?
+                            SOLVED_TO_ACCEPTABLE_LEVEL : SEARCH_DIRECTION_BECOMES_TOO_SMALL
+                    else # Experimental
+                        fill!(solver.y, zero(T))
+                        fill!(solver.zl_r, one(T))
+                        fill!(solver.zu_r, one(T))
+                        empty!(solver.filter)
+                        push!(solver.filter,(solver.theta_max,-Inf))
+                        solver.cnt.k+=1
+                        
+                        return REGULAR
+                    end
+                end
             end
         end
 
@@ -533,7 +546,7 @@ function robust!(solver::MadNLPSolver{T}) where T
         while RR.mu_R >= solver.opt.mu_min &&
             max(RR.inf_pr_R,RR.inf_du_R,inf_compl_mu_R) <= solver.opt.barrier_tol_factor*RR.mu_R
             RR.mu_R = get_mu(RR.mu_R,solver.opt.mu_min,
-                            solver.opt.mu_linear_decrease_factor,solver.opt.mu_superlinear_decrease_power,solver.opt.tol)
+                             solver.opt.mu_linear_decrease_factor,solver.opt.mu_superlinear_decrease_power,solver.opt.tol)
             inf_compl_mu_R = get_inf_compl_R(
                 solver.x_lr,solver.xl_r,solver.zl_r,solver.xu_r,solver.x_ur,solver.zu_r,RR.pp,RR.zp,RR.nn,RR.zn,RR.mu_R,sc)
             RR.tau_R= max(solver.opt.tau_min,1-RR.mu_R)
@@ -561,7 +574,7 @@ function robust!(solver::MadNLPSolver{T}) where T
         #     )
         # end
         
-        inertia_correction!(solver.inertia_corrector, solver) || return ROBUST
+        inertia_correction!(solver.inertia_corrector, solver) || return RESTORATION_FAILED
 
         
         finish_aug_solve_RR!(
@@ -632,7 +645,19 @@ function robust!(solver::MadNLPSolver{T}) where T
             solver.cnt.l += 1
             if solver.alpha < alpha_min
                 @debug(solver.logger,"Restoration phase cannot find an acceptable step at iteration $(solver.cnt.k).")
-                return RESTORATION_FAILED
+                if (solver.cnt.restoration_fail_count += 1) >= 4
+                    return RESTORATION_FAILED
+                else # Experimental
+                    fill!(solver.y, zero(T))
+                    fill!(solver.zl_r, one(T))
+                    fill!(solver.zu_r, one(T))
+                    empty!(solver.filter)
+                    push!(solver.filter,(solver.theta_max,-Inf))
+
+                    solver.cnt.k+=1
+                    solver.cnt.t+=1
+                    return REGULAR
+                end
             else
                 @trace(solver.logger,"Step rejected; proceed with the next trial step.")
                 solver.alpha < eps(T)*10 && return solver.cnt.acceptable_cnt >0 ?
@@ -815,7 +840,8 @@ function inertia_correction!(
     
     while !solve_status
         @debug(solver.logger,"Primal-dual perturbed.")
-        if solver.del_w == zero(T)
+
+        if n_trial == 0
             solver.del_w = solver.del_w_last==zero(T) ? solver.opt.first_hessian_perturbation :
                 max(solver.opt.min_hessian_perturbation,solver.opt.perturb_dec_fact*solver.del_w_last)
         else
@@ -826,8 +852,7 @@ function inertia_correction!(
                 return false
             end
         end
-        solver.del_c = num_zero != 0 ?
-            solver.opt.jacobian_regularization_value * solver.mu^(solver.opt.jacobian_regularization_exponent) : zero(T)
+        solver.del_c = solver.opt.jacobian_regularization_value * solver.mu^(solver.opt.jacobian_regularization_exponent) 
         regularize_diagonal!(solver.kkt, solver.del_w - del_w_prev, solver.del_c)
         del_w_prev = solver.del_w
 
@@ -842,6 +867,7 @@ function inertia_correction!(
         end
         n_trial += 1
     end
+    
     solver.del_w != 0 && (solver.del_w_last = solver.del_w)
     return true
 end
@@ -891,8 +917,7 @@ function inertia_correction!(
                 return false
             end
         end
-        solver.del_c = !solve_status ?
-            solver.opt.jacobian_regularization_value * solver.mu^(solver.opt.jacobian_regularization_exponent) : zero(T)
+        solver.del_c = solver.opt.jacobian_regularization_value * solver.mu^(solver.opt.jacobian_regularization_exponent)
         regularize_diagonal!(solver.kkt, solver.del_w - del_w_prev, solver.del_c)
         del_w_prev = solver.del_w
 
@@ -933,7 +958,7 @@ function inertia_correction!(
     end
     while !solve_status
         @debug(solver.logger,"Primal-dual perturbed.")
-        if solver.del_w == zero(T)
+        if n_trial == 0
             solver.del_w = solver.del_w_last==zero(T) ? solver.opt.first_hessian_perturbation :
                 max(solver.opt.min_hessian_perturbation,solver.opt.perturb_dec_fact*solver.del_w_last)
         else
@@ -944,8 +969,7 @@ function inertia_correction!(
                 return false
             end
         end
-        solver.del_c = !solve_status ?
-            solver.opt.jacobian_regularization_value * solver.mu^(solver.opt.jacobian_regularization_exponent) : zero(T)
+        solver.del_c = solver.opt.jacobian_regularization_value * solver.mu^(solver.opt.jacobian_regularization_exponent) 
         regularize_diagonal!(solver.kkt, solver.del_w - del_w_prev, solver.del_c)
         del_w_prev = solver.del_w
 

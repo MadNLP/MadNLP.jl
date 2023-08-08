@@ -150,7 +150,7 @@ end
 
 function MadNLP.factorize!(M::GLUSolver)
     copyto!(M.full.nzVal, M.tril_to_full_view)
-    if M.inner == nothing
+    if M.inner == nothing  
         sym_lu = CUSOLVERRF.klu_symbolic_analysis(M.full)
         M.inner = CUSOLVERRF.GLULowLevel(sym_lu)
     end

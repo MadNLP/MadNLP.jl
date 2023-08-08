@@ -51,7 +51,7 @@ function solve_refine!(
     iter = 0
 
     while true
-        solve!(iterator.kkt, w)  # TODO this includes some extra time. Ideally, LinearSolver should count the time
+        solve!(iterator.kkt, w) 
         axpy!(1., full(w), full(x))
         copyto!(full(w), full(b))
 

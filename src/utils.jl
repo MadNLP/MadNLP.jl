@@ -112,6 +112,7 @@ const SubVector{Tv,VT, VI} = SubArray{Tv, 1, VT, Tuple{VI}, false}
     
     acceptable_cnt::Int = 0
     unsuccessful_iterate::Int = 0
+    restoration_fail_count::Int = 0
 end
 
 """

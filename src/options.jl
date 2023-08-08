@@ -45,7 +45,7 @@ end
     boudn_relax_factor::Float64 = 1e-8
     jacobian_constant::Bool = false
     hessian_constant::Bool = false
-    kkt_system::Type = SparseKKTSystem
+    kkt_system::Type = SparseKKTSystemes
     hessian_approximation::Type = ExactHessian
     callback::Type = SparseCallback
 
