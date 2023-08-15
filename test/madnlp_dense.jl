@@ -8,7 +8,7 @@ using Random
 
 function _compare_dense_with_sparse(
     kkt_system, n, m, ind_fixed, ind_eq;
-    inertia=MadNLP.INERTIA_BASED,
+    inertia=MadNLP.InertiaBased,
 )
 
     for (T,tol,atol) in [(Float32,1e-3,1e0), (Float64,1e-8,1e-6)]
@@ -104,18 +104,18 @@ end
 @testset "MadNLP: option kkt_system=$(kkt)" for kkt in [MadNLP.DenseKKTSystem, MadNLP.DenseCondensedKKTSystem]
     @testset "Size: ($n, $m)" for (n, m) in [(10, 0), (10, 5), (50, 10)]
         _compare_dense_with_sparse(kkt, n, m, Int[], Int[])
-        _compare_dense_with_sparse(kkt, n, m, Int[], Int[]; inertia=MadNLP.INERTIA_FREE)
+        _compare_dense_with_sparse(kkt, n, m, Int[], Int[]; inertia=MadNLP.InertiaFree)
     end
     # Test with non-trivial equality constraints.
     @testset "Equality constraints" begin
         n, m = 20, 15
         _compare_dense_with_sparse(kkt, n, m, Int[], Int[1, 8])
-        _compare_dense_with_sparse(kkt, n, m, Int[], Int[1, 8]; inertia=MadNLP.INERTIA_FREE)
+        _compare_dense_with_sparse(kkt, n, m, Int[], Int[1, 8]; inertia=MadNLP.InertiaFree)
     end
     @testset "Fixed variables" begin
         n, m = 10, 5
         _compare_dense_with_sparse(kkt, n, m, Int[1, 2], Int[])
-        _compare_dense_with_sparse(kkt, n, m, Int[1, 2], Int[]; inertia=MadNLP.INERTIA_FREE)
+        _compare_dense_with_sparse(kkt, n, m, Int[1, 2], Int[]; inertia=MadNLP.InertiaFree)
     end
 end
 

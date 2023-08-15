@@ -67,24 +67,24 @@ testset = [
         []
     ],
     [
-        "Option: INERTIA_FREE",
+        "Option: InertiaFree",
         ()->MadNLP.Optimizer(
-            inertia_correction_method=MadNLP.INERTIA_FREE,
+            inertia_correction_method=MadNLP.InertiaFree,
             print_level=MadNLP.ERROR),
         []
     ],
     [
-        "Option: INERTIA_FREE & AUGMENTED KKT SYSTEM",
+        "Option: InertiaFree & AUGMENTED KKT SYSTEM",
         ()->MadNLP.Optimizer(
-            inertia_correction_method=MadNLP.INERTIA_FREE,
+            inertia_correction_method=MadNLP.InertiaFree,
             kkt_system=MadNLP.SparseUnreducedKKTSystem,
             print_level=MadNLP.ERROR),
         []
     ],
     [
-        "Option: INERTIA_FREE & SPARSE CONDENSED KKT SYSTEM",
+        "Option: InertiaFree & SPARSE CONDENSED KKT SYSTEM",
         ()->MadNLP.Optimizer(
-            inertia_correction_method=MadNLP.INERTIA_FREE,
+            inertia_correction_method=MadNLP.InertiaFree,
             kkt_system=MadNLP.SparseCondensedKKTSystem,
             equality_treatment = MadNLP.RelaxEquality,
             fixed_variable_treatment = MadNLP.RelaxBound,

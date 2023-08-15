@@ -58,7 +58,7 @@ end
         return (status=get_status(retval.status),time=t,mem=mem,iter=retval.iter)
     catch e
         finalize(nlp)
-        throw(e)
+        return (status=3,time=0.,mem=0,iter=0)
     end
     println("Solved $name")
 end

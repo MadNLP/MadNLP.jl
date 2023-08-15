@@ -565,7 +565,7 @@ function robust!(solver::MadNLPSolver{T}) where T
         # without inertia correction,
         @trace(solver.logger,"Solving restoration phase primal-dual system.")
         set_aug_rhs_RR!(solver, solver.kkt, RR, solver.opt.rho)
-        dual_inf_perturbation!(primal(solver.p),solver.ind_llb,solver.ind_uub,solver.mu,solver.opt.kappa_d)
+        # dual_inf_perturbation!(primal(solver.p),solver.ind_llb,solver.ind_uub,solver.mu,solver.opt.kappa_d)
         
         # factorize_wrapper!(solver)
         # solver.cnt.linear_solver_time += @elapsed begin
@@ -852,7 +852,7 @@ function inertia_correction!(
                 return false
             end
         end
-        solver.del_c = solver.opt.jacobian_regularization_value * solver.mu^(solver.opt.jacobian_regularization_exponent) 
+        solver.del_c = num_neg == 0 ? zero(T) : solver.opt.jacobian_regularization_value * solver.mu^(solver.opt.jacobian_regularization_exponent) 
         regularize_diagonal!(solver.kkt, solver.del_w - del_w_prev, solver.del_c)
         del_w_prev = solver.del_w
 
@@ -885,7 +885,7 @@ function inertia_correction!(
     p0 = inertia_corrector.p0
     d0 = inertia_corrector.d0
     t = inertia_corrector.t
-    n = primal(p0)
+    n = primal(d0)
     wx= inertia_corrector.wx
     g = inertia_corrector.g
 
