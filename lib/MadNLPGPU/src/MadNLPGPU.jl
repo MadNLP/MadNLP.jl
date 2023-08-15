@@ -29,7 +29,6 @@ function MadNLP._madnlp_unsafe_wrap(vec::VT, n, shift=1) where {T, VT <: CuVecto
 end
 
 include("kernels.jl")
-include("callbacks.jl")
 include("interface.jl")
 include("lapackgpu.jl")
 include("cusolver.jl")
