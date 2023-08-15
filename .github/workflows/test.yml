@@ -44,7 +44,6 @@ jobs:
     env:
       CUDA_VISIBLE_DEVICES: 1
       JULIA_DEPOT_PATH: /scratch/sshin/github-actions/julia_depot_madnlp
-      JULIA_CUDA_USE_BINARYBUILDER: true
     runs-on: self-hosted
     strategy:
       matrix:
