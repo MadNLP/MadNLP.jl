@@ -31,7 +31,7 @@ end
 include("kernels.jl")
 include("interface.jl")
 include("lapackgpu.jl")
-include("cusolver.jl")
+include("cusolverrf.jl")
 
 # option preset
 function MadNLP.MadNLPOptions(nlp::AbstractNLPModel{T,VT}) where {T, VT <: CuVector{T}}
