@@ -32,7 +32,7 @@ const CuSubVector{T} = SubArray{T, 1, CUDA.CuArray{T, 1, CUDA.Mem.DeviceBuffer},
     rf_pivot_tol::Float64 = 1e-14
     rf_boost::Float64 = 1e-14
     rf_factorization_algo::CUSOLVER.cusolverRfFactorization_t = CUSOLVER.CUSOLVERRF_FACTORIZATION_ALG0
-    rf_triangular_solve_algo::CUSOLVER.cusolverRfTriangularSolve_t = CUSOLVER.CUSOLVERRF_TRIANGULAR_SOLVE_ALG2
+    rf_triangular_solve_algo::CUSOLVER.cusolverRfTriangularSolve_t = CUSOLVER.CUSOLVERRF_TRIANGULAR_SOLVE_ALG1
 end
 
 mutable struct RFSolver{T} <: MadNLP.AbstractLinearSolver{T}
@@ -41,7 +41,7 @@ mutable struct RFSolver{T} <: MadNLP.AbstractLinearSolver{T}
     tril::CUSPARSE.CuSparseMatrixCSC{T}
     full::CUSPARSE.CuSparseMatrixCSR{T}
     tril_to_full_view::CuSubVector{T}
-    dummy::CUDA.CuVector{T}
+    buffer::CUDA.CuVector{T}
 
     opt::RFSolverOptions
     logger::MadNLP.MadNLPLogger
@@ -79,8 +79,8 @@ function MadNLP.factorize!(M::RFSolver)
             fast_mode=M.opt.rf_fast_mode,
             factorization_algo=M.opt.rf_factorization_algo,
             triangular_algo=M.opt.rf_triangular_solve_algo,
-            nboost=M.opt.rf_boost,
-            nzero=M.opt.rf_pivot_tol,
+            # nboost=M.opt.rf_boost,
+            # nzero=M.opt.rf_pivot_tol,
         )
     end
     CUSOLVERRF.rf_refactor!(M.inner, M.full)
@@ -90,7 +90,7 @@ end
 function MadNLP.solve!(M::RFSolver{T}, x) where T
     CUSOLVERRF.rf_solve!(M.inner, x)
     # this is necessary to not distort the timing in MadNLP
-    copyto!(M.dummy, M.dummy)
+    copyto!(M.buffer, M.buffer)
     synchronize(CUDABackend())
     # -----------------------------------------------------
     return x
@@ -123,7 +123,7 @@ MadNLP.introduce(M::RFSolver) = "cuSolverRF"
 #     tril::CUSPARSE.CuSparseMatrixCSC{T}
 #     full::CUSPARSE.CuSparseMatrixCSR{T}
 #     tril_to_full_view::CuSubVector{T}
-#     dummy::CUDA.CuVector{T}
+#     buffer::CUDA.CuVector{T}
 
 #     opt::GLUSolverOptions
 #     logger::MadNLP.MadNLPLogger
@@ -165,7 +165,7 @@ MadNLP.introduce(M::RFSolver) = "cuSolverRF"
 # function MadNLP.solve!(M::GLUSolver{T}, x) where T
 #     CUSOLVERRF.glu_solve!(M.inner, x)
 #     # this is necessary to not distort the timing in MadNLP
-#     copyto!(M.dummy, M.dummy)
+#     copyto!(M.buffer, M.buffer)
 #     synchronize(CUDABackend())
 #     # -----------------------------------------------------
 #     return x
