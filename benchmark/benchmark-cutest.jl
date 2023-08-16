@@ -5,7 +5,7 @@ include("config.jl")
 if SOLVER == "master" || SOLVER == "current"
     @everywhere begin
         using MadNLP, MadNLPHSL
-        LinSol = @isdefined(MadNLPMa57) ? MadNLPMa57 : Ma57Solver
+        LinSol = @isdefined(MadNLPMa57) ? MadNLPMa57 : MadNLPMa57 # for older version of MadNLP
         solver = nlp -> madnlp(nlp,linear_solver=LinSol,max_wall_time=900., print_level=PRINT_LEVEL, tol=1e-6)
         function get_status(code::MadNLP.Status)
             if code == MadNLP.SOLVE_SUCCEEDED
