@@ -4,7 +4,7 @@
 
 @kernel function _copy_diag!(dest, src)
     i = @index(Global)
-    dest[i] = src[i, i]
+    @inbounds dest[i] = src[i, i]
 end
 
 function MadNLP.diag!(dest::CuVector{T}, src::CuMatrix{T}) where T
@@ -15,7 +15,7 @@ end
 
 @kernel function _add_diagonal!(dest, src1, src2)
     i = @index(Global)
-    dest[i, i] = src1[i] + src2[i]
+    @inbounds dest[i, i] = src1[i] + src2[i]
 end
 
 function MadNLP.diag_add!(dest::CuMatrix, src1::CuVector, src2::CuVector)
@@ -57,7 +57,7 @@ MadNLP.is_valid(src::CuArray) = true
     dest, hess, jac, pr_diag, du_diag, diag_hess, ind_ineq, n, m, ns
 )
     i, j = @index(Global, NTuple)
-    if (i <= n)
+    @inbounds if (i <= n)
         # Transfer Hessian
         if (i == j)
             dest[i, i] = pr_diag[i] + diag_hess[i]
@@ -109,7 +109,7 @@ end
     dest, jac, diag_buffer, ind_ineq,  m_ineq,
 )
     i, j = @index(Global, NTuple)
-    is = ind_ineq[i]
+    @inbounds is = ind_ineq[i]
     @inbounds dest[i, j] = jac[is, j] * sqrt(diag_buffer[i])
 end
  
@@ -134,20 +134,20 @@ end
     i, j = @index(Global, NTuple)
 
     # Transfer Hessian
-    if i <= n
+    @inbounds if i <= n
         if i == j
-            @inbounds dest[i, i] += pr_diag[i] + hess[i, i]
+            dest[i, i] += pr_diag[i] + hess[i, i]
         else
-            @inbounds dest[i, j] += hess[i, j]
+            dest[i, j] += hess[i, j]
         end
     elseif i <= n + m_eq
         i_ = i - n
-        @inbounds is = ind_eq[i_]
+        is = ind_eq[i_]
         # Jacobian / equality
-        @inbounds dest[i_ + n, j] = jac[is, j]
-        @inbounds dest[j, i_ + n] = jac[is, j]
+        dest[i_ + n, j] = jac[is, j]
+        dest[j, i_ + n] = jac[is, j]
         # Transfer dual regularization
-        @inbounds dest[i_ + n, i_ + n] = du_diag[is]
+        dest[i_ + n, i_ + n] = du_diag[is]
     end
 end
 
@@ -178,6 +178,8 @@ end
     A, inds, a
     )
     i = @index(Global)
-    index = inds[i]
-    A[index,index] = a
+    @inbounds begin
+        index = inds[i]
+        A[index,index] = a
+    end
 end

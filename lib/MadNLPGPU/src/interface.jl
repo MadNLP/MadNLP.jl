@@ -50,13 +50,13 @@ end
 
 @kernel function _transfer!(y, @Const(ptr), @Const(x))
     index = @index(Global)
-    i,j = ptr[index]
-    y[i] += x[j]
+    @inbounds i,j = ptr[index]
+    @inbounds y[i] += x[j]
 end
 
 @kernel function _jtsj!(y, @Const(ptr), @Const(ptrptr), @Const(x), @Const(s))
     index = @index(Global)
-    for index2 in ptrptr[index]:ptrptr[index+1]-1
+    @inbounds for index2 in ptrptr[index]:ptrptr[index+1]-1
         i,(j,k,l) = ptr[index2]
         y[i] += s[j] * x[k] * x[l]
     end
@@ -139,9 +139,11 @@ function MadNLP.mul!(
 end
 @kernel function diag_operation(y,@Const(A),@Const(x),@Const(alpha),@Const(idx_to),@Const(idx_fr))
     i = @index(Global)
-    to = idx_to[i]
-    fr = idx_fr[i]
-    y[to] -= alpha * A[fr] * x[to]
+    @inbounds begin
+        to = idx_to[i]
+        fr = idx_fr[i]
+        y[to] -= alpha * A[fr] * x[to]
+    end
 end
 
 function MadNLP.mul_hess_blk!(
@@ -207,7 +209,7 @@ end
 
 @kernel function _transfer!(y, @Const(ptr), @Const(ptrptr), @Const(x))
     index = @index(Global)
-    for index2 in ptrptr[index]:ptrptr[index+1]-1
+    @inbounds for index2 in ptrptr[index]:ptrptr[index+1]-1
         i,j = ptr[index2]
         y[i] += x[j]
     end
@@ -242,7 +244,7 @@ end
 
 @kernel function ker_build_condensed_aug_symbolic_hess(sym, sym2, @Const(colptr), @Const(rowval))
     i = @index(Global)
-    for j in colptr[i]:colptr[i+1]-1
+    @inbounds for j in colptr[i]:colptr[i+1]-1
         c = rowval[j]
         sym[j] = (0,j,0)
         sym2[j] = (c,i)
@@ -291,13 +293,15 @@ end
 
 @kernel function ker_set_colptr(colptr, @Const(sym2), @Const(ptr2), @Const(guide))
     idx = @index(Global)
-    i = ptr2[idx+1]
+    @inbounds begin
+        i = ptr2[idx+1]
 
-    (~, prevcol) = sym2[i-1]
-    (row, col)   = sym2[i]
+        (~, prevcol) = sym2[i-1]
+        (row, col)   = sym2[i]
 
-    for j in prevcol+1:col
-        colptr[j] = guide[i]
+        for j in prevcol+1:col
+            colptr[j] = guide[i]
+        end
     end
 end
 
