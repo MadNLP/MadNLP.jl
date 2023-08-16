@@ -346,4 +346,11 @@ end
     end
 end
 
-
+if VERSION < v"1.10" 
+    function MadNLP.mul_hess_blk!(wx::CuVector{T}, kkt::Union{MadNLP.DenseKKTSystem,MadNLP.DenseCondensedKKTSystem}, t) where T
+        n = size(kkt.hess, 1)
+        CUDA.CUBLAS.symv!('L', one(T), kkt.hess, @view(t[1:n]), zero(T), @view(wx[1:n]))
+        fill!(@view(wx[n+1:end]), 0)
+        wx .+= t .* kkt.pr_diag
+    end
+end

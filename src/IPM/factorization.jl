@@ -214,6 +214,7 @@ function mul_hess_blk!(wx, kkt::Union{DenseKKTSystem,DenseCondensedKKTSystem}, t
     fill!(@view(wx[n+1:end]), 0)
     wx .+= t .* kkt.pr_diag
 end
+    
 function mul_hess_blk!(wx, kkt::Union{SparseKKTSystem,SparseCondensedKKTSystem}, t)
     n = size(kkt.hess_com, 1)
     mul!(@view(wx[1:n]), Symmetric(kkt.hess_com, :L), @view(t[1:n]))
