@@ -92,10 +92,8 @@ function solve!(kkt::SparseCondensedKKTSystem{T}, w::AbstractKKTVector)  where T
     ws = view(full(w), n+1:n+m)
     wz = view(full(w), n+m+1:n+2*m)
     Σs = view(kkt.pr_diag, n+1:n+m)
-
+    
     reduce_rhs!(w.xp_lr, dual_lb(w), kkt.l_diag, w.xp_ur, dual_ub(w), kkt.u_diag)
-
-
 
     kkt.buffer .= kkt.diag_buffer .* (wz .+ ws ./ Σs) 
     
