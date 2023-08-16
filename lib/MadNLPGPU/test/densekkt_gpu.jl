@@ -16,15 +16,21 @@ function _compare_gpu_with_cpu(KKTSystem, n, m, ind_fixed)
             :tol=>tol
         )
 
-        nlp = MadNLPTests.DenseDummyQP(zeros(T,n); m=m, fixed_variables=ind_fixed)
+        nlph = MadNLPTests.DenseDummyQP(zeros(T,n); m=m, fixed_variables=ind_fixed)
+
+        # Some weird issue: there's some non-deterministic behavior in generating the model for the first call
+        # Not sure where this error is originating, but seems to be resolved in v1.10
+        # Here, we call this twice to avoid this error
+        nlpd = MadNLPTests.DenseDummyQP(CUDA.zeros(T,n); m=m, fixed_variables=CuArray(ind_fixed))
+        
+        nlpd = MadNLPTests.DenseDummyQP(CUDA.zeros(T,n); m=m, fixed_variables=CuArray(ind_fixed))
 
         # Solve on CPU
-        h_solver = MadNLPSolver(nlp; madnlp_options...)
+        h_solver = MadNLPSolver(nlph; madnlp_options...)
         results_cpu = MadNLP.solve!(h_solver)
 
-        nlp = MadNLPTests.DenseDummyQP(CUDA.zeros(T,n); m=m, fixed_variables=CuArray(ind_fixed))
         # Solve on GPU
-        d_solver = MadNLPSolver(nlp; madnlp_options...)
+        d_solver = MadNLPSolver(nlpd; madnlp_options...)
         results_gpu = MadNLP.solve!(d_solver)
 
         @test isa(d_solver.kkt, KKTSystem{T})
