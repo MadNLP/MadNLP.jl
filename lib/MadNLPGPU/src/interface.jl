@@ -146,7 +146,7 @@ end
 
 function MadNLP.mul_hess_blk!(
     wx::VT,
-    kkt::MadNLP.SparseKKTSystem,MadNLP.SparseCondensedKKTSystem,
+    kkt::Union{MadNLP.SparseKKTSystem,MadNLP.SparseCondensedKKTSystem},
     t
     ) where {T, VT <: CuVector{T}}
     
