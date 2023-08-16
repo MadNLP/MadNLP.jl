@@ -56,11 +56,9 @@ function initialize!(solver::AbstractMadNLPSolver{T}) where T
     if !solver.opt.dual_initialized
         set_initial_rhs!(solver, solver.kkt)
         factorize_wrapper!(solver)
-        solver.cnt.linear_solver_time += @elapsed begin
-            is_solved = solve_refine_wrapper!(
-                solver.d, solver, solver.p, solver._w5
-            )
-        end
+        is_solved = solve_refine_wrapper!(
+            solver.d, solver, solver.p, solver._w5
+        )
         if !is_solved || (norm(dual(solver.d), Inf) > solver.opt.constr_mult_init_max)
             fill!(solver.y, zero(T))
         else
@@ -494,11 +492,9 @@ function restore!(solver::AbstractMadNLPSolver{T}) where T
 
         dual_inf_perturbation!(primal(solver.p),solver.ind_llb,solver.ind_uub,solver.mu,solver.opt.kappa_d)
         factorize_wrapper!(solver)
-        solver.cnt.linear_solver_time += @elapsed begin
-            solve_refine_wrapper!(
-                solver.d, solver, solver.p, solver._w5
-            )
-        end
+        solve_refine_wrapper!(
+            solver.d, solver, solver.p, solver._w5
+        )
 
         solver.ftype = "f"
     end
@@ -565,14 +561,6 @@ function robust!(solver::MadNLPSolver{T}) where T
         # without inertia correction,
         @trace(solver.logger,"Solving restoration phase primal-dual system.")
         set_aug_rhs_RR!(solver, solver.kkt, RR, solver.opt.rho)
-        # dual_inf_perturbation!(primal(solver.p),solver.ind_llb,solver.ind_uub,solver.mu,solver.opt.kappa_d)
-        
-        # factorize_wrapper!(solver)
-        # solver.cnt.linear_solver_time += @elapsed begin
-        #     solve_refine_wrapper!(
-        #         solver.d, solver, solver.p, solver._w5
-        #     )
-        # end
         
         inertia_correction!(solver.inertia_corrector, solver) || return RESTORATION_FAILED
 
@@ -718,11 +706,9 @@ function robust!(solver::MadNLPSolver{T}) where T
             initialize!(solver.kkt)
 
             factorize_wrapper!(solver)
-            solver.cnt.linear_solver_time += @elapsed begin
-                solve_refine_wrapper!(
-                    solver.d, solver, solver.p, solver._w5
-                )
-            end
+            solve_refine_wrapper!(
+                solver.d, solver, solver.p, solver._w5
+            )
             if norm(dual(solver.d), Inf)>solver.opt.constr_mult_init_max
                 fill!(solver.y, zero(T))
             else
@@ -767,11 +753,9 @@ function second_order_correction(solver::AbstractMadNLPSolver,alpha_max,theta,va
             primal(solver.p),
             solver.ind_llb,solver.ind_uub,solver.mu,solver.opt.kappa_d,
         )
-        solver.cnt.linear_solver_time += @elapsed begin
-            solve_refine_wrapper!(
-                solver._w1, solver, solver.p, solver._w5
-            )
-        end
+        solve_refine_wrapper!(
+            solver._w1, solver, solver.p, solver._w5
+        )
         alpha_soc = get_alpha_max(
             primal(solver.x),
             primal(solver.xl),
@@ -830,12 +814,11 @@ function inertia_correction!(
 
     num_pos,num_zero,num_neg = inertia(solver.kkt.linear_solver)
     
-    solver.cnt.linear_solver_time += @elapsed begin
-        solve_status = !is_inertia_correct(solver.kkt, num_pos, num_zero, num_neg) ?
-            false : solve_refine_wrapper!(
-                solver.d, solver, solver.p, solver._w5,
-            )
-    end
+    
+    solve_status = !is_inertia_correct(solver.kkt, num_pos, num_zero, num_neg) ?
+        false : solve_refine_wrapper!(
+            solver.d, solver, solver.p, solver._w5,
+        )
     
     
     while !solve_status
@@ -859,12 +842,10 @@ function inertia_correction!(
         factorize_wrapper!(solver)
         num_pos,num_zero,num_neg = inertia(solver.kkt.linear_solver)
 
-        solver.cnt.linear_solver_time += @elapsed begin
-            solve_status = !is_inertia_correct(solver.kkt, num_pos, num_zero, num_neg) ?
-                false : solve_refine_wrapper!(
-                    solver.d, solver, solver.p, solver._w5
-                )
-        end
+        solve_status = !is_inertia_correct(solver.kkt, num_pos, num_zero, num_neg) ?
+            false : solve_refine_wrapper!(
+                solver.d, solver, solver.p, solver._w5
+            )
         n_trial += 1
     end
     
@@ -894,13 +875,11 @@ function inertia_correction!(
 
     factorize_wrapper!(solver)
 
-    solver.cnt.linear_solver_time += @elapsed begin
-        solve_status = solve_refine_wrapper!(
-            d0, solver, p0, solver._w3,
-        ) && solve_refine_wrapper!(
-            solver.d, solver, solver.p, solver._w5,
-        )
-    end
+    solve_status = solve_refine_wrapper!(
+        d0, solver, p0, solver._w3,
+    ) && solve_refine_wrapper!(
+        solver.d, solver, solver.p, solver._w5,
+    )
     copyto!(t,dx)
     axpy!(-1.,n,t)
 
@@ -922,13 +901,11 @@ function inertia_correction!(
         del_w_prev = solver.del_w
 
         factorize_wrapper!(solver)
-        solver.cnt.linear_solver_time += @elapsed begin
-            solve_status = solve_refine_wrapper!(
-                d0, solver, p0, solver._w5
-            ) && solve_refine_wrapper!(
-                solver.d, solver, solver.p, solver._w6
-            )
-        end
+        solve_status = solve_refine_wrapper!(
+            d0, solver, p0, solver._w5
+        ) && solve_refine_wrapper!(
+            solver.d, solver, solver.p, solver._w6
+        )
         copyto!(t,dx)
         axpy!(-1.,n,t)
 
@@ -951,11 +928,9 @@ function inertia_correction!(
 
     factorize_wrapper!(solver)
 
-    solver.cnt.linear_solver_time += @elapsed begin
-        solve_status = solve_refine_wrapper!(
-            solver.d, solver, solver.p, solver._w5,
-        )
-    end
+    solve_status = solve_refine_wrapper!(
+        solver.d, solver, solver.p, solver._w5,
+    )
     while !solve_status
         @debug(solver.logger,"Primal-dual perturbed.")
         if n_trial == 0
@@ -974,11 +949,9 @@ function inertia_correction!(
         del_w_prev = solver.del_w
 
         factorize_wrapper!(solver)
-        solver.cnt.linear_solver_time += @elapsed begin
-            solve_status = solve_refine_wrapper!(
-                solver.d, solver, solver.p, solver._w5
-            )
-        end
+        solve_status = solve_refine_wrapper!(
+            solver.d, solver, solver.p, solver._w5
+        )
         n_trial += 1
     end
     solver.del_w != 0 && (solver.del_w_last = solver.del_w)

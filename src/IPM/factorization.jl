@@ -1,13 +1,19 @@
 function solve_refine_wrapper!(d, solver, p, w)
-    if solve_refine!(d, solver.iterator, p, w)
-        return true
-    else
-        if improve!(solver.kkt.linear_solver)
-            return solve_refine!(d, solver.iterator, p, w)
+    result = false
+    
+    solver.cnt.linear_solver_time += @elapsed begin
+        if solve_refine!(d, solver.iterator, p, w)
+            result = true
         else
-            return false
+            if improve!(solver.kkt.linear_solver)
+                if solve_refine!(d, solver.iterator, p, w)
+                    result = true
+                end
+            end
         end
     end
+
+    return result
 end
 function factorize_wrapper!(solver::MadNLPSolver)
     @trace(solver.logger,"Factorization started.")
