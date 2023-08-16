@@ -98,9 +98,7 @@ end
 
 function MadNLP.mul!(
     w::MadNLP.AbstractKKTVector{T,VT},
-    kkt::Union{
-        MadNLP.SparseCondensedKKTSystem
-    },
+    kkt::MadNLP.SparseCondensedKKTSystem,
     x::MadNLP.AbstractKKTVector,
     alpha = one(T), beta = zero(T)
     ) where {T, VT <: CuVector{T}}
@@ -148,7 +146,7 @@ end
 
 function MadNLP.mul_hess_blk!(
     wx::VT,
-    kkt::Union{MadNLP.SparseKKTSystem,MadNLP.SparseCondensedKKTSystem},
+    kkt::MadNLP.SparseKKTSystem,MadNLP.SparseCondensedKKTSystem,
     t
     ) where {T, VT <: CuVector{T}}
     
