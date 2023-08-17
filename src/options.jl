@@ -137,8 +137,8 @@ function default_sparse_solver(nlp::AbstractNLPModel)
 end
 
 function check_option_sanity(options)
-    is_kkt_dense = (options.kkt_system == DENSE_KKT_SYSTEM) || (options.kkt_system == DENSE_CONDENSED_KKT_SYSTEM)
-    is_hess_approx_dense = (options.hessian_approximation == DENSE_BFGS) || (options.hessian_approximation == DENSE_DAMPED_BFGS)
+    is_kkt_dense = options.kkt_system <: AbstractDenseKKTSystem
+    is_hess_approx_dense = options.hessian_approximation <: Union{DenseBFGS, DenseDampedBFGS}
     if input_type(options.linear_solver) == :csc && is_kkt_dense
         error("[options] Sparse Linear solver is not supported in dense mode.\n"*
               "Please use a dense linear solver or change `kkt_system` ")
