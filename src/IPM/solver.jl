@@ -322,7 +322,11 @@ function regular!(solver::AbstractMadNLPSolver{T}) where T
                     if (solver.cnt.restoration_fail_count += 1) >= 4
                         return solver.cnt.acceptable_cnt >0 ?
                             SOLVED_TO_ACCEPTABLE_LEVEL : SEARCH_DIRECTION_BECOMES_TOO_SMALL
-                    else # Experimental
+                    else
+                        # (experimental) while giving up directly
+                        # we give MadNLP.jl second chance to explore
+                        # some possibility at the current iterate
+
                         fill!(solver.y, zero(T))
                         fill!(solver.zl_r, one(T))
                         fill!(solver.zu_r, one(T))
@@ -635,7 +639,11 @@ function robust!(solver::MadNLPSolver{T}) where T
                 @debug(solver.logger,"Restoration phase cannot find an acceptable step at iteration $(solver.cnt.k).")
                 if (solver.cnt.restoration_fail_count += 1) >= 4
                     return RESTORATION_FAILED
-                else # Experimental
+                else
+                    # (experimental) while giving up directly
+                    # we give MadNLP.jl second chance to explore
+                    # some possibility at the current iterate
+                    
                     fill!(solver.y, zero(T))
                     fill!(solver.zl_r, one(T))
                     fill!(solver.zu_r, one(T))
@@ -714,15 +722,9 @@ function robust!(solver::MadNLPSolver{T}) where T
             else
                 copyto!(solver.y, dual(solver.d))
             end
-            # fill!(solver.zl_r, one(T)) # Experimental
-            # fill!(solver.zu_r, one(T)) # Experimental
             
             solver.cnt.k+=1
             solver.cnt.t+=1
-
-            # # Experimental: empty the filter before returning to regular phase
-            # empty!(solver.filter)
-            # push!(solver.filter,(solver.theta_max,-Inf))
 
             return REGULAR
         end
