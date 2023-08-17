@@ -49,8 +49,7 @@ end
     @testset "Size: ($n, $m)" for (n, m) in [(10, 0), (10, 5), (50, 10)]
         _compare_gpu_with_cpu(kkt_system, n, m, Int[])
     end
-    @testset "Fixed variables" begin
-        n, m = 20, 0 # warning: setting m >= 1 does not work in inertia free mode
+    @testset "Fixed variables" for (n,m) in [(10, 0), (10, 5), (50, 10)]
         _compare_gpu_with_cpu(kkt_system, n, m, Int[1, 2])
     end
 end

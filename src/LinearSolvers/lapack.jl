@@ -3,7 +3,7 @@
 end
 
 mutable struct LapackCPUSolver{T, MT} <: AbstractLinearSolver{T}
-    mat::MT
+    A::MT
     fact::Matrix{T}
     work::Vector{T}
     lwork::BlasInt
@@ -72,16 +72,16 @@ for (sytrf,sytrs,getrf,getrs,geqrf,ormqr,trsm,potrf,potrs,typ) in (
 end
 
 function LapackCPUSolver(
-    mat::MT;
+    A::MT;
     opt=LapackOptions(),
     logger=MadNLPLogger(),
 ) where {T, MT <: AbstractMatrix{T}}
-    fact = Matrix{T}(undef, size(mat))
+    fact = Matrix{T}(undef, size(A))
     etc = Dict{Symbol,Any}()
     work = Vector{T}(undef, 1)
     info = Ref(0)
 
-    return LapackCPUSolver(mat,fact,work,-1,info,etc,opt,logger)
+    return LapackCPUSolver(A,fact,work,-1,info,etc,opt,logger)
 end
 
 
@@ -114,9 +114,9 @@ end
 
 function factorize_bunchkaufman!(M::LapackCPUSolver)
     size(M.fact,1) == 0 && return M
-    haskey(M.etc,:ipiv) || (M.etc[:ipiv] = Vector{BlasInt}(undef,size(M.mat,1)))
+    haskey(M.etc,:ipiv) || (M.etc[:ipiv] = Vector{BlasInt}(undef,size(M.A,1)))
     M.lwork = -1
-    M.fact .= M.mat
+    M.fact .= M.A
     sytrf('L',size(M.fact,1),M.fact,size(M.fact,2),M.etc[:ipiv],M.work,M.lwork,M.info)
     M.lwork = BlasInt(real(M.work[1]))
     length(M.work) < M.lwork && resize!(M.work,M.lwork)
@@ -131,8 +131,8 @@ end
 
 function factorize_lu!(M::LapackCPUSolver)
     size(M.fact,1) == 0 && return M
-    haskey(M.etc,:ipiv) || (M.etc[:ipiv] = Vector{BlasInt}(undef,size(M.mat,1)))
-    M.fact .= M.mat
+    haskey(M.etc,:ipiv) || (M.etc[:ipiv] = Vector{BlasInt}(undef,size(M.A,1)))
+    M.fact .= M.A
     tril_to_full!(M.fact)
     getrf(size(M.fact,1),size(M.fact,2),M.fact,size(M.fact,2),M.etc[:ipiv],M.info)
     return M
@@ -147,9 +147,9 @@ end
 
 function factorize_qr!(M::LapackCPUSolver{T}) where T
     size(M.fact,1) == 0 && return M
-    haskey(M.etc,:tau) || (M.etc[:tau] = Vector{T}(undef,size(M.mat,1)))
+    haskey(M.etc,:tau) || (M.etc[:tau] = Vector{T}(undef,size(M.A,1)))
     M.lwork = -1
-    M.fact .= M.mat
+    M.fact .= M.A
     tril_to_full!(M.fact)
     geqrf(size(M.fact,1),size(M.fact,2),M.fact,size(M.fact,2),M.etc[:tau],M.work,M.lwork,M.info)
     M.lwork = BlasInt(real(M.work[1]))
@@ -172,7 +172,7 @@ end
 function factorize_cholesky!(M::LapackCPUSolver)
     size(M.fact,1) == 0 && return M
     M.lwork = -1
-    M.fact .= M.mat
+    M.fact .= M.A
     potrf('L',size(M.fact,1),M.fact,size(M.fact,2),M.info)
     return M
 end

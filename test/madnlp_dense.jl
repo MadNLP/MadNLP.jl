@@ -68,7 +68,7 @@ end
 
         kkt = solverd.kkt
         @test isempty(kkt.jac)
-        @test solverd.kkt.linear_solver.mat === kkt.aug_com 
+        @test solverd.kkt.linear_solver.A === kkt.aug_com 
         @test size(kkt.hess) == (n, n)
         @test length(kkt.pr_diag) == n
         @test length(kkt.du_diag) == m
@@ -93,7 +93,7 @@ end
         kkt = solverd.kkt
         @test isa(kkt, MadNLP.DenseKKTSystem)
         @test size(kkt.jac) == (m, n)
-        @test solverd.kkt.linear_solver.mat === kkt.aug_com
+        @test solverd.kkt.linear_solver.A === kkt.aug_com
         @test size(kkt.hess) == (n, n)
         @test length(kkt.pr_diag) == n + ns
         @test length(kkt.du_diag) == m

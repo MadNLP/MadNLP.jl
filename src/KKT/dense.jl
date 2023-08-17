@@ -7,7 +7,7 @@ Implement [`AbstractReducedKKTSystem`](@ref) with dense matrices.
 Requires a dense linear solver to be factorized (otherwise an error is returned).
 
 """
-mutable struct DenseKKTSystem{
+struct DenseKKTSystem{
     T,
     VT <: AbstractVector{T},
     MT <: AbstractMatrix{T},
@@ -33,10 +33,6 @@ mutable struct DenseKKTSystem{
     ind_ineq::VI
     ind_lb::VI
     ind_ub::VI
-    # Regularization
-    del_w::T
-    del_w_last::T
-    del_c::T
     # Linear Solver
     linear_solver::LS
     # Buffers
@@ -82,16 +78,11 @@ function create_kkt_system(
     quasi_newton = create_quasi_newton(opt.hessian_approximation, cb, n)
     cnt.linear_solver_time += @elapsed linear_solver = opt.linear_solver(aug_com; opt = opt_linear_solver)
     
-    del_w = one(T)
-    del_w_last = zero(T)
-    del_c = zero(T)
-
     return DenseKKTSystem(
         hess, jac, quasi_newton,
         reg, pr_diag, du_diag, l_diag, u_diag, l_lower, u_lower,
         diag_hess, aug_com,
         ind_ineq, ind_cons.ind_lb, ind_cons.ind_ub,
-        del_w, del_w_last, del_c,
         linear_solver,
         Dict{Symbol, Any}(), 
     )
@@ -105,7 +96,7 @@ Implement [`AbstractCondensedKKTSystem`](@ref) with dense matrices.
 Requires a dense linear solver to factorize the associated KKT system (otherwise an error is returned).
 
 """
-mutable struct DenseCondensedKKTSystem{
+struct DenseCondensedKKTSystem{
     T,
     VT <: AbstractVector{T},
     MT <: AbstractMatrix{T},
@@ -141,10 +132,6 @@ mutable struct DenseCondensedKKTSystem{
     ind_lb::VI
     ind_ub::VI
     ind_ineq_shifted::VI
-    # Regularization
-    del_w::T
-    del_w_last::T
-    del_c::T
     # Linear Solver
     linear_solver::LS
     # Buffers
@@ -194,10 +181,6 @@ function create_kkt_system(
     quasi_newton = create_quasi_newton(opt.hessian_approximation, cb, n)
     cnt.linear_solver_time += @elapsed linear_solver = opt.linear_solver(aug_com; opt = opt_linear_solver)
     
-    del_w = one(T)
-    del_w_last = zero(T)
-    del_c = zero(T)
-
     return DenseCondensedKKTSystem(
         hess, jac, quasi_newton, jac_ineq,
         reg, pr_diag, du_diag, l_diag, u_diag, l_lower, u_lower,
@@ -207,7 +190,6 @@ function create_kkt_system(
         ns,
         ind_cons.ind_ineq, ind_cons.ind_lb, ind_cons.ind_ub,
         ind_ineq_shifted,
-        del_w, del_w_last, del_c,
         linear_solver,
         Dict{Symbol, Any}(),
     )
@@ -223,7 +205,7 @@ const AbstractDenseKKTSystem{T, VT, MT, QN} = Union{
     Generic functions
 =#
 
-@views function jtprod!(y::AbstractVector, kkt::AbstractDenseKKTSystem, x::AbstractVector)
+function jtprod!(y::AbstractVector, kkt::AbstractDenseKKTSystem, x::AbstractVector)
     nx = size(kkt.hess, 1)
     ind_ineq = kkt.ind_ineq
     ns = length(ind_ineq)
@@ -232,7 +214,7 @@ const AbstractDenseKKTSystem{T, VT, MT, QN} = Union{
     # / x
     mul!(yx, kkt.jac', x)
     # / s
-    ys .= -x[ind_ineq]
+    ys .= -@view(x[ind_ineq])
     return
 end
 
