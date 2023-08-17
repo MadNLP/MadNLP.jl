@@ -57,7 +57,7 @@ function initialize!(solver::AbstractMadNLPSolver{T}) where T
         set_initial_rhs!(solver, solver.kkt)
         factorize_wrapper!(solver)
         is_solved = solve_refine_wrapper!(
-            solver.d, solver, solver.p, solver._w5
+            solver.d, solver, solver.p, solver._w4
         )
         if !is_solved || (norm(dual(solver.d), Inf) > solver.opt.constr_mult_init_max)
             fill!(solver.y, zero(T))
@@ -497,7 +497,7 @@ function restore!(solver::AbstractMadNLPSolver{T}) where T
         dual_inf_perturbation!(primal(solver.p),solver.ind_llb,solver.ind_uub,solver.mu,solver.opt.kappa_d)
         factorize_wrapper!(solver)
         solve_refine_wrapper!(
-            solver.d, solver, solver.p, solver._w5
+            solver.d, solver, solver.p, solver._w4
         )
 
         solver.ftype = "f"
@@ -715,7 +715,7 @@ function robust!(solver::MadNLPSolver{T}) where T
 
             factorize_wrapper!(solver)
             solve_refine_wrapper!(
-                solver.d, solver, solver.p, solver._w5
+                solver.d, solver, solver.p, solver._w4
             )
             if norm(dual(solver.d), Inf)>solver.opt.constr_mult_init_max
                 fill!(solver.y, zero(T))
@@ -756,7 +756,7 @@ function second_order_correction(solver::AbstractMadNLPSolver,alpha_max,theta,va
             solver.ind_llb,solver.ind_uub,solver.mu,solver.opt.kappa_d,
         )
         solve_refine_wrapper!(
-            solver._w1, solver, solver.p, solver._w5
+            solver._w1, solver, solver.p, solver._w4
         )
         alpha_soc = get_alpha_max(
             primal(solver.x),
@@ -819,7 +819,7 @@ function inertia_correction!(
     
     solve_status = !is_inertia_correct(solver.kkt, num_pos, num_zero, num_neg) ?
         false : solve_refine_wrapper!(
-            solver.d, solver, solver.p, solver._w5,
+            solver.d, solver, solver.p, solver._w4,
         )
     
     
@@ -846,7 +846,7 @@ function inertia_correction!(
 
         solve_status = !is_inertia_correct(solver.kkt, num_pos, num_zero, num_neg) ?
             false : solve_refine_wrapper!(
-                solver.d, solver, solver.p, solver._w5
+                solver.d, solver, solver.p, solver._w4
             )
         n_trial += 1
     end
@@ -880,7 +880,7 @@ function inertia_correction!(
     solve_status = solve_refine_wrapper!(
         d0, solver, p0, solver._w3,
     ) && solve_refine_wrapper!(
-        solver.d, solver, solver.p, solver._w5,
+        solver.d, solver, solver.p, solver._w4,
     )
     copyto!(t,dx)
     axpy!(-1.,n,t)
@@ -904,9 +904,9 @@ function inertia_correction!(
 
         factorize_wrapper!(solver)
         solve_status = solve_refine_wrapper!(
-            d0, solver, p0, solver._w5
+            d0, solver, p0, solver._w3
         ) && solve_refine_wrapper!(
-            solver.d, solver, solver.p, solver._w6
+            solver.d, solver, solver.p, solver._w4
         )
         copyto!(t,dx)
         axpy!(-1.,n,t)
@@ -931,7 +931,7 @@ function inertia_correction!(
     factorize_wrapper!(solver)
 
     solve_status = solve_refine_wrapper!(
-        solver.d, solver, solver.p, solver._w5,
+        solver.d, solver, solver.p, solver._w4,
     )
     while !solve_status
         @debug(solver.logger,"Primal-dual perturbed.")
@@ -952,7 +952,7 @@ function inertia_correction!(
 
         factorize_wrapper!(solver)
         solve_status = solve_refine_wrapper!(
-            solver.d, solver, solver.p, solver._w5
+            solver.d, solver, solver.p, solver._w4
         )
         n_trial += 1
     end
