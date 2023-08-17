@@ -10,21 +10,6 @@
       WARN   = 5,
       ERROR  = 6)
 
-@enum(KKTLinearSystem::Int,
-      SPARSE_KKT_SYSTEM = 1,
-      SPARSE_CONDENSED_KKT_SYSTEM = 2, 
-      SPARSE_UNREDUCED_KKT_SYSTEM = 3,
-      DENSE_KKT_SYSTEM = 4,
-      DENSE_CONDENSED_KKT_SYSTEM = 5,
-)
-
-@enum(HessianApproximation::Int,
-      EXACT_HESSIAN = 1,
-      DENSE_BFGS = 2,
-      DENSE_DAMPED_BFGS = 3,
-      SPARSE_COMPACT_LBFGS = 4,
-)
-
 @enum(BFGSInitStrategy::Int,
       SCALAR1  = 1,
       SCALAR2  = 2,
