@@ -41,10 +41,6 @@ end
     MadNLP kernels
 =#
 
-# Overload MadNLP.is_valid to avoid fallback to default is_valid, slow on GPU
-MadNLP.is_valid(src::CuArray) = true
-
-
 # #=
 #     AbstractDenseKKTSystem
 # =#

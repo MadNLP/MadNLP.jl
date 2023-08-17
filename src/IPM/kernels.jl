@@ -296,14 +296,14 @@ function finish_aug_solve_RR!(dpp, dnn, dzp, dzn, l, dl, pp, nn, zp, zn, mu_R, r
 end
 
 # Kernel functions ---------------------------------------------------------
-is_valid(val::Real) = !(isnan(val) || isinf(val))
-function is_valid(vec::AbstractArray)
+is_valid(val::R) where R <: Real = !(isnan(val) || isinf(val))
+function is_valid(vec::VT) where {VT <: Union{Vector,Matrix}}
     @inbounds @simd for i=1:length(vec)
         is_valid(vec[i]) || return false
     end
     return true
 end
-is_valid(args...) = all(is_valid(arg) for arg in args)
+is_valid(vec::AbstractArray) where T = isempty(vec) ? true : mapreduce(is_valid, &, vec)
 
 # temporaily commented out
 function get_varphi(obj_val, x_lr::SubVector{T,Vector{T},VI}, xl_r, xu_r, x_ur, mu) where {T, VI}
