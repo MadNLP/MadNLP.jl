@@ -337,7 +337,7 @@ function regular!(solver::AbstractMadNLPSolver{T}) where T
         end
 
         # this implements the heuristics in Section 3.2 of Ipopt paper.
-        # Case I is only implemented without crietria on \theta.
+        # Case I is only implemented
         if unsuccessful_iterate
             if (solver.cnt.unsuccessful_iterate += 1) >= 4
                 if solver.theta_max/10 > theta_trial

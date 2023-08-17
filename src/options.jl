@@ -138,7 +138,7 @@ end
 
 function check_option_sanity(options)
     is_kkt_dense = options.kkt_system <: AbstractDenseKKTSystem
-    is_hess_approx_dense = options.hessian_approximation <: Union{DenseBFGS, DenseDampedBFGS}
+    is_hess_approx_dense = options.hessian_approximation <: Union{BFGS, DampedBFGS}
     if input_type(options.linear_solver) == :csc && is_kkt_dense
         error("[options] Sparse Linear solver is not supported in dense mode.\n"*
               "Please use a dense linear solver or change `kkt_system` ")
