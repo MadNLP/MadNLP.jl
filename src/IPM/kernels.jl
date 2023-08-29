@@ -1,29 +1,27 @@
 
 # KKT system updates -------------------------------------------------------
 # Set diagonal
-# temporaily commented out
-# function set_aug_diagonal!(kkt::AbstractKKTSystem, solver::MadNLPSolver{T}) where T
-#     x = full(solver.x)
-#     xl = full(solver.xl)
-#     xu = full(solver.xu)
-#     zl = full(solver.zl)
-#     zu = full(solver.zu)
-#     @inbounds @simd for i in eachindex(kkt.pr_diag)
-#         kkt.pr_diag[i] = zl[i] /(x[i] - xl[i])
-#         kkt.pr_diag[i] += zu[i] /(xu[i] - x[i])
-#     end
-#     fill!(kkt.du_diag, zero(T))
-#     @inbounds @simd for i in eachindex(kkt.l_lower)
-#         kkt.l_lower[i] = solver.zl_r[i]
-#         kkt.l_diag[i]  = solver.x_lr[i] - solver.xl_r[i]
-#     end
-#     @inbounds @simd for i in eachindex(kkt.u_lower)
-#         kkt.u_lower[i] = solver.zu_r[i]
-#         kkt.u_diag[i] = solver.x_ur[i] - solver.xu_r[i]
-#     end
+function set_aug_diagonal!(kkt::AbstractKKTSystem, solver::MadNLPSolver{T, VT}) where {T, VT <: Vector{T}}
+    x = full(solver.x)
+    xl = full(solver.xl)
+    xu = full(solver.xu)
+    zl = full(solver.zl)
+    zu = full(solver.zu)
+    fill!(kkt.reg, zero(T))
+    fill!(kkt.du_diag, zero(T))
+    @inbounds @simd for i in eachindex(kkt.l_lower)
+        kkt.l_lower[i] = solver.zl_r[i]
+        kkt.l_diag[i]  = solver.xl_r[i] - solver.x_lr[i]
+    end
+    @inbounds @simd for i in eachindex(kkt.u_lower)
+        kkt.u_lower[i] = solver.zu_r[i]
+        kkt.u_diag[i] = solver.x_ur[i] - solver.xu_r[i]
+    end
 
-#     return
-# end
+    _set_aug_diagonal!(kkt)
+    
+    return
+end
 function set_aug_diagonal!(kkt::AbstractKKTSystem{T}, solver::MadNLPSolver{T}) where T
     x = full(solver.x)
     xl = full(solver.xl)
@@ -200,19 +198,18 @@ end
 
 
 # Finish
-# temporaily commented out
-# function finish_aug_solve!(kkt::AbstractKKTSystem, d)
-#     dlb = dual_lb(d)
-#     dub = dual_ub(d)
-#     @inbounds @simd for i in eachindex(dlb)
-#         dlb[i] = (dlb[i] - kkt.l_lower[i] * d.xp_lr[i]) / kkt.l_diag[i]
-#     end
-#     @inbounds @simd for i in eachindex(dub)
-#         dub[i] = (dub[i] - kkt.u_lower[i] * d.xp_ur[i]) / kkt.u_diag[i]
-#     end
+function finish_aug_solve!(kkt::AbstractKKTSystem{T, VT}, d) where {T, VT <: Vector{T}}
+    dlb = dual_lb(d)
+    dub = dual_ub(d)
+    @inbounds @simd for i in eachindex(dlb)
+        dlb[i] = (-dlb[i] + kkt.l_lower[i] * d.xp_lr[i]) / kkt.l_diag[i]
+    end
+    @inbounds @simd for i in eachindex(dub)
+        dub[i] = ( dub[i] - kkt.u_lower[i] * d.xp_ur[i]) / kkt.u_diag[i]
+    end
 
-#     return
-# end
+    return
+end
 
 function finish_aug_solve!(kkt::AbstractKKTSystem, d)
     dlb = dual_lb(d)
@@ -223,20 +220,6 @@ function finish_aug_solve!(kkt::AbstractKKTSystem, d)
 end
 
 function set_initial_bounds!(xl::AbstractVector{T},xu,tol) where T
-    # map!(
-    #     (xl, xu) -> begin
-    #         a = max(one(T), abs(xl)) .* tol
-    #         (xu-xl) > a ? xl : xl - a
-    #     end,
-    #     xl, xl, xu
-    # )
-    # map!(
-    #     (xl, xu) -> begin
-    #         a = max(one(T), abs(xu)) .* tol
-    #         (xu-xl) > a ? xu : xu + a
-    #     end,
-    #     xu, xl, xu
-    # )
     map!(
         x->x - max(one(T), abs(x)) .* tol,
         xl, xl
@@ -245,14 +228,6 @@ function set_initial_bounds!(xl::AbstractVector{T},xu,tol) where T
         x->x + max(one(T), abs(x)) .* tol,
         xu, xu
     )
-    # map!(
-    #     x->x - tol,
-    #     xl, xl
-    # )
-    # map!(
-    #     x->x + tol,
-    #     xu, xu
-    # )
 end
 
 function set_initial_rhs!(solver::MadNLPSolver{T}, kkt::AbstractKKTSystem) where T
@@ -305,7 +280,6 @@ function is_valid(vec::VT) where {VT <: Union{Vector,Matrix}}
 end
 is_valid(vec::AbstractArray) where T = isempty(vec) ? true : mapreduce(is_valid, &, vec)
 
-# temporaily commented out
 function get_varphi(obj_val, x_lr::SubVector{T,Vector{T},VI}, xl_r, xu_r, x_ur, mu) where {T, VI}
     varphi = obj_val
     @inbounds @simd for i=1:length(x_lr)
@@ -340,7 +314,6 @@ end
 
 @inline get_inf_pr(c) = norm(c, Inf)
 
-# temporarily commented out
 function get_inf_du(f::Vector{T}, zl, zu, jacl, sd) where T
     inf_du = zero(T)
     @inbounds @simd for i=1:length(f)
@@ -352,7 +325,6 @@ function get_inf_du(f, zl, zu, jacl, sd)
     return mapreduce((f,zl,zu,jacl) -> abs(f-zl+zu+jacl), max, f, zl, zu, jacl; init = zero(eltype(f))) / sd
 end
 
-# temporarily commented out
 function get_inf_compl(x_lr::SubVector{T,Vector{T},VI}, xl_r, zl_r, xu_r, x_ur, zu_r, mu, sc) where {T, VI}
     inf_compl = zero(T)
     @inbounds @simd for i=1:length(x_lr)
@@ -380,7 +352,6 @@ function get_inf_compl(x_lr, xl_r, zl_r, xu_r, x_ur, zu_r, mu, sc)
     ) / sc
 end
 
-# temporarily commented out
 function get_varphi_d(f::Vector{T}, x, xl, xu, dx, mu) where T
     varphi_d = zero(T)
     @inbounds @simd for i=1:length(f)
@@ -397,7 +368,6 @@ function get_varphi_d(f, x, xl, xu, dx, mu)
     )
 end
 
-# temporarily commented out
 function get_alpha_max(x::Vector{T}, xl, xu, dx, tau) where T
     alpha_max = one(T)
     @inbounds @simd for i=1:length(x)
@@ -425,7 +395,6 @@ function get_alpha_max(x::VT, xl, xu, dx, tau) where {T, VT <: AbstractVector{T}
 end
 
 
-# temporarily commented out
 function get_alpha_z(zl_r::SubVector{T,Vector{T},VI}, zu_r, dzl, dzu, tau) where {T, VI}
     alpha_z = one(T)
     @inbounds @simd for i=1:length(zl_r)
@@ -846,21 +815,20 @@ function get_varphi_d_R(f_R::VT, x, xl, xu, dx, pp, nn, dpp, dnn, mu_R, rho) whe
     )
 end
 
-# temporarily commented out
-# function initialize_variables!(x, xl, xu, bound_push, bound_fac)
-#     @inbounds @simd for i=1:length(x)
-#         if xl[i]!=-Inf && xu[i]!=Inf
-#             x[i] = min(
-#                 xu[i]-min(bound_push*max(1,abs(xu[i])), bound_fac*(xu[i]-xl[i])),
-#                 max(xl[i]+min(bound_push*max(1,abs(xl[i])),bound_fac*(xu[i]-xl[i])),x[i]),
-#             )
-#         elseif xl[i]!=-Inf && xu[i]==Inf
-#             x[i] = max(xl[i]+bound_push*max(1,abs(xl[i])), x[i])
-#         elseif xl[i]==-Inf && xu[i]!=Inf
-#             x[i] = min(xu[i]-bound_push*max(1,abs(xu[i])), x[i])
-#         end
-#     end
-# end
+function initialize_variables!(x::Vector{T}, xl, xu, bound_push, bound_fac) where T
+    @inbounds @simd for i=1:length(x)
+        if xl[i]!=-Inf && xu[i]!=Inf
+            x[i] = min(
+                xu[i]-min(bound_push*max(1,abs(xu[i])), bound_fac*(xu[i]-xl[i])),
+                max(xl[i]+min(bound_push*max(1,abs(xl[i])),bound_fac*(xu[i]-xl[i])),x[i]),
+            )
+        elseif xl[i]!=-Inf && xu[i]==Inf
+            x[i] = max(xl[i]+bound_push*max(1,abs(xl[i])), x[i])
+        elseif xl[i]==-Inf && xu[i]!=Inf
+            x[i] = min(xu[i]-bound_push*max(1,abs(xu[i])), x[i])
+        end
+    end
+end
 
 function initialize_variables!(x, xl, xu, bound_push, bound_fac)
     map!((x,l,u) -> _initialize_variables!(x,l,u, bound_push, bound_fac), x, x, xl, xu)
@@ -895,7 +863,6 @@ function adjust_boundary!(x_lr::VT, xl_r, x_ur, xu_r, mu) where {T, VT <: Abstra
     )
 end
 
-# temporarily commented out
 function get_rel_search_norm(x::Vector{T}, dx) where T
     rel_search_norm = zero(T)
     @inbounds @simd for i=1:length(x)
@@ -991,13 +958,12 @@ function is_barr_obj_rapid_increase(varphi, varphi_trial, obj_max_inc)
     return (varphi_trial >= varphi) && (log10(varphi_trial-varphi) > obj_max_inc + max(1.0, log10(abs(varphi))))
 end
 
-# temporarily commented out
-# function reset_bound_dual!(z, x, mu, kappa_sigma)
-#     @inbounds @simd for i in eachindex(z)
-#         z[i] = max(min(z[i], (kappa_sigma*mu)/x[i]), (mu/kappa_sigma)/x[i])
-#     end
-#     return
-# end
+function reset_bound_dual!(z::Vector{T}, x, mu, kappa_sigma) where T
+    @inbounds @simd for i in eachindex(z)
+        z[i] = max(min(z[i], (kappa_sigma*mu)/x[i]), (mu/kappa_sigma)/x[i])
+    end
+    return
+end
 function reset_bound_dual!(z, x, mu, kappa_sigma)
     map!(
         (z, x) -> max(min(z, (kappa_sigma*mu)/x), (mu/kappa_sigma)/x),
@@ -1006,13 +972,12 @@ function reset_bound_dual!(z, x, mu, kappa_sigma)
     return
 end
 
-# temporarily commented out
-# function reset_bound_dual!(z, x1, x2, mu, kappa_sigma)
-#     @inbounds @simd for i in eachindex(z)
-#         z[i] = max(min(z[i], (kappa_sigma*mu)/(x1[i]-x2[i])), (mu/kappa_sigma)/(x1[i]-x2[i]))
-#     end
-#     return
-# end
+function reset_bound_dual!(z::Vector{T}, x1, x2, mu, kappa_sigma) where T
+    @inbounds @simd for i in eachindex(z)
+        z[i] = max(min(z[i], (kappa_sigma*mu)/(x1[i]-x2[i])), (mu/kappa_sigma)/(x1[i]-x2[i]))
+    end
+    return
+end
 
 function reset_bound_dual!(z, x1, x2, mu, kappa_sigma)
     map!(
