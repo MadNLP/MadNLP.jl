@@ -109,72 +109,68 @@ MadNLP.introduce(M::RFSolver) = "cuSolverRF"
     GLU
 =#
 
-# TODO: This part of the code can be uncommented once the fp/glu branch
-# in https://github.com/exanauts/CUSOLVERRF.jl is merged and released.
+@kwdef mutable struct GLUSolverOptions <: MadNLP.AbstractOptions
+    glu_symbolic_analysis::Symbol = :klu
+end
 
+mutable struct GLUSolver{T} <: MadNLP.AbstractLinearSolver{T}
+    inner::Union{Nothing,CUSOLVERRF.GLULowLevel}
 
-# @kwdef mutable struct GLUSolverOptions <: MadNLP.AbstractOptions
-#     glu_symbolic_analysis::Symbol = :klu
-# end
+    tril::CUSPARSE.CuSparseMatrixCSC{T}
+    full::CUSPARSE.CuSparseMatrixCSR{T}
+    tril_to_full_view::CuSubVector{T}
+    buffer::CUDA.CuVector{T}
 
-# mutable struct GLUSolver{T} <: MadNLP.AbstractLinearSolver{T}
-#     inner::Union{Nothing,CUSOLVERRF.GLULowLevel}
+    opt::GLUSolverOptions
+    logger::MadNLP.MadNLPLogger
+end
 
-#     tril::CUSPARSE.CuSparseMatrixCSC{T}
-#     full::CUSPARSE.CuSparseMatrixCSR{T}
-#     tril_to_full_view::CuSubVector{T}
-#     buffer::CUDA.CuVector{T}
+function GLUSolver(
+    csc::CUSPARSE.CuSparseMatrixCSC;
+    opt=GLUSolverOptions(),
+    logger=MadNLP.MadNLPLogger(),
+)
+    n, m = size(csc)
+    @assert n == m
 
-#     opt::GLUSolverOptions
-#     logger::MadNLP.MadNLPLogger
-# end
+    full,tril_to_full_view = MadNLP.get_tril_to_full(csc)
 
-# function GLUSolver(
-#     csc::CUSPARSE.CuSparseMatrixCSC;
-#     opt=GLUSolverOptions(),
-#     logger=MadNLP.MadNLPLogger(),
-# )
-#     n, m = size(csc)
-#     @assert n == m
+    full = CUSPARSE.CuSparseMatrixCSR(
+        full.colPtr,
+        full.rowVal,
+        full.nzVal,
+        full.dims
+    )
 
-#     full,tril_to_full_view = MadNLP.get_tril_to_full(csc)
+    return GLUSolver(
+        nothing, csc, full, tril_to_full_view, similar(csc.nzVal,1),
+        opt, logger
+    )
+end
 
-#     full = CUSPARSE.CuSparseMatrixCSR(
-#         full.colPtr,
-#         full.rowVal,
-#         full.nzVal,
-#         full.dims
-#     )
+function MadNLP.factorize!(M::GLUSolver)
+    copyto!(M.full.nzVal, M.tril_to_full_view)
+    if M.inner == nothing  
+        sym_lu = CUSOLVERRF.klu_symbolic_analysis(M.full)
+        M.inner = CUSOLVERRF.GLULowLevel(sym_lu)
+    end
+    CUSOLVERRF.glu_refactor!(M.inner, M.full)
+    return M
+end
 
-#     return GLUSolver(
-#         nothing, csc, full, tril_to_full_view, similar(csc.nzVal,1),
-#         opt, logger
-#     )
-# end
+function MadNLP.solve!(M::GLUSolver{T}, x) where T
+    CUSOLVERRF.glu_solve!(M.inner, x)
+    # this is necessary to not distort the timing in MadNLP
+    copyto!(M.buffer, M.buffer)
+    synchronize(CUDABackend())
+    # -----------------------------------------------------
+    return x
+end
 
-# function MadNLP.factorize!(M::GLUSolver)
-#     copyto!(M.full.nzVal, M.tril_to_full_view)
-#     if M.inner == nothing  
-#         sym_lu = CUSOLVERRF.klu_symbolic_analysis(M.full)
-#         M.inner = CUSOLVERRF.GLULowLevel(sym_lu)
-#     end
-#     CUSOLVERRF.glu_refactor!(M.inner, M.full)
-#     return M
-# end
-
-# function MadNLP.solve!(M::GLUSolver{T}, x) where T
-#     CUSOLVERRF.glu_solve!(M.inner, x)
-#     # this is necessary to not distort the timing in MadNLP
-#     copyto!(M.buffer, M.buffer)
-#     synchronize(CUDABackend())
-#     # -----------------------------------------------------
-#     return x
-# end
-
-# MadNLP.input_type(::Type{GLUSolver}) = :csc
-# MadNLP.default_options(::Type{GLUSolver}) = GLUSolverOptions()
-# MadNLP.is_inertia(M::GLUSolver) = false
-# MadNLP.improve!(M::GLUSolver) = false
-# MadNLP.is_supported(::Type{GLUSolver},::Type{Float32}) = true
-# MadNLP.is_supported(::Type{GLUSolver},::Type{Float64}) = true
-# MadNLP.introduce(M::GLUSolver) = "GLU"
+MadNLP.input_type(::Type{GLUSolver}) = :csc
+MadNLP.default_options(::Type{GLUSolver}) = GLUSolverOptions()
+MadNLP.is_inertia(M::GLUSolver) = false
+MadNLP.improve!(M::GLUSolver) = false
+MadNLP.is_supported(::Type{GLUSolver},::Type{Float32}) = true
+MadNLP.is_supported(::Type{GLUSolver},::Type{Float64}) = true
+MadNLP.introduce(M::GLUSolver) = "GLU"

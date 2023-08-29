@@ -181,14 +181,14 @@ function get_diagonal_mapping(colptr, rowval)
 end
 
 function MadNLP.initialize!(kkt::MadNLP.AbstractSparseKKTSystem{T,VT}) where {T, VT <: CuVector{T}}
-    fill!(kkt.reg, 1.0)
-    fill!(kkt.pr_diag, 1.0)
-    fill!(kkt.du_diag, 0.0)
-    fill!(kkt.hess, 0.0)
-    fill!(kkt.l_lower, 0.0)
-    fill!(kkt.u_lower, 0.0)
-    fill!(kkt.l_diag, 1.0)
-    fill!(kkt.u_diag, 1.0)
+    fill!(kkt.reg, one(T))
+    fill!(kkt.pr_diag, one(T))
+    fill!(kkt.du_diag, zero(T))
+    fill!(kkt.hess, zero(T))
+    fill!(kkt.l_lower, zero(T))
+    fill!(kkt.u_lower, zero(T))
+    fill!(kkt.l_diag, one(T))
+    fill!(kkt.u_diag, one(T))
     fill!(kkt.hess_com.nzVal, 0.) # so that mul! in the initial primal-dual solve has no effect
 end
 

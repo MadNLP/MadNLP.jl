@@ -17,13 +17,14 @@ function eval_grad_f_wrapper!(solver::MadNLPSolver, f::PrimalVector{T}, x::Prima
     nlp = solver.nlp
     cnt = solver.cnt
     @trace(solver.logger,"Evaluating objective gradient.")
-    obj_scaling = (get_minimize(nlp) ? one(T) : -one(T))
     cnt.eval_function_time += @elapsed _eval_grad_f_wrapper!(
         solver.cb,
         variable(x),
         variable(f),
     )
-    variable(f) .*= obj_scaling
+    if !get_minimize(nlp)
+        variable(f) .*= -one(T)
+    end
     cnt.obj_grad_cnt+=1
 
     if cnt.obj_grad_cnt == 1 && !is_valid(full(f))
