@@ -16,12 +16,13 @@ pkg> add MadNLP
 
 Optionally, various extension packages can be installed together:
 ```julia
-pkg> add MadNLPHSL, MadNLPPardiso, MadNLPMumps, MadNLPGPU, MadNLPGraph
+pkg> add MadNLPHSL, MadNLPPardiso, MadNLPMumps, MadNLPGPU
 ```
 
 These packages are stored in the `lib` subdirectory within the main MadNLP repository. Some extension packages may require additional dependencies or specific hardware. For the instructions for the build procedure, see the following links:
 
  * [MadNLPHSL](https://github.com/MadNLP/MadNLP.jl/tree/master/lib/MadNLPHSL)
+ * [MadNLPMumps](https://github.com/MadNLP/MadNLP.jl/tree/master/lib/MadNLPMumps)
  * [MadNLPPardiso](https://github.com/MadNLP/MadNLP.jl/tree/master/lib/MadNLPHSL)
  * [MadNLPGPU](https://github.com/MadNLP/MadNLP.jl/tree/master/lib/MadNLPGPU)
 
@@ -59,10 +60,10 @@ madnlp(model, print_level=MadNLP.WARN, max_wall_time=3600)
 
 MadNLP is interfaced with non-Julia sparse/dense linear solvers:
 - [Umfpack](https://people.engr.tamu.edu/davis/suitesparse.html)
-- [MKL-Pardiso](https://software.intel.com/content/www/us/en/develop/documentation/mkl-developer-reference-fortran/top/sparse-solver-routines/intel-mkl-pardiso-parallel-direct-sparse-solver-interface.html)
-- [MKL-Lapack](https://software.intel.com/content/www/us/en/develop/documentation/mkl-developer-reference-fortran/top/lapack-routines.html)
+- [Lapack](https://software.intel.com/content/www/us/en/develop/documentation/mkl-developer-reference-fortran/top/lapack-routines.html)
 - [HSL solvers](http://www.hsl.rl.ac.uk/ipopt/) (requires extension)
 - [Pardiso](https://www.pardiso-project.org/) (requires extension)
+- [Pardiso-MKL](https://software.intel.com/content/www/us/en/develop/documentation/mkl-developer-reference-fortran/top/sparse-solver-routines/intel-mkl-pardiso-parallel-direct-sparse-solver-interface.html) (requires extension)
 - [Mumps](http://mumps.enseeiht.fr/)  (requires extension)
 - [cuSOLVER](https://docs.nvidia.com/cuda/cusolver/index.html) (requires extension)
 
