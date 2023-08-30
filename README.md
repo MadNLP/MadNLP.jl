@@ -1,14 +1,12 @@
-<img src="https://github.com/MadNLP/MadNLP.jl/blob/master/logo-full.svg?raw=true"/>
+![logo](https://github.com/MadNLP/MadNLP.jl/blob/master/logo-full.svg)
 
-| **Documentation** | **Build Status** | **Coverage** | **DOI** |
-|:-----------------:|:----------------:|:----------------:|:----------------:|
-| [![doc](https://img.shields.io/badge/docs-dev-blue.svg)](https://madnlp.github.io/MadNLP.jl/dev) | [![build](https://github.com/MadNLP/MadNLP.jl/actions/workflows/test.yml/badge.svg)](https://github.com/MadNLP/MadNLP.jl/actions/workflows/test.yml) | [![codecov](https://codecov.io/gh/MadNLP/MadNLP.jl/branch/master/graph/badge.svg?token=MBxH2AAu8Z)](https://codecov.io/gh/MadNLP/MadNLP.jl) | [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.5825776.svg)](https://doi.org/10.5281/zenodo.5825776) |
+*A [nonlinear programming](https://en.wikipedia.org/wiki/Nonlinear_programming) solver based on the filter line-search [interior point method](https://en.wikipedia.org/wiki/Interior-point_method) (as in [Ipopt](https://github.com/coin-or/Ipopt)) that can handle/exploit diverse classes of data structures, either on [host](https://en.wikipedia.org/wiki/Central_processing_unit) or [device](https://en.wikipedia.org/wiki/Graphics_processing_unit) memories.*
 
-MadNLP is a [nonlinear programming](https://en.wikipedia.org/wiki/Nonlinear_programming) (NLP) solver, purely implemented in [Julia](https://julialang.org/). MadNLP implements a filter line-search algorithm, as that used in [Ipopt](https://github.com/coin-or/Ipopt). MadNLP seeks to streamline the development of modeling and algorithmic paradigms in order to exploit structures and to make efficient use of high-performance computers.
+---
 
-## License
-
-MadNLP is available under the [MIT license](https://github.com/MadNLP/MadNLP.jl/blob/master/LICENSE).
+| **License** | **Documentation** | **Build Status** | **Coverage** | **DOI** |
+|:-----------------:|:-----------------:|:----------------:|:----------------:|:----------------:|
+| [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/MadNLP/MadNLP.jl/blob/master/LICENSE) | [![doc](https://img.shields.io/badge/docs-dev-blue.svg)](https://madnlp.github.io/MadNLP.jl/stable) [![doc](https://img.shields.io/badge/docs-dev-blue.svg)](https://madnlp.github.io/MadNLP.jl/dev) | [![build](https://github.com/MadNLP/MadNLP.jl/actions/workflows/test.yml/badge.svg)](https://github.com/MadNLP/MadNLP.jl/actions/workflows/test.yml) | [![codecov](https://codecov.io/gh/MadNLP/MadNLP.jl/branch/master/graph/badge.svg?token=MBxH2AAu8Z)](https://codecov.io/gh/MadNLP/MadNLP.jl) | [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.5825776.svg)](https://doi.org/10.5281/zenodo.5825776) |
 
 ## Installation
 
@@ -18,7 +16,7 @@ pkg> add MadNLP
 
 Optionally, various extension packages can be installed together:
 ```julia
-pkg> add MadNLPHSL, MadNLPPardiso, MadNLPMumps, MadNLPGPU, MadNLPGraph, MadNLPKrylov
+pkg> add MadNLPHSL, MadNLPPardiso, MadNLPMumps, MadNLPGPU, MadNLPGraph
 ```
 
 These packages are stored in the `lib` subdirectory within the main MadNLP repository. Some extension packages may require additional dependencies or specific hardware. For the instructions for the build procedure, see the following links:
@@ -34,7 +32,6 @@ These packages are stored in the `lib` subdirectory within the main MadNLP repos
 MadNLP is interfaced with modeling packages:
 
 - [JuMP](https://github.com/jump-dev/JuMP.jl)
-- [Plasmo](https://github.com/zavalab/Plasmo.jl)
 - [NLPModels](https://github.com/JuliaSmoothOptimizers/NLPModels.jl).
 
 Users can pass various options to MadNLP also through the modeling packages. The interface-specific syntax are shown below. To see the list of MadNLP solver options, check the [OPTIONS.md](https://github.com/MadNLP/MadNLP/blob/master/OPTIONS.md) file.
@@ -58,23 +55,6 @@ model = CUTEstModel("PRIMALC1")
 madnlp(model, print_level=MadNLP.WARN, max_wall_time=3600)
 ```
 
-#### Plasmo interface (requires extension `MadNLPGraph`)
-
-```julia
-using MadNLP, MadNLPGraph, Plasmo
-graph = OptiGraph()
-@optinode(graph,n1)
-@optinode(graph,n2)
-@variable(n1,0 <= x <= 2)
-@variable(n1,0 <= y <= 3)
-@constraint(n1,x+y <= 4)
-@objective(n1,Min,x)
-@variable(n2,x)
-@NLnodeconstraint(n2,exp(x) >= 2)
-@linkconstraint(graph,n1[:x] == n2[:x])
-MadNLP.optimize!(graph; print_level=MadNLP.DEBUG, max_iter=100)
-```
-
 ### Linear Solvers
 
 MadNLP is interfaced with non-Julia sparse/dense linear solvers:
@@ -88,7 +68,7 @@ MadNLP is interfaced with non-Julia sparse/dense linear solvers:
 
 Each linear solver in MadNLP is a Julia type, and the `linear_solver` option should be specified by the actual type. Note that the linear solvers are always exported to `Main`.
 
-#### Built-in Solvers: Umfpack, PardisoMKL, LapackCPU
+#### Built-in Solvers: Umfpack, LapackCPU
 
 ```julia
 using MadNLP, JuMP
@@ -132,19 +112,6 @@ model = Model(()->MadNLP.Optimizer(linear_solver=PardisoMKLSolver))
 using MadNLP, MadNLPGPU, JuMP
 # ...
 model = Model(()->MadNLP.Optimizer(linear_solver=LapackGPUSolver))
-```
-
-#### Schur and Schwarz (requires extension `MadNLPGraph`)
-
-```julia
-using MadNLP, MadNLPGraph, JuMP
-# ...
-model = Model(()->MadNLP.Optimizer(linear_solver=MadNLPSchwarz))
-model = Model(()->MadNLP.Optimizer(linear_solver=MadNLPSchur))
-```
-The solvers in `MadNLPGraph` (`Schur` and `Schwarz`) use multi-thread parallelism; thus, Julia session should be started with `-t` flag.
-```sh
-julia -t 16 # to use 16 threads
 ```
 
 ## Citing MadNLP.jl
