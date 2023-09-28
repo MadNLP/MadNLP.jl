@@ -73,12 +73,12 @@ function MadNLP.hess_dense!(qp::DenseDummyQP{T}, x, l,hess::AbstractMatrix; obj_
 end
 
 function DenseDummyQP(
-    x0::VT = zeros(100);
+    x0::AbstractVector{T} = zeros(100);
     m=10, fixed_variables=similar(x0,Int,0), equality_cons=similar(x0,Int,0)
-    ) where {T, VT <: AbstractVector{T}}
-    
+    ) where {T}
+
     n = length(x0)
-    
+
     if m >= n
         error("The number of constraints `m` should be less than the number of variable `n`.")
     end
@@ -94,7 +94,7 @@ function DenseDummyQP(
     xu = fill!(similar(x0, n), one(T))
     gl = fill!(similar(x0, m), zero(T))
     gu = fill!(similar(x0, m), one(T))
-    
+
     # Update gu to load equality constraints
     gu[equality_cons] .= zero(T)
     xl[fixed_variables] .= @view(xu[fixed_variables])

@@ -19,7 +19,7 @@ function set_aug_diagonal!(kkt::AbstractKKTSystem, solver::MadNLPSolver{T, VT}) 
     end
 
     _set_aug_diagonal!(kkt)
-    
+
     return
 end
 function set_aug_diagonal!(kkt::AbstractKKTSystem{T}, solver::MadNLPSolver{T}) where T
@@ -28,7 +28,7 @@ function set_aug_diagonal!(kkt::AbstractKKTSystem{T}, solver::MadNLPSolver{T}) w
     xu = full(solver.xu)
     zl = full(solver.zl)
     zu = full(solver.zu)
-    
+
     fill!(kkt.reg, zero(T))
     fill!(kkt.du_diag, zero(T))
     kkt.l_diag .= solver.xl_r .- solver.x_lr
@@ -37,7 +37,7 @@ function set_aug_diagonal!(kkt::AbstractKKTSystem{T}, solver::MadNLPSolver{T}) w
     copyto!(kkt.u_lower, solver.zu_r)
 
     _set_aug_diagonal!(kkt)
-    
+
     return
 end
 
@@ -66,9 +66,9 @@ function set_aug_RR!(kkt::AbstractKKTSystem, solver::MadNLPSolver, RR::RobustRes
     copyto!(kkt.u_lower, solver.zu_r)
     kkt.l_diag .= solver.xl_r .- solver.x_lr
     kkt.u_diag .= solver.x_ur .- solver.xu_r
-    
+
     _set_aug_diagonal!(kkt)
-    
+
     return
 end
 
@@ -93,7 +93,7 @@ function set_aug_rhs!(solver::MadNLPSolver, kkt::AbstractKKTSystem, c)
 
     px .= .-f .+ zl .- zu .- solver.jacl
     py .= .-c
-    pzl .= (solver.xl_r .- solver.x_lr) .* solver.zl_r .+ solver.mu 
+    pzl .= (solver.xl_r .- solver.x_lr) .* solver.zl_r .+ solver.mu
     pzu .= (solver.xu_r .- solver.x_ur) .* solver.zu_r .- solver.mu
 
 end
@@ -108,7 +108,7 @@ end
 #     @inbounds @simd for i in eachindex(px)
 #         px[i] = -f[i] + zl[i] - zu[i] - solver.jacl[i]
 #     end
-    
+
 #     py = dual(solver.p)
 #     @inbounds @simd for i in eachindex(py)
 #         py[i] = -c[i]
@@ -116,15 +116,15 @@ end
 
 #     pzl = dual_lb(solver.p)
 #     @inbounds @simd for i in eachindex(pzl)
-#         pzl[i] = (solver.xl_r[i] - solver.x_lr[i]) * solver.zl_r[i] + solver.mu 
+#         pzl[i] = (solver.xl_r[i] - solver.x_lr[i]) * solver.zl_r[i] + solver.mu
 #     end
 
 #     pzu = dual_ub(solver.p)
 #     @inbounds @simd for i in eachindex(pzu)
-#         pzu[i] = (solver.xu_r[i] -solver.x_ur[i]) * solver.zu_r[i] - solver.mu 
+#         pzu[i] = (solver.xu_r[i] -solver.x_ur[i]) * solver.zu_r[i] - solver.mu
 #     end
 # return
-# end 
+# end
 
 # function set_aug_rhs!(solver::MadNLPSolver, kkt::SparseUnreducedKKTSystem, c)
 #     f = primal(solver.f)
@@ -166,8 +166,8 @@ function set_aug_rhs_RR!(
     pzu = dual_ub(solver.p)
 
     mu = RR.mu_R
-    
-    px .= .- RR.f_R .+ zl .- zu .- solver.jacl 
+
+    px .= .- RR.f_R .+ zl .- zu .- solver.jacl
     py .= .- solver.c .+ RR.pp .- RR.nn .+
         (mu .- (rho .- solver.y) .* RR.pp) ./ RR.zp .-
         (mu .- (rho .+ solver.y) .* RR.nn) ./ RR.zn
@@ -267,7 +267,7 @@ function finish_aug_solve_RR!(dpp, dnn, dzp, dzn, l, dl, pp, nn, zp, zn, mu_R, r
     dzn .= rho .+ l .+ dl .- zn
     dpp .= .- pp .+ mu_R ./zp .- (pp./zp) .* dzp
     dnn .= .- nn .+ mu_R ./zn .- (nn./zn) .* dzn
-    return 
+    return
 end
 
 # Kernel functions ---------------------------------------------------------
@@ -278,7 +278,7 @@ function is_valid(vec::VT) where {VT <: Union{Vector,Matrix}}
     end
     return true
 end
-is_valid(vec::AbstractArray) where T = isempty(vec) ? true : mapreduce(is_valid, &, vec)
+is_valid(vec::AbstractArray) = isempty(vec) ? true : mapreduce(is_valid, &, vec)
 
 function get_varphi(obj_val, x_lr::SubVector{T,Vector{T},VI}, xl_r, xu_r, x_ur, mu) where {T, VI}
     varphi = obj_val
@@ -295,7 +295,7 @@ function get_varphi(obj_val, x_lr::SubVector{T,Vector{T},VI}, xl_r, xu_r, x_ur, 
     return varphi
 end
 function get_varphi(obj_val, x_lr, xl_r, xu_r, x_ur, mu)
-    
+
     return obj_val + mapreduce(
         (x1,x2) -> _get_varphi(x1,x2,mu), +, x_lr, xl_r
     ) + mapreduce(
@@ -381,7 +381,7 @@ function get_alpha_max(x::VT, xl, xu, dx, tau) where {T, VT <: AbstractVector{T}
         mapreduce(
             (x, xl, dx) -> dx < 0 ? (-x+xl)*tau/dx : T(Inf),
             min,
-            
+
             x, xl, dx,
             init = one(eltype(x))
         ),
@@ -512,7 +512,7 @@ end
 function get_inf_compl_R(
     x_lr::SubVector{T,Vector{T},VI}, xl_r, zl_r, xu_r, x_ur, zu_r, pp, zp, nn, zn, mu_R, sc
     ) where {T, VI}
-    
+
     inf_compl_R = zero(T)
     @inbounds @simd for i=1:length(x_lr)
         inf_compl_R = max(inf_compl_R,abs((x_lr[i]-xl_r[i])*zl_r[i]-mu_R))
@@ -608,13 +608,13 @@ function get_alpha_max_R(x::VT, xl, xu, dx, pp, dpp, nn, dnn, tau_R) where {T, V
             nn, dnn;
             init = one(T)
         )
-    ) 
+    )
 end
 
 function get_alpha_z_R(
     zl_r::SubVector{T,Vector{T},VI}, zu_r, dzl, dzu, zp, dzp, zn, dzn, tau_R
     ) where {T, VI}
-    
+
     alpha_z_R = one(T)
     @inbounds @simd for i=1:length(zl_r)
         dzl[i]<0 && (alpha_z_R=min(alpha_z_R,-zl_r[i]*tau_R/dzl[i]))
@@ -633,7 +633,7 @@ end
 function get_alpha_z_R(
     zl_r::SubVector{T,VT,VI}, zu_r, dzl, dzu, zp, dzp, zn, dzn, tau_R
     ) where {T, VT <: AbstractVector{T}, VI}
-    
+
     f(d,z) = d < 0 ? -z*tau_R/d : T(Inf)
     return min(
         mapreduce(
@@ -667,7 +667,7 @@ end
 function get_varphi_R(
     obj_val, x_lr::SubVector{T,Vector{T},VI}, xl_r, xu_r, x_ur, pp, nn, mu_R
     )  where {T, VI}
-    
+
     varphi_R = obj_val
     @inbounds @simd for i=1:length(x_lr)
         xll = x_lr[i]-xl_r[i]
@@ -692,7 +692,7 @@ end
 function get_varphi_R(
     obj_val, x_lr::SubVector{T,VT,VI}, xl_r, xu_r, x_ur, pp, nn, mu_R
     )  where {T, VT <: AbstractVector{T}, VI}
-    
+
     varphi_R = obj_val
     f1(x) = x < 0 ? T(Inf) : mu_R*log(x)
     function f2(x,y)
