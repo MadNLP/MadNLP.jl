@@ -1,6 +1,6 @@
 function solve_refine_wrapper!(d, solver, p, w)
     result = false
-    
+
     solver.cnt.linear_solver_time += @elapsed begin
         if solve_refine!(d, solver.iterator, p, w)
             result = true
@@ -15,6 +15,7 @@ function solve_refine_wrapper!(d, solver, p, w)
 
     return result
 end
+
 function factorize_wrapper!(solver::MadNLPSolver)
     @trace(solver.logger,"Factorization started.")
     build_kkt!(solver.kkt)
@@ -22,7 +23,7 @@ function factorize_wrapper!(solver::MadNLPSolver)
 end
 
 function solve!(kkt::SparseUnreducedKKTSystem, w::AbstractKKTVector)
-    wzl = dual_lb(w) 
+    wzl = dual_lb(w)
     wzu = dual_ub(w)
     f(x,y) = iszero(y) ? x : x/y
     wzl .= f.(wzl, kkt.l_lower_aug)
@@ -42,7 +43,7 @@ function solve!(
     kkt::SparseKKTSystem{T, VT, MT, QN},
     w::AbstractKKTVector
     ) where {T, VT, MT, QN<:CompactLBFGS}
-        
+
     qn = kkt.quasi_newton
     n, p = size(qn)
     # Load buffers
@@ -54,9 +55,8 @@ function solve!(
     fill!(Tk, zero(T))
     reduce_rhs!(w.xp_lr, dual_lb(w), kkt.l_diag, w.xp_ur, dual_ub(w), kkt.u_diag)
 
-
     # Resize arrays with correct dimension
-    if size(qn.V1, 2) < 2*p
+    if size(qn.V1) != (nn, 2*p)
         qn.V1 = zeros(nn, 2*p)
         qn.V2 = zeros(nn, 2*p)
     else
@@ -68,13 +68,13 @@ function solve!(
     # (C + U Vᵀ)⁻¹ = C⁻¹ - C⁻¹ U (I + Vᵀ C⁻¹ U) Vᵀ C⁻¹
 
     # Solve linear system without low-rank part
-    solve!(kkt.linear_solver, primal_dual(w))
+    solve!(kkt.linear_solver, w_)
 
     # Add low-rank correction
     if p > 0
         _init_lbfgs_factors!(qn.V1, qn.V2, qn.U, n, p)
 
-        multi_solve!(kkt.linear_solver, qn.V2)  # V2 = C⁻¹ U
+        multi_solve!(kkt.linear_solver, qn.V2)      # V2 = C⁻¹ U
 
         Tk[diagind(Tk)] .= one(T)                   # Tₖ = I
         mul!(Tk, qn.V1', qn.V2, one(T), one(T))     # Tₖ = (I + Vᵀ C⁻¹ U)
@@ -85,7 +85,7 @@ function solve!(
         mul!(w_, qn.V2, xr, -one(T), one(T))        # x = x - C⁻¹ U xᵣ
     end
 
-    finish_aug_solve!(kkt, w)    
+    finish_aug_solve!(kkt, w)
 end
 
 
@@ -98,11 +98,11 @@ function solve!(kkt::SparseCondensedKKTSystem{T}, w::AbstractKKTVector)  where T
     ws = view(full(w), n+1:n+m)
     wz = view(full(w), n+m+1:n+2*m)
     Σs = view(kkt.pr_diag, n+1:n+m)
-    
+
     reduce_rhs!(w.xp_lr, dual_lb(w), kkt.l_diag, w.xp_ur, dual_ub(w), kkt.u_diag)
 
-    kkt.buffer .= kkt.diag_buffer .* (wz .+ ws ./ Σs) 
-    
+    kkt.buffer .= kkt.diag_buffer .* (wz .+ ws ./ Σs)
+
     mul!(wx, kkt.jt_csc, kkt.buffer, one(T), one(T))
     solve!(kkt.linear_solver, wx)
 
@@ -115,7 +115,7 @@ function solve!(kkt::SparseCondensedKKTSystem{T}, w::AbstractKKTVector)  where T
 
 end
 
-function solve!( 
+function solve!(
     kkt::DenseCondensedKKTSystem,
     w::AbstractKKTVector{T},
     ) where T
@@ -123,7 +123,7 @@ function solve!(
     n = num_variables(kkt)
     n_eq, ns = kkt.n_eq, kkt.n_ineq
     n_condensed = n + n_eq
-    
+
     # Decompose rhs
     wx = view(full(w), 1:n)
     ws = view(full(w), n+1:n+ns)
@@ -139,7 +139,7 @@ function solve!(
     reduce_rhs!(w.xp_lr, dual_lb(w), kkt.l_diag, w.xp_ur, dual_ub(w), kkt.u_diag)
 
     fill!(kkt.buffer, zero(T))
-    kkt.buffer[kkt.ind_ineq] .= kkt.diag_buffer .* (wz .+ ws ./ Σs) 
+    kkt.buffer[kkt.ind_ineq] .= kkt.diag_buffer .* (wz .+ ws ./ Σs)
     mul!(xx, kkt.jac', kkt.buffer)
     xx .+= wx
     xy .= wy
@@ -151,14 +151,35 @@ function solve!(
     wz .*= kkt.diag_buffer
     dual(w) .-= kkt.buffer
     ws .= (ws .+ wz) ./ Σs
-    
+
     finish_aug_solve!(kkt, w)
 end
 
-function mul!(w::AbstractKKTVector{T}, kkt::Union{SparseKKTSystem,SparseUnreducedKKTSystem}, x::AbstractKKTVector, alpha = one(T), beta = zero(T)) where T
+function mul!(w::AbstractKKTVector{T}, kkt::Union{SparseKKTSystem{T,VT,MT,QN},SparseUnreducedKKTSystem{T,VT,MT,QN}}, x::AbstractKKTVector, alpha = one(T), beta = zero(T)) where {T, VT, MT, QN<:ExactHessian}
     mul!(primal(w), Symmetric(kkt.hess_com, :L), primal(x), alpha, beta)
     mul!(primal(w), kkt.jac_com', dual(x), alpha, one(T))
     mul!(dual(w), kkt.jac_com,  primal(x), alpha, beta)
+    _kktmul!(w,x,kkt.reg,kkt.du_diag,kkt.l_lower,kkt.u_lower,kkt.l_diag,kkt.u_diag, alpha, beta)
+end
+
+function mul!(w::AbstractKKTVector{T}, kkt::Union{SparseKKTSystem{T,VT,MT,QN},SparseUnreducedKKTSystem{T,VT,MT,QN}}, x::AbstractKKTVector, alpha = one(T), beta = zero(T)) where {T, VT, MT, QN<:CompactLBFGS}
+    qn = kkt.quasi_newton
+    n, p = size(qn)
+    nn = length(primal_dual(w))
+    # Load buffers (size: 2p)
+    vx = qn._w2
+    # Reset V1 and V2
+    fill!(qn.V1, zero(T))
+    fill!(qn.V2, zero(T))
+    _init_lbfgs_factors!(qn.V1, qn.V2, qn.U, n, p)
+    # Upper-left block is C = ξ I + U Vᵀ
+    mul!(primal(w), Symmetric(kkt.hess_com, :L), primal(x), alpha, beta)
+    mul!(primal(w), kkt.jac_com', dual(x), alpha, one(T))
+    mul!(dual(w), kkt.jac_com,  primal(x), alpha, beta)
+    # Add (U Vᵀ) x contribution
+    mul!(vx, qn.V2', primal_dual(x))
+    mul!(primal_dual(w), qn.V1, vx, alpha, one(T))
+
     _kktmul!(w,x,kkt.reg,kkt.du_diag,kkt.l_lower,kkt.u_lower,kkt.l_diag,kkt.u_diag, alpha, beta)
 end
 
@@ -182,7 +203,7 @@ function mul!(w::AbstractKKTVector{T}, kkt::SparseCondensedKKTSystem, x::Abstrac
     mul!(wz, kkt.jt_csc', xx, alpha, one(T))
     axpy!(-alpha, xz, ws)
     axpy!(-alpha, xs, wz)
-    
+
     _kktmul!(w,x,kkt.reg,kkt.du_diag,kkt.l_lower,kkt.u_lower,kkt.l_diag,kkt.u_diag, alpha, beta)
 end
 
@@ -192,12 +213,12 @@ function mul!(w::AbstractKKTVector{T}, kkt::AbstractDenseKKTSystem, x::AbstractK
     ws = @view(primal(w)[n+1:end])
     wy = dual(w)
     wz = @view(dual(w)[kkt.ind_ineq])
-    
+
     xx = @view(primal(x)[1:n])
     xs = @view(primal(x)[n+1:end])
     xy = dual(x)
     xz = @view(dual(x)[kkt.ind_ineq])
-    
+
     symul!(wx, kkt.hess, xx, alpha, beta)
     if m > 0  # otherwise, CUDA causes an error
         mul!(wx, kkt.jac', dual(x), alpha, one(T))
@@ -214,7 +235,7 @@ function mul_hess_blk!(wx, kkt::Union{DenseKKTSystem,DenseCondensedKKTSystem}, t
     fill!(@view(wx[n+1:end]), 0)
     wx .+= t .* kkt.pr_diag
 end
-    
+
 function mul_hess_blk!(wx, kkt::Union{SparseKKTSystem,SparseCondensedKKTSystem}, t)
     n = size(kkt.hess_com, 1)
     mul!(@view(wx[1:n]), Symmetric(kkt.hess_com, :L), @view(t[1:n]))
@@ -224,7 +245,7 @@ end
 function mul_hess_blk!(wx, kkt::SparseUnreducedKKTSystem, t)
     ind_lb = kkt.ind_lb
     ind_ub = kkt.ind_ub
-    
+
     n = size(kkt.hess_com, 1)
     mul!(@view(wx[1:n]), Symmetric(kkt.hess_com, :L), @view(t[1:n]))
     fill!(@view(wx[n+1:end]), 0)

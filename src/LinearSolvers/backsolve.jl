@@ -35,7 +35,7 @@ function solve_refine!(
 
     fill!(full(x), zero(T))
 
-    
+
     if norm_b == zero(T)
         @debug(
             iterator.logger,
@@ -46,12 +46,12 @@ function solve_refine!(
         )
         return true
     end
-    
+
     copyto!(full(w), full(b))
     iter = 0
 
     while true
-        solve!(iterator.kkt, w) 
+        solve!(iterator.kkt, w)
         axpy!(1., full(w), full(x))
         copyto!(full(w), full(b))
 
@@ -60,13 +60,13 @@ function solve_refine!(
         norm_w = norm(full(w), Inf)
         norm_x = norm(full(x), Inf)
         residual_ratio = norm_w / (min(norm_x, 1e6 * norm_b) + norm_b)
-        
-        if mod(iter, 10)==0 
+
+        if mod(iter, 10)==0
             @debug(iterator.logger,"iter ||res||")
         end
         @debug(iterator.logger, @sprintf("%4i %6.2e", iter, residual_ratio))
         iter += 1
-        
+
         if (iter >= iterator.opt.max_iter) || (residual_ratio < iterator.opt.tol)
             break
         end
