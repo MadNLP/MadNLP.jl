@@ -543,7 +543,7 @@ get_sparse_condensed_ext(::Type{Vector{T}},args...) where T = nothing
 is_reduced(::SparseCondensedKKTSystem) = true
 num_variables(kkt::SparseCondensedKKTSystem) = length(kkt.pr_diag)
 function is_inertia_correct(kkt::SparseCondensedKKTSystem, num_pos, num_zero, num_neg)
-    return (num_zero == 0) && (num_pos == num_variables(kkt))
+    return (num_zero == 0) && (num_pos == size(kkt.hess_com,1))
 end
 
 
