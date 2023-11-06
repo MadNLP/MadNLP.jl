@@ -80,7 +80,7 @@ abstract type AbstractCondensedKKTSystem{T, VT, MT, QN} <: AbstractKKTSystem{T, 
     Templates
 =#
 
-"Number of primal variables associated to the KKT system."
+"Number of primal variables (including slacks) associated to the KKT system."
 function num_variables end
 
 """
@@ -153,15 +153,6 @@ Called internally inside the interior-point routine.
 function regularize_diagonal! end
 
 """
-    set_jacobian_scaling!(kkt::AbstractKKTSystem, scaling::AbstractVector)
-
-Set the scaling of the Jacobian with the vector `scaling` storing
-the scaling for all the constraints in the problem.
-
-"""
-function set_jacobian_scaling! end
-
-"""
     is_inertia_correct(kkt::AbstractKKTSystem, n::Int, m::Int, p::Int)
 
 Check if the inertia ``(n, m, p)`` returned by the linear solver is adapted
@@ -193,6 +184,7 @@ function initialize!(kkt::AbstractKKTSystem)
     fill!(kkt.pr_diag, 1.0)
     fill!(kkt.du_diag, 0.0)
     fill!(kkt.hess, 0.0)
+    return
 end
 
 function regularize_diagonal!(kkt::AbstractKKTSystem, primal, dual)
@@ -215,7 +207,7 @@ function is_inertia_correct(kkt::AbstractKKTSystem, num_pos, num_zero, num_neg)
     return (num_zero == 0) && (num_pos == num_variables(kkt))
 end
 
-compress_hessian!(kkt::AbstractKKTSystem) = nothing 
+compress_hessian!(kkt::AbstractKKTSystem) = nothing
 
 
 include("rhs.jl")

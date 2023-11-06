@@ -1,7 +1,24 @@
-function get_index_constraints(lvar, uvar, lcon, ucon, fixed_variable_treatment, equality_treatment)
-    
+
+function get_index_constraints(
+    nlp::AbstractNLPModel,
+    fixed_variable_treatment,
+    equality_treatment,
+)
+    get_index_constraints(
+        get_lvar(nlp), get_uvar(nlp),
+        get_lcon(nlp), get_ucon(nlp),
+        fixed_variable_treatment, equality_treatment,
+    )
+end
+
+function get_index_constraints(
+    lvar, uvar,
+    lcon, ucon,
+    fixed_variable_treatment,
+    equality_treatment,
+)
     ncon = length(lcon)
-    
+
     if ncon > 0
         if equality_treatment == EnforceEquality
             ind_eq = findall(lcon .== ucon)
@@ -18,7 +35,7 @@ function get_index_constraints(lvar, uvar, lcon, ucon, fixed_variable_treatment,
         xl = lvar
         xu = uvar
     end
-    
+
     if fixed_variable_treatment == MakeParameter
         ind_fixed = findall(xl .== xu)
         ind_lb = findall((xl .!= -Inf) .* (xl .!= xu))
@@ -31,7 +48,7 @@ function get_index_constraints(lvar, uvar, lcon, ucon, fixed_variable_treatment,
 
     ind_llb = findall((lvar .!= -Inf).*(uvar .== Inf))
     ind_uub = findall((lvar .== -Inf).*(uvar .!= Inf))
-    
+
     # Return named tuple
     return (
         ind_eq = ind_eq,
@@ -67,7 +84,7 @@ struct SparseCallback{
     FH <: AbstractFixedVariableTreatment,
     EH <: AbstractEqualityTreatment,
     } <: AbstractCallback{T, VT}
-    
+
     nlp::I
     nvar::Int
     ncon::Int
@@ -100,7 +117,7 @@ struct DenseCallback{
     FH <: AbstractFixedVariableTreatment,
     EH <: AbstractEqualityTreatment,
     } <: AbstractCallback{T, VT}
-    
+
     nlp::I
     nvar::Int
     ncon::Int
@@ -148,7 +165,7 @@ function create_dense_fixed_handler(
     )
     lvar = get_lvar(nlp)
     uvar = get_uvar(nlp)
-    
+
     isfixed  = (lvar .== uvar)
     fixed  = findall(isfixed)
 
@@ -174,9 +191,9 @@ function create_sparse_fixed_handler(
     uvar = get_uvar(nlp)
     nnzj = get_nnzj(nlp.meta)
     nnzh = get_nnzh(nlp.meta)
-    
+
     isfixed  = (lvar .== uvar)
-    
+
     fixed  = findall(isfixed)
     fixedj = findall(@view(isfixed[jac_J]))
     fixedh = findall(@view(isfixed[hess_I]) .|| @view(isfixed[hess_J]))
@@ -195,7 +212,7 @@ function create_sparse_fixed_handler(
         fixedh,
         similar(lvar, length(fixed))
     )
-    
+
     return fixed_handler, nnzj, nnzh
 end
 
@@ -212,7 +229,7 @@ function create_sparse_fixed_handler(
 
     fixed_handler = RelaxBound()
 
-    
+
     return fixed_handler, get_nnzj(nlp.meta), get_nnzh(nlp.meta)
 end
 
@@ -226,7 +243,7 @@ function create_callback(
     m = get_ncon(nlp)
     nnzj = get_nnzj(nlp.meta)
     nnzh = get_nnzh(nlp.meta)
-    
+
 
     x0   = get_x0(nlp)
 
@@ -241,9 +258,9 @@ function create_callback(
     hess_J = similar(x0, Int, nnzh)
 
     obj_scale = Ref(one(T))
-    con_scale = similar(jac_buffer, m)
-    jac_scale = similar(jac_buffer, nnzj)
-    
+    con_scale = similar(jac_buffer, m)    ; fill!(con_scale, one(T))
+    jac_scale = similar(jac_buffer, nnzj) ; fill!(jac_scale, one(T))
+
     NLPModels.jac_structure!(nlp,jac_I,jac_J)
     NLPModels.hess_structure!(nlp,hess_I,hess_J)
 
@@ -285,13 +302,13 @@ function create_callback(
 
     n = get_nvar(nlp)
     m = get_ncon(nlp)
-    
+
     x0   = similar(get_x0(nlp))
     con_buffer = similar(x0, m)
     jac_buffer = similar(x0, m, n)
     grad_buffer = similar(x0, n)
     obj_scale = Ref(one(T))
-    con_scale = similar(x0, m)
+    con_scale = similar(x0, m) ; fill!(con_scale, one(T))
 
     fixed_handler = create_dense_fixed_handler(
         opt.fixed_variable_treatment,
@@ -341,21 +358,21 @@ function initialize!(
     x0= variable(x)
     lvar= variable(xl)
     uvar= variable(xu)
-    
+
     fixed_handler = cb.fixed_handler
     nlp = cb.nlp
-    
+
     con_buffer =cb.con_buffer
     grad_buffer =cb.grad_buffer
 
-    
+
     x0   .= get_x0(nlp)
-    y0   .= get_y0(nlp) 
+    y0   .= get_y0(nlp)
     lvar .= get_lvar(nlp)
     uvar .= get_uvar(nlp)
     lcon = copy(get_lcon(nlp))
     ucon = copy(get_ucon(nlp))
-    
+
     _treat_fixed_variable_initialize!(fixed_handler, x0, lvar, uvar)
     _treat_equality_initialize!(cb.equality_handler, lcon, ucon, opt.tol)
 
@@ -371,9 +388,9 @@ function initialize!(
         opt.bound_push,
         opt.bound_fac
     )
-    
+
     NLPModels.cons!(nlp,x0,con_buffer)
-    
+
     slack(xl) .= view(lcon, ind_ineq)
     slack(xu) .= view(ucon, ind_ineq)
     rhs .= (lcon.==ucon).*lcon
@@ -400,13 +417,13 @@ function set_scaling!(
     ind_ineq,
     nlp_scaling_max_gradient
     )
-    
+
     x0= variable(x)
 
     nlp = cb.nlp
     obj_scale = cb.obj_scale
     con_scale = cb.con_scale
-    jac_scale = cb.jac_scale    
+    jac_scale = cb.jac_scale
     con_buffer =cb.con_buffer
     jac_buffer =cb.jac_buffer
     grad_buffer =cb.grad_buffer
@@ -415,7 +432,7 @@ function set_scaling!(
     NLPModels.jac_coord!(nlp,x0,jac_buffer)
     set_con_scale_sparse!(con_scale, cb.jac_I, jac_buffer, nlp_scaling_max_gradient)
     set_jac_scale_sparse!(jac_scale, con_scale, cb.jac_I)
-    
+
     NLPModels.grad!(nlp,x0,grad_buffer)
     set_obj_scale!(obj_scale, grad_buffer, nlp_scaling_max_gradient)
 
@@ -433,7 +450,7 @@ function set_scaling!(
     ind_ineq,
     nlp_scaling_max_gradient
     )
-    
+
     x0= variable(x)
 
     nlp = cb.nlp
@@ -446,7 +463,7 @@ function set_scaling!(
     # Set scaling
     jac_dense!(nlp,x0,jac_buffer)
     set_con_scale_dense!(con_scale, jac_buffer, nlp_scaling_max_gradient)
-    
+
     NLPModels.grad!(nlp,x0,grad_buffer)
     set_obj_scale!(obj_scale, grad_buffer, nlp_scaling_max_gradient)
 
@@ -462,7 +479,7 @@ function _jac_sparsity_wrapper!(
     cb::SparseCallback,
     I::AbstractVector,J::AbstractVector
     )
-    
+
     copyto!(I, cb.jac_I)
     copyto!(J, cb.jac_J)
 end
@@ -470,7 +487,7 @@ end
 function _hess_sparsity_wrapper!(
     cb::SparseCallback,
     I::AbstractVector,J::AbstractVector
-    ) 
+    )
     copyto!(I, cb.hess_I)
     copyto!(J, cb.hess_J)
 end
@@ -488,7 +505,7 @@ function _eval_jac_wrapper!(
     x::AbstractVector,
     jac::AbstractVector
     )
-    
+
     nnzj_orig = get_nnzj(cb.nlp.meta)
     NLPModels.jac_coord!(cb.nlp, x, jac)
     jac .*= cb.jac_scale
@@ -505,7 +522,7 @@ function _eval_grad_f_wrapper!(
     x::AbstractVector,
     grad::AbstractVector
     ) where T
-    
+
     NLPModels.grad!(cb.nlp, x, grad)
     grad .*= cb.obj_scale[]
     _treat_fixed_variable_grad!(cb.fixed_handler, cb, x, grad)
@@ -529,18 +546,18 @@ function _eval_lag_hess_wrapper!(
     cb::SparseCallback{T},
     x::AbstractVector,
     y::AbstractVector,
-    hess::AbstractVector; 
+    hess::AbstractVector;
     obj_weight = 1.0
     ) where T
-    
+
     nnzh_orig = get_nnzh(cb.nlp.meta)
-    
+
     cb.con_buffer .= y .* cb.con_scale
     NLPModels.hess_coord!(
         cb.nlp, x, cb.con_buffer, view(hess, 1:nnzh_orig);
         obj_weight=obj_weight * cb.obj_scale[]
     )
-    _treat_fixed_variable_hess_coord!(cb.fixed_handler, cb, hess) 
+    _treat_fixed_variable_hess_coord!(cb.fixed_handler, cb, hess)
 end
 
 function _treat_fixed_variable_hess_coord!(fixed_handler::RelaxBound, cb, hess) end
@@ -555,7 +572,7 @@ function _eval_jac_wrapper!(
     x::AbstractVector,
     jac::AbstractMatrix
     ) where T
-    
+
     jac_buffer = cb.jac_buffer
     _eval_jac_wrapper!(cb, x, jac_buffer)
     fill!(jac, zero(T))
@@ -572,7 +589,7 @@ function _eval_lag_hess_wrapper!(
     hess::AbstractMatrix;
     obj_weight = one(T)
     ) where T
-    
+
     hess_buffer = cb.hess_buffer
     _eval_lag_hess_wrapper!(cb, x, y, hess_buffer; obj_weight=obj_weight * cb.obj_scale[])
     fill!(hess, zero(T))
@@ -585,7 +602,7 @@ end
 function _treat_fixed_variable_hess_dense!(fixed_handler::RelaxBound, cb, hess) end
 function _treat_fixed_variable_hess_dense!(fixed_handler::MakeParameter, cb::SparseCallback{T}, hess) where T
     nnzh_orig = get_nnzh(cb.nlp.meta)
-    
+
     fixed = fixed_handler.fixed
     _set_diag!(hess, fixed, one(T))
 end
@@ -596,7 +613,7 @@ function _eval_jac_wrapper!(
     x::AbstractVector,
     jac::AbstractMatrix
     ) where T
-    
+
     jac_dense!(cb.nlp, x, jac)
     jac .*= cb.con_scale
     _treat_fixed_variable_jac_dense!(cb.fixed_handler, cb, jac)
@@ -614,12 +631,12 @@ function _eval_lag_hess_wrapper!(
     hess::AbstractMatrix;
     obj_weight = one(T)
     ) where T
-    
+
     hess_dense!(
         cb.nlp, x, y, hess;
         obj_weight=obj_weight * cb.obj_scale[]
     )
-    
+
     _treat_fixed_variable_lag_hess_dense!(cb.fixed_handler, cb, hess)
 end
 function _treat_fixed_variable_lag_hess_dense!(fixed_handler::RelaxBound, cb::DenseCallback, hess) end
@@ -636,7 +653,7 @@ function update_z!(cb, zl, zu, jacl)
     _update_z!(cb.fixed_handler, zl, zu, jacl, get_minimize(cb.nlp) ? 1 : -1)
 end
 
-function _update_z!(fixed_handler::MakeParameter, zl, zu, jacl, sense) 
+function _update_z!(fixed_handler::MakeParameter, zl, zu, jacl, sense)
     zl_r = @view(zl[fixed_handler.fixed])
     zu_r = @view(zu[fixed_handler.fixed])
     jacl_r = @view(jacl[fixed_handler.fixed])

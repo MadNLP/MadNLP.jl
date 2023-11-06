@@ -20,7 +20,7 @@ end
     # General options
     rethrow_error::Bool = true
     disable_garbage_collector::Bool = false
-    blas_num_threads::Int = 1 
+    blas_num_threads::Int = 1
     linear_solver::Type = LapackCPUSolver
     iterator::Type = RichardsonIterator
 
@@ -45,7 +45,7 @@ end
     boudn_relax_factor::Float64 = 1e-8
     jacobian_constant::Bool = false
     hessian_constant::Bool = false
-    kkt_system::Type = SparseKKTSystemes
+    kkt_system::Type = SparseKKTSystem
     hessian_approximation::Type = ExactHessian
     callback::Type = SparseCallback
 
@@ -104,7 +104,7 @@ function MadNLPOptions(nlp::AbstractNLPModel{T}) where T
     is_dense_callback =
         hasmethod(MadNLP.jac_dense!, Tuple{typeof(nlp), AbstractVector, AbstractMatrix}) &&
         hasmethod(MadNLP.hess_dense!, Tuple{typeof(nlp), AbstractVector, AbstractVector, AbstractMatrix})
-    
+
     callback = is_dense_callback ? DenseCallback : SparseCallback
 
     # if dense callback is used, we use dense condensed kkt system
@@ -114,7 +114,7 @@ function MadNLPOptions(nlp::AbstractNLPModel{T}) where T
     linear_solver = is_dense_callback ? LapackCPUSolver : default_sparse_solver(nlp)
 
     tol = get_tolerance(T,kkt_system)
-    
+
     return MadNLPOptions(
         callback = callback,
         kkt_system = kkt_system,

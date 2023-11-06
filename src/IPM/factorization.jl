@@ -31,12 +31,14 @@ function solve!(kkt::SparseUnreducedKKTSystem, w::AbstractKKTVector)
     solve!(kkt.linear_solver, full(w))
     wzl .*= .-kkt.l_lower_aug
     wzu .*= kkt.u_lower_aug
+    return w
 end
 
 function solve!(kkt::AbstractReducedKKTSystem, w::AbstractKKTVector)
     reduce_rhs!(w.xp_lr, dual_lb(w), kkt.l_diag, w.xp_ur, dual_ub(w), kkt.u_diag)
     solve!(kkt.linear_solver, primal_dual(w))
     finish_aug_solve!(kkt, w)
+    return w
 end
 
 function solve!(
@@ -86,6 +88,7 @@ function solve!(
     end
 
     finish_aug_solve!(kkt, w)
+    return w
 end
 
 
@@ -112,7 +115,7 @@ function solve!(kkt::SparseCondensedKKTSystem{T}, w::AbstractKKTVector)  where T
     ws .= (ws .+ wz) ./ Σs
 
     finish_aug_solve!(kkt, w)
-
+    return w
 end
 
 function solve!(
@@ -153,6 +156,7 @@ function solve!(
     ws .= (ws .+ wz) ./ Σs
 
     finish_aug_solve!(kkt, w)
+    return w
 end
 
 function mul!(w::AbstractKKTVector{T}, kkt::Union{SparseKKTSystem{T,VT,MT,QN},SparseUnreducedKKTSystem{T,VT,MT,QN}}, x::AbstractKKTVector, alpha = one(T), beta = zero(T)) where {T, VT, MT, QN<:ExactHessian}
@@ -160,6 +164,7 @@ function mul!(w::AbstractKKTVector{T}, kkt::Union{SparseKKTSystem{T,VT,MT,QN},Sp
     mul!(primal(w), kkt.jac_com', dual(x), alpha, one(T))
     mul!(dual(w), kkt.jac_com,  primal(x), alpha, beta)
     _kktmul!(w,x,kkt.reg,kkt.du_diag,kkt.l_lower,kkt.u_lower,kkt.l_diag,kkt.u_diag, alpha, beta)
+    return w
 end
 
 function mul!(w::AbstractKKTVector{T}, kkt::Union{SparseKKTSystem{T,VT,MT,QN},SparseUnreducedKKTSystem{T,VT,MT,QN}}, x::AbstractKKTVector, alpha = one(T), beta = zero(T)) where {T, VT, MT, QN<:CompactLBFGS}
@@ -199,12 +204,13 @@ function mul!(w::AbstractKKTVector{T}, kkt::SparseCondensedKKTSystem, x::Abstrac
 
     mul!(wx, Symmetric(kkt.hess_com, :L), xx, alpha, beta) # TODO: make this symmetric
 
-    mul!(wx, kkt.jt_csc,  xz, alpha, beta)
-    mul!(wz, kkt.jt_csc', xx, alpha, one(T))
-    axpy!(-alpha, xz, ws)
+    mul!(wx, kkt.jt_csc,  xz, alpha, one(T))
+    mul!(wz, kkt.jt_csc', xx, alpha, beta)
     axpy!(-alpha, xs, wz)
+    ws .= beta.*ws .- alpha.* xz
 
     _kktmul!(w,x,kkt.reg,kkt.du_diag,kkt.l_lower,kkt.u_lower,kkt.l_diag,kkt.u_diag, alpha, beta)
+    return w
 end
 
 function mul!(w::AbstractKKTVector{T}, kkt::AbstractDenseKKTSystem, x::AbstractKKTVector, alpha = one(T), beta = zero(T)) where T
@@ -225,8 +231,9 @@ function mul!(w::AbstractKKTVector{T}, kkt::AbstractDenseKKTSystem, x::AbstractK
         mul!(wy, kkt.jac,  xx, alpha, beta)
     end
     ws .= beta.*ws .- alpha.* xz
-    wz .= beta.*wz .- alpha.* xs
+    wz .-= alpha.* xs
     _kktmul!(w,x,kkt.reg,kkt.du_diag,kkt.l_lower,kkt.u_lower,kkt.l_diag,kkt.u_diag, alpha, beta)
+    return w
 end
 
 function mul_hess_blk!(wx, kkt::Union{DenseKKTSystem,DenseCondensedKKTSystem}, t)
