@@ -21,8 +21,7 @@ function solcmp(x,sol;atol=1e-4,rtol=1e-4)
     return (aerr < atol || rerr < rtol)
 end
 
-function test_linear_solver(solver,T; kwargs...)
-
+function test_linear_solver(solver, T; kwargs...)
     m = 2
     n = 2
     row = Int32[1,2,2]
@@ -30,28 +29,85 @@ function test_linear_solver(solver,T; kwargs...)
     val = T[1.,.1,2.]
     b = T[1.0,3.0]
     x = similar(b)
+    sol= [0.8542713567839195, 1.4572864321608041]
 
-    @testset "Linear solver $solver" begin
-
-        csc = sparse(row,col,val,m,n)
-        sol= [0.8542713567839195, 1.4572864321608041]
-        if MadNLP.input_type(solver) == :csc
-            opt = MadNLP.default_options(solver)
-            M = solver(csc; opt=opt)
-        elseif MadNLP.input_type(solver) == :dense
-            dense = Array(csc)
-            opt = MadNLP.default_options(solver)
-            M = solver(dense; opt=opt)
-        end
-        MadNLP.introduce(M)
-        MadNLP.improve!(M)
-        MadNLP.factorize!(M)
-        if MadNLP.is_inertia(M)
-            @test MadNLP.inertia(M) == (2, 0, 0)
-        end
-        x = MadNLP.solve!(M,copy(b))
-        @test solcmp(x,sol)
+    csc = sparse(row,col,val,m,n)
+    if MadNLP.input_type(solver) == :csc
+        opt = MadNLP.default_options(solver)
+        M = solver(csc; opt=opt)
+    elseif MadNLP.input_type(solver) == :dense
+        dense = Array(csc)
+        opt = MadNLP.default_options(solver)
+        M = solver(dense; opt=opt)
     end
+    MadNLP.introduce(M)
+    MadNLP.improve!(M)
+    MadNLP.factorize!(M)
+    if MadNLP.is_inertia(M)
+        @test MadNLP.inertia(M) == (2, 0, 0)
+    end
+    x = MadNLP.solve!(M,copy(b))
+    @test solcmp(x,sol)
+end
+
+function test_kkt_system(kkt, cb)
+    # Getters
+    n = MadNLP.num_variables(kkt)
+    (m, p) = size(kkt)
+    # system should be square
+    @test m == p
+    @test isa(MadNLP.is_reduced(kkt), Bool)
+
+    # Interface
+    MadNLP.initialize!(kkt)
+
+    # Update internal structure
+    x0 = NLPModels.get_x0(cb.nlp)
+    y0 = NLPModels.get_y0(cb.nlp)
+    # Update Jacobian manually
+    jac = MadNLP.get_jacobian(kkt)
+    MadNLP._eval_jac_wrapper!(cb, x0, jac)
+    MadNLP.compress_jacobian!(kkt)
+    # Update Hessian manually
+    hess = MadNLP.get_hessian(kkt)
+    MadNLP._eval_lag_hess_wrapper!(cb, x0, y0, hess)
+    MadNLP.compress_hessian!(kkt)
+
+    # N.B.: set non-trivial dual's bounds to ensure
+    # l_lower and u_lower are positive. If not we run into
+    # an issue inside SparseUnreducedKKTSystem, which symmetrize
+    # the system using the values in l_lower and u_lower.
+    fill!(kkt.l_lower, 1e-3)
+    fill!(kkt.u_lower, 1e-3)
+
+    # Update diagonal terms manually.
+    MadNLP._set_aug_diagonal!(kkt)
+
+    # Factorization
+    MadNLP.build_kkt!(kkt)
+    MadNLP.factorize!(kkt.linear_solver)
+
+    # Backsolve
+    x = MadNLP.UnreducedKKTVector(kkt)
+    fill!(MadNLP.full(x), 1.0)  # fill RHS with 1
+    out1 = MadNLP.solve!(kkt, x)
+    @test out1 === x
+
+    y = copy(x)
+    fill!(MadNLP.full(y), 0.0)
+    out2 = mul!(y, kkt, x)
+    @test out2 === y
+    @test MadNLP.full(y) ≈ ones(length(x))
+
+    if MadNLP.is_inertia(kkt.linear_solver)
+        ni, mi, pi = MadNLP.inertia(kkt.linear_solver)
+        @test MadNLP.is_inertia_correct(kkt, ni, mi, pi)
+    end
+
+    prim_reg, dual_reg = 1.0, 1.0
+    MadNLP.regularize_diagonal!(kkt, prim_reg, dual_reg)
+
+    return
 end
 
 function test_madnlp(name,optimizer_constructor::Function,exclude; Arr = Array)
@@ -75,7 +131,7 @@ function infeasible(optimizer_constructor::Function; Arr = Array)
         )
         optimizer = optimizer_constructor()
         result = MadNLP.madnlp(nlp; optimizer.options...)
-        
+
         @test result.status == MadNLP.INFEASIBLE_PROBLEM_DETECTED
     end
 end
@@ -92,7 +148,7 @@ function unbounded(optimizer_constructor::Function; Arr = Array)
         )
         optimizer = optimizer_constructor()
         result = MadNLP.madnlp(nlp; optimizer.options...)
-        
+
         @test result.status == MadNLP.DIVERGING_ITERATES
     end
 end

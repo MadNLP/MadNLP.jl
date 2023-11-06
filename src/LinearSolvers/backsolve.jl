@@ -35,7 +35,6 @@ function solve_refine!(
 
     fill!(full(x), zero(T))
 
-
     if norm_b == zero(T)
         @debug(
             iterator.logger,

@@ -1,6 +1,6 @@
 using LinearAlgebra
 
-@testset "$KKTVector" for KKTVector in [
+@testset "[KKT vector] $KKTVector" for KKTVector in [
     MadNLP.UnreducedKKTVector,
 ]
     T = Float64
@@ -19,4 +19,45 @@ using LinearAlgebra
 
     fill!(rhs, one(T))
     @test norm(rhs) == sqrt(length(rhs))
+
+    # Test copy
+    copy_rhs = copy(rhs)
+    @test MadNLP.full(rhs) == MadNLP.full(copy_rhs)
 end
+
+@testset "[KKT system] $(KKTSystem)" for (KKTSystem, Callback) in [
+    (MadNLP.SparseKKTSystem, MadNLP.SparseCallback),
+    (MadNLP.SparseUnreducedKKTSystem, MadNLP.SparseCallback),
+    (MadNLP.SparseCondensedKKTSystem, MadNLP.SparseCallback),
+    (MadNLP.DenseKKTSystem, MadNLP.DenseCallback),
+    (MadNLP.DenseCondensedKKTSystem, MadNLP.DenseCallback),
+]
+    linear_solver = MadNLP.LapackCPUSolver
+    options = MadNLP.MadNLPOptions(; linear_solver=linear_solver)
+    options_linear_solver = MadNLP.default_options(linear_solver)
+    cnt = MadNLP.MadNLPCounters(; start_time=time())
+
+    nlp = MadNLPTests.HS15Model()
+    ind_cons = MadNLP.get_index_constraints(
+        nlp,
+        options.fixed_variable_treatment,
+        options.equality_treatment,
+    )
+
+    cb = MadNLP.create_callback(
+        Callback,
+        nlp,
+        options,
+    )
+
+    kkt = MadNLP.create_kkt_system(
+        KKTSystem,
+        cb,
+        options,
+        options_linear_solver,
+        cnt,
+        ind_cons,
+    )
+    MadNLPTests.test_kkt_system(kkt, cb)
+end
+
