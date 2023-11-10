@@ -36,9 +36,6 @@ curvature(::Val{SCALAR3}, sk, yk) = 0.5 * (curvature(Val(SCALAR1), sk, yk) + cur
 curvature(::Val{SCALAR4}, sk, yk) = sqrt(curvature(Val(SCALAR1), sk, yk) * curvature(Val(SCALAR2), sk, yk))
 
 
-struct ExactHessian{T, VT} <: AbstractHessian{T, VT} end
-ExactHessian{T, VT}(n::Int) where {T, VT} = ExactHessian{T, VT}()
-
 """
     BFGS{T, VT} <: AbstractQuasiNewton{T, VT}
 
@@ -51,7 +48,7 @@ B_{k+1} = B_k - \frac{(B_k s_k)(B_k s_k)^⊤}{s_k^⊤ B_k s_k} + \frac{y_k y_k^�
 The matrix is not updated if ``s_k^⊤ y_k < 10^{-8}``.
 
 """
-struct BFGS{T, VT} <: AbstractQuasiNewton{T, VT}
+struct BFGS{T, VT <: AbstractVector{T}} <: AbstractQuasiNewton{T, VT}
     init_strategy::BFGSInitStrategy
     sk::VT
     yk::VT
@@ -60,8 +57,13 @@ struct BFGS{T, VT} <: AbstractQuasiNewton{T, VT}
     last_x::VT
     last_jv::VT
 end
-function BFGS{T, VT}(n::Int; init_strategy=SCALAR1) where {T, VT}
-    return BFGS{T, VT}(
+function create_quasi_newton(
+    ::Type{BFGS},
+    cb::AbstractCallback{T,VT},
+    n;
+    init_strategy = SCALAR1
+    ) where {T,VT}
+    BFGS(
         init_strategy,
         VT(undef, n),
         VT(undef, n),
@@ -84,7 +86,7 @@ function update!(qn::BFGS{T, VT}, Bk::AbstractMatrix, sk::AbstractVector, yk::Ab
     return true
 end
 
-struct DampedBFGS{T, VT} <: AbstractQuasiNewton{T, VT}
+struct DampedBFGS{T, VT <: AbstractVector{T}} <: AbstractQuasiNewton{T, VT}
     init_strategy::BFGSInitStrategy
     sk::VT
     yk::VT
@@ -94,8 +96,13 @@ struct DampedBFGS{T, VT} <: AbstractQuasiNewton{T, VT}
     last_x::VT
     last_jv::VT
 end
-function DampedBFGS{T, VT}(n::Int; init_strategy=SCALAR1) where {T, VT}
-    return DampedBFGS{T, VT}(
+function create_quasi_newton(
+    ::Type{DampedBFGS},
+    cb::AbstractCallback{T,VT},
+    n;
+    init_strategy = SCALAR1
+    ) where {T,VT}
+    return DampedBFGS(
         init_strategy,
         VT(undef, n),
         VT(undef, n),
@@ -142,7 +149,7 @@ end
 """
     CompactLBFGS{T, VT} <: AbstractQuasiNewton
 """
-mutable struct CompactLBFGS{T, VT, MT} <: AbstractQuasiNewton{T, VT}
+mutable struct CompactLBFGS{T, VT <: AbstractVector{T}, MT <: AbstractMatrix{T}} <: AbstractQuasiNewton{T, VT}
     init_strategy::BFGSInitStrategy
     sk::VT
     yk::VT
@@ -167,30 +174,36 @@ mutable struct CompactLBFGS{T, VT, MT} <: AbstractQuasiNewton{T, VT}
     _w2::VT
 end
 
-function CompactLBFGS{T, VT, MT}(n::Int; max_mem=6, init_strategy=SCALAR1) where {T, VT<:AbstractVector{T}, MT<:AbstractMatrix{T}}
-    return CompactLBFGS{T, VT, MT}(
+function create_quasi_newton(
+    ::Type{CompactLBFGS},
+    cb::AbstractCallback{T,VT},
+    n;
+    max_mem=6,
+    init_strategy = SCALAR1
+    ) where {T, VT}
+    return CompactLBFGS(
         init_strategy,
-        zeros(T, n),
-        zeros(T, n),
-        zeros(T, n),
-        zeros(T, n),
-        zeros(T, n),
+        fill!(create_array(cb, n), zero(T)),
+        fill!(create_array(cb, n), zero(T)),
+        fill!(create_array(cb, n), zero(T)),
+        fill!(create_array(cb, n), zero(T)),
+        fill!(create_array(cb, n), zero(T)),
         max_mem,
         0,
-        zeros(T, n, 0),
-        zeros(T, n, 0),
-        zeros(T, n, 0),
-        zeros(T, 0, 0),
-        zeros(T, 0, 0),
-        zeros(T, 0, 0),
-        zeros(T, 0, 0),
-        zeros(T, 0, 0),
-        zeros(T, 0, 0),
-        zeros(T, 0, 0),
-        zeros(T, 0, 0),
-        zeros(T, 0),
-        zeros(T, 0),
-        zeros(T, 0),
+        fill!(create_array(cb, n, 0), zero(T)),
+        fill!(create_array(cb, n, 0), zero(T)),
+        fill!(create_array(cb, n, 0), zero(T)),
+        fill!(create_array(cb, 0, 0), zero(T)),
+        fill!(create_array(cb, 0, 0), zero(T)),
+        fill!(create_array(cb, 0, 0), zero(T)),
+        fill!(create_array(cb, 0, 0), zero(T)),
+        fill!(create_array(cb, 0, 0), zero(T)),
+        fill!(create_array(cb, 0, 0), zero(T)),
+        fill!(create_array(cb, 0, 0), zero(T)),
+        fill!(create_array(cb, 0, 0), zero(T)),
+        fill!(create_array(cb, 0), zero(T)),
+        fill!(create_array(cb, 0), zero(T)),
+        fill!(create_array(cb, 0), zero(T)),
     )
 end
 
@@ -277,26 +290,26 @@ function update!(qn::CompactLBFGS{T, VT, MT}, Bk, sk, yk) where {T, VT, MT}
     #            [ U₂ ]          [  U₂ ]
 
     # Step 1: σₖ I
-    sigma = curvature(Val(qn.init_strategy), sk, yk) # σₖ
-    Bk .= sigma                                      # Hₖ .= σₖ I (diagonal Hessian approx.)
+    sigma = curvature(Val(qn.init_strategy), sk, yk)  # σₖ
+    Bk .= sigma                                       # Hₖ .= σₖ I (diagonal Hessian approx.)
 
     # Step 2: Mₖ = σₖ Sₖᵀ Sₖ + Lₖ Dₖ⁻¹ Lₖᵀ
-    qn.DkLk .= (one(T) ./ qn.Dk) .* qn.Lk'           # DₖLₖ = Dₖ⁻¹ Lₖᵀ
-    qn.Mk .= qn.SdotS                                # Mₖ = Sₖᵀ Sₖ
-    mul!(qn.Mk, qn.Lk, qn.DkLk, one(T), sigma)       # Mₖ = σₖ Sₖᵀ Sₖ + Lₖ Dₖ⁻¹ Lₖᵀ
+    qn.DkLk .= (one(T) ./ qn.Dk) .* qn.Lk'            # DₖLₖ = Dₖ⁻¹ Lₖᵀ
+    qn.Mk .= qn.SdotS                                 # Mₖ = Sₖᵀ Sₖ
+    mul!(qn.Mk, qn.Lk, qn.DkLk, one(T), sigma)        # Mₖ = σₖ Sₖᵀ Sₖ + Lₖ Dₖ⁻¹ Lₖᵀ
     symmetrize!(qn.Mk)
 
     copyto!(qn.Jk, qn.Mk)
-    cholesky!(qn.Jk)                                 # Mₖ = Jₖᵀ Jₖ (factorization)
+    cholesky!(qn.Jk)                                  # Mₖ = Jₖᵀ Jₖ (factorization)
 
     # Step 3: Nₖ = [U₁ U₂]
     U1 = view(qn.U, :, 1:k)
-    copyto!(U1, qn.Sk)                               # U₁ = Sₖ
-    mul!(U1, qn.Yk, qn.DkLk, one(T), sigma)          # U₁ = σₖ Sₖ + Yₖ Dₖ⁻¹ Lₖ
+    copyto!(U1, qn.Sk)                                # U₁ = Sₖ
+    mul!(U1, qn.Yk, qn.DkLk, one(T), sigma)           # U₁ = σₖ Sₖ + Yₖ Dₖ⁻¹ Lₖ
     BLAS.trsm!('R', 'U', 'N', 'N', one(T), qn.Jk, U1) # U₁ = Jₖ⁻ᵀ (σₖ Sₖ + Yₖ Dₖ⁻¹ Lₖ)
     U2 = view(qn.U, :, 1+k:2*k)
-    δ .= .-one(T) ./ sqrt.(qn.Dk)                    # δ = 1 / √Dₖ
-    U2 .= δ' .* qn.Yk                                # U₂ = (1 / √Dₖ) * Yₖ
+    δ .= .-one(T) ./ sqrt.(qn.Dk)                     # δ = 1 / √Dₖ
+    U2 .= δ' .* qn.Yk                                 # U₂ = (1 / √Dₖ) * Yₖ
     return true
 end
 
@@ -304,3 +317,6 @@ function init!(qn::CompactLBFGS, Bk::AbstractArray, sk::AbstractVector, yk::Abst
     return
 end
 
+
+struct ExactHessian{T, VT} <: AbstractHessian{T, VT} end
+create_quasi_newton(::Type{ExactHessian}, cb::AbstractCallback{T,VT}, n) where {T,VT} = ExactHessian{T, VT}()

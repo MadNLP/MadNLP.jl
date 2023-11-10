@@ -1,12 +1,12 @@
 include("config.jl")
-Pkg.add(PackageSpec(name="CUTEst",rev="main")) # will be removed once the new CUTEst version is released
 
 @everywhere using CUTEst
 
 if SOLVER == "master" || SOLVER == "current"
     @everywhere begin
         using MadNLP, MadNLPHSL
-        solver = nlp -> madnlp(nlp,linear_solver=MadNLPMa57,max_wall_time=900., print_level=PRINT_LEVEL)
+        LinSol = @isdefined(MadNLPMa57) ? MadNLPMa57 : MadNLPMa57 # for older version of MadNLP
+        solver = nlp -> madnlp(nlp,linear_solver=LinSol,max_wall_time=900., print_level=PRINT_LEVEL, tol=1e-6)
         function get_status(code::MadNLP.Status)
             if code == MadNLP.SOLVE_SUCCEEDED
                 return 1
@@ -19,7 +19,7 @@ if SOLVER == "master" || SOLVER == "current"
     end
 elseif SOLVER == "ipopt"
     @everywhere begin
-        solver = nlp -> ipopt(nlp,linear_solver="ma57",max_cpu_time=900., print_level=PRINT_LEVEL)
+        solver = nlp -> ipopt(nlp,linear_solver="ma57",max_cpu_time=900., print_level=PRINT_LEVEL, tol=1e-6)
         using NLPModelsIpopt
         function get_status(code::Symbol)
             if code == :first_order
@@ -58,8 +58,9 @@ end
         return (status=get_status(retval.status),time=t,mem=mem,iter=retval.iter)
     catch e
         finalize(nlp)
-        throw(e)
+        return (status=3,time=0.,mem=0,iter=0)
     end
+    println("Solved $name")
 end
 
 function benchmark(solver,probs;warm_up_probs = [], decode = false)

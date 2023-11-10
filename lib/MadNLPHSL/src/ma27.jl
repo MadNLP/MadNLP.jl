@@ -156,8 +156,11 @@ end
 
 is_inertia(::Ma27Solver) = true
 function inertia(M::Ma27Solver)
-    rank = M.info[1]==3 ? M.info[2] : rank = M.csc.n
-    return (rank-M.info[15],M.csc.n-rank,M.info[15])
+    dim = M.csc.n
+    rank = (Int(M.info[1])==3) ? Int(M.info[2]) : dim
+    neg = Int(M.info[15])
+
+    return (rank-neg,dim-rank,neg) 
 end
 
 function improve!(M::Ma27Solver)

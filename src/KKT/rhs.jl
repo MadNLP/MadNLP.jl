@@ -78,43 +78,6 @@ function axpy!(a::Number, X::AbstractKKTVector, Y::AbstractKKTVector)
 end
 
 #=
-    ReducedKKTVector
-=#
-
-"""
-    ReducedKKTVector{T, VT<:AbstractVector{T}} <: AbstractKKTVector{T, VT}
-
-KKT vector ``(x, s, y, z)``, associated to a [`AbstractReducedKKTSystem`](@ref).
-
-Compared to [`UnreducedKKTVector`](@ref), it does not store
-the dual values associated to the primal's lower and upper bounds.
-"""
-struct ReducedKKTVector{T, VT<:AbstractVector{T}} <: AbstractKKTVector{T, VT}
-    values::VT
-    xp::VT # unsafe view
-    xl::VT # unsafe view
-end
-
-ReducedKKTVector{T,VT}(n::Int, m::Int, nlb::Int, nub::Int) where {T, VT <: AbstractVector{T}} = ReducedKKTVector{T,VT}(n, m)
-function ReducedKKTVector{T,VT}(n::Int, m::Int) where {T, VT <: AbstractVector{T}}
-    x = VT(undef, n + m)
-    fill!(x, 0.0)
-    # Wrap directly array x to avoid dealing with views
-    xp = _madnlp_unsafe_wrap(x, n)
-    xl = _madnlp_unsafe_wrap(x, m, n+1)
-    return ReducedKKTVector{T, VT}(x, xp, xl)
-end
-function ReducedKKTVector(rhs::AbstractKKTVector)
-    return ReducedKKTVector(number_primal(rhs), number_dual(rhs))
-end
-
-full(rhs::ReducedKKTVector) = rhs.values
-primal(rhs::ReducedKKTVector) = rhs.xp
-dual(rhs::ReducedKKTVector) = rhs.xl
-primal_dual(rhs::ReducedKKTVector) = rhs.values
-
-
-#=
     UnreducedKKTVector
 =#
 
@@ -124,17 +87,22 @@ primal_dual(rhs::ReducedKKTVector) = rhs.values
 Full KKT vector ``(x, s, y, z, ν, w)``, associated to a [`AbstractUnreducedKKTSystem`](@ref).
 
 """
-struct UnreducedKKTVector{T, VT<:AbstractVector{T}} <: AbstractKKTVector{T, VT}
+struct UnreducedKKTVector{T, VT<:AbstractVector{T}, VI} <: AbstractKKTVector{T, VT}
     values::VT
     x::VT  # unsafe view
     xp::VT # unsafe view
+    xp_lr::SubVector{T, VT, VI}
+    xp_ur::SubVector{T, VT, VI}
     xl::VT # unsafe view
     xzl::VT # unsafe view
     xzu::VT # unsafe view
 end
 
-function UnreducedKKTVector{T, VT}(n::Int, m::Int, nlb::Int, nub::Int) where {T, VT <: AbstractVector{T}}
+function UnreducedKKTVector(
+    ::Type{VT}, n::Int, m::Int, nlb::Int, nub::Int, ind_lb, ind_ub;
     values = VT(undef,n+m+nlb+nub)
+    ) where {T, VT <: AbstractVector{T}}
+    
     fill!(values, 0.0)
     # Wrap directly array x to avoid dealing with views
     x = _madnlp_unsafe_wrap(values, n + m) # Primal-Dual
@@ -142,7 +110,11 @@ function UnreducedKKTVector{T, VT}(n::Int, m::Int, nlb::Int, nub::Int) where {T,
     xl = _madnlp_unsafe_wrap(values, m, n+1) # Dual
     xzl = _madnlp_unsafe_wrap(values, nlb, n + m + 1) # Lower bound
     xzu = _madnlp_unsafe_wrap(values, nub, n + m + nlb + 1) # Upper bound
-    return UnreducedKKTVector{T, VT}(values, x, xp, xl, xzl, xzu)
+
+    xp_lr = view(xp, ind_lb)
+    xp_ur = view(xp, ind_ub)
+
+    return UnreducedKKTVector(values, x, xp, xp_lr, xp_ur, xl, xzl, xzu)
 end
 
 full(rhs::UnreducedKKTVector) = rhs.values
@@ -159,18 +131,24 @@ dual_ub(rhs::UnreducedKKTVector) = rhs.xzu
 Primal vector ``(x, s)``.
 
 """
-struct PrimalVector{T, VT<:AbstractVector{T}} <: AbstractKKTVector{T, VT}
+struct PrimalVector{T, VT<:AbstractVector{T}, VI} <: AbstractKKTVector{T, VT}
     values::VT
+    values_lr::SubVector{T, VT, VI}
+    values_ur::SubVector{T, VT, VI}
     x::VT  # unsafe view
     s::VT # unsafe view
 end
 
-function PrimalVector{T, VT}(nx::Int, ns::Int) where {T, VT <: AbstractVector{T}}
-    values = VT(undef, nx+ns) ; fill!(values, zero(T))
-    return PrimalVector{T, VT}(
-        values,
-        _madnlp_unsafe_wrap(values, nx),
-        _madnlp_unsafe_wrap(values, ns, nx+1),
+function PrimalVector(::Type{VT}, nx::Int, ns::Int, ind_lb, ind_ub) where {T, VT <: AbstractVector{T}}
+    values = VT(undef, nx+ns)
+    fill!(values, zero(T))
+    x = _madnlp_unsafe_wrap(values, nx)
+    s = _madnlp_unsafe_wrap(values, ns, nx+1)
+    values_lr = view(values, ind_lb)
+    values_ur = view(values, ind_ub)
+    
+    return PrimalVector(
+        values, values_lr, values_ur, x, s, 
     )
 end
 
@@ -178,4 +156,6 @@ full(rhs::PrimalVector) = rhs.values
 primal(rhs::PrimalVector) = rhs.values
 variable(rhs::PrimalVector) = rhs.x
 slack(rhs::PrimalVector) = rhs.s
+
+
 

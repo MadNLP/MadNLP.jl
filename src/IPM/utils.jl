@@ -1,42 +1,59 @@
-mutable struct MadNLPExecutionStats{T} <: AbstractExecutionStats
+mutable struct MadNLPExecutionStats{T, VT} <: AbstractExecutionStats
+    options::MadNLPOptions
     status::Status
-    solution::Vector{T}
+    solution::VT
     objective::T
-    constraints::Vector{T}
+    constraints::VT
     dual_feas::T
     primal_feas::T
-    multipliers::Vector{T}
-    multipliers_L::Vector{T}
-    multipliers_U::Vector{T}
+    multipliers::VT
+    multipliers_L::VT
+    multipliers_U::VT
     iter::Int
-    counters::NLPModels.Counters
-    elapsed_time::Real
+    counters::MadNLPCounters
 end
 
 MadNLPExecutionStats(solver::MadNLPSolver) =MadNLPExecutionStats(
+    solver.opt,
     solver.status,
-    primal(solver.x),
-    solver.obj_val,solver.c,
-    solver.inf_du, solver.inf_pr,
-    solver.y,
-    primal(solver.zl),
-    primal(solver.zu),
-    solver.cnt.k, get_counters(solver.nlp),solver.cnt.total_time
+    primal(solver.x)[1:get_nvar(solver.nlp)],
+    solver.obj_val / solver.cb.obj_scale[],
+    solver.c ./ solver.cb.con_scale,
+    solver.inf_du,
+    solver.inf_pr,
+    copy(solver.y),
+    primal(solver.zl)[1:get_nvar(solver.nlp)],
+    primal(solver.zu)[1:get_nvar(solver.nlp)],
+    0,
+    solver.cnt,
 )
 
 function update!(stats::MadNLPExecutionStats, solver::MadNLPSolver)
     stats.status = solver.status
-    stats.objective = solver.obj_val
+    stats.solution .= @view(primal(solver.x)[1:get_nvar(solver.nlp)])
+    stats.multipliers .= solver.y
+    stats.multipliers_L .= @view(primal(solver.zl)[1:get_nvar(solver.nlp)])
+    stats.multipliers_U .= @view(primal(solver.zu)[1:get_nvar(solver.nlp)])
+    # stats.solution .= min.(
+    #     max.(
+    #         @view(primal(solver.x)[1:get_nvar(solver.nlp)]),
+    #         get_lvar(solver.nlp)
+    #     ),
+    #     get_uvar(solver.nlp)
+    # )
+    stats.objective = solver.obj_val / solver.cb.obj_scale[]
+    stats.constraints .= solver.c ./ solver.cb.con_scale .+ solver.rhs
+    stats.constraints[solver.ind_ineq] .+= slack(solver.x)
     stats.dual_feas = solver.inf_du
     stats.primal_feas = solver.inf_pr
+    update_z!(solver.cb, stats.multipliers_L, stats.multipliers_U, solver.jacl)
     stats.iter = solver.cnt.k
-    stats.elapsed_time = solver.cnt.total_time
     return stats
 end
 
 get_counters(nlp::NLPModels.AbstractNLPModel) = nlp.counters
 get_counters(nlp::NLPModels.AbstractNLSModel) = nlp.counters.counters
-getStatus(result::MadNLPExecutionStats) = STATUS_OUTPUT_DICT[result.status]
+getStatus(result::MadNLPExecutionStats) = get_status_output(result.status, result.options)
 
 # Exceptions
 struct InvalidNumberException <: Exception
@@ -48,18 +65,16 @@ struct NotEnoughDegreesOfFreedomException <: Exception end
 has_constraints(solver) = solver.m != 0
 
 function get_vars_info(solver)
-    x_lb = get_lvar(solver.nlp)
-    x_ub = get_uvar(solver.nlp)
+    nlp = solver.nlp
+
+    x_lb = get_lvar(nlp)
+    x_ub = get_uvar(nlp)
     num_fixed = length(solver.ind_fixed)
-    num_var = get_nvar(solver.nlp) - num_fixed
+    num_var = get_nvar(nlp) - num_fixed
     num_llb_vars = length(solver.ind_llb)
-    num_lu_vars = -num_fixed
-    # Number of bounded variables
-    for i in 1:get_nvar(solver.nlp)
-        if (x_lb[i] > -Inf) && (x_ub[i] < Inf)
-            num_lu_vars += 1
-        end
-    end
+    
+    # TODO make this non-allocating
+    num_lu_vars = sum((x_lb .!=-Inf) .& (x_ub .!= Inf)) - num_fixed
     num_uub_vars = length(solver.ind_uub)
     return (
         n_free=num_var,
@@ -71,26 +86,18 @@ function get_vars_info(solver)
 end
 
 function get_cons_info(solver)
-    g_lb = get_lcon(solver.nlp)
-    g_ub = get_ucon(solver.nlp)
-    # Classify constraints
-    num_eq_cons, num_ineq_cons = 0, 0
-    num_ue_cons, num_le_cons, num_lu_cons = 0, 0, 0
-    for i in 1:get_ncon(solver.nlp)
-        l, u = g_lb[i], g_ub[i]
-        if l == u
-            num_eq_cons += 1
-        elseif l < u
-            num_ineq_cons += 1
-            if isinf(l) && isfinite(u)
-                num_ue_cons += 1
-            elseif isfinite(l) && isinf(u)
-                num_le_cons +=1
-            else isfinite(l) && isfinite(u)
-                num_lu_cons += 1
-            end
-        end
-    end
+    nlp = solver.nlp
+    
+    g_lb = get_lcon(nlp)
+    g_ub = get_ucon(nlp)
+
+    # TODO make this non-allocating
+    num_eq_cons = sum(g_lb .== g_ub)
+    num_ineq_cons = length(g_lb) - num_eq_cons
+    num_le_cons = sum((g_lb .!= -Inf) .& (g_ub .==  Inf))
+    num_ue_cons = sum((g_ub .!=  Inf) .& (g_lb .== -Inf))
+    num_lu_cons = num_ineq_cons - num_le_cons - num_ue_cons
+                           
     return (
         n_eq=num_eq_cons,
         n_ineq=num_ineq_cons,
@@ -124,6 +131,7 @@ function print_init(solver::AbstractMadNLPSolver)
 end
 
 function print_iter(solver::AbstractMadNLPSolver;is_resto=false)
+    obj_scale = solver.cb.obj_scale[]
     mod(solver.cnt.k,10)==0&& @info(solver.logger,@sprintf(
         "iter    objective    inf_pr   inf_du lg(mu)  ||d||  lg(rg) alpha_du alpha_pr  ls"))
     if is_resto
@@ -138,7 +146,7 @@ function print_iter(solver::AbstractMadNLPSolver;is_resto=false)
     end
     @info(solver.logger,@sprintf(
         "%4i%s% 10.7e %6.2e %6.2e %5.1f %6.2e %s %6.2e %6.2e%s  %i",
-        solver.cnt.k,is_resto ? "r" : " ",solver.obj_val/solver.obj_scale[],
+        solver.cnt.k,is_resto ? "r" : " ",solver.obj_val/obj_scale,
         inf_pr, inf_du, mu,
         solver.cnt.k == 0 ? 0. : norm(primal(solver.d),Inf),
         solver.del_w == 0 ? "   - " : @sprintf("%5.1f",log(10,solver.del_w)),
@@ -146,23 +154,23 @@ function print_iter(solver::AbstractMadNLPSolver;is_resto=false)
     return
 end
 
-function print_summary_1(solver::AbstractMadNLPSolver)
+function print_summary(solver::AbstractMadNLPSolver)
+    # TODO inquire this from nlpmodel wrapper
+    obj_scale = solver.cb.obj_scale[]
+    solver.cnt.solver_time = solver.cnt.total_time-solver.cnt.linear_solver_time-solver.cnt.eval_function_time
+    
     @notice(solver.logger,"")
     @notice(solver.logger,"Number of Iterations....: $(solver.cnt.k)\n")
     @notice(solver.logger,"                                   (scaled)                 (unscaled)")
-    @notice(solver.logger,@sprintf("Objective...............:  % 1.16e   % 1.16e",solver.obj_val,solver.obj_val/solver.obj_scale[]))
-    @notice(solver.logger,@sprintf("Dual infeasibility......:   %1.16e    %1.16e",solver.inf_du,solver.inf_du/solver.obj_scale[]))
+    @notice(solver.logger,@sprintf("Objective...............:  % 1.16e   % 1.16e",solver.obj_val,solver.obj_val/obj_scale))
+    @notice(solver.logger,@sprintf("Dual infeasibility......:   %1.16e    %1.16e",solver.inf_du,solver.inf_du/obj_scale))
     @notice(solver.logger,@sprintf("Constraint violation....:   %1.16e    %1.16e",norm(solver.c,Inf),solver.inf_pr))
     @notice(solver.logger,@sprintf("Complementarity.........:   %1.16e    %1.16e",
-                                solver.inf_compl*solver.obj_scale[],solver.inf_compl))
+                                solver.inf_compl*obj_scale,solver.inf_compl))
     @notice(solver.logger,@sprintf("Overall NLP error.......:   %1.16e    %1.16e\n",
-                                max(solver.inf_du*solver.obj_scale[],norm(solver.c,Inf),solver.inf_compl),
+                                max(solver.inf_du*obj_scale,norm(solver.c,Inf),solver.inf_compl),
                                 max(solver.inf_du,solver.inf_pr,solver.inf_compl)))
-    return
-end
-
-function print_summary_2(solver::AbstractMadNLPSolver)
-    solver.cnt.solver_time = solver.cnt.total_time-solver.cnt.linear_solver_time-solver.cnt.eval_function_time
+    
     @notice(solver.logger,"Number of objective function evaluations             = $(solver.cnt.obj_cnt)")
     @notice(solver.logger,"Number of objective gradient evaluations             = $(solver.cnt.obj_grad_cnt)")
     @notice(solver.logger,"Number of constraint evaluations                     = $(solver.cnt.con_cnt)")

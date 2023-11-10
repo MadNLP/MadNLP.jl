@@ -10,29 +10,6 @@
       WARN   = 5,
       ERROR  = 6)
 
-@enum(FixedVariableTreatments::Int,
-      RELAX_BOUND = 1,
-      MAKE_PARAMETER = 2)
-
-@enum(InertiaCorrectionMethod::Int,
-      INERTIA_AUTO = 1,
-      INERTIA_BASED = 2,
-      INERTIA_FREE = 3)
-
-@enum(KKTLinearSystem::Int,
-      SPARSE_KKT_SYSTEM = 1,
-      SPARSE_UNREDUCED_KKT_SYSTEM = 2,
-      DENSE_KKT_SYSTEM = 3,
-      DENSE_CONDENSED_KKT_SYSTEM = 4,
-)
-
-@enum(HessianApproximation::Int,
-      EXACT_HESSIAN = 1,
-      DENSE_BFGS = 2,
-      DENSE_DAMPED_BFGS = 3,
-      SPARSE_COMPACT_LBFGS = 4,
-)
-
 @enum(BFGSInitStrategy::Int,
       SCALAR1  = 1,
       SCALAR2  = 2,
@@ -66,23 +43,44 @@
       INVALID_NUMBER_HESSIAN_LAGRANGIAN = -11,
 )
 
-const STATUS_OUTPUT_DICT = Dict(
-    SOLVE_SUCCEEDED => "Optimal Solution Found.",
-    SOLVED_TO_ACCEPTABLE_LEVEL => "Solved To Acceptable Level.",
-    SEARCH_DIRECTION_BECOMES_TOO_SMALL => "Search Direction is becoming Too Small.",
-    DIVERGING_ITERATES => "Iterates divering; problem might be unbounded.",
-    MAXIMUM_ITERATIONS_EXCEEDED => "Maximum Number of Iterations Exceeded.",
-    MAXIMUM_WALLTIME_EXCEEDED => "Maximum wall-clock Time Exceeded.",
-    RESTORATION_FAILED => "Restoration Failed",
-    INFEASIBLE_PROBLEM_DETECTED => "Converged to a point of local infeasibility. Problem may be infeasible.",
-    INVALID_NUMBER_DETECTED => "Invalid number in NLP function or derivative detected.",
-    ERROR_IN_STEP_COMPUTATION => "Error in step computation.",
-    NOT_ENOUGH_DEGREES_OF_FREEDOM => "Problem has too few degrees of freedom.",
-    USER_REQUESTED_STOP => "Stopping optimization at current point as requested by user.",
-    INTERNAL_ERROR => "Internal Error.",
-    INVALID_NUMBER_OBJECTIVE => "Invalid number in NLP objective function detected.",
-    INVALID_NUMBER_GRADIENT => "Invalid number in NLP objective gradient detected.",
-    INVALID_NUMBER_CONSTRAINTS => "Invalid number in NLP constraint function detected.",
-    INVALID_NUMBER_JACOBIAN => "Invalid number in NLP constraint Jacobian detected.",
-    INVALID_NUMBER_HESSIAN_LAGRANGIAN => "Invalid number in NLP Hessian Lagrangian detected.",
-)
+function get_status_output(status, opt)
+    if status == SOLVE_SUCCEEDED
+        return @sprintf "Optimal Solution Found (tol = %5.1e)." opt.tol 
+    elseif status == SOLVED_TO_ACCEPTABLE_LEVEL
+        return @sprintf "Solved To Acceptable Level (tol = %5.1e)." opt.acceptable_tol
+    elseif status == SEARCH_DIRECTION_BECOMES_TOO_SMALL
+        return "Search Direction is becoming Too Small."
+    elseif status == DIVERGING_ITERATES
+        return "Iterates divering; problem might be unbounded."
+    elseif status == MAXIMUM_ITERATIONS_EXCEEDED
+        return "Maximum Number of Iterations Exceeded."
+    elseif status == MAXIMUM_WALLTIME_EXCEEDED
+        return "Maximum wall-clock Time Exceeded."
+    elseif status == RESTORATION_FAILED
+        return "Restoration Failed"
+    elseif status == INFEASIBLE_PROBLEM_DETECTED
+        return "Converged to a point of local infeasibility. Problem may be infeasible."
+    elseif status == INVALID_NUMBER_DETECTED
+        return "Invalid number in NLP function or derivative detected."
+    elseif status == ERROR_IN_STEP_COMPUTATION
+        return "Error in step computation."
+    elseif status == NOT_ENOUGH_DEGREES_OF_FREEDOM
+        return "Problem has too few degrees of freedom."
+    elseif status == USER_REQUESTED_STOP
+        return "Stopping optimization at current point as requested by user."
+    elseif status == INTERNAL_ERROR
+        return "Internal Error."
+    elseif status == INVALID_NUMBER_OBJECTIVE
+        return "Invalid number in NLP objective function detected."
+    elseif status == INVALID_NUMBER_GRADIENT
+        return "Invalid number in NLP objective gradient detected."
+    elseif status == INVALID_NUMBER_CONSTRAINTS
+        return "Invalid number in NLP constraint function detected."
+    elseif status == INVALID_NUMBER_JACOBIAN
+        return "Invalid number in NLP constraint Jacobian detected."
+    elseif INVALID_NUMBER_HESSIAN_LAGRANGIAN
+        return "Invalid number in NLP Hessian Lagrangian detected."
+    else
+        error("status code is not valid") 
+    end
+end

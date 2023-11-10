@@ -8,7 +8,8 @@ Pkg.activate(@__DIR__)
 
 
 if ARGS[1] == "full"
-    pkgs = ["MadNLPHSL","MadNLPPardiso","MadNLPMumps","MadNLPKrylov"]
+    pkgs = ["MadNLPHSL","MadNLPPardiso","MadNLPMumps"]
+            # ,"MadNLPKrylov"] # Krylov has been discontinued since the introduction of iterative refinement on the full space.
 elseif ARGS[1] == "basic"
     pkgs = ["MadNLPMumps","MadNLPKrylov"]
 elseif ARGS[1] == "cuda"

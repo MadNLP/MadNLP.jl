@@ -584,21 +584,21 @@ struct MOIModel{T} <: AbstractNLPModel{T,Vector{T}}
     counters::NLPModels.Counters
 end
 
-obj(nlp::MOIModel,x::Vector{Float64}) = MOI.eval_objective(nlp.model,x)
+obj(nlp::MOIModel,x::AbstractVector{Float64}) = MOI.eval_objective(nlp.model,x)
 
-function grad!(nlp::MOIModel,x::Vector{Float64},f::Vector{Float64})
+function grad!(nlp::MOIModel,x::AbstractVector{Float64},f::AbstractVector{Float64})
     MOI.eval_objective_gradient(nlp.model,f,x)
 end
 
-function cons!(nlp::MOIModel,x::Vector{Float64},c::Vector{Float64})
+function cons!(nlp::MOIModel,x::AbstractVector{Float64},c::AbstractVector{Float64})
     MOI.eval_constraint(nlp.model,c,x)
 end
 
-function jac_coord!(nlp::MOIModel,x::Vector{Float64},jac::Vector{Float64})
+function jac_coord!(nlp::MOIModel,x::AbstractVector{Float64},jac::AbstractVector{Float64})
     MOI.eval_constraint_jacobian(nlp.model,jac,x)
 end
 
-function hess_coord!(nlp::MOIModel,x::Vector{Float64},l::Vector{Float64},hess::Vector{Float64}; obj_weight::Float64=1.)
+function hess_coord!(nlp::MOIModel,x::AbstractVector{Float64},l::AbstractVector{Float64},hess::AbstractVector{Float64}; obj_weight::Float64=1.)
     MOI.eval_hessian_lagrangian(nlp.model,hess,x,obj_weight,l)
 end
 
@@ -738,11 +738,7 @@ function MOI.get(model::Optimizer, ::MOI.RawStatusString)
     elseif model.solver === nothing
         return "Optimize not called"
     end
-    return get(
-        STATUS_OUTPUT_DICT,
-        model.result.status,
-        "Unknown result status: $(model.result.status)",
-    )
+    return get_status_output(model.result.status, model.result.options)
 end
 
 ### MOI.TerminationStatus
