@@ -7,7 +7,6 @@ const QUICK = ARGS[4] == "true"
 const GCOFF = ARGS[5] == "true"
 const DECODE = ARGS[6] == "true"
 
-addprocs(parse(Int,NP),exeflags="--project=.")
 Pkg.instantiate()
 
 if SOLVER == "master"
@@ -21,7 +20,9 @@ elseif SOLVER == "current"
 elseif SOLVER == "ipopt"
 elseif SOLVER == "knitro"
 else
-    error("Proper ARGS should be given")
+    Pkg.add(PackageSpec(name="MadNLP",rev="$SOLVER"))
+    Pkg.add(PackageSpec(name="MadNLPHSL",rev="$SOLVER"))
+    Pkg.build("MadNLPHSL")
 end
 
 # Set verbose option
@@ -34,5 +35,4 @@ else
     const PRINT_LEVEL = VERBOSE ? MadNLP.INFO : MadNLP.ERROR
 end
 
-# Set quick option
-
+addprocs(parse(Int,NP))

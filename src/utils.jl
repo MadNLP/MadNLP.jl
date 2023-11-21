@@ -1,9 +1,5 @@
 abstract type AbstractOptions end
 
-# Build info
-default_linear_solver() = UmfpackSolver
-default_dense_solver() = LapackCPUSolver
-
 # MadNLPLogger
 @kwdef mutable struct MadNLPLogger
     print_level::LogLevels = INFO
@@ -84,7 +80,7 @@ function _madnlp_unsafe_wrap(vec::VT, n, shift=1) where VT
 end
 
 # Type definitions for noncontiguous views
-const SubVector{Tv} = SubArray{Tv, 1, Vector{Tv}, Tuple{Vector{Int}}, false}
+const SubVector{Tv,VT, VI} = SubArray{Tv, 1, VT, Tuple{VI}, false}
 
 @kwdef mutable struct MadNLPCounters
     k::Int = 0 # total iteration counter
@@ -97,6 +93,7 @@ const SubVector{Tv} = SubArray{Tv, 1, Vector{Tv}, Tuple{Vector{Int}}, false}
     eval_function_time::Float64 = 0.
     solver_time::Float64 = 0.
     total_time::Float64 = 0.
+    init_time::Float64 = 0.
 
     obj_cnt::Int = 0
     obj_grad_cnt::Int = 0
@@ -104,7 +101,18 @@ const SubVector{Tv} = SubArray{Tv, 1, Vector{Tv}, Tuple{Vector{Int}}, false}
     con_jac_cnt::Int = 0
     lag_hess_cnt::Int = 0
 
+    t1::Float64 = 0.
+    t2::Float64 = 0.
+    t3::Float64 = 0.
+    t4::Float64 = 0.
+    t5::Float64 = 0.
+    t6::Float64 = 0.
+    t7::Float64 = 0.
+    t8::Float64 = 0.
+    
     acceptable_cnt::Int = 0
+    unsuccessful_iterate::Int = 0
+    restoration_fail_count::Int = 0
 end
 
 """
@@ -143,8 +151,8 @@ function timing_linear_solver(ips; ntrials=10)
     t_build, t_factorize, t_backsolve = (0.0, 0.0, 0.0)
     for _ in 1:ntrials
         t_build     += @elapsed build_kkt!(ips.kkt)
-        t_factorize += @elapsed factorize!(ips.linear_solver)
-        t_backsolve += @elapsed solve_refine_wrapper!(ips,ips.d,ips.p)
+        t_factorize += @elapsed factorize!(ips.kkt.linear_solver)
+        t_backsolve += @elapsed solve!(ips.kkt, ips.d)
     end
     return (
         time_build_kkt = t_build / ntrials,

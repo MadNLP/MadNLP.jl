@@ -20,7 +20,7 @@ end
     # General options
     rethrow_error::Bool = true
     disable_garbage_collector::Bool = false
-    blas_num_threads::Int = 1
+    blas_num_threads::Int = 1 
     linear_solver::Type = LapackCPUSolver
     iterator::Type = RichardsonIterator
 
@@ -40,15 +40,18 @@ end
 
     # NLP options
     kappa_d::Float64 = 1e-5
-    fixed_variable_treatment::FixedVariableTreatments = MAKE_PARAMETER
+    fixed_variable_treatment::Type = MakeParameter
+    equality_treatment::Type = EnforceEquality
+    boudn_relax_factor::Float64 = 1e-8
     jacobian_constant::Bool = false
     hessian_constant::Bool = false
-    kkt_system::KKTLinearSystem = SPARSE_KKT_SYSTEM
-    hessian_approximation::HessianApproximation = EXACT_HESSIAN
+    kkt_system::Type = SparseKKTSystemes
+    hessian_approximation::Type = ExactHessian
+    callback::Type = SparseCallback
 
     # initialization options
     dual_initialized::Bool = false
-    inertia_correction_method::InertiaCorrectionMethod = INERTIA_AUTO
+    inertia_correction_method::Type = InertiaAuto
     constr_mult_init_max::Float64 = 1e3
     bound_push::Float64 = 1e-2
     bound_fac::Float64 = 1e-2
@@ -88,15 +91,54 @@ end
 
     # Barrier
     mu_init::Float64 = 1e-1
-    mu_min::Float64 = 1e-11
+    mu_min::Float64 = min(1e-4, tol ) / (barrier_tol_factor + 1) # by courtesy of Ipopt
     mu_superlinear_decrease_power::Float64 = 1.5
     tau_min::Float64 = 0.99
     mu_linear_decrease_factor::Float64 = .2
 end
 
+# smart option presets
+function MadNLPOptions(nlp::AbstractNLPModel{T}) where T
+
+    # if dense callback is defined, we use dense callback
+    is_dense_callback =
+        hasmethod(MadNLP.jac_dense!, Tuple{typeof(nlp), AbstractVector, AbstractMatrix}) &&
+        hasmethod(MadNLP.hess_dense!, Tuple{typeof(nlp), AbstractVector, AbstractVector, AbstractMatrix})
+    
+    callback = is_dense_callback ? DenseCallback : SparseCallback
+
+    # if dense callback is used, we use dense condensed kkt system
+    kkt_system = is_dense_callback ? DenseCondensedKKTSystem : SparseKKTSystem
+
+    # if dense kkt system, we use a dense linear solver
+    linear_solver = is_dense_callback ? LapackCPUSolver : default_sparse_solver(nlp)
+
+    tol = get_tolerance(T,kkt_system)
+    
+    return MadNLPOptions(
+        callback = callback,
+        kkt_system = kkt_system,
+        linear_solver = linear_solver,
+        tol = tol,
+    )
+end
+
+get_tolerance(::Type{T},::Type{KKT}) where {T, KKT} = 10^round(log10(eps(T))/2)
+get_tolerance(::Type{T},::Type{SparseCondensedKKTSystem}) where T = 10^(round(log10(eps(T))/4))
+
+function default_sparse_solver(nlp::AbstractNLPModel)
+    if isdefined(Main, :MadNLPHSL)
+        Main.MadNLPHSL.Ma27Solver
+    elseif isdefined(Main, :MadNLPMumps)
+        Main.MadNLPMumps.MumpsSolver
+    else
+        UmfpackSolver
+    end
+end
+
 function check_option_sanity(options)
-    is_kkt_dense = (options.kkt_system == DENSE_KKT_SYSTEM) || (options.kkt_system == DENSE_CONDENSED_KKT_SYSTEM)
-    is_hess_approx_dense = (options.hessian_approximation == DENSE_BFGS) || (options.hessian_approximation == DENSE_DAMPED_BFGS)
+    is_kkt_dense = options.kkt_system <: AbstractDenseKKTSystem
+    is_hess_approx_dense = options.hessian_approximation <: Union{BFGS, DampedBFGS}
     if input_type(options.linear_solver) == :csc && is_kkt_dense
         error("[options] Sparse Linear solver is not supported in dense mode.\n"*
               "Please use a dense linear solver or change `kkt_system` ")
@@ -114,9 +156,9 @@ function print_ignored_options(logger,option_dict)
     end
 end
 
-function load_options(; linear_solver=default_linear_solver(), options...)
+function load_options(nlp; options...)
     # Initiate interior-point options
-    opt_ipm = MadNLPOptions(linear_solver=linear_solver)
+    opt_ipm = MadNLPOptions(nlp)
     linear_solver_options = set_options!(opt_ipm, options)
     check_option_sanity(opt_ipm)
     # Initiate linear-solver options

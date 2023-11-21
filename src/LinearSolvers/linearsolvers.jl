@@ -140,15 +140,5 @@ include("backsolve.jl")
 
 # dense solvers
 include("lapack.jl")
-
-# UMFPACK
-# N.B: interface depends on Julia version as the UMFPACK's
-#      wrapper has been updated in v1.9. The deprecated
-#      interface will not be supported once the new LTS
-#      released.
-if VERSION >= v"1.9"
-    include("umfpack.jl")
-else
-    include("umfpack_deprecated.jl")
-end
+include("umfpack.jl")
 

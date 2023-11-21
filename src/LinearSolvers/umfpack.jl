@@ -7,12 +7,13 @@
 end
 
 mutable struct UmfpackSolver{T} <: AbstractLinearSolver{T}
-    inner::UMFPACK.UmfpackLU{T, Int32}
-    tril::SparseMatrixCSC{T}
-    full::SparseMatrixCSC{T}
+    inner::UMFPACK.UmfpackLU{Float64, Int32}
+    tril::SparseMatrixCSC{T,Int32}
+    full::SparseMatrixCSC{Float64,Int32}
     tril_to_full_view::SubVector{T}
 
-    p::Vector{T}
+    p::Vector{Float64}
+    d::Vector{Float64}
 
     opt::UmfpackOptions
     logger::MadNLPLogger
@@ -22,16 +23,17 @@ function UmfpackSolver(
     csc::SparseMatrixCSC{T};
     opt=UmfpackOptions(), logger=MadNLPLogger(),
 ) where T
-    p = Vector{T}(undef,csc.n)
-    full, tril_to_full_view = get_tril_to_full(csc)
-    controls = UMFPACK.get_umfpack_control(T, Int)
+    p = Vector{Float64}(undef,csc.n)
+    d = Vector{Float64}(undef,csc.n)
+    full, tril_to_full_view = get_tril_to_full(Float64,csc)
+    controls = UMFPACK.get_umfpack_control(Float64, Int)
     # Override default controls with custom setting
     controls[4] = opt.umfpack_pivtol
     controls[5] = opt.umfpack_block_size
     controls[6] = opt.umfpack_strategy
     controls[12] = opt.umfpack_sym_pivtol
-    inner = UMFPACK.UmfpackLU(csc; control=controls)
-    return UmfpackSolver(inner, csc, full, tril_to_full_view, p, opt, logger)
+    inner = UMFPACK.UmfpackLU(full; control=controls)
+    return UmfpackSolver(inner, csc, full, tril_to_full_view, p, d, opt, logger)
 end
 
 function factorize!(M::UmfpackSolver)
@@ -43,8 +45,9 @@ end
 
 function solve!(M::UmfpackSolver{T},rhs::Vector{T}) where T
     if UMFPACK.issuccess(M.inner)
-        UMFPACK.ldiv!(M.p, M.inner, rhs)
-        rhs .= M.p
+        M.p .= rhs
+        UMFPACK.ldiv!(M.d, M.inner, M.p)
+        rhs .= M.d
     end
     # If the factorization failed, we return the same
     # rhs to enter into a primal-dual regularization phase.
@@ -66,4 +69,5 @@ function improve!(M::UmfpackSolver)
     return true
 end
 introduce(::UmfpackSolver) = "umfpack"
+is_supported(::Type{UmfpackSolver},::Type{Float32}) = true
 is_supported(::Type{UmfpackSolver},::Type{Float64}) = true

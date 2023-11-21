@@ -2,8 +2,8 @@
     lapack_algorithm::LinearFactorization = BUNCHKAUFMAN
 end
 
-mutable struct LapackCPUSolver{T} <: AbstractLinearSolver{T}
-    dense::Matrix{T}
+mutable struct LapackCPUSolver{T, MT} <: AbstractLinearSolver{T}
+    A::MT
     fact::Matrix{T}
     work::Vector{T}
     lwork::BlasInt
@@ -72,18 +72,18 @@ for (sytrf,sytrs,getrf,getrs,geqrf,ormqr,trsm,potrf,potrs,typ) in (
 end
 
 function LapackCPUSolver(
-    dense::Matrix{T};
+    A::MT;
     opt=LapackOptions(),
     logger=MadNLPLogger(),
-) where T
-    fact = copy(dense)
-
+) where {T, MT <: AbstractMatrix{T}}
+    fact = Matrix{T}(undef, size(A))
     etc = Dict{Symbol,Any}()
     work = Vector{T}(undef, 1)
-    info = 0
+    info = Ref(0)
 
-    return LapackCPUSolver{T}(dense,fact,work,-1,info,etc,opt,logger)
+    return LapackCPUSolver(A,fact,work,-1,info,etc,opt,logger)
 end
+
 
 function factorize!(M::LapackCPUSolver)
     if M.opt.lapack_algorithm == BUNCHKAUFMAN
@@ -114,9 +114,9 @@ end
 
 function factorize_bunchkaufman!(M::LapackCPUSolver)
     size(M.fact,1) == 0 && return M
-    haskey(M.etc,:ipiv) || (M.etc[:ipiv] = Vector{BlasInt}(undef,size(M.dense,1)))
+    haskey(M.etc,:ipiv) || (M.etc[:ipiv] = Vector{BlasInt}(undef,size(M.A,1)))
     M.lwork = -1
-    M.fact .= M.dense
+    M.fact .= M.A
     sytrf('L',size(M.fact,1),M.fact,size(M.fact,2),M.etc[:ipiv],M.work,M.lwork,M.info)
     M.lwork = BlasInt(real(M.work[1]))
     length(M.work) < M.lwork && resize!(M.work,M.lwork)
@@ -131,9 +131,9 @@ end
 
 function factorize_lu!(M::LapackCPUSolver)
     size(M.fact,1) == 0 && return M
-    haskey(M.etc,:ipiv) || (M.etc[:ipiv] = Vector{BlasInt}(undef,size(M.dense,1)))
-    tril_to_full!(M.dense)
-    M.fact .= M.dense
+    haskey(M.etc,:ipiv) || (M.etc[:ipiv] = Vector{BlasInt}(undef,size(M.A,1)))
+    M.fact .= M.A
+    tril_to_full!(M.fact)
     getrf(size(M.fact,1),size(M.fact,2),M.fact,size(M.fact,2),M.etc[:ipiv],M.info)
     return M
 end
@@ -147,10 +147,10 @@ end
 
 function factorize_qr!(M::LapackCPUSolver{T}) where T
     size(M.fact,1) == 0 && return M
-    haskey(M.etc,:tau) || (M.etc[:tau] = Vector{T}(undef,size(M.dense,1)))
-    tril_to_full!(M.dense)
+    haskey(M.etc,:tau) || (M.etc[:tau] = Vector{T}(undef,size(M.A,1)))
     M.lwork = -1
-    M.fact .= M.dense
+    M.fact .= M.A
+    tril_to_full!(M.fact)
     geqrf(size(M.fact,1),size(M.fact,2),M.fact,size(M.fact,2),M.etc[:tau],M.work,M.lwork,M.info)
     M.lwork = BlasInt(real(M.work[1]))
     length(M.work) < M.lwork && resize!(M.work,M.lwork)
@@ -172,7 +172,7 @@ end
 function factorize_cholesky!(M::LapackCPUSolver)
     size(M.fact,1) == 0 && return M
     M.lwork = -1
-    M.fact .= M.dense
+    M.fact .= M.A
     potrf('L',size(M.fact,1),M.fact,size(M.fact,2),M.info)
     return M
 end
@@ -184,6 +184,7 @@ end
 
 is_inertia(M::LapackCPUSolver) =
     M.opt.lapack_algorithm == BUNCHKAUFMAN || M.opt.lapack_algorithm == CHOLESKY
+
 function inertia(M::LapackCPUSolver)
     if M.opt.lapack_algorithm == BUNCHKAUFMAN
         inertia(M.fact,M.etc[:ipiv],M.info[])
@@ -203,9 +204,10 @@ end
 
 improve!(M::LapackCPUSolver) = false
 
+input_type(::Type{LapackCPUSolver}) = :dense
+
 introduce(M::LapackCPUSolver) = "Lapack-CPU ($(M.opt.lapack_algorithm))"
 
-input_type(::Type{LapackCPUSolver}) = :dense
 default_options(::Type{LapackCPUSolver}) = LapackOptions()
 
 function num_neg_ev(n,D,ipiv)

@@ -1,94 +1,85 @@
-# MadNLP.jl
-# Created by Sungho Shin (sungho.shin@wisc.edu)
+@kwdef struct RichardsonOptions
+    max_iter::Int = 10
+    tol::Float64 = 1e-10
+    acceptable_tol::Float64 = 1e-5
+end
 
-struct RichardsonIterator{T, VT, KKT, LinSolver <: AbstractLinearSolver{T}} <: AbstractIterator{T}
-    linear_solver::LinSolver
+struct RichardsonIterator{T, KKT <: AbstractKKTSystem{T}} <: AbstractIterator{T}
     kkt::KKT
-    residual::VT
-    max_iter::Int
-    tol::T
-    acceptable_tol::T
+    opt::RichardsonOptions
+    cnt::MadNLPCounters
     logger::MadNLPLogger
 end
+
 function RichardsonIterator(
-    linear_solver::AbstractLinearSolver{T},
-    kkt::AbstractKKTSystem,
-    res::AbstractVector;
-    max_iter=10, tol=T(1e-10), acceptable_tol=T(1e-5), logger=MadNLPLogger(),
-) where T
+    kkt;
+    opt = RichardsonOptions(),
+    logger = MadNLPLogger(),
+    cnt = MadNLPCounters()
+)
     return RichardsonIterator(
-        linear_solver, kkt, res, max_iter, tol, acceptable_tol, logger,
+        kkt, opt, cnt, logger
     )
 end
 
-# Solve reduced KKT system. Require only the primal/dual values.
 function solve_refine!(
-    x::AbstractKKTVector{T, VT},
-    solver::RichardsonIterator{T, VT, KKT, LinSolver},
-    b::AbstractKKTVector{T, VT},
-) where {T, VT, KKT<:AbstractReducedKKTSystem, LinSolver}
-    solve_refine!(primal_dual(x), solver, primal_dual(b))
-end
+    x::VT,
+    iterator::R,
+    b::VT,
+    w::VT
+    ) where {T, VT, R <: RichardsonIterator{T}}
+    @debug(iterator.logger, "Iterative solver initiated")
 
-# Solve unreduced KKT system. Require UnreducedKKTVector as inputs.
-function solve_refine!(
-    x::UnreducedKKTVector{T, VT},
-    solver::RichardsonIterator{T, VT, KKT, LinSolver},
-    b::UnreducedKKTVector{T, VT},
-) where {T, VT, KKT<:AbstractUnreducedKKTSystem, LinSolver}
-    solve_refine!(full(x), solver, full(b))
-end
+    norm_b = norm(full(b), Inf)
+    residual_ratio = zero(T)
 
-function solve_refine!(
-    x::AbstractVector{T},
-    solver::RichardsonIterator{T},
-    b::AbstractVector{T},
-) where T
-    @debug(solver.logger, "Iterative solver initiated")
+    fill!(full(x), zero(T))
 
-    ε = solver.residual
-    norm_b = norm(b, Inf)
 
-    fill!(x, zero(T))
-    fill!(ε, zero(T))
+    if norm_b == zero(T)
+        @debug(
+            iterator.logger,
+            @sprintf(
+                "Iterative solver terminated with %4i refinement steps and residual = %6.2e",
+                0, 0
+            ),
+        )
+        return true
+    end
 
-    ε = solver.residual
-    axpy!(-1, b, ε)
-    norm_res = norm(ε, Inf)
-    residual_ratio = norm_res / (one(T) + norm_b)
-
+    copyto!(full(w), full(b))
     iter = 0
-    residual_ratio_old = Inf
-    noprogress = 0
 
     while true
-        mod(iter, 10)==0 &&
-            @debug(solver.logger,"iter ||res||")
-        @debug(solver.logger, @sprintf("%4i %6.2e", iter, residual_ratio))
+        solve!(iterator.kkt, w)
+        axpy!(1., full(w), full(x))
+        copyto!(full(w), full(b))
+
+        mul!(w, iterator.kkt, x, -one(T), one(T))
+
+        norm_w = norm(full(w), Inf)
+        norm_x = norm(full(x), Inf)
+        residual_ratio = norm_w / (min(norm_x, 1e6 * norm_b) + norm_b)
+
+        if mod(iter, 10)==0
+            @debug(iterator.logger,"iter ||res||")
+        end
+        @debug(iterator.logger, @sprintf("%4i %6.2e", iter, residual_ratio))
         iter += 1
-        if (iter > solver.max_iter) || (residual_ratio < solver.tol)
+
+        if (iter >= iterator.opt.max_iter) || (residual_ratio < iterator.opt.tol)
             break
         end
-
-        solve!(solver.linear_solver, ε)
-        axpy!(-1, ε, x)
-        mul!(ε, solver.kkt, x)
-        axpy!(-1, b, ε)
-        norm_res = norm(ε, Inf)
-
-        residual_ratio_old = residual_ratio
-        residual_ratio = norm_res / (one(T)+norm_b)
     end
 
-    @debug(solver.logger, @sprintf(
-        "Iterative solver terminated with %4i refinement steps and residual = %6.2e",
-        iter, residual_ratio),
+    @debug(
+        iterator.logger,
+        @sprintf(
+            "Iterative solver terminated with %4i refinement steps and residual = %6.2e",
+            iter, residual_ratio
+        ),
     )
 
-    if residual_ratio < solver.acceptable_tol
-        return :Solved
-    else
-        return :Failed
-    end
+    return residual_ratio < iterator.opt.acceptable_tol
 end
 

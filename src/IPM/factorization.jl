@@ -1,96 +1,257 @@
+function solve_refine_wrapper!(d, solver, p, w)
+    result = false
+
+    solver.cnt.linear_solver_time += @elapsed begin
+        if solve_refine!(d, solver.iterator, p, w)
+            result = true
+        else
+            if improve!(solver.kkt.linear_solver)
+                if solve_refine!(d, solver.iterator, p, w)
+                    result = true
+                end
+            end
+        end
+    end
+
+    return result
+end
 
 function factorize_wrapper!(solver::MadNLPSolver)
     @trace(solver.logger,"Factorization started.")
     build_kkt!(solver.kkt)
-    solver.cnt.linear_solver_time += @elapsed factorize!(solver.linear_solver)
+    solver.cnt.linear_solver_time += @elapsed factorize!(solver.kkt.linear_solver)
 end
 
-function solve_refine_wrapper!(
-    solver::MadNLPSolver,
-    x::AbstractKKTVector,
-    b::AbstractKKTVector,
-)
-    cnt = solver.cnt
-    @trace(solver.logger,"Iterative solution started.")
-    fixed_variable_treatment_vec!(full(b), solver.ind_fixed)
+function solve!(kkt::SparseUnreducedKKTSystem, w::AbstractKKTVector)
+    wzl = dual_lb(w)
+    wzu = dual_ub(w)
+    f(x,y) = iszero(y) ? x : x/y
+    wzl .= f.(wzl, kkt.l_lower_aug)
+    wzu .= f.(wzu, kkt.u_lower_aug)
+    solve!(kkt.linear_solver, full(w))
+    wzl .*= .-kkt.l_lower_aug
+    wzu .*= kkt.u_lower_aug
+end
 
-    cnt.linear_solver_time += @elapsed begin
-        result = solve_refine!(x, solver.iterator, b)
-    end
+function solve!(kkt::AbstractReducedKKTSystem, w::AbstractKKTVector)
+    reduce_rhs!(w.xp_lr, dual_lb(w), kkt.l_diag, w.xp_ur, dual_ub(w), kkt.u_diag)
+    solve!(kkt.linear_solver, primal_dual(w))
+    finish_aug_solve!(kkt, w)
+end
 
-    if result == :Solved
-        solve_status =  true
+function solve!(
+    kkt::SparseKKTSystem{T, VT, MT, QN},
+    w::AbstractKKTVector
+    ) where {T, VT, MT, QN<:CompactLBFGS}
+
+    qn = kkt.quasi_newton
+    n, p = size(qn)
+    # Load buffers
+    xr = qn._w2
+    Tk = qn.Tk
+    w_ = primal_dual(w)
+    nn = length(w_)
+
+    fill!(Tk, zero(T))
+    reduce_rhs!(w.xp_lr, dual_lb(w), kkt.l_diag, w.xp_ur, dual_ub(w), kkt.u_diag)
+
+    # Resize arrays with correct dimension
+    if size(qn.V1) != (nn, 2*p)
+        qn.V1 = zeros(nn, 2*p)
+        qn.V2 = zeros(nn, 2*p)
     else
-        if improve!(solver.linear_solver)
-            cnt.linear_solver_time += @elapsed begin
-                factorize!(solver.linear_solver)
-                ret = solve_refine!(x, solver.iterator, b)
-                solve_status = (ret == :Solved)
-            end
-        else
-            solve_status = false
-        end
+        fill!(qn.V1, zero(T))
+        fill!(qn.V2, zero(T))
     end
-    fixed_variable_treatment_vec!(full(x), solver.ind_fixed)
-    return solve_status
+
+    # Solve LBFGS system with Sherman-Morrison-Woodbury formula
+    # (C + U Vᵀ)⁻¹ = C⁻¹ - C⁻¹ U (I + Vᵀ C⁻¹ U) Vᵀ C⁻¹
+
+    # Solve linear system without low-rank part
+    solve!(kkt.linear_solver, w_)
+
+    # Add low-rank correction
+    if p > 0
+        _init_lbfgs_factors!(qn.V1, qn.V2, qn.U, n, p)
+
+        multi_solve!(kkt.linear_solver, qn.V2)      # V2 = C⁻¹ U
+
+        Tk[diagind(Tk)] .= one(T)                   # Tₖ = I
+        mul!(Tk, qn.V1', qn.V2, one(T), one(T))     # Tₖ = (I + Vᵀ C⁻¹ U)
+        J1 = qr(Tk)                                 # Tₖ⁻¹
+
+        mul!(xr, qn.V1', w_)                        # xᵣ = Vᵀ C⁻¹ b
+        ldiv!(J1, xr)                               # xᵣ = (I + Vᵀ C⁻¹ U)⁻¹ Vᵀ C⁻¹ b
+        mul!(w_, qn.V2, xr, -one(T), one(T))        # x = x - C⁻¹ U xᵣ
+    end
+
+    finish_aug_solve!(kkt, w)
 end
 
-function solve_refine_wrapper!(
-    solver::MadNLPSolver{T,<:DenseCondensedKKTSystem},
-    x::AbstractKKTVector,
-    b::AbstractKKTVector,
-) where T
-    cnt = solver.cnt
-    @trace(solver.logger,"Iterative solution started.")
-    fixed_variable_treatment_vec!(full(b), solver.ind_fixed)
 
-    kkt = solver.kkt
+function solve!(kkt::SparseCondensedKKTSystem{T}, w::AbstractKKTVector)  where T
+
+    (n,m) = size(kkt.jt_csc)
+
+    # Decompose buffers
+    wx = _madnlp_unsafe_wrap(full(w), n)
+    ws = view(full(w), n+1:n+m)
+    wz = view(full(w), n+m+1:n+2*m)
+    Σs = view(kkt.pr_diag, n+1:n+m)
+
+    reduce_rhs!(w.xp_lr, dual_lb(w), kkt.l_diag, w.xp_ur, dual_ub(w), kkt.u_diag)
+
+    kkt.buffer .= kkt.diag_buffer .* (wz .+ ws ./ Σs)
+
+    mul!(wx, kkt.jt_csc, kkt.buffer, one(T), one(T))
+    solve!(kkt.linear_solver, wx)
+
+    mul!(kkt.buffer2, kkt.jt_csc', wx) # TODO: investigate why directly using wz here is causing an error
+
+    wz .= .- kkt.buffer .+ kkt.diag_buffer .* kkt.buffer2
+    ws .= (ws .+ wz) ./ Σs
+
+    finish_aug_solve!(kkt, w)
+
+end
+
+function solve!(
+    kkt::DenseCondensedKKTSystem,
+    w::AbstractKKTVector{T},
+    ) where T
 
     n = num_variables(kkt)
     n_eq, ns = kkt.n_eq, kkt.n_ineq
     n_condensed = n + n_eq
 
-    # load buffers
-    b_c = view(full(solver._w1), 1:n_condensed)
-    x_c = view(full(solver._w2), 1:n_condensed)
-    jv_x = view(full(solver._w3), 1:ns) # for jprod
-    jv_t = primal(solver._w4)             # for jtprod
-    v_c = dual(solver._w4)
+    # Decompose rhs
+    wx = view(full(w), 1:n)
+    ws = view(full(w), n+1:n+ns)
+    wy = view(full(w), kkt.ind_eq_shifted)
+    wz = view(full(w), kkt.ind_ineq_shifted)
+
+    x = kkt.pd_buffer
+    xx = view(x, 1:n)
+    xy = view(x, n+1:n+n_eq)
 
     Σs = get_slack_regularization(kkt)
-    α = get_scaling_inequalities(kkt)
 
-    # Decompose right hand side
-    bx = view(full(b), 1:n)
-    bs = view(full(b), n+1:n+ns)
-    by = view(full(b), kkt.ind_eq_shifted)
-    bz = view(full(b), kkt.ind_ineq_shifted)
+    reduce_rhs!(w.xp_lr, dual_lb(w), kkt.l_diag, w.xp_ur, dual_ub(w), kkt.u_diag)
+
+    fill!(kkt.buffer, zero(T))
+    kkt.buffer[kkt.ind_ineq] .= kkt.diag_buffer .* (wz .+ ws ./ Σs)
+    mul!(xx, kkt.jac', kkt.buffer)
+    xx .+= wx
+    xy .= wy
+    solve!(kkt.linear_solver, x)
+
+    wx .= xx
+    mul!(dual(w), kkt.jac, wx)
+    wy .= xy
+    wz .*= kkt.diag_buffer
+    dual(w) .-= kkt.buffer
+    ws .= (ws .+ wz) ./ Σs
+
+    finish_aug_solve!(kkt, w)
+end
+
+function mul!(w::AbstractKKTVector{T}, kkt::Union{SparseKKTSystem{T,VT,MT,QN},SparseUnreducedKKTSystem{T,VT,MT,QN}}, x::AbstractKKTVector, alpha = one(T), beta = zero(T)) where {T, VT, MT, QN<:ExactHessian}
+    mul!(primal(w), Symmetric(kkt.hess_com, :L), primal(x), alpha, beta)
+    mul!(primal(w), kkt.jac_com', dual(x), alpha, one(T))
+    mul!(dual(w), kkt.jac_com,  primal(x), alpha, beta)
+    _kktmul!(w,x,kkt.reg,kkt.du_diag,kkt.l_lower,kkt.u_lower,kkt.l_diag,kkt.u_diag, alpha, beta)
+end
+
+function mul!(w::AbstractKKTVector{T}, kkt::Union{SparseKKTSystem{T,VT,MT,QN},SparseUnreducedKKTSystem{T,VT,MT,QN}}, x::AbstractKKTVector, alpha = one(T), beta = zero(T)) where {T, VT, MT, QN<:CompactLBFGS}
+    qn = kkt.quasi_newton
+    n, p = size(qn)
+    nn = length(primal_dual(w))
+    # Load buffers (size: 2p)
+    vx = qn._w2
+    # Reset V1 and V2
+    fill!(qn.V1, zero(T))
+    fill!(qn.V2, zero(T))
+    _init_lbfgs_factors!(qn.V1, qn.V2, qn.U, n, p)
+    # Upper-left block is C = ξ I + U Vᵀ
+    mul!(primal(w), Symmetric(kkt.hess_com, :L), primal(x), alpha, beta)
+    mul!(primal(w), kkt.jac_com', dual(x), alpha, one(T))
+    mul!(dual(w), kkt.jac_com,  primal(x), alpha, beta)
+    # Add (U Vᵀ) x contribution
+    mul!(vx, qn.V2', primal_dual(x))
+    mul!(primal_dual(w), qn.V1, vx, alpha, one(T))
+
+    _kktmul!(w,x,kkt.reg,kkt.du_diag,kkt.l_lower,kkt.u_lower,kkt.l_diag,kkt.u_diag, alpha, beta)
+end
+
+function mul!(w::AbstractKKTVector{T}, kkt::SparseCondensedKKTSystem, x::AbstractKKTVector, alpha, beta) where T
+    n = size(kkt.hess_com, 1)
+    m = size(kkt.jt_csc, 2)
 
     # Decompose results
     xx = view(full(x), 1:n)
-    xs = view(full(x), n+1:n+ns)
-    xy = view(full(x), kkt.ind_eq_shifted)
-    xz = view(full(x), kkt.ind_ineq_shifted)
+    xs = view(full(x), n+1:n+m)
+    xz = view(full(x), n+m+1:n+2*m)
 
-    fill!(v_c, zero(T))
-    v_c[kkt.ind_ineq] .= (Σs .* bz .+ α .* bs) ./ α.^2
-    jtprod!(jv_t, kkt, v_c)
-    # init right-hand-side
-    b_c[1:n] .= bx .+ jv_t[1:n]
-    b_c[1+n:n+n_eq] .= by
+    # Decompose buffers
+    wx = _madnlp_unsafe_wrap(full(w), n)
+    ws = view(full(w), n+1:n+m)
+    wz = view(full(w), n+m+1:n+2*m)
 
-    cnt.linear_solver_time += @elapsed (result = solve_refine!(x_c, solver.iterator, b_c))
-    solve_status = (result == :Solved)
+    mul!(wx, Symmetric(kkt.hess_com, :L), xx, alpha, beta) # TODO: make this symmetric
 
-    # Expand solution
-    xx .= x_c[1:n]
-    xy .= x_c[1+n:end]
-    jprod_ineq!(jv_x, kkt, xx)
-    xz .= sqrt.(Σs) ./ α .* jv_x .- Σs .* bz ./ α.^2 .- bs ./ α
-    xs .= (bs .+ α .* xz) ./ Σs
+    mul!(wx, kkt.jt_csc,  xz, alpha, beta)
+    mul!(wz, kkt.jt_csc', xx, alpha, one(T))
+    axpy!(-alpha, xz, ws)
+    axpy!(-alpha, xs, wz)
 
-    fixed_variable_treatment_vec!(full(x), solver.ind_fixed)
-    return solve_status
+    _kktmul!(w,x,kkt.reg,kkt.du_diag,kkt.l_lower,kkt.u_lower,kkt.l_diag,kkt.u_diag, alpha, beta)
+end
+
+function mul!(w::AbstractKKTVector{T}, kkt::AbstractDenseKKTSystem, x::AbstractKKTVector, alpha = one(T), beta = zero(T)) where T
+    (m, n) = size(kkt.jac)
+    wx = @view(primal(w)[1:n])
+    ws = @view(primal(w)[n+1:end])
+    wy = dual(w)
+    wz = @view(dual(w)[kkt.ind_ineq])
+
+    xx = @view(primal(x)[1:n])
+    xs = @view(primal(x)[n+1:end])
+    xy = dual(x)
+    xz = @view(dual(x)[kkt.ind_ineq])
+
+    symul!(wx, kkt.hess, xx, alpha, beta)
+    if m > 0  # otherwise, CUDA causes an error
+        mul!(wx, kkt.jac', dual(x), alpha, one(T))
+        mul!(wy, kkt.jac,  xx, alpha, beta)
+    end
+    ws .= beta.*ws .- alpha.* xz
+    wz .= beta.*wz .- alpha.* xs
+    _kktmul!(w,x,kkt.reg,kkt.du_diag,kkt.l_lower,kkt.u_lower,kkt.l_diag,kkt.u_diag, alpha, beta)
+end
+
+function mul_hess_blk!(wx, kkt::Union{DenseKKTSystem,DenseCondensedKKTSystem}, t)
+    n = size(kkt.hess, 1)
+    mul!(@view(wx[1:n]), Symmetric(kkt.hess, :L), @view(t[1:n]))
+    fill!(@view(wx[n+1:end]), 0)
+    wx .+= t .* kkt.pr_diag
+end
+
+function mul_hess_blk!(wx, kkt::Union{SparseKKTSystem,SparseCondensedKKTSystem}, t)
+    n = size(kkt.hess_com, 1)
+    mul!(@view(wx[1:n]), Symmetric(kkt.hess_com, :L), @view(t[1:n]))
+    fill!(@view(wx[n+1:end]), 0)
+    wx .+= t .* kkt.pr_diag
+end
+function mul_hess_blk!(wx, kkt::SparseUnreducedKKTSystem, t)
+    ind_lb = kkt.ind_lb
+    ind_ub = kkt.ind_ub
+
+    n = size(kkt.hess_com, 1)
+    mul!(@view(wx[1:n]), Symmetric(kkt.hess_com, :L), @view(t[1:n]))
+    fill!(@view(wx[n+1:end]), 0)
+    wx .+= t .* kkt.pr_diag
+    wx[ind_lb] .-= @view(t[ind_lb]) .* (kkt.l_lower ./ kkt.l_diag)
+    wx[ind_ub] .-= @view(t[ind_ub]) .* (kkt.u_lower ./ kkt.u_diag)
 end
 
 # Set V1 = [U₁   U₂]   ,   V2 = [-U₁   U₂]
@@ -101,61 +262,5 @@ function _init_lbfgs_factors!(V1, V2, U, n, p)
         V1[i, j+p] = U[i, j+p]
         V2[i, j+p] = U[i, j+p]
     end
-end
-
-function solve_refine_wrapper!(
-    solver::MadNLPSolver{T, <:SparseKKTSystem{T, VT, MT, QN}},
-    x::AbstractKKTVector,
-    b::AbstractKKTVector,
-) where {T, VT, MT, QN<:CompactLBFGS{T, Vector{T}, Matrix{T}}}
-    cnt = solver.cnt
-    kkt = solver.kkt
-    qn = kkt.quasi_newton
-    n, p = size(qn)
-    # Load buffers
-    xr = qn._w2
-    Tk = qn.Tk  ; fill!(Tk, zero(T))
-    x_ = primal_dual(x)
-    b_ = primal_dual(b)
-    nn = length(x_)
-    # Resize arrays with correct dimension
-    if size(qn.V1, 2) < 2*p
-        qn.V1 = zeros(nn, 2*p)
-        qn.V2 = zeros(nn, 2*p)
-    else
-        fill!(qn.V1, zero(T))
-        fill!(qn.V2, zero(T))
-    end
-
-    fixed_variable_treatment_vec!(full(b), solver.ind_fixed)
-
-    # Solve LBFGS system with Sherman-Morrison-Woodbury formula
-    # (C + U Vᵀ)⁻¹ = C⁻¹ - C⁻¹ U (I + Vᵀ C⁻¹ U) Vᵀ C⁻¹
-
-    # Solve linear system without low-rank part
-    cnt.linear_solver_time += @elapsed begin
-        result = solve_refine!(x, solver.iterator, b)
-    end
-
-    # Add low-rank correction
-    if p > 0
-        _init_lbfgs_factors!(qn.V1, qn.V2, qn.U, n, p)
-
-        cnt.linear_solver_time += @elapsed begin
-            multi_solve!(solver.linear_solver, qn.V2)  # V2 = C⁻¹ U
-        end
-
-        Tk[diagind(Tk)] .= one(T)                   # Tₖ = I
-        mul!(Tk, qn.V1', qn.V2, one(T), one(T))     # Tₖ = (I + Vᵀ C⁻¹ U)
-        J1 = qr(Tk)                                 # Tₖ⁻¹
-
-        mul!(xr, qn.V1', x_)                        # xᵣ = Vᵀ C⁻¹ b
-        ldiv!(J1, xr)                               # xᵣ = (I + Vᵀ C⁻¹ U)⁻¹ Vᵀ C⁻¹ b
-        mul!(x_, qn.V2, xr, -one(T), one(T))        # x = x - C⁻¹ U xᵣ
-    end
-
-    fixed_variable_treatment_vec!(full(x), solver.ind_fixed)
-    solve_status = (result == :Solved)
-    return solve_status
 end
 

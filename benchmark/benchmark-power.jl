@@ -39,9 +39,17 @@ end
 if SOLVER == "master" || SOLVER == "current"
     @everywhere begin
         using MadNLP, MadNLPHSL
+        LinSol = @isdefined(MadNLPMa57) ? MadNLPMa57 : Ma57Solver
+
         solver = pm -> begin
-            set_optimizer(pm.model,()->
-                MadNLP.Optimizer(linear_solver=MadNLPMa57,max_wall_time=900.,tol=1e-6, print_level=PRINT_LEVEL))
+            set_optimizer(
+                pm.model,()-> MadNLP.Optimizer(
+                    linear_solver=LinSol,
+                    max_wall_time=900.,
+                    tol=1e-6,
+                    print_level=PRINT_LEVEL
+                )
+            )
             mem=@allocated begin
                 t=@elapsed begin
                     optimize_model!(pm)
@@ -56,7 +64,7 @@ elseif SOLVER == "ipopt"
         
         const ITER = [-1]
         function ipopt_callback(
-            prob::IpoptProblem,alg_mod::Cint,iter_count::Cint,obj_value::Float64,
+            alg_mod::Cint,iter_count::Cint,obj_value::Float64,
             inf_pr::Float64,inf_du::Float64,mu::Float64,d_norm::Float64,
             regularization_size::Float64,alpha_du::Float64,alpha_pr::Float64,ls_trials::Cint)
             
@@ -66,8 +74,14 @@ elseif SOLVER == "ipopt"
 
         solver = pm -> begin
             ITER[] = 0
-            set_optimizer(pm.model,()->
-                Ipopt.Optimizer(linear_solver="ma57",max_cpu_time=900.,tol=1e-6, print_level=PRINT_LEVEL))
+            set_optimizer(pm.model, Ipopt.Optimizer)
+            set_optimizer_attributes(
+                pm.model,
+                "linear_solver"=>"ma57",
+                "max_cpu_time"=>900.,
+                "tol"=>1e-6,
+                "print_level"=>PRINT_LEVEL
+            )
             MOI.set(pm.model, Ipopt.CallbackFunction(), ipopt_callback)
             mem=@allocated begin
                 t=@elapsed begin

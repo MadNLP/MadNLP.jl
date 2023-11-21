@@ -9,6 +9,16 @@ import MadNLP:
     SymbolicException,FactorizationException,SolveException,InertiaException,
     AbstractOptions, AbstractLinearSolver, set_options!, input_type, default_options,
     introduce, factorize!, solve!, improve!, is_inertia, is_supported, inertia, findIJ, nnz
+import LinearAlgebra, OpenBLAS32_jll
+
+function __init__()
+    if VERSION ≥ v"1.9"
+        config = LinearAlgebra.BLAS.lbt_get_config()
+        if !any(lib -> lib.interface == :lp64, config.loaded_libs)
+            LinearAlgebra.BLAS.lbt_forward(OpenBLAS32_jll.libopenblas_path)
+        end
+    end
+end
 
 const version = parsefile(joinpath(dirname(pathof(MUMPS_seq_jll)),"..","Project.toml"))["version"]
 
@@ -22,212 +32,109 @@ const version = parsefile(joinpath(dirname(pathof(MUMPS_seq_jll)),"..","Project.
     mumps_scaling::Int = 77
 end
 
-if version == "5.3.5+0"
-    @kwdef mutable struct Struc{T}
-        sym::Cint = 0
-        par::Cint = 0
-        job::Cint = 0
+@kwdef mutable struct Struc{T}
+    sym::Cint = 0
+    par::Cint = 0
+    job::Cint = 0
 
-        comm_fortran::Cint = 0
+    comm_fortran::Cint = 0
 
-        icntl::SVector{60,Cint} = zeros(60)
-        keep::SVector{500,Cint} = zeros(500)
-        cntl::SVector{15,T} = zeros(15)
-        dkeep::SVector{230,T} = zeros(230)
-        keep8::SVector{150,Int64} = zeros(150)
-        n::Cint = 0
-        nblk::Cint = 0
+    icntl::SVector{60,Cint} = zeros(60)
+    keep::SVector{500,Cint} = zeros(500)
+    cntl::SVector{15,T} = zeros(15)
+    dkeep::SVector{230,T} = zeros(230)
+    keep8::SVector{150,Int64} = zeros(150)
+    n::Cint = 0
+    nblk::Cint = 0
 
-        nz_alloc::Cint = 0
+    nz_alloc::Cint = 0
 
-        nz::Cint = 0
-        nnz::Int64 = 0
-        irn::Ptr{Cint} = C_NULL
-        jcn::Ptr{Cint} = C_NULL
-        a::Ptr{T} = C_NULL
+    nz::Cint = 0
+    nnz::Int64 = 0
+    irn::Ptr{Cint} = C_NULL
+    jcn::Ptr{Cint} = C_NULL
+    a::Ptr{T} = C_NULL
 
-        nz_loc::Cint = 0
-        nnz_loc::Int64 = 0
-        irn_loc::Ptr{Cint} = C_NULL
-        jcn_loc::Ptr{Cint} = C_NULL
-        a_loc::Ptr{T} = C_NULL ###
+    nz_loc::Cint = 0
+    nnz_loc::Int64 = 0
+    irn_loc::Ptr{Cint} = C_NULL
+    jcn_loc::Ptr{Cint} = C_NULL
+    a_loc::Ptr{T} = C_NULL ###
 
-        nelt::Cint = 0
-        eltptr::Ptr{Cint} = C_NULL
-        eltvar::Ptr{Cint} = C_NULL
-        a_elt::Ptr{T} = C_NULL
+    nelt::Cint = 0
+    eltptr::Ptr{Cint} = C_NULL
+    eltvar::Ptr{Cint} = C_NULL
+    a_elt::Ptr{T} = C_NULL
 
-        blkptr::Ptr{Cint} = C_NULL
-        blkvar::Ptr{Cint} = C_NULL
+    blkptr::Ptr{Cint} = C_NULL
+    blkvar::Ptr{Cint} = C_NULL
 
-        perm_in::Ptr{Cint} = C_NULL
+    perm_in::Ptr{Cint} = C_NULL
 
-        sym_perm::Ptr{Cint} = C_NULL
-        uns_perm::Ptr{Cint} = C_NULL
+    sym_perm::Ptr{Cint} = C_NULL
+    uns_perm::Ptr{Cint} = C_NULL
 
-        colsca::Ptr{T} = C_NULL
-        rowsca::Ptr{T} = C_NULL
-        colsca_from_mumps::Cint = 0
-        rowsca_from_mumps::Cint = 0
+    colsca::Ptr{T} = C_NULL
+    rowsca::Ptr{T} = C_NULL
+    colsca_from_mumps::Cint = 0
+    rowsca_from_mumps::Cint = 0
 
-        rhs::Ptr{T} = C_NULL
-        redrhs::Ptr{T} = C_NULL
-        rhs_sparse::Ptr{T} = C_NULL
-        sol_loc::Ptr{T} = C_NULL
-        rhs_loc::Ptr{T} = C_NULL
+    rhs::Ptr{T} = C_NULL
+    redrhs::Ptr{T} = C_NULL
+    rhs_sparse::Ptr{T} = C_NULL
+    sol_loc::Ptr{T} = C_NULL
+    rhs_loc::Ptr{T} = C_NULL
 
-        irhs_sparse::Ptr{Cint} = C_NULL
-        irhs_ptr::Ptr{Cint} = C_NULL
-        isol_loc::Ptr{Cint} = C_NULL
-        irhs_loc::Ptr{Cint} = C_NULL
+    irhs_sparse::Ptr{Cint} = C_NULL
+    irhs_ptr::Ptr{Cint} = C_NULL
+    isol_loc::Ptr{Cint} = C_NULL
+    irhs_loc::Ptr{Cint} = C_NULL
 
-        nrhs::Cint = 0
-        lrhs::Cint = 0
-        lredrhs::Cint = 0
-        nz_rhs::Cint = 0
-        lsol_loc::Cint = 0
-        nloc_rhs::Cint = 0
-        lrhs_loc::Cint = 0
+    nrhs::Cint = 0
+    lrhs::Cint = 0
+    lredrhs::Cint = 0
+    nz_rhs::Cint = 0
+    lsol_loc::Cint = 0
+    nloc_rhs::Cint = 0
+    lrhs_loc::Cint = 0
 
-        schur_mloc::Cint = 0
-        schur_nloc::Cint = 0
-        schur_lld::Cint = 0
+    schur_mloc::Cint = 0
+    schur_nloc::Cint = 0
+    schur_lld::Cint = 0
 
-        mblock::Cint = 0
-        nblock::Cint = 0
-        nprow::Cint = 0
-        npcol::Cint = 0
+    mblock::Cint = 0
+    nblock::Cint = 0
+    nprow::Cint = 0
+    npcol::Cint = 0
 
-        info::SVector{80,Cint} = zeros(80)
-        infog::SVector{80,Cint} = zeros(80)
-        rinfo::SVector{40,T} = zeros(40)
-        rinfog::SVector{40,T} = zeros(40)
+    info::SVector{80,Cint} = zeros(80)
+    infog::SVector{80,Cint} = zeros(80)
+    rinfo::SVector{40,T} = zeros(40)
+    rinfog::SVector{40,T} = zeros(40)
 
-        deficiency::Cint = 0
-        pivnul_list::Ptr{Cint} = C_NULL
-        mapping::Ptr{Cint} = C_NULL
+    deficiency::Cint = 0
+    pivnul_list::Ptr{Cint} = C_NULL
+    mapping::Ptr{Cint} = C_NULL
 
-        size_schur::Cint = 0
-        listvar_schur::Ptr{Cint} = C_NULL
-        schur::Ptr{T} = C_NULL ##
+    size_schur::Cint = 0
+    listvar_schur::Ptr{Cint} = C_NULL
+    schur::Ptr{T} = C_NULL ##
 
-        instance_number::Cint = 0
-        wk_user::Ptr{T} = C_NULL
+    instance_number::Cint = 0
+    wk_user::Ptr{T} = C_NULL
 
-        version_number::SVector{32,Cchar} = zeros(32)
+    version_number::SVector{32,Cchar} = zeros(32)
 
-        ooc_tmpdir::SVector{256,Cchar} = zeros(256)
-        ooc_prefix::SVector{64,Cchar} = zeros(64)
+    ooc_tmpdir::SVector{256,Cchar} = zeros(256)
+    ooc_prefix::SVector{64,Cchar} = zeros(64)
 
-        write_problem::SVector{256,Cchar} = zeros(256)
-        lwk_user::Cint = 0
+    write_problem::SVector{256,Cchar} = zeros(256)
+    lwk_user::Cint = 0
 
-        save_dir::SVector{256,Cchar} = zeros(256)
-        save_prefix::SVector{256,Cchar} = zeros(256)
+    save_dir::SVector{256,Cchar} = zeros(256)
+    save_prefix::SVector{256,Cchar} = zeros(256)
 
-        metis_options::SVector{40,Cint} = zeros(40)
-    end
-elseif version == "5.2.1+4"
-    @kwdef mutable struct Struc{T}
-        sym::Cint = 0
-        par::Cint = 0
-        job::Cint = 0
-
-        comm_fortran::Cint = 0
-
-        icntl::SVector{60,Cint} = zeros(60)
-        keep::SVector{500,Cint} = zeros(500)
-        cntl::SVector{15,T} = zeros(15)
-        dkeep::SVector{230,T} = zeros(230)
-        keep8::SVector{150,Int64} = zeros(150)
-        n::Cint = 0
-
-        nz_alloc::Cint = 0
-
-        nz::Cint = 0
-        nnz::Int64 = 0
-        irn::Ptr{Cint} = C_NULL
-        jcn::Ptr{Cint} = C_NULL
-        a::Ptr{T} = C_NULL
-
-        nz_loc::Cint = 0
-        nnz_loc::Int64 = 0
-        irn_loc::Ptr{Cint} = C_NULL
-        jcn_loc::Ptr{Cint} = C_NULL
-        a_loc::Ptr{T} = C_NULL ###
-
-        nelt::Cint = 0
-        eltptr::Ptr{Cint} = C_NULL
-        eltvar::Ptr{Cint} = C_NULL
-        a_elt::Ptr{T} = C_NULL
-
-        perm_in::Ptr{Cint} = C_NULL
-
-        sym_perm::Ptr{Cint} = C_NULL
-        uns_perm::Ptr{Cint} = C_NULL
-
-        colsca::Ptr{T} = C_NULL
-        rowsca::Ptr{T} = C_NULL
-        colsca_from_mumps::Cint = 0
-        rowsca_from_mumps::Cint = 0
-
-        rhs::Ptr{T} = C_NULL
-        redrhs::Ptr{T} = C_NULL
-        rhs_sparse::Ptr{T} = C_NULL
-        sol_loc::Ptr{T} = C_NULL
-        rhs_loc::Ptr{T} = C_NULL
-
-        irhs_sparse::Ptr{Cint} = C_NULL
-        irhs_ptr::Ptr{Cint} = C_NULL
-        isol_loc::Ptr{Cint} = C_NULL
-        irhs_loc::Ptr{Cint} = C_NULL
-
-        nrhs::Cint = 0
-        lrhs::Cint = 0
-        lredrhs::Cint = 0
-        nz_rhs::Cint = 0
-        lsol_loc::Cint = 0
-        nloc_rhs::Cint = 0
-        lrhs_loc::Cint = 0
-
-        schur_mloc::Cint = 0
-        schur_nloc::Cint = 0
-        schur_lld::Cint = 0
-
-        mblock::Cint = 0
-        nblock::Cint = 0
-        nprow::Cint = 0
-        npcol::Cint = 0
-
-        info::SVector{80,Cint} = zeros(80)
-        infog::SVector{80,Cint} = zeros(80)
-        rinfo::SVector{40,T} = zeros(40)
-        rinfog::SVector{40,T} = zeros(40)
-
-        deficiency::Cint = 0
-        pivnul_list::Ptr{Cint} = C_NULL
-        mapping::Ptr{Cint} = C_NULL
-
-        size_schur::Cint = 0
-        listvar_schur::Ptr{Cint} = C_NULL
-        schur::Ptr{T} = C_NULL ##
-
-        instance_number::Cint = 0
-        wk_user::Ptr{T} = C_NULL
-
-        version_number::SVector{32,Cchar} = zeros(32)
-
-        ooc_tmpdir::SVector{256,Cchar} = zeros(256)
-        ooc_prefix::SVector{64,Cchar} = zeros(64)
-
-        write_problem::SVector{256,Cchar} = zeros(256)
-        lwk_user::Cint = 0
-
-        save_dir::SVector{256,Cchar} = zeros(256)
-        save_prefix::SVector{256,Cchar} = zeros(256)
-
-        metis_options::SVector{40,Cint} = zeros(40)
-    end
+    metis_options::SVector{40,Cint} = zeros(40)
 end
 
 mutable struct MumpsSolver{T} <: AbstractLinearSolver{T}

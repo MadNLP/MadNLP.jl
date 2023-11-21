@@ -12,7 +12,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        julia-version: ['1.6','^1.7']
+        julia-version: ['1.9']
         julia-arch: [x64]
         os: [ubuntu-latest,macos-latest,windows-latest]
     steps:
@@ -23,11 +23,11 @@ jobs:
       - run: julia --color=yes --project=.ci .ci/ci.jl basic
   test-moonshot:
     env:
-      JULIA_DEPOT_PATH: /scratch/sshin/github-actions/julia_depot_madnlp
+      JULIA_DEPOT_PATH: /home/sshin/action-runners/MadNLP/julia-depot/
     runs-on: self-hosted
     strategy:
       matrix:
-        julia-version: ['1.6','^1.7']
+        julia-version: ['1.9']
     steps:
       - uses: actions/checkout@v2
       - uses: julia-actions/setup-julia@latest
@@ -43,12 +43,11 @@ jobs:
   test-moonshot-cuda:
     env:
       CUDA_VISIBLE_DEVICES: 1
-      JULIA_DEPOT_PATH: /scratch/sshin/github-actions/julia_depot_madnlp
-      JULIA_CUDA_USE_BINARYBUILDER: true
+      JULIA_DEPOT_PATH: /home/sshin/action-runners/MadNLP/julia-depot/
     runs-on: self-hosted
     strategy:
       matrix:
-        julia-version: ['^1.7']
+        julia-version: ['1.9']
     steps:
       - uses: actions/checkout@v2
       - uses: julia-actions/setup-julia@latest
