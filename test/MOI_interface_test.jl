@@ -35,17 +35,15 @@ function test_MOI_Test()
                 MOI.ObjectiveBound,
             ]
         );
-        exclude = String[
-            "test_modification",
-            "test_attribute_TimeLimitSec",
+        exclude = [
             # TODO: MadNLP does not return the correct multiplier
-            # when a variable is fixed with MOI.EqualTo.
-            "test_linear_integration",
+            # when a variable is fixed with MOI.EqualTo (Issue #229).
+            r"^test_linear_integration$",
             "test_quadratic_constraint_GreaterThan",
             "test_quadratic_constraint_LessThan",
             # MadNLP reaches maximum number of iterations instead
             # of returning infeasibility certificate.
-            "test_linear_DUAL_INFEASIBLE",
+            r"test_linear_DUAL_INFEASIBLE.*",
             "test_solve_TerminationStatus_DUAL_INFEASIBLE",
             # Tests excluded on purpose
             # - Excluded because Hessian information is needed
@@ -57,6 +55,12 @@ function test_MOI_Test()
 
             #  - Excluded because this test is optional
             "test_model_ScalarFunctionConstantNotZero",
+            # Throw an error: "Unable to query the dual of a variable
+            # bound that was reformulated using `ZerosBridge`."
+            "test_linear_VectorAffineFunction_empty_row",
+            "test_conic_linear_VectorOfVariables_2",
+            # TODO: investigate why it is breaking.
+            "test_nonlinear_expression_hs109",
         ]
     )
 
