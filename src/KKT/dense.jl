@@ -15,7 +15,7 @@ struct DenseKKTSystem{
     LS,
     VI <: AbstractVector{Int},
     } <: AbstractReducedKKTSystem{T, VT, MT, QN}
-    
+
     hess::MT
     jac::MT
     quasi_newton::QN
@@ -41,19 +41,19 @@ end
 
 function create_kkt_system(
     ::Type{DenseKKTSystem},
-    cb::AbstractCallback{T,VT}, opt, 
+    cb::AbstractCallback{T,VT}, opt,
     opt_linear_solver, cnt, ind_cons) where {T,VT}
-    
+
     ind_ineq = ind_cons.ind_ineq
     ind_lb = ind_cons.ind_lb
     ind_ub = ind_cons.ind_ub
-    
+
     n = cb.nvar
     m = cb.ncon
     ns = length(ind_ineq)
     nlb = length(ind_cons.ind_lb)
     nub = length(ind_cons.ind_ub)
-    
+
     hess = create_array(cb, n, n)
     jac = create_array(cb, m, n)
     aug_com = create_array(cb, n+ns+m, n+ns+m)
@@ -61,7 +61,7 @@ function create_kkt_system(
     pr_diag = create_array(cb, n+ns)
     du_diag = create_array(cb, m)
     diag_hess = create_array(cb, n)
-    
+
     l_diag = fill!(VT(undef, nlb), one(T))
     u_diag = fill!(VT(undef, nub), one(T))
     l_lower = fill!(VT(undef, nlb), zero(T))
@@ -71,20 +71,21 @@ function create_kkt_system(
     fill!(aug_com, zero(T))
     fill!(hess,    zero(T))
     fill!(jac,     zero(T))
+    fill!(reg,     zero(T))
     fill!(pr_diag, zero(T))
     fill!(du_diag, zero(T))
     fill!(diag_hess, zero(T))
 
     quasi_newton = create_quasi_newton(opt.hessian_approximation, cb, n)
     cnt.linear_solver_time += @elapsed linear_solver = opt.linear_solver(aug_com; opt = opt_linear_solver)
-    
+
     return DenseKKTSystem(
         hess, jac, quasi_newton,
         reg, pr_diag, du_diag, l_diag, u_diag, l_lower, u_lower,
         diag_hess, aug_com,
         ind_ineq, ind_cons.ind_lb, ind_cons.ind_ub,
         linear_solver,
-        Dict{Symbol, Any}(), 
+        Dict{Symbol, Any}(),
     )
 end
 
@@ -104,7 +105,7 @@ struct DenseCondensedKKTSystem{
     LS,
     VI <: AbstractVector{Int}
     } <: AbstractCondensedKKTSystem{T, VT, MT, QN}
-    
+
     hess::MT
     jac::MT
     quasi_newton::QN
@@ -140,9 +141,9 @@ end
 
 function create_kkt_system(
     ::Type{DenseCondensedKKTSystem},
-    cb::AbstractCallback{T,VT}, opt, 
+    cb::AbstractCallback{T,VT}, opt,
     opt_linear_solver, cnt, ind_cons) where {T,VT}
-    
+
     n = cb.nvar
     m = cb.ncon
     ns = length(ind_cons.ind_ineq)
@@ -162,11 +163,11 @@ function create_kkt_system(
     u_diag = fill!(VT(undef, nub), one(T))
     l_lower = fill!(VT(undef, nlb), zero(T))
     u_lower = fill!(VT(undef, nub), zero(T))
-    
+
     pd_buffer = VT(undef, n + n_eq)
     diag_buffer = VT(undef, ns)
     buffer = VT(undef, m)
-    
+
     # Init!
     fill!(aug_com, zero(T))
     fill!(hess,    zero(T))
@@ -180,12 +181,12 @@ function create_kkt_system(
 
     quasi_newton = create_quasi_newton(opt.hessian_approximation, cb, n)
     cnt.linear_solver_time += @elapsed linear_solver = opt.linear_solver(aug_com; opt = opt_linear_solver)
-    
+
     return DenseCondensedKKTSystem(
         hess, jac, quasi_newton, jac_ineq,
         reg, pr_diag, du_diag, l_diag, u_diag, l_lower, u_lower,
         pd_buffer, diag_buffer, buffer,
-        aug_com, 
+        aug_com,
         n_eq, ind_cons.ind_eq, ind_eq_shifted,
         ns,
         ind_cons.ind_ineq, ind_cons.ind_lb, ind_cons.ind_ub,
@@ -285,10 +286,10 @@ function build_kkt!(kkt::DenseKKTSystem{T, VT, MT}) where {T, VT, MT}
     n = size(kkt.hess, 1)
     m = size(kkt.jac, 1)
     ns = length(kkt.ind_ineq)
-    
+
     _build_dense_kkt_system!(kkt.aug_com, kkt.hess, kkt.jac,
                                 kkt.pr_diag, kkt.du_diag, kkt.diag_hess,
-                                kkt.ind_ineq, 
+                                kkt.ind_ineq,
                                 n, m, ns)
 end
 
@@ -337,12 +338,12 @@ end
 
 function _build_ineq_jac!(
     dest::AbstractMatrix, jac::AbstractMatrix, diag_buffer::AbstractVector,
-    ind_ineq::AbstractVector, 
+    ind_ineq::AbstractVector,
     n, m_ineq,
 )
     @inbounds for i in 1:m_ineq, j in 1:n
         is = ind_ineq[i]
-        dest[i, j] = jac[is, j] * sqrt(diag_buffer[i]) 
+        dest[i, j] = jac[is, j] * sqrt(diag_buffer[i])
     end
 end
 

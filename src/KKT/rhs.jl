@@ -99,11 +99,10 @@ struct UnreducedKKTVector{T, VT<:AbstractVector{T}, VI} <: AbstractKKTVector{T, 
 end
 
 function UnreducedKKTVector(
-    ::Type{VT}, n::Int, m::Int, nlb::Int, nub::Int, ind_lb, ind_ub;
+    ::Type{VT}, n::Int, m::Int, nlb::Int, nub::Int, ind_lb, ind_ub
+) where {T, VT <: AbstractVector{T}}
     values = VT(undef,n+m+nlb+nub)
-    ) where {T, VT <: AbstractVector{T}}
-    
-    fill!(values, 0.0)
+    fill!(values, zero(T))
     # Wrap directly array x to avoid dealing with views
     x = _madnlp_unsafe_wrap(values, n + m) # Primal-Dual
     xp = _madnlp_unsafe_wrap(values, n) # Primal
@@ -115,6 +114,32 @@ function UnreducedKKTVector(
     xp_ur = view(xp, ind_ub)
 
     return UnreducedKKTVector(values, x, xp, xp_lr, xp_ur, xl, xzl, xzu)
+end
+
+function UnreducedKKTVector(kkt::AbstractKKTSystem{T, VT}) where {T, VT}
+    return UnreducedKKTVector(
+        VT,
+        length(kkt.pr_diag),
+        length(kkt.du_diag),
+        length(kkt.l_diag),
+        length(kkt.u_diag),
+        kkt.ind_lb,
+        kkt.ind_ub,
+    )
+end
+
+function Base.copy(rhs::UnreducedKKTVector{T, VT}) where {T, VT}
+    new_rhs = UnreducedKKTVector(
+        VT,
+        length(rhs.xp),
+        length(rhs.xl),
+        length(rhs.xzl),
+        length(rhs.xzu),
+        rhs.xp_lr.indices[1],
+        rhs.xp_ur.indices[1],
+    )
+    copyto!(full(new_rhs), full(rhs))
+    return new_rhs
 end
 
 full(rhs::UnreducedKKTVector) = rhs.values
@@ -146,9 +171,9 @@ function PrimalVector(::Type{VT}, nx::Int, ns::Int, ind_lb, ind_ub) where {T, VT
     s = _madnlp_unsafe_wrap(values, ns, nx+1)
     values_lr = view(values, ind_lb)
     values_ur = view(values, ind_ub)
-    
+
     return PrimalVector(
-        values, values_lr, values_ur, x, s, 
+        values, values_lr, values_ur, x, s,
     )
 end
 
@@ -156,6 +181,4 @@ full(rhs::PrimalVector) = rhs.values
 primal(rhs::PrimalVector) = rhs.values
 variable(rhs::PrimalVector) = rhs.x
 slack(rhs::PrimalVector) = rhs.s
-
-
 
