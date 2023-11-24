@@ -1,17 +1,16 @@
 name = "MadNLPHSL"
 uuid = "7fb6135f-58fe-4112-84ca-653cf5be0c77"
-version = "0.4"
+version = "0.4.0"
 
 [deps]
-HSL_jll = "017b0a0e-03f4-516a-9b91-836bbd1904dd"
+HSL = "34c5aeac-e683-54a6-a0e9-6e0fdc586c50"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 MadNLP = "2621e9c9-9eb4-46b1-8089-e8c72242dfb6"
-OpenBLAS32_jll = "656ef2d0-ae68-5445-9ca0-591084a874a2"
 
 [compat]
+HSL = "0.4.2"
 MadNLP = "0.5,0.6,0.7"
 MadNLPTests = "0.3, 0.4"
-OpenBLAS32_jll = "0.3"
 julia = "1.6"
 
 [extras]

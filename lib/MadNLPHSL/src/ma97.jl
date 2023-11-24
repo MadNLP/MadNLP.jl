@@ -9,57 +9,13 @@
     ma97_umax::Float64 = 1e-4
 end
 
-@kwdef mutable struct Ma97Control{T}
-    f_arrays::Cint = 0
-    action::Cint = 0
-    nemin::Cint = 0
-    multiplier::T = 0.
-    ordering::Cint = 0
-    print_level::Cint = 0
-    scaling::Cint = 0
-    small::T = 0
-    u::T = 0
-    unit_diagnostics::Cint = 0
-    unit_error::Cint = 0
-    unit_warning::Cint = 0
-    factor_min::Clong = 0
-    solve_blas3::Cint = 0
-    solve_min::Clong = 0
-    solve_mf::Cint = 0
-    consist_tol::T = 0
-    ispare::Vector{Cint}
-    rspare::Vector{T}
-end
-
-@kwdef mutable struct Ma97Info{T}
-    flag::Cint = 0
-    flag68::Cint = 0
-    flag77::Cint = 0
-    matrix_dup::Cint = 0
-    matrix_rank::Cint = 0
-    matrix_outrange::Cint = 0
-    matrix_missing_diag::Cint = 0
-    maxdepth::Cint = 0
-    maxfront::Cint = 0
-    num_delay::Cint = 0
-    num_factor::Clong = 0
-    num_flops::Clong = 0
-    num_neg::Cint = 0
-    num_sup::Cint = 0
-    num_two::Cint = 0
-    ordering::Cint = 0
-    stat::Cint = 0
-    ispare::Vector{Cint}
-    rspare::Vector{T}
-end
-
 mutable struct Ma97Solver{T} <:AbstractLinearSolver{T}
     n::Int32
 
     csc::SparseMatrixCSC{T,Int32}
 
-    control::Ma97Control{T}
-    info::Ma97Info{T}
+    control::ma97_control{T}
+    info::ma97_info{T}
 
     akeep::Vector{Ptr{Nothing}}
     fkeep::Vector{Ptr{Nothing}}
@@ -76,61 +32,34 @@ for (fdefault, fanalyse, ffactor, fsolve, ffinalise, typ) in [
      ]
     @eval begin
         ma97_default_control(
-            control::Ma97Control{$typ}
-        ) = ccall(
-            ($(string(fdefault)), libhsl),
-            Nothing,
-            (Ref{Ma97Control{$typ}},),
-            control
-        )
+            control::ma97_control{$typ}
+        ) = HSL.$fdefault(control)
+
         ma97_analyse(
             check::Cint,n::Cint,ptr::Vector{Cint},row::Vector{Cint},
             val::Ptr{Nothing},akeep::Vector{Ptr{Nothing}},
-            control::Ma97Control{$typ},info::Ma97Info{$typ},
+            control::ma97_control{$typ},info::ma97_info{$typ},
             order::Ptr{Nothing}
-        ) = ccall(
-            ($(string(fanalyse)),libhsl),
-            Nothing,
-            (Cint,Cint,Ptr{Cint},Ptr{Cint},Ptr{$typ},
-             Ptr{Ptr{Nothing}},Ref{Ma97Control{$typ}},Ref{Ma97Info{$typ}},Ptr{Cint}),
-            check,n,ptr,row,val,akeep,control,info,order
-        )
+        ) = HSL.$fanalyse(check,n,ptr,row,val,akeep,control,info,order)
+
         ma97_factor(
             matrix_type::Cint,ptr::Ptr{Nothing},row::Ptr{Nothing},
             val::Vector{$typ},akeep::Vector{Ptr{Nothing}},fkeep::Vector{Ptr{Nothing}},
-            control::Ma97Control,info::Ma97Info,scale::Ptr{Nothing}
-        ) = ccall(
-            ($(string(ffactor)),libhsl),
-            Nothing,
-            (Cint,Ptr{Cint},Ptr{Cint},Ptr{$typ},Ptr{Ptr{Nothing}},
-             Ptr{Ptr{Nothing}},Ref{Ma97Control},Ref{Ma97Info},Ptr{$typ}),
-            matrix_type,ptr,row,val,akeep,fkeep,control,info,scale
-        )
+            control::ma97_control,info::ma97_info,scale::Ptr{Nothing}
+        ) = HSL.$ffactor(matrix_type,ptr,row,val,akeep,fkeep,control,info,scale)
+
         ma97_solve(
             job::Cint,nrhs::Cint,x::Vector{$typ},ldx::Cint,
             akeep::Vector{Ptr{Nothing}},fkeep::Vector{Ptr{Nothing}},
-            control::Ma97Control,info::Ma97Info
-        ) = ccall(
-            ($(string(fsolve)),libhsl),
-            Nothing,
-            (Cint,Cint,Ptr{$typ},Cint,Ptr{Ptr{Nothing}},
-             Ptr{Ptr{Nothing}},Ref{Ma97Control},Ref{Ma97Info}),
-            job,nrhs,x,ldx,akeep,fkeep,control,info
-        )
+            control::ma97_control,info::ma97_info
+        ) = HSL.$fsolve(job,nrhs,x,ldx,akeep,fkeep,control,info)
+
         ma97_finalize(
             ::Type{$typ},akeep::Vector{Ptr{Nothing}},fkeep::Vector{Ptr{Nothing}}
-        )=ccall(
-            ($(string(ffinalise)),libhsl),
-            Nothing,
-            (Ptr{Ptr{Nothing}},Ptr{Ptr{Nothing}}),
-            akeep,fkeep
-        )
+        ) = HSL.$ffinalise(akeep,fkeep)
     end
 end
-ma97_set_num_threads(n) = ccall((:omp_set_num_threads_,libhsl),
-                                Cvoid,
-                                (Ref{Cint},),
-                                Cint(n))
+ma97_set_num_threads(n) = HSL.omp_set_num_threads(n)
 
 
 function Ma97Solver(
@@ -142,8 +71,8 @@ function Ma97Solver(
 
     n = Int32(csc.n)
 
-    info = Ma97Info{T}(ispare=zeros(Int32,5),rspare=zeros(T,10))
-    control=Ma97Control{T}(ispare=zeros(Int32,5),rspare=zeros(T,10))
+    info = ma97_info{T}()
+    control=ma97_control{T}()
     ma97_default_control(control)
 
     control.print_level = opt.ma97_print_level

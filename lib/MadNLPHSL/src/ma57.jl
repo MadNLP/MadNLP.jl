@@ -43,44 +43,27 @@ end
 
 
 for (fa,fb,fc,typ) in (
-    (:ma57ad_, :ma57bd_, :ma57cd_, Float64),
-    (:ma57a_, :ma57b_, :ma57c_, Float32)
+    (:ma57ad, :ma57bd, :ma57cd, Float64),
+    (:ma57a , :ma57b , :ma57c , Float32)
     )
     @eval begin
 
         ma57ad!(n::Cint,nz::Cint,I::Vector{Cint},J::Vector{Cint},lkeep::Cint,
                 keep::Vector{Cint},iwork::Vector{Cint},icntl::Vector{Cint},
-                info::Vector{Cint},rinfo::Vector{$typ}) = ccall(
-                    ($(string(fa)),libhsl),
-                    Nothing,
-                    (Ref{Cint},Ref{Cint},Ptr{Cint},Ptr{Cint},Ref{Cint},
-                     Ptr{Cint},Ptr{Cint},Ptr{Cint},
-                     Ptr{Cint},Ptr{$typ}),
-                    n,nz,I,J,lkeep,keep,iwork,icntl,info,rinfo)
+                info::Vector{Cint},rinfo::Vector{$typ}
+        ) = HSL.$fa(n,nz,I,J,lkeep,keep,iwork,icntl,info,rinfo)
 
         ma57bd!(n::Cint,nz::Cint,V::Vector{$typ},fact::Vector{$typ},
                 lfact::Cint,ifact::Vector{Cint},lifact::Cint,lkeep::Cint,
                 keep::Vector{Cint},iwork::Vector{Cint},icntl::Vector{Cint},cntl::Vector{$typ},
-                info::Vector{Cint},rinfo::Vector{$typ}) = ccall(
-                    ($(string(fb)),libhsl),
-                    Nothing,
-                    (Ref{Cint},Ref{Cint},Ptr{$typ},Ptr{$typ},
-                     Ref{Cint},Ptr{Cint},Ref{Cint},Ref{Cint},
-                     Ptr{Cint},Ptr{Cint},Ptr{Cint},Ptr{$typ},
-                     Ptr{Cint},Ptr{$typ}),
-                    n,nz,V,fact,lfact,ifact,lifact,lkeep,keep,iwork,icntl,cntl,info,rinfo)
+                info::Vector{Cint},rinfo::Vector{$typ}
+        ) = HSL.$fb(n,nz,V,fact,lfact,ifact,lifact,lkeep,keep,iwork,icntl,cntl,info,rinfo)
 
         ma57cd!(job::Cint,n::Cint,fact::Vector{$typ},lfact::Cint,
                 ifact::Vector{Cint},lifact::Cint,nrhs::Cint,rhs::Vector{$typ},
                 lrhs::Cint,work::Vector{$typ},lwork::Cint,iwork::Vector{Cint},
-                icntl::Vector{Cint},info::Vector{Cint}) = ccall(
-                    ($(string(fc)),libhsl),
-                    Nothing,
-                    (Ref{Cint},Ref{Cint},Ptr{$typ},Ref{Cint},
-                     Ptr{Cint},Ref{Cint},Ref{Cint},Ptr{$typ},
-                     Ref{Cint},Ptr{$typ},Ref{Cint},Ptr{Cint},
-                     Ptr{Cint},Ptr{Cint}),
-                    job,n,fact,lfact,ifact,lifact,nrhs,rhs,lrhs,work,lwork,iwork,icntl,info)
+                icntl::Vector{Cint},info::Vector{Cint}
+        ) = HSL.$fc(job,n,fact,lfact,ifact,lifact,nrhs,rhs,lrhs,work,lwork,iwork,icntl,info)
     end
 end
 
