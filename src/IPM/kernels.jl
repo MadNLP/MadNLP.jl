@@ -1,27 +1,6 @@
 
 # KKT system updates -------------------------------------------------------
 # Set diagonal
-function set_aug_diagonal!(kkt::AbstractKKTSystem, solver::MadNLPSolver{T, VT}) where {T, VT <: Vector{T}}
-    x = full(solver.x)
-    xl = full(solver.xl)
-    xu = full(solver.xu)
-    zl = full(solver.zl)
-    zu = full(solver.zu)
-    fill!(kkt.reg, zero(T))
-    fill!(kkt.du_diag, zero(T))
-    @inbounds @simd for i in eachindex(kkt.l_lower)
-        kkt.l_lower[i] = solver.zl_r[i]
-        kkt.l_diag[i]  = solver.xl_r[i] - solver.x_lr[i]
-    end
-    @inbounds @simd for i in eachindex(kkt.u_lower)
-        kkt.u_lower[i] = solver.zu_r[i]
-        kkt.u_diag[i] = solver.x_ur[i] - solver.xu_r[i]
-    end
-
-    _set_aug_diagonal!(kkt)
-
-    return
-end
 function set_aug_diagonal!(kkt::AbstractKKTSystem{T}, solver::MadNLPSolver{T}) where T
     x = full(solver.x)
     xl = full(solver.xl)
@@ -37,7 +16,6 @@ function set_aug_diagonal!(kkt::AbstractKKTSystem{T}, solver::MadNLPSolver{T}) w
     copyto!(kkt.u_lower, solver.zu_r)
 
     _set_aug_diagonal!(kkt)
-
     return
 end
 
@@ -45,12 +23,14 @@ function _set_aug_diagonal!(kkt::AbstractKKTSystem)
     copyto!(kkt.pr_diag, kkt.reg)
     kkt.pr_diag[kkt.ind_lb] .-= kkt.l_lower ./ kkt.l_diag
     kkt.pr_diag[kkt.ind_ub] .-= kkt.u_lower ./ kkt.u_diag
+    return
 end
 
 function _set_aug_diagonal!(kkt::AbstractUnreducedKKTSystem)
     copyto!(kkt.pr_diag, kkt.reg)
     kkt.l_lower_aug .= sqrt.(kkt.l_lower)
     kkt.u_lower_aug .= sqrt.(kkt.u_lower)
+    return
 end
 
 # Robust restoration
@@ -75,11 +55,11 @@ end
 function set_f_RR!(solver::MadNLPSolver, RR::RobustRestorer)
     x = full(solver.x)
     RR.f_R .= RR.zeta .* RR.D_R .^ 2 .* (x .- RR.x_ref)
+    return
 end
 
-
 # Set RHS
-function set_aug_rhs!(solver::MadNLPSolver, kkt::AbstractKKTSystem, c)
+function set_aug_rhs!(solver::MadNLPSolver, kkt::AbstractKKTSystem, c::AbstractVector)
     px = primal(solver.p)
     x = primal(solver.x)
     f = primal(solver.f)
@@ -95,60 +75,8 @@ function set_aug_rhs!(solver::MadNLPSolver, kkt::AbstractKKTSystem, c)
     py .= .-c
     pzl .= (solver.xl_r .- solver.x_lr) .* solver.zl_r .+ solver.mu
     pzu .= (solver.xu_r .- solver.x_ur) .* solver.zu_r .- solver.mu
-
+    return
 end
-# function set_aug_rhs!(solver::MadNLPSolver, kkt::AbstractKKTSystem, c)
-#     px = primal(solver.p)
-#     x = primal(solver.x)
-#     f = primal(solver.f)
-#     xl = primal(solver.xl)
-#     xu = primal(solver.xu)
-#     zl = full(solver.zl)
-#     zu = full(solver.zu)
-#     @inbounds @simd for i in eachindex(px)
-#         px[i] = -f[i] + zl[i] - zu[i] - solver.jacl[i]
-#     end
-
-#     py = dual(solver.p)
-#     @inbounds @simd for i in eachindex(py)
-#         py[i] = -c[i]
-#     end
-
-#     pzl = dual_lb(solver.p)
-#     @inbounds @simd for i in eachindex(pzl)
-#         pzl[i] = (solver.xl_r[i] - solver.x_lr[i]) * solver.zl_r[i] + solver.mu
-#     end
-
-#     pzu = dual_ub(solver.p)
-#     @inbounds @simd for i in eachindex(pzu)
-#         pzu[i] = (solver.xu_r[i] -solver.x_ur[i]) * solver.zu_r[i] - solver.mu
-#     end
-# return
-# end
-
-# function set_aug_rhs!(solver::MadNLPSolver, kkt::SparseUnreducedKKTSystem, c)
-#     f = primal(solver.f)
-#     zl = primal(solver.zl)
-#     zu = primal(solver.zu)
-#     px = primal(solver.p)
-#     @inbounds @simd for i in eachindex(px)
-#         px[i] = -f[i] + zl[i] - zu[i] - solver.jacl[i]
-#     end
-#     py = dual(solver.p)
-#     @inbounds @simd for i in eachindex(py)
-#         py[i] = -c[i]
-#     end
-#     pzl = dual_lb(solver.p)
-#     @inbounds @simd for i in eachindex(pzl)
-#         pzl[i] = (solver.xl_r[i] - solver.x_lr[i]) * kkt.l_lower[i] + solver.mu / kkt.l_lower[i]
-#     end
-#     pzu = dual_ub(solver.p)
-#     @inbounds @simd for i in eachindex(pzu)
-#         pzu[i] = (solver.xu_r[i] - solver.x_ur[i]) * kkt.u_lower[i] - solver.mu / kkt.u_lower[i]
-#     end
-#     return
-# end
-
 
 # Set RHS RR
 function set_aug_rhs_RR!(
@@ -179,39 +107,38 @@ function set_aug_rhs_RR!(
 end
 
 # solving KKT system
-@inbounds function _kktmul!(w,x,reg,du_diag,l_lower,u_lower,l_diag,u_diag, alpha, beta)
+@inbounds function _kktmul!(
+    w::AbstractKKTVector,
+    x::AbstractKKTVector,
+    reg,
+    du_diag,
+    l_lower,
+    u_lower,
+    l_diag,
+    u_diag,
+    alpha,
+    beta,
+)
     primal(w) .+= alpha .* reg .* primal(x)
     dual(w) .+= alpha .* du_diag .* dual(x)
     w.xp_lr .-= alpha .* dual_lb(x)
     w.xp_ur .+= alpha .* dual_ub(x)
     dual_lb(w) .= beta .* dual_lb(w) .+ alpha .* (x.xp_lr .* l_lower .- dual_lb(x) .* l_diag)
     dual_ub(w) .= beta .* dual_ub(w) .+ alpha .* (x.xp_ur .* u_lower .+ dual_ub(x) .* u_diag)
-end
-
-@inbounds function reduce_rhs!(
-    xp_lr,wl,l_diag,
-    xp_ur,wu,u_diag,
-    )
-    xp_lr .-= wl ./ l_diag
-    xp_ur .-= wu ./ u_diag
-end
-
-
-# Finish
-function finish_aug_solve!(kkt::AbstractKKTSystem{T, VT}, d) where {T, VT <: Vector{T}}
-    dlb = dual_lb(d)
-    dub = dual_ub(d)
-    @inbounds @simd for i in eachindex(dlb)
-        dlb[i] = (-dlb[i] + kkt.l_lower[i] * d.xp_lr[i]) / kkt.l_diag[i]
-    end
-    @inbounds @simd for i in eachindex(dub)
-        dub[i] = ( dub[i] - kkt.u_lower[i] * d.xp_ur[i]) / kkt.u_diag[i]
-    end
-
     return
 end
 
-function finish_aug_solve!(kkt::AbstractKKTSystem, d)
+@inbounds function reduce_rhs!(
+    xp_lr, wl, l_diag,
+    xp_ur, wu, u_diag,
+)
+    xp_lr .-= wl ./ l_diag
+    xp_ur .-= wu ./ u_diag
+    return
+end
+
+# Finish
+function finish_aug_solve!(kkt::AbstractKKTSystem, d::AbstractKKTVector)
     dlb = dual_lb(d)
     dub = dual_ub(d)
     dlb .= (.-dlb .+ kkt.l_lower .* d.xp_lr) ./ kkt.l_diag
@@ -219,7 +146,7 @@ function finish_aug_solve!(kkt::AbstractKKTSystem, d)
     return
 end
 
-function set_initial_bounds!(xl::AbstractVector{T},xu,tol) where T
+function set_initial_bounds!(xl::AbstractVector{T}, xu::AbstractVector{T}, tol) where T
     map!(
         x->x - max(one(T), abs(x)) .* tol,
         xl, xl
@@ -243,7 +170,7 @@ function set_initial_rhs!(solver::MadNLPSolver{T}, kkt::AbstractKKTSystem) where
 end
 
 # Set ifr
-function set_aug_rhs_ifr!(solver::MadNLPSolver{T}, kkt::AbstractKKTSystem, p0) where T
+function set_aug_rhs_ifr!(solver::MadNLPSolver{T}, kkt::AbstractKKTSystem, p0::AbstractKKTVector) where T
     fill!(primal(p0), zero(T))
     fill!(dual_lb(p0), zero(T))
     fill!(dual_ub(p0), zero(T))
@@ -252,14 +179,13 @@ function set_aug_rhs_ifr!(solver::MadNLPSolver{T}, kkt::AbstractKKTSystem, p0) w
     return
 end
 
-function set_g_ifr!(solver::MadNLPSolver, g)
+function set_g_ifr!(solver::MadNLPSolver, g::AbstractArray)
     f = full(solver.f)
     x = full(solver.x)
     xl = full(solver.xl)
     xu = full(solver.xu)
     g .= f .- solver.mu ./ (x .- xl) .+ solver.mu ./ (xu .- x) .+ solver.jacl
 end
-
 
 # Finish RR
 function finish_aug_solve_RR!(dpp, dnn, dzp, dzn, l, dl, pp, nn, zp, zn, mu_R, rho)
@@ -272,38 +198,9 @@ end
 
 # Kernel functions ---------------------------------------------------------
 is_valid(val::R) where R <: Real = !(isnan(val) || isinf(val))
-function is_valid(vec::VT) where {VT <: Union{Vector,Matrix}}
-    @inbounds @simd for i=1:length(vec)
-        is_valid(vec[i]) || return false
-    end
-    return true
-end
 is_valid(vec::AbstractArray) = isempty(vec) ? true : mapreduce(is_valid, &, vec)
 
-function get_varphi(obj_val, x_lr::SubVector{T,Vector{T},VI}, xl_r, xu_r, x_ur, mu) where {T, VI}
-    varphi = obj_val
-    @inbounds @simd for i=1:length(x_lr)
-        xll = x_lr[i]-xl_r[i]
-        xll < 0 && return T(Inf)
-        varphi -= mu*log(xll)
-    end
-    @inbounds @simd for i=1:length(x_ur)
-        xuu = xu_r[i]-x_ur[i]
-        xuu < 0 && return T(Inf)
-        varphi -= mu*log(xuu)
-    end
-    return varphi
-end
-function get_varphi(obj_val, x_lr, xl_r, xu_r, x_ur, mu)
-
-    return obj_val + mapreduce(
-        (x1,x2) -> _get_varphi(x1,x2,mu), +, x_lr, xl_r
-    ) + mapreduce(
-        (x1,x2) -> _get_varphi(x1,x2,mu), +, xu_r, x_ur
-    )
-end
-
-function _get_varphi(x1::T,x2,mu) where T
+function _get_varphi(x1::T, x2::T, mu::T) where T
     x = x1 - x2
     if x < 0
         return T(Inf)
@@ -312,29 +209,20 @@ function _get_varphi(x1::T,x2,mu) where T
     end
 end
 
-@inline get_inf_pr(c) = norm(c, Inf)
-
-function get_inf_du(f::Vector{T}, zl, zu, jacl, sd) where T
-    inf_du = zero(T)
-    @inbounds @simd for i=1:length(f)
-        inf_du = max(inf_du,abs(f[i]-zl[i]+zu[i]+jacl[i]))
-    end
-    return inf_du/sd
+function get_varphi(obj_val, x_lr, xl_r, xu_r, x_ur, mu)
+    return obj_val + mapreduce(
+        (x1,x2) -> _get_varphi(x1,x2,mu), +, x_lr, xl_r
+    ) + mapreduce(
+        (x1,x2) -> _get_varphi(x1,x2,mu), +, xu_r, x_ur
+    )
 end
+
+@inline get_inf_pr(c::AbstractVector) = norm(c, Inf)
+
 function get_inf_du(f, zl, zu, jacl, sd)
     return mapreduce((f,zl,zu,jacl) -> abs(f-zl+zu+jacl), max, f, zl, zu, jacl; init = zero(eltype(f))) / sd
 end
 
-function get_inf_compl(x_lr::SubVector{T,Vector{T},VI}, xl_r, zl_r, xu_r, x_ur, zu_r, mu, sc) where {T, VI}
-    inf_compl = zero(T)
-    @inbounds @simd for i=1:length(x_lr)
-        inf_compl = max(inf_compl,abs((x_lr[i]-xl_r[i])*zl_r[i]-mu))
-    end
-    @inbounds @simd for i=1:length(x_ur)
-        inf_compl = max(inf_compl,abs((xu_r[i]-x_ur[i])*zu_r[i]-mu))
-    end
-    return inf_compl/sc
-end
 function get_inf_compl(x_lr, xl_r, zl_r, xu_r, x_ur, zu_r, mu, sc)
     return max(
         mapreduce(
@@ -352,60 +240,53 @@ function get_inf_compl(x_lr, xl_r, zl_r, xu_r, x_ur, zu_r, mu, sc)
     ) / sc
 end
 
-function get_varphi_d(f::Vector{T}, x, xl, xu, dx, mu) where T
-    varphi_d = zero(T)
-    @inbounds @simd for i=1:length(f)
-        varphi_d += (f[i] - mu/(x[i]-xl[i]) + mu/(xu[i]-x[i])) * dx[i]
-    end
-    return varphi_d
-end
-function get_varphi_d(f, x, xl, xu, dx, mu)
+function get_varphi_d(
+    f::AbstractVector{T},
+    x::AbstractVector{T},
+    xl::AbstractVector{T},
+    xu::AbstractVector{T},
+    dx::AbstractVector{T},
+    mu,
+) where T
     return mapreduce(
         (f,x,xl,xu,dx)-> (f - mu/(x-xl) + mu/(xu-x)) * dx,
         +,
         f, x, xl, xu, dx;
-        init = zero(eltype(f))
+        init = zero(T)
     )
 end
 
-function get_alpha_max(x::Vector{T}, xl, xu, dx, tau) where T
-    alpha_max = one(T)
-    @inbounds @simd for i=1:length(x)
-        dx[i]<0 && (alpha_max=min(alpha_max,(-x[i]+xl[i])*tau/dx[i]))
-        dx[i]>0 && (alpha_max=min(alpha_max,(-x[i]+xu[i])*tau/dx[i]))
-    end
-    return alpha_max
-end
-function get_alpha_max(x::VT, xl, xu, dx, tau) where {T, VT <: AbstractVector{T}}
+function get_alpha_max(
+    x::AbstractVector{T},
+    xl::AbstractVector{T},
+    xu::AbstractVector{T},
+    dx::AbstractVector{T},
+    tau,
+) where T
     return min(
         mapreduce(
             (x, xl, dx) -> dx < 0 ? (-x+xl)*tau/dx : T(Inf),
             min,
 
             x, xl, dx,
-            init = one(eltype(x))
+            init = one(T)
         ),
         mapreduce(
             (x, xu, dx) -> dx > 0 ? (-x+xu)*tau/dx : T(Inf),
             min,
             x, xu, dx,
-            init = one(eltype(x))
+            init = one(T)
         )
     )
 end
 
-
-function get_alpha_z(zl_r::SubVector{T,Vector{T},VI}, zu_r, dzl, dzu, tau) where {T, VI}
-    alpha_z = one(T)
-    @inbounds @simd for i=1:length(zl_r)
-        dzl[i] < 0 && (alpha_z=min(alpha_z,-zl_r[i]*tau/dzl[i]))
-     end
-    @inbounds @simd for i=1:length(zu_r)
-        dzu[i] < 0 && (alpha_z=min(alpha_z,-zu_r[i]*tau/dzu[i]))
-    end
-    return alpha_z
-end
-function get_alpha_z(zl_r::VT, zu_r, dzl, dzu, tau)  where {T, VT <: AbstractVector{T}}
+function get_alpha_z(
+    zl_r::AbstractVector{T},
+    zu_r::AbstractVector{T},
+    dzl::AbstractVector{T},
+    dzu::AbstractVector{T},
+    tau,
+)  where T
     return min(
         mapreduce(
             (zl_r, dzl) -> dzl < 0 ? (-zl_r)*tau/dzl : T(Inf),
@@ -422,14 +303,15 @@ function get_alpha_z(zl_r::VT, zu_r, dzl, dzu, tau)  where {T, VT <: AbstractVec
     )
 end
 
-function get_obj_val_R(p::Vector{T}, n, D_R, x, x_ref, rho, zeta) where T
-    obj_val_R = 0.
-    @inbounds @simd for i=1:length(p)
-        obj_val_R += rho*(p[i]+n[i]) .+ zeta/2*D_R[i]^2*(x[i]-x_ref[i])^2
-    end
-    return obj_val_R
-end
-function get_obj_val_R(p::VT, n, D_R, x, x_ref, rho, zeta) where {T, VT <: AbstractVector{T}}
+function get_obj_val_R(
+    p::AbstractVector{T},
+    n::AbstractVector{T},
+    D_R::AbstractVector{T},
+    x::AbstractVector{T},
+    x_ref::AbstractVector{T},
+    rho,
+    zeta,
+) where T
     return mapreduce(
         (p,n,D_R,x,x_ref) -> rho*(p+n) .+ zeta/2*D_R^2*(x-x_ref)^2,
         +,
@@ -440,14 +322,11 @@ end
 
 @inline get_theta(c) = norm(c, 1)
 
-function get_theta_R(c::Vector{T}, p, n) where T
-    theta_R = zero(T)
-    @inbounds @simd for i=1:length(c)
-        theta_R += abs(c[i]-p[i]+n[i])
-    end
-    return theta_R
-end
-function get_theta_R(c::VT, p, n) where {T, VT <: AbstractVector{T}}
+function get_theta_R(
+    c::AbstractVector{T},
+    p::AbstractVector{T},
+    n::AbstractVector{T},
+) where T
     return mapreduce(
         (c,p,n) -> abs(c-p+n),
         +,
@@ -456,14 +335,11 @@ function get_theta_R(c::VT, p, n) where {T, VT <: AbstractVector{T}}
     )
 end
 
-function get_inf_pr_R(c::Vector{T}, p, n) where T
-    inf_pr_R = zero(T)
-    @inbounds @simd for i=1:length(c)
-        inf_pr_R = max(inf_pr_R,abs(c[i]-p[i]+n[i]))
-    end
-    return inf_pr_R
-end
-function get_inf_pr_R(c::VT, p, n) where {T, VT <: AbstractVector{T}}
+function get_inf_pr_R(
+    c::AbstractVector{T},
+    p::AbstractVector{T},
+    n::AbstractVector{T},
+) where T
     return mapreduce(
         (c,p,n) -> abs(c-p+n),
         max,
@@ -472,20 +348,17 @@ function get_inf_pr_R(c::VT, p, n) where {T, VT <: AbstractVector{T}}
     )
 end
 
-function get_inf_du_R(f_R::Vector{T}, l, zl, zu, jacl, zp, zn, rho, sd) where T
-    inf_du_R = zero(T)
-    @inbounds @simd for i=1:length(zl)
-        inf_du_R = max(inf_du_R,abs(f_R[i]-zl[i]+zu[i]+jacl[i]))
-    end
-    @inbounds @simd for i=1:length(zp)
-        inf_du_R = max(inf_du_R,abs(rho-l[i]-zp[i]))
-    end
-    @inbounds @simd for i=1:length(zn)
-        inf_du_R = max(inf_du_R,abs(rho+l[i]-zn[i]))
-    end
-    return inf_du_R / sd
-end
-function get_inf_du_R(f_R::VT, l, zl, zu, jacl, zp, zn, rho, sd)  where {T, VT <: AbstractVector{T}}
+function get_inf_du_R(
+    f_R::AbstractVector{T},
+    l::AbstractVector{T},
+    zl::AbstractVector{T},
+    zu::AbstractVector{T},
+    jacl::AbstractVector{T},
+    zp::AbstractVector{T},
+    zn::AbstractVector{T},
+    rho,
+    sd,
+)  where T
     return max(
         mapreduce(
             (f_R, zl, zu, jacl) -> abs(f_R-zl+zu+jacl),
@@ -508,30 +381,20 @@ function get_inf_du_R(f_R::VT, l, zl, zu, jacl, zp, zn, rho, sd)  where {T, VT <
     ) / sd
 end
 
-
 function get_inf_compl_R(
-    x_lr::SubVector{T,Vector{T},VI}, xl_r, zl_r, xu_r, x_ur, zu_r, pp, zp, nn, zn, mu_R, sc
-    ) where {T, VI}
-
-    inf_compl_R = zero(T)
-    @inbounds @simd for i=1:length(x_lr)
-        inf_compl_R = max(inf_compl_R,abs((x_lr[i]-xl_r[i])*zl_r[i]-mu_R))
-    end
-    @inbounds @simd for i=1:length(xu_r)
-        inf_compl_R = max(inf_compl_R,abs((xu_r[i]-x_ur[i])*zu_r[i]-mu_R))
-    end
-    @inbounds @simd for i=1:length(pp)
-        inf_compl_R = max(inf_compl_R,abs(pp[i]*zp[i]-mu_R))
-    end
-    @inbounds @simd for i=1:length(nn)
-        inf_compl_R = max(inf_compl_R,abs(nn[i]*zn[i]-mu_R))
-    end
-    return inf_compl_R / sc
-end
-function get_inf_compl_R(
-    x_lr::SubVector{T,VT,VI}, xl_r, zl_r, xu_r, x_ur, zu_r, pp, zp, nn, zn, mu_R, sc
-    ) where {T, VT <: AbstractVector{T}, VI}
-
+    x_lr::SubVector{T, VT, VI},
+    xl_r,
+    zl_r,
+    xu_r,
+    x_ur,
+    zu_r,
+    pp,
+    zp,
+    nn,
+    zn,
+    mu_R,
+    sc
+) where {T, VT <: AbstractVector{T}, VI}
     return max(
         mapreduce(
             (x_lr, xl_r, zl_r) -> abs((x_lr-xl_r)*zl_r-mu_R),
@@ -557,24 +420,20 @@ function get_inf_compl_R(
             nn, zn;
             init = zero(T)
         ),
-    )/ sc
+    ) / sc
 end
 
-function get_alpha_max_R(x::Vector{T}, xl, xu, dx, pp, dpp, nn, dnn, tau_R) where T
-    alpha_max_R = one(T)
-    @inbounds @simd for i=1:length(x)
-        dx[i]<0 && (alpha_max_R=min(alpha_max_R,(-x[i]+xl[i])*tau_R/dx[i]))
-        dx[i]>0 && (alpha_max_R=min(alpha_max_R,(-x[i]+xu[i])*tau_R/dx[i]))
-    end
-    @inbounds @simd for i=1:length(pp)
-        dpp[i]<0 && (alpha_max_R=min(alpha_max_R,-pp[i]*tau_R/dpp[i]))
-    end
-    @inbounds @simd for i=1:length(nn)
-        dnn[i]<0 && (alpha_max_R=min(alpha_max_R,-nn[i]*tau_R/dnn[i]))
-    end
-    return alpha_max_R
-end
-function get_alpha_max_R(x::VT, xl, xu, dx, pp, dpp, nn, dnn, tau_R) where {T, VT <: AbstractVector{T}}
+function get_alpha_max_R(
+    x::AbstractVector{T},
+    xl::AbstractVector{T},
+    xu::AbstractVector{T},
+    dx::AbstractVector{T},
+    pp::AbstractVector{T},
+    dpp::AbstractVector{T},
+    nn::AbstractVector{T},
+    dnn::AbstractVector{T},
+    tau_R,
+) where T
     return min(
         mapreduce(
             (x,xl,xu,dx) -> if dx < 0
@@ -612,27 +471,16 @@ function get_alpha_max_R(x::VT, xl, xu, dx, pp, dpp, nn, dnn, tau_R) where {T, V
 end
 
 function get_alpha_z_R(
-    zl_r::SubVector{T,Vector{T},VI}, zu_r, dzl, dzu, zp, dzp, zn, dzn, tau_R
-    ) where {T, VI}
-
-    alpha_z_R = one(T)
-    @inbounds @simd for i=1:length(zl_r)
-        dzl[i]<0 && (alpha_z_R=min(alpha_z_R,-zl_r[i]*tau_R/dzl[i]))
-    end
-    @inbounds @simd for i=1:length(zu_r)
-        dzu[i]<0 && (alpha_z_R=min(alpha_z_R,-zu_r[i]*tau_R/dzu[i]))
-    end
-    @inbounds @simd for i=1:length(zp)
-        dzp[i]<0 && (alpha_z_R=min(alpha_z_R,-zp[i]*tau_R/dzp[i]))
-    end
-    @inbounds @simd for i=1:length(zn)
-        dzn[i]<0 && (alpha_z_R=min(alpha_z_R,-zn[i]*tau_R/dzn[i]))
-    end
-    return alpha_z_R
-end
-function get_alpha_z_R(
-    zl_r::SubVector{T,VT,VI}, zu_r, dzl, dzu, zp, dzp, zn, dzn, tau_R
-    ) where {T, VT <: AbstractVector{T}, VI}
+    zl_r::SubVector{T, VT, VI},
+    zu_r,
+    dzl,
+    dzu,
+    zp,
+    dzp,
+    zn,
+    dzn,
+    tau_R,
+) where {T, VT <: AbstractVector{T}, VI}
 
     f(d,z) = d < 0 ? -z*tau_R/d : T(Inf)
     return min(
@@ -663,36 +511,16 @@ function get_alpha_z_R(
     )
 end
 
-
 function get_varphi_R(
-    obj_val, x_lr::SubVector{T,Vector{T},VI}, xl_r, xu_r, x_ur, pp, nn, mu_R
-    )  where {T, VI}
-
-    varphi_R = obj_val
-    @inbounds @simd for i=1:length(x_lr)
-        xll = x_lr[i]-xl_r[i]
-        xll < 0 && return T(Inf)
-        varphi_R -= mu_R*log(xll)
-    end
-    @inbounds @simd for i=1:length(x_ur)
-        xuu = xu_r[i]-x_ur[i]
-        xuu < 0 && return T(Inf)
-        varphi_R -= mu_R*log(xuu)
-    end
-    @inbounds @simd for i=1:length(pp)
-        pp[i] < 0 && return T(Inf)
-        varphi_R -= mu_R*log(pp[i])
-    end
-    @inbounds @simd for i=1:length(pp)
-        nn[i] < 0 && return T(Inf)
-        varphi_R -= mu_R*log(nn[i])
-    end
-    return varphi_R
-end
-function get_varphi_R(
-    obj_val, x_lr::SubVector{T,VT,VI}, xl_r, xu_r, x_ur, pp, nn, mu_R
-    )  where {T, VT <: AbstractVector{T}, VI}
-
+    obj_val,
+    x_lr::SubVector{T, VT, VI},
+    xl_r,
+    xu_r,
+    x_ur,
+    pp,
+    nn,
+    mu_R,
+)  where {T, VT <: AbstractVector{T}, VI}
     varphi_R = obj_val
     f1(x) = x < 0 ? T(Inf) : mu_R*log(x)
     function f2(x,y)
@@ -710,7 +538,7 @@ function get_varphi_R(
         mapreduce(
             f2,
             +,
-            x_lr, xl_r;
+            xu_r, x_ur;
             init = zero(T)
         ),
         mapreduce(
@@ -728,28 +556,20 @@ function get_varphi_R(
     )
 end
 
-
-function get_F(c::Vector{T}, f, zl, zu, jacl, x_lr, xl_r, zl_r, xu_r, x_ur, zu_r, mu) where T
-    F = zero(T)
-    @inbounds @simd for i=1:length(c)
-        F += abs(c[i])
-    end
-    @inbounds @simd for i=1:length(f)
-        F += abs(f[i]-zl[i]+zu[i]+jacl[i])
-    end
-    @inbounds @simd for i=1:length(x_lr)
-        x_lr[i] >= xl_r[i] || return T(Inf)
-        zl_r[i] >= 0       || return T(Inf)
-        F += abs((x_lr[i]-xl_r[i])*zl_r[i]-mu)
-    end
-    @inbounds @simd for i=1:length(x_ur)
-        xu_r[i] >= x_ur[i] || return T(Inf)
-        zu_r[i] >= 0       || return T(Inf)
-        F += abs((xu_r[i]-xu_r[i])*zu_r[i]-mu)
-    end
-    return F
-end
-function get_F(c::AbstractVector{T}, f, zl, zu, jacl, x_lr, xl_r, zl_r, xu_r, x_ur, zu_r, mu) where T
+function get_F(
+    c::AbstractVector{T},
+    f,
+    zl,
+    zu,
+    jacl,
+    x_lr,
+    xl_r,
+    zl_r,
+    xu_r,
+    x_ur,
+    zu_r,
+    mu,
+) where T
     F1 = mapreduce(
         abs,
         +,
@@ -777,21 +597,19 @@ function get_F(c::AbstractVector{T}, f, zl, zu, jacl, x_lr, xl_r, zl_r, xu_r, x_
     return F1 + F2 + F3 + F4
 end
 
-
-function get_varphi_d_R(f_R::Vector{T}, x, xl, xu, dx, pp, nn, dpp, dnn, mu_R, rho) where T
-    varphi_d = zero(T)
-    @inbounds @simd for i=1:length(x)
-        varphi_d += (f_R[i] - mu_R/(x[i]-xl[i]) + mu_R/(xu[i]-x[i])) * dx[i]
-    end
-    @inbounds @simd for i=1:length(pp)
-        varphi_d += (rho - mu_R/pp[i]) * dpp[i]
-    end
-    @inbounds @simd for i=1:length(nn)
-        varphi_d += (rho - mu_R/nn[i]) * dnn[i]
-    end
-    return varphi_d
-end
-function get_varphi_d_R(f_R::VT, x, xl, xu, dx, pp, nn, dpp, dnn, mu_R, rho) where {T, VT <: AbstractVector{T}}
+function get_varphi_d_R(
+    f_R::AbstractVector{T},
+    x::AbstractVector{T},
+    xl::AbstractVector{T},
+    xu::AbstractVector{T},
+    dx::AbstractVector{T},
+    pp::AbstractVector{T},
+    nn::AbstractVector{T},
+    dpp::AbstractVector{T},
+    dnn::AbstractVector{T},
+    mu_R,
+    rho,
+) where T
     f(x,dx) = (rho - mu_R/x) * dx
     return +(
         mapreduce(
@@ -815,25 +633,6 @@ function get_varphi_d_R(f_R::VT, x, xl, xu, dx, pp, nn, dpp, dnn, mu_R, rho) whe
     )
 end
 
-function initialize_variables!(x::Vector{T}, xl, xu, bound_push, bound_fac) where T
-    @inbounds @simd for i=1:length(x)
-        if xl[i]!=-Inf && xu[i]!=Inf
-            x[i] = min(
-                xu[i]-min(bound_push*max(1,abs(xu[i])), bound_fac*(xu[i]-xl[i])),
-                max(xl[i]+min(bound_push*max(1,abs(xl[i])),bound_fac*(xu[i]-xl[i])),x[i]),
-            )
-        elseif xl[i]!=-Inf && xu[i]==Inf
-            x[i] = max(xl[i]+bound_push*max(1,abs(xl[i])), x[i])
-        elseif xl[i]==-Inf && xu[i]!=Inf
-            x[i] = min(xu[i]-bound_push*max(1,abs(xu[i])), x[i])
-        end
-    end
-end
-
-function initialize_variables!(x, xl, xu, bound_push, bound_fac)
-    map!((x,l,u) -> _initialize_variables!(x,l,u, bound_push, bound_fac), x, x, xl, xu)
-end
-
 function _initialize_variables!(x::T, xl, xu, bound_push, bound_fac) where T
     if xl!=-T(Inf) && xu!=T(Inf)
         return min(
@@ -848,9 +647,17 @@ function _initialize_variables!(x::T, xl, xu, bound_push, bound_fac) where T
     return x
 end
 
+function initialize_variables!(x, xl, xu, bound_push, bound_fac)
+    map!((x,l,u) -> _initialize_variables!(x,l,u, bound_push, bound_fac), x, x, xl, xu)
+end
 
-
-function adjust_boundary!(x_lr::VT, xl_r, x_ur, xu_r, mu) where {T, VT <: AbstractVector{T}}
+function adjust_boundary!(
+    x_lr::AbstractVector{T},
+    xl_r::AbstractVector{T},
+    x_ur::AbstractVector{T},
+    xu_r::AbstractVector{T},
+    mu,
+) where T
     c1 = eps(T)*mu
     c2 = eps(T)^(3/4)
     map!(
@@ -863,17 +670,7 @@ function adjust_boundary!(x_lr::VT, xl_r, x_ur, xu_r, mu) where {T, VT <: Abstra
     )
 end
 
-function get_rel_search_norm(x::Vector{T}, dx) where T
-    rel_search_norm = zero(T)
-    @inbounds @simd for i=1:length(x)
-        rel_search_norm = max(
-            rel_search_norm,
-            abs(dx[i]) / (one(T) + abs(x[i])),
-        )
-    end
-    return rel_search_norm
-end
-function get_rel_search_norm(x::AbstractVector{T}, dx) where T
+function get_rel_search_norm(x::AbstractVector{T}, dx::AbstractVector{T}) where T
     return mapreduce(
         (x,dx) -> abs(dx) / (one(T) + abs(x)),
         max,
@@ -896,7 +693,13 @@ function get_sc(zl_r, zu_r, s_max)
     ) / s_max
 end
 
-function get_mu(mu, mu_min, mu_linear_decrease_factor, mu_superlinear_decrease_power, tol)
+function get_mu(
+    mu,
+    mu_min,
+    mu_linear_decrease_factor,
+    mu_superlinear_decrease_power,
+    tol,
+)
     # Warning: `a * tol` should be strictly less than 100 * mu_min, see issue #242
     a = min(99.0 * mu_min / tol, 0.01)
     return max(
@@ -908,7 +711,17 @@ end
 
 @inline get_tau(mu, tau_min) = max(tau_min, 1-mu)
 
-function get_alpha_min(theta, varphi_d, theta_min, gamma_theta, gamma_phi, alpha_min_frac, del, s_theta, s_phi)
+function get_alpha_min(
+    theta,
+    varphi_d,
+    theta_min,
+    gamma_theta,
+    gamma_phi,
+    alpha_min_frac,
+    del,
+    s_theta,
+    s_phi,
+)
     if varphi_d<0
         if theta<=theta_min
             return alpha_min_frac*min(
@@ -958,13 +771,12 @@ function is_barr_obj_rapid_increase(varphi, varphi_trial, obj_max_inc)
     return (varphi_trial >= varphi) && (log10(varphi_trial-varphi) > obj_max_inc + max(1.0, log10(abs(varphi))))
 end
 
-function reset_bound_dual!(z::Vector{T}, x, mu, kappa_sigma) where T
-    @inbounds @simd for i in eachindex(z)
-        z[i] = max(min(z[i], (kappa_sigma*mu)/x[i]), (mu/kappa_sigma)/x[i])
-    end
-    return
-end
-function reset_bound_dual!(z, x, mu, kappa_sigma)
+function reset_bound_dual!(
+    z::AbstractVector{T},
+    x::AbstractVector{T},
+    mu,
+    kappa_sigma,
+) where T
     map!(
         (z, x) -> max(min(z, (kappa_sigma*mu)/x), (mu/kappa_sigma)/x),
         z, z, x
@@ -972,14 +784,13 @@ function reset_bound_dual!(z, x, mu, kappa_sigma)
     return
 end
 
-function reset_bound_dual!(z::Vector{T}, x1, x2, mu, kappa_sigma) where T
-    @inbounds @simd for i in eachindex(z)
-        z[i] = max(min(z[i], (kappa_sigma*mu)/(x1[i]-x2[i])), (mu/kappa_sigma)/(x1[i]-x2[i]))
-    end
-    return
-end
-
-function reset_bound_dual!(z, x1, x2, mu, kappa_sigma)
+function reset_bound_dual!(
+    z::AbstractVector{T},
+    x1::AbstractVector{T},
+    x2::AbstractVector{T},
+    mu,
+    kappa_sigma,
+) where T
     map!(
         (z,x1,x2) -> max(min(z, (kappa_sigma*mu)/(x1-x2)), (mu/kappa_sigma)/(x1-x2)),
         z,z,x1,x2
