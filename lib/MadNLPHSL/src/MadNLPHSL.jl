@@ -6,20 +6,13 @@ import MadNLP: @kwdef, MadNLPLogger, @debug, @warn, @error,
     introduce, factorize!, solve!, improve!, is_inertia, inertia, findIJ, nnz,
     get_tril_to_full, transfer!, input_type, _madnlp_unsafe_wrap,
     is_supported, default_options
-import HSL_jll: libhsl
-import LinearAlgebra, OpenBLAS32_jll
 
-function __init__()
-    if VERSION ≥ v"1.9"
-        config = LinearAlgebra.BLAS.lbt_get_config()
-        if !any(lib -> lib.interface == :lp64, config.loaded_libs)
-            LinearAlgebra.BLAS.lbt_forward(OpenBLAS32_jll.libopenblas_path)
-        end
-    end
-end
+import HSL
+import HSL: mc68_control, mc68_info, ma77_control, ma77_info, ma86_control, ma86_info, ma97_control, ma97_info
+
+import LinearAlgebra
 
 include("common.jl")
-include("mc68.jl")
 include("ma27.jl")
 include("ma57.jl")
 include("ma77.jl")

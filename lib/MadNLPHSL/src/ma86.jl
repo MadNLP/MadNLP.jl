@@ -10,51 +10,14 @@
     ma86_umax::Float64 = 1e-4
 end
 
-@kwdef mutable struct Ma86Control{T}
-    f_arrays::Int32 = 0
-    diagnostics_level::Int32 = 0
-    unit_diagnostics::Int32 = 0
-    unit_error::Int32 = 0
-    unit_warning::Int32 = 0
-    nemin::Int32 = 0
-    nb::Int32 = 0
-    action::Int32 = 0
-    nbi::Int32 = 0
-    pool_size::Int32 = 0
-    small::T = 0.
-    static::T = 0.
-    u::T = 0.
-    umin::T = 0.
-    scaling::Int32 = 0
-end
-
-@kwdef mutable struct Ma86Info{T}
-    detlog::T = 0.
-    detsign::Int32 = 0
-    flag::Int32 = 0
-    matrix_rank::Int32 = 0
-    maxdepth::Int32 = 0
-    num_delay::Int32 = 0
-    num_factor::Clong = 0
-    num_flops::Clong = 0
-    num_neg::Int32 = 0
-    num_nodes::Int32 = 0
-    num_nothresh::Int32 = 0
-    num_perturbed::Int32 = 0
-    num_two::Int32 = 0
-    pool_size::Int32 = 0
-    stat::Int32 = 0
-    usmall::T = 0.
-end
-
 mutable struct Ma86Solver{T} <: AbstractLinearSolver{T}
     csc::SparseMatrixCSC{T,Int32}
 
-    control::Ma86Control{T}
-    info::Ma86Info{T}
+    control::ma86_control{T}
+    info::ma86_info{T}
 
-    mc68_control::Mc68Control
-    mc68_info::Mc68Info
+    mc68_control::mc68_control
+    mc68_info::mc68_info
 
     order::Vector{Int32}
     keep::Vector{Ptr{Nothing}}
@@ -72,61 +35,34 @@ for (fdefault, fanalyse, ffactor, fsolve, ffinalise, typ) in [
      ]
     @eval begin
         ma86_default_control(
-            control::Ma86Control{$typ}
-        ) = ccall(
-            ($(string(fdefault)),libhsl),
-            Nothing,
-            (Ref{Ma86Control{$typ}},),
-            control
-        )
+            control::ma86_control{$typ}
+        ) = HSL.$fdefault(control)
+
         ma86_analyse(
             n::Cint,colptr::Vector{Cint},rowval::Vector{Cint},
             order::Vector{Cint},keep::Vector{Ptr{Nothing}},
-            control::Ma86Control{$typ},info::Ma86Info{$typ}
-        ) = ccall(
-            ($(string(fanalyse)),libhsl),
-            Nothing,
-            (Cint,Ptr{Cint},Ptr{Cint},Ptr{$typ},
-             Ptr{Ptr{Nothing}},Ref{Ma86Control{$typ}},Ref{Ma86Info{$typ}}),
-            n,colptr,rowval,order,keep,control,info
-        )
+            control::ma86_control{$typ},info::ma86_info{$typ}
+        ) = HSL.$fanalyse(n,colptr,rowval,order,keep,control,info)
+
         ma86_factor(
             n::Cint,colptr::Vector{Cint},rowval::Vector{Cint},
             nzval::Vector{$typ},order::Vector{Cint},
-            keep::Vector{Ptr{Nothing}},control::Ma86Control,info::Ma86Info,
+            keep::Vector{Ptr{Nothing}},control::ma86_control,info::ma86_info,
             scale::Ptr{Nothing}
-        ) = ccall(
-            ($(string(ffactor)),libhsl),
-            Nothing,
-            (Cint,Ptr{Cint},Ptr{Cint},Ptr{$typ},Ptr{Cint},
-             Ptr{Ptr{Nothing}},Ref{Ma86Control},Ref{Ma86Info},Ptr{Nothing}),
-            n,colptr,rowval,nzval,order,keep,control,info,scale
-        )
+        ) = HSL.$ffactor(n,colptr,rowval,nzval,order,keep,control,info,scale)
+
         ma86_solve(
             job::Cint,nrhs::Cint,n::Cint,rhs::Vector{$typ},
             order::Vector{Cint},keep::Vector{Ptr{Nothing}},
-            control::Ma86Control,info::Ma86Info,scale::Ptr{Nothing}
-        ) = ccall(
-            ($(string(fsolve)),libhsl),
-            Nothing,
-            (Cint,Cint,Cint,Ptr{$typ},Ptr{Cint},Ptr{Ptr{Nothing}},
-             Ref{Ma86Control},Ref{Ma86Info},Ptr{Nothing}),
-            job,nrhs,n,rhs,order,keep,control,info,scale
-        )
+            control::ma86_control,info::ma86_info,scale::Ptr{Nothing}
+        ) = HSL.$fsolve(job,nrhs,n,rhs,order,keep,control,info,scale)
+
         ma86_finalize(
-            keep::Vector{Ptr{Nothing}},control::Ma86Control{$typ}
-        ) = ccall(
-            ($(string(ffinalise)),libhsl),
-            Nothing,
-            (Ptr{Ptr{Nothing}},Ref{Ma86Control{$typ}}),
-            keep,control
-        )
+            keep::Vector{Ptr{Nothing}},control::ma86_control{$typ}
+        ) = HSL.$ffinalise(keep,control)
     end
 end
-ma86_set_num_threads(n) = ccall((:omp_set_num_threads_,libhsl),
-                                Cvoid,
-                                (Ref{Int32},),
-                                Int32(n))
+ma86_set_num_threads(n) = HSL.omp_set_num_threads(n)
 
 function Ma86Solver(
     csc::SparseMatrixCSC{T,Int32};
@@ -137,29 +73,30 @@ function Ma86Solver(
 
     order = Vector{Int32}(undef,csc.n)
 
-    info=Ma86Info{T}()
-    control=Ma86Control{T}()
-    mc68_info = Mc68Info()
-    mc68_control = get_mc68_default_control()
+    info = ma86_info{T}()
+    control = ma86_control{T}()
+    mc68info = mc68_info()
+    mc68control = mc68_control()
+    HSL.mc68_default_control_i(mc68control)
 
     keep = [C_NULL]
 
-    mc68_control.f_array_in=1
-    mc68_control.f_array_out=1
-    mc68_order_i(Int32(opt.ma86_order),Int32(csc.n),csc.colptr,csc.rowval,order,mc68_control,mc68_info)
+    mc68control.f_array_in=1
+    mc68control.f_array_out=1
+    HSL.mc68_order_i(Int32(opt.ma86_order),Int32(csc.n),csc.colptr,csc.rowval,order,mc68control,mc68info)
 
     ma86_default_control(control)
     control.diagnostics_level = Int32(opt.ma86_print_level)
     control.f_arrays = 1
     control.nemin = opt.ma86_nemin
-    control.small = opt.ma86_small
+    control.small_ = opt.ma86_small
     control.u = opt.ma86_u
     control.scaling = Int32(opt.ma86_scaling)
 
     ma86_analyse(Int32(csc.n),csc.colptr,csc.rowval,order,keep,control,info)
     info.flag<0 && throw(SymbolicException())
 
-    M = Ma86Solver{T}(csc,control,info,mc68_control,mc68_info,order,keep,opt,logger)
+    M = Ma86Solver{T}(csc,control,info,mc68control,mc68info,order,keep,opt,logger)
     finalizer(finalize,M)
 
     return M

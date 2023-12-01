@@ -12,144 +12,16 @@
     ma77_umax::Float64 = 1e-4
 end
 
-@kwdef mutable struct Ma77Control{T}
-    f_arrays::Cint = 0
-    print_level::Cint = 0
-    unit_diagnostics::Cint = 0
-    unit_error::Cint = 0
-    unit_warning::Cint = 0
-    bits::Cint = 0
-
-    buffer_lpage_1::Cint = 0
-    buffer_lpage_2::Cint = 0
-    buffer_npage_1::Cint = 0
-    buffer_npage_2::Cint = 0
-
-    file_size::Clong = 0
-    maxstore::Clong = 0
-
-    storage_1::Clong = 0
-    storage_2::Clong = 0
-    storage_3::Clong = 0
-
-    nemin::Cint = 0
-    maxit::Cint = 0
-    infnorm::Cint = 0
-    thresh::T = 0.
-    nb54::Cint = 0
-    action::Cint = 0
-    multiplier::T = 0.
-    nb64::Cint = 0
-    nbi::Cint = 0
-    small::T = 0.
-    static_::T = 0.
-    storage_indef::Clong = 0
-    u::T = 0.
-    umin::T = 0.
-    consist_tol::T = 0.
-
-    ispare_1::Cint = 0
-    ispare_2::Cint = 0
-    ispare_3::Cint = 0
-    ispare_4::Cint = 0
-    ispare_5::Cint = 0
-
-    lspare_1::Clong = 0
-    lspare_2::Clong = 0
-    lspare_3::Clong = 0
-    lspare_4::Clong = 0
-    lspare_5::Clong = 0
-
-    rspare_1::T = 0.
-    rspare_2::T = 0.
-    rspare_3::T = 0.
-    rspare_4::T = 0.
-    rspare_5::T = 0.
-end
-
-@kwdef mutable struct Ma77Info{T}
-    detlog::T = 0.
-    detsign::Cint = 0
-    flag::Cint = 0
-    iostat::Cint = 0
-    matrix_dup::Cint = 0
-    matrix_rank::Cint = 0
-    matrix_outrange::Cint = 0
-    maxdepth::Cint = 0
-    maxfront::Cint = 0
-    minstore::Clong = 0
-    ndelay::Cint = 0
-    nfactor::Clong = 0
-    nflops::Clong = 0
-    niter::Cint = 0
-    nsup::Cint = 0
-    num_neg::Cint = 0
-    num_nothresh::Cint = 0
-    num_perturbed::Cint = 0
-    ntwo::Cint = 0
-
-    stat_1::Cint = 0
-    stat_2::Cint = 0
-    stat_3::Cint = 0
-    stat_4::Cint = 0
-
-    nio_read_1::Clong = 0 # 2
-    nio_read_2::Clong = 0 # 2
-
-    nio_write_1::Clong = 0 # 2
-    nio_write_2::Clong = 0 # 2
-
-    nwd_read_1::Clong = 0 # 2
-    nwd_read_2::Clong = 0 # 2
-
-    nwd_write_1::Clong = 0 # 2
-    nwd_write_2::Clong = 0 # 2
-
-    num_file_1::Cint = 0 # 4
-    num_file_2::Cint = 0 # 4
-    num_file_3::Cint = 0 # 4
-    num_file_4::Cint = 0 # 4
-
-    storage_1::Clong = 0 # 4
-    storage_2::Clong = 0 # 4
-    storage_3::Clong = 0 # 4
-    storage_4::Clong = 0 # 4
-
-    tree_nodes::Cint = 0
-    unit_restart::Cint = 0
-    unused::Cint = 0
-    usmall::T = 0.
-
-
-    ispare_1::Cint = 0
-    ispare_2::Cint = 0
-    ispare_3::Cint = 0
-    ispare_4::Cint = 0
-    ispare_5::Cint = 0
-
-    lspare_1::Clong = 0
-    lspare_2::Clong = 0
-    lspare_3::Clong = 0
-    lspare_4::Clong = 0
-    lspare_5::Clong = 0
-
-    rspare_1::T = 0.
-    rspare_2::T = 0.
-    rspare_3::T = 0.
-    rspare_4::T = 0.
-    rspare_5::T = 0.
-end
-
 mutable struct Ma77Solver{T} <: AbstractLinearSolver{T}
     tril::SparseMatrixCSC{T,Int32}
     full::SparseMatrixCSC{T,Int32}
     tril_to_full_view::SubVector{T}
 
-    control::Ma77Control{T}
-    info::Ma77Info{T}
+    control::ma77_control{T}
+    info::ma77_info{T}
 
-    mc68_control::Mc68Control
-    mc68_info::Mc68Info
+    mc68_control::mc68_control
+    mc68_info::mc68_info
 
     order::Vector{Int32}
     keep::Vector{Ptr{Nothing}}
@@ -167,79 +39,43 @@ for (fdefault, fanalyse, ffactor, fsolve, ffinalise, fopen, finputv, finputr, ty
      :ma77_open_s, :ma77_input_vars_s, :ma77_input_reals_s, Float32),
     ]
     @eval begin
-        ma77_default_control(control::Ma77Control{$typ}) = ccall(
-            ($(string(fdefault)),libhsl),
-            Cvoid,
-            (Ref{Ma77Control{$typ}},),
-            control
-        )
+        ma77_default_control(control::ma77_control{$typ}
+        ) = HSL.$fdefault(control)
+
         ma77_open(
             n::Cint,fname1::String,fname2::String,fname3::String,fname4::String,
-            keep::Vector{Ptr{Cvoid}},control::Ma77Control{$typ},info::Ma77Info{$typ}
-        ) = ccall(
-            ($(string(fopen)),libhsl),
-            Cvoid,
-            (Cint,Ptr{Cchar},Ptr{Cchar},Ptr{Cchar},Ptr{Cchar},
-             Ptr{Ptr{Cvoid}},Ref{Ma77Control{$typ}},Ref{Ma77Info{$typ}}),
-            n,fname1,fname2,fname3,fname4,keep,control,info
-        )
+            keep::Vector{Ptr{Cvoid}},control::ma77_control{$typ},info::ma77_info{$typ}
+        ) = HSL.$fopen(n,fname1,fname2,fname3,fname4,keep,control,info)
+
         ma77_input_vars(
             idx::Cint,nvar::Cint,list::Vector{Cint},
-            keep::Vector{Ptr{Cvoid}},control::Ma77Control{$typ},info::Ma77Info{$typ}
-        ) = ccall(
-            ($(string(finputv)),libhsl),
-            Cvoid,
-            (Cint,Cint,Ptr{Cint},
-             Ptr{Ptr{Cvoid}},Ref{Ma77Control{$typ}},Ref{Ma77Info{$typ}}
-             ),
-                              idx,nvar,list,keep,control,info)
+            keep::Vector{Ptr{Cvoid}},control::ma77_control{$typ},info::ma77_info{$typ}
+        ) = HSL.$finputv(idx,nvar,list,keep,control,info)
+
         ma77_input_reals(
             idx::Cint,length::Cint,reals::Vector{$typ},
-            keep::Vector{Ptr{Cvoid}},control::Ma77Control{$typ},info::Ma77Info{$typ}
-        ) = ccall(
-            ($(string(finputr)),libhsl),
-            Cvoid,
-            (Cint,Cint,Ptr{$typ},
-             Ptr{Ptr{Cvoid}},Ref{Ma77Control{$typ}},Ref{Ma77Info{$typ}}),
-            idx,length,reals,keep,control,info
-        )
+            keep::Vector{Ptr{Cvoid}},control::ma77_control{$typ},info::ma77_info{$typ}
+        ) = HSL.$finputr(idx,length,reals,keep,control,info)
+
         ma77_analyse(
             order::Vector{Cint},
-            keep::Vector{Ptr{Cvoid}},control::Ma77Control{$typ},info::Ma77Info{$typ}
-        ) = ccall(
-            ($(string(fanalyse)),libhsl),
-            Cvoid,
-            (Ptr{Cint},Ptr{Ptr{Cvoid}},Ref{Ma77Control{$typ}},Ref{Ma77Info{$typ}}),
-            order,keep,control,info
-        )
+            keep::Vector{Ptr{Cvoid}},control::ma77_control{$typ},info::ma77_info{$typ}
+        ) = HSL.$fanalyse(order,keep,control,info)
+
         ma77_factor(
-            posdef::Cint,keep::Vector{Ptr{Cvoid}},control::Ma77Control{$typ},info::Ma77Info{$typ},
+            posdef::Cint,keep::Vector{Ptr{Cvoid}},control::ma77_control{$typ},info::ma77_info{$typ},
             scale::Ptr{Nothing}
-        ) = ccall(
-            ($(string(ffactor)),libhsl),
-            Cvoid,
-            (Cint,Ptr{Ptr{Cvoid}},Ref{Ma77Control{$typ}},Ref{Ma77Info{$typ}},Ptr{Nothing}),
-            posdef,keep,control,info,scale
-        )
+        ) = HSL.$ffactor(posdef,keep,control,info,scale)
+
         ma77_solve(
             job::Cint,nrhs::Cint,lx::Cint,x::Vector{$typ},
-            keep::Vector{Ptr{Cvoid}},control::Ma77Control{$typ},info::Ma77Info{$typ},
+            keep::Vector{Ptr{Cvoid}},control::ma77_control{$typ},info::ma77_info{$typ},
             scale::Ptr{Nothing}
-        ) = ccall(
-            ($(string(fsolve)),libhsl),
-            Cvoid,
-            (Cint,Cint,Cint,Ptr{$typ},
-             Ptr{Ptr{Cvoid}},Ref{Ma77Control{$typ}},Ref{Ma77Info{$typ}},Ptr{Nothing}),
-            job,nrhs,lx,x,keep,control,info,scale
-        );
+        ) = HSL.$fsolve(job,nrhs,lx,x,keep,control,info,scale)
+
         ma77_finalize(
-            keep::Vector{Ptr{Cvoid}},control::Ma77Control{$typ},info::Ma77Info{$typ}
-        ) = ccall(
-            ($(string(ffinalise)),libhsl),
-            Cvoid,
-            (Ptr{Ptr{Cvoid}},Ref{Ma77Control{$typ}},Ref{Ma77Info{$typ}}),
-            keep,control,info
-        )
+            keep::Vector{Ptr{Cvoid}},control::ma77_control{$typ},info::ma77_info{$typ}
+        ) = HSL.$ffinalise(keep,control,info)
     end
 end
 
@@ -250,17 +86,18 @@ function Ma77Solver(
     full,tril_to_full_view = get_tril_to_full(csc)
     order = Vector{Int32}(undef,csc.n)
 
-    mc68_info = Mc68Info()
-    mc68_control = get_mc68_default_control()
+    mc68info = mc68_info()
+    mc68control = mc68_control()
+    HSL.mc68_default_control_i(mc68control)
 
     keep = [C_NULL]
 
-    mc68_control.f_array_in=1
-    mc68_control.f_array_out=1
-    mc68_order_i(Int32(opt.ma77_order),Int32(csc.n),csc.colptr,csc.rowval,order,mc68_control,mc68_info)
+    mc68control.f_array_in=1
+    mc68control.f_array_out=1
+    HSL.mc68_order_i(Int32(opt.ma77_order),Int32(csc.n),csc.colptr,csc.rowval,order,mc68control,mc68info)
 
-    info=Ma77Info{T}()
-    control=Ma77Control{T}()
+    info=ma77_info{T}()
+    control=ma77_control{T}()
     ma77_default_control(control)
     control.f_arrays = 1
     control.bits = 32
@@ -268,10 +105,8 @@ function Ma77Solver(
     control.maxstore = opt.ma77_maxstore
     control.print_level = -1
 
-    control.buffer_lpage_1=opt.ma77_buffer_lpage
-    control.buffer_lpage_2=opt.ma77_buffer_lpage
-    control.buffer_npage_1=opt.ma77_buffer_npage
-    control.buffer_npage_2=opt.ma77_buffer_npage
+    control.buffer_lpage = (opt.ma77_buffer_lpage, opt.ma77_buffer_lpage)
+    control.buffer_npage = (opt.ma77_buffer_npage, opt.ma77_buffer_npage)
 
     control.nemin = opt.ma77_nemin
     control.small = opt.ma77_small
@@ -302,7 +137,7 @@ function Ma77Solver(
     info.flag<0 && throw(SymbolicException())
 
     M = Ma77Solver{T}(csc,full,tril_to_full_view,
-                   control,info,mc68_control,mc68_info,order,keep,opt,logger)
+                   control,info,mc68control,mc68info,order,keep,opt,logger)
     finalizer(finalize,M)
     return M
 end

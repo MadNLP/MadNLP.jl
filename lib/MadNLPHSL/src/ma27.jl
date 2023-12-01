@@ -38,8 +38,8 @@ end
 
 
 for (fa, fb, fc, typ) in [
-    (:ma27ad_,:ma27bd_,:ma27cd_,Float64),
-    (:ma27a_,:ma27b_,:ma27c_,Float32)
+    (:ma27ad, :ma27bd, :ma27cd, Float64),
+    (:ma27a , :ma27b , :ma27c , Float32)
     ]
     @eval begin
         ma27a!(
@@ -47,44 +47,21 @@ for (fa, fb, fc, typ) in [
             iw::Vector{Cint},liw::Cint,ikeep::Vector{Cint},iw1::Vector{Cint},
             nsteps::Vector{Cint},iflag::Cint,icntl::Vector{Cint},cntl::Vector{$typ},
             info::Vector{Cint},ops::$typ
-        ) = ccall(
-            ($(string(fa)),libhsl),
-            Nothing,
-            (Ref{Cint},Ref{Cint},Ptr{Cint},Ptr{Cint},
-             Ptr{Cint},Ref{Cint},Ptr{Cint},Ptr{Cint},
-             Ptr{Cint},Ref{Cint},Ptr{Cint},Ptr{$typ},
-             Ptr{Cint},Ref{$typ}),
-            n,nz,I,J,iw,liw,ikeep,iw1,nsteps,iflag,icntl,cntl,info,ops
-        )
+        ) = HSL.$fa(n,nz,I,J,iw,liw,ikeep,iw1,nsteps,iflag,icntl,cntl,info,ops)
 
         ma27b!(
             n::Cint,nz::Cint,I::Vector{Cint},J::Vector{Cint},
             a::Vector{$typ},la::Cint,iw::Vector{Cint},liw::Cint,
             ikeep::Vector{Cint},nsteps::Vector{Cint},maxfrt::Vector{Cint},iw1::Vector{Cint},
             icntl::Vector{Cint},cntl::Vector{$typ},info::Vector{Cint}
-        ) = ccall(
-            ($(string(fb)),libhsl),
-            Nothing,
-            (Ref{Cint},Ref{Cint},Ptr{Cint},Ptr{Cint},
-             Ptr{$typ},Ref{Cint},Ptr{Cint},Ref{Cint},
-             Ptr{Cint},Ptr{Cint},Ptr{Cint},Ptr{Cint},
-             Ptr{Cint},Ptr{$typ},Ptr{Cint}),
-            n,nz,I,J,a,la,iw,liw,ikeep,nsteps,maxfrt,iw1,icntl,cntl,info
-        )
+        ) = HSL.$fb(n,nz,I,J,a,la,iw,liw,ikeep,nsteps,maxfrt,iw1,icntl,cntl,info)
 
         ma27c!(
             n::Cint,a::Vector{$typ},la::Cint,iw::Vector{Cint},
             liw::Cint,w::Vector{$typ},maxfrt::Vector{Cint},rhs::Vector{$typ},
             iw1::Vector{Cint},nsteps::Vector{Cint},icntl::Vector{Cint},
             info::Vector{Cint}
-        ) = ccall(
-            ($(string(fc)),libhsl),
-            Nothing,
-            (Ref{Cint},Ptr{$typ},Ref{Cint},Ptr{Cint},
-             Ref{Cint},Ptr{$typ},Ptr{Cint},Ptr{$typ},
-             Ptr{Cint},Ptr{Cint},Ptr{Cint},Ptr{Cint}),
-            n,a,la,iw,liw,w,maxfrt,rhs,iw1,nsteps,icntl,info
-        )
+        ) = HSL.$fc(n,a,la,iw,liw,w,maxfrt,rhs,iw1,nsteps,icntl,info)
     end
 end
 
