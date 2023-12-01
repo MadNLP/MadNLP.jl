@@ -3,7 +3,6 @@ using CUDA
 using MadNLPTests
 
 function _compare_gpu_with_cpu(KKTSystem, n, m, ind_fixed)
-
     for (T,tol,atol) in [
         (Float32,1e-3,1e-1),
         (Float64,1e-8,1e-6)
@@ -16,13 +15,9 @@ function _compare_gpu_with_cpu(KKTSystem, n, m, ind_fixed)
             :tol=>tol
         )
 
+        # Host evaluator
         nlph = MadNLPTests.DenseDummyQP(zeros(T,n); m=m, fixed_variables=ind_fixed)
-
-        # Some weird issue: there's some non-deterministic behavior in generating the model for the first call
-        # Not sure where this error is originating, but seems to be resolved in v1.10
-        # Here, we call this twice to avoid this error
-        nlpd = MadNLPTests.DenseDummyQP(CUDA.zeros(T,n); m=m, fixed_variables=CuArray(ind_fixed))
-        
+        # Device evaluator
         nlpd = MadNLPTests.DenseDummyQP(CUDA.zeros(T,n); m=m, fixed_variables=CuArray(ind_fixed))
 
         # Solve on CPU
