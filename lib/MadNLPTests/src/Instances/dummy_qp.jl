@@ -25,7 +25,7 @@ function NLPModels.hess_structure!(qp::DenseDummyQP, I::AbstractVector{T}, J::Ab
     copyto!(J, qp.hcols)
 end
 
-function NLPModels.obj(qp::DenseDummyQP, x::AbstractVector)
+function NLPModels.obj(qp::DenseDummyQP{T}, x::AbstractVector{T}) where T
     mul!(qp.buffer, qp.P, x)
     return 0.5 * dot(x, qp.buffer) + dot(qp.q, x)
 end
@@ -84,9 +84,15 @@ function DenseDummyQP(
     end
 
     Random.seed!(1)
+    # Generate random values.
+    # N.B.: we need to allocate the matrix P_ right after the vector
+    # q_ if we want to obtain a deterministic behavior: the seed is not working
+    # if we call the function `randn` after allocating vectors on the device.
+    q_ = randn(n)
+    P_ = randn(n, n)
 
     y0 = fill!(similar(x0, m), zero(T))
-    q = copyto!(similar(x0, n), randn(n))
+    q = copyto!(similar(x0, n), q_)
     buffer = similar(x0, n)
 
     # Bound constraints
@@ -100,7 +106,7 @@ function DenseDummyQP(
     xl[fixed_variables] .= @view(xu[fixed_variables])
 
     # Build QP problem 0.5 * x' * P * x + q' * x
-    P = copyto!(similar(x0, n , n), randn(n,n))
+    P = copyto!(similar(x0, n , n), P_)
     P = P*P' # P is symmetric
     P += T(100.0) * I
 
@@ -109,10 +115,6 @@ function DenseDummyQP(
     A = fill!(similar(x0, m, n), zero(T))
     A[1:m+1:m^2] .= one(T)
     A[m+1:m+1:m^2+m] .=-one(T)
-    # for j in 1:m
-    #     A[j, j]  = one(T)
-    #     A[j, j+1]  = -one(T)
-    # end
 
     nnzh = div(n * (n + 1), 2)
     hrows = copyto!(similar(x0, Int, nnzh), [i for i in 1:n for j in 1:i])
