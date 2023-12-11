@@ -247,10 +247,10 @@ function create_callback(
 
     x0   = get_x0(nlp)
 
-    con_buffer = similar(x0, m)
-    grad_buffer = similar(x0, n)
-    jac_buffer = similar(x0, nnzj)
-    hess_buffer = similar(x0, nnzh)
+    con_buffer = similar(x0, m)     ; fill!(con_buffer, zero(T))
+    grad_buffer = similar(x0, n)    ; fill!(grad_buffer, zero(T))
+    jac_buffer = similar(x0, nnzj)  ; fill!(jac_buffer, zero(T))
+    hess_buffer = similar(x0, nnzh) ; fill!(hess_buffer, zero(T))
 
     jac_I = similar(x0, Int, nnzj)
     jac_J = similar(x0, Int, nnzj)
@@ -273,7 +273,6 @@ function create_callback(
     )
 
     equality_handler = opt.equality_treatment()
-
 
     return SparseCallback(
         nlp,
@@ -304,9 +303,9 @@ function create_callback(
     m = get_ncon(nlp)
 
     x0   = similar(get_x0(nlp))
-    con_buffer = similar(x0, m)
-    jac_buffer = similar(x0, m, n)
-    grad_buffer = similar(x0, n)
+    con_buffer = similar(x0, m) ;    fill!(con_buffer, zero(T))
+    jac_buffer = similar(x0, m, n) ; fill!(jac_buffer, zero(T))
+    grad_buffer = similar(x0, n) ;   fill!(grad_buffer, zero(T))
     obj_scale = Ref(one(T))
     con_scale = similar(x0, m) ; fill!(con_scale, one(T))
 
