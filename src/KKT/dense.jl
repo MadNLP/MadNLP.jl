@@ -41,8 +41,12 @@ end
 
 function create_kkt_system(
     ::Type{DenseKKTSystem},
-    cb::AbstractCallback{T,VT}, opt,
-    opt_linear_solver, cnt, ind_cons) where {T,VT}
+    cb::AbstractCallback{T,VT},
+    ind_cons,
+    linear_solver::Type;
+    opt_linear_solver=default_options(linear_solver),
+    hessian_approximation=ExactHessian,
+) where {T, VT}
 
     ind_ineq = ind_cons.ind_ineq
     ind_lb = ind_cons.ind_lb
@@ -76,15 +80,15 @@ function create_kkt_system(
     fill!(du_diag, zero(T))
     fill!(diag_hess, zero(T))
 
-    quasi_newton = create_quasi_newton(opt.hessian_approximation, cb, n)
-    cnt.linear_solver_time += @elapsed linear_solver = opt.linear_solver(aug_com; opt = opt_linear_solver)
+    quasi_newton = create_quasi_newton(hessian_approximation, cb, n)
+    _linear_solver = linear_solver(aug_com; opt = opt_linear_solver)
 
     return DenseKKTSystem(
         hess, jac, quasi_newton,
         reg, pr_diag, du_diag, l_diag, u_diag, l_lower, u_lower,
         diag_hess, aug_com,
         ind_ineq, ind_cons.ind_lb, ind_cons.ind_ub,
-        linear_solver,
+        _linear_solver,
         Dict{Symbol, Any}(),
     )
 end
@@ -141,8 +145,12 @@ end
 
 function create_kkt_system(
     ::Type{DenseCondensedKKTSystem},
-    cb::AbstractCallback{T,VT}, opt,
-    opt_linear_solver, cnt, ind_cons) where {T,VT}
+    cb::AbstractCallback{T,VT},
+    ind_cons,
+    linear_solver::Type;
+    opt_linear_solver=default_options(linear_solver),
+    hessian_approximation=ExactHessian,
+) where {T, VT}
 
     n = cb.nvar
     m = cb.ncon
@@ -179,8 +187,8 @@ function create_kkt_system(
     ind_eq_shifted = ind_cons.ind_eq .+ n .+ ns
     ind_ineq_shifted = ind_cons.ind_ineq .+ n .+ ns
 
-    quasi_newton = create_quasi_newton(opt.hessian_approximation, cb, n)
-    cnt.linear_solver_time += @elapsed linear_solver = opt.linear_solver(aug_com; opt = opt_linear_solver)
+    quasi_newton = create_quasi_newton(hessian_approximation, cb, n)
+    _linear_solver = linear_solver(aug_com; opt = opt_linear_solver)
 
     return DenseCondensedKKTSystem(
         hess, jac, quasi_newton, jac_ineq,
@@ -191,7 +199,7 @@ function create_kkt_system(
         ns,
         ind_cons.ind_ineq, ind_cons.ind_lb, ind_cons.ind_ub,
         ind_ineq_shifted,
-        linear_solver,
+        _linear_solver,
         Dict{Symbol, Any}(),
     )
 end

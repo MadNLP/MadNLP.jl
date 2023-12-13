@@ -34,7 +34,6 @@ end
 ]
     linear_solver = MadNLP.LapackCPUSolver
     options = MadNLP.MadNLPOptions(; linear_solver=linear_solver)
-    options_linear_solver = MadNLP.default_options(linear_solver)
     cnt = MadNLP.MadNLPCounters(; start_time=time())
 
     nlp = MadNLPTests.HS15Model()
@@ -53,10 +52,8 @@ end
     kkt = MadNLP.create_kkt_system(
         KKTSystem,
         cb,
-        options,
-        options_linear_solver,
-        cnt,
         ind_cons,
+        linear_solver;
     )
     MadNLPTests.test_kkt_system(kkt, cb)
 end
