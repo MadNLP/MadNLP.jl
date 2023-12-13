@@ -17,7 +17,7 @@ mutable struct MadNLPSolver{
     IC <: AbstractInertiaCorrector,
     KKTVec <: AbstractKKTVector{T, VT}
     } <: AbstractMadNLPSolver{T}
-    
+
     nlp::Model
     cb::CB
     kkt::KKTSystem
@@ -103,29 +103,34 @@ mutable struct MadNLPSolver{
 end
 
 function MadNLPSolver(nlp::AbstractNLPModel{T,VT}; kwargs...) where {T, VT}
-    
+
     opt, opt_linear_solver, logger = load_options(nlp; kwargs...)
     @assert is_supported(opt.linear_solver, T)
 
     cnt = MadNLPCounters(start_time=time())
-    cb = create_callback(opt.callback, nlp, opt)
-    
+    cb = create_callback(
+        opt.callback,
+        nlp;
+        fixed_variable_treatment=opt.fixed_variable_treatment,
+        equality_treatment=opt.equality_treatment,
+    )
+
     # generic options
     opt.disable_garbage_collector &&
         (GC.enable(false); @warn(logger,"Julia garbage collector is temporarily disabled"))
     set_blas_num_threads(opt.blas_num_threads; permanent=true)
     @trace(logger,"Initializing variables.")
-    
+
     ind_cons = get_index_constraints(
         get_lvar(nlp), get_uvar(nlp),
-        get_lcon(nlp), get_ucon(nlp),
-        opt.fixed_variable_treatment,
-        opt.equality_treatment
+        get_lcon(nlp), get_ucon(nlp);
+        fixed_variable_treatment=opt.fixed_variable_treatment,
+        equality_treatment=opt.equality_treatment
     )
 
     ind_lb = ind_cons.ind_lb
     ind_ub = ind_cons.ind_ub
-    
+
     ns = length(ind_cons.ind_ineq)
     nx = get_nvar(nlp)
     n = nx+ns
@@ -148,12 +153,12 @@ function MadNLPSolver(nlp::AbstractNLPModel{T,VT}; kwargs...) where {T, VT}
 
     x = PrimalVector(VT, nx, ns, ind_lb, ind_ub)
     xl = PrimalVector(VT, nx, ns, ind_lb, ind_ub)
-    xu = PrimalVector(VT, nx, ns, ind_lb, ind_ub)  
+    xu = PrimalVector(VT, nx, ns, ind_lb, ind_ub)
     zl = PrimalVector(VT, nx, ns, ind_lb, ind_ub)
     zu = PrimalVector(VT, nx, ns, ind_lb, ind_ub)
     f = PrimalVector(VT, nx, ns, ind_lb, ind_ub)
     x_trial = PrimalVector(VT, nx, ns, ind_lb, ind_ub)
-    
+
     d = UnreducedKKTVector(VT, n, m, nlb, nub, ind_lb, ind_ub)
     p = UnreducedKKTVector(VT, n, m, nlb, nub, ind_lb, ind_ub)
     _w1 = UnreducedKKTVector(VT, n, m, nlb, nub, ind_lb, ind_ub)
@@ -161,7 +166,7 @@ function MadNLPSolver(nlp::AbstractNLPModel{T,VT}; kwargs...) where {T, VT}
     _w3 = UnreducedKKTVector(VT, n, m, nlb, nub, ind_lb, ind_ub)
     _w4 = UnreducedKKTVector(VT, n, m, nlb, nub, ind_lb, ind_ub)
 
-    jacl = VT(undef,n) 
+    jacl = VT(undef,n)
     c_trial = VT(undef, m)
     y = VT(undef, m)
     c = VT(undef, m)
@@ -190,28 +195,28 @@ function MadNLPSolver(nlp::AbstractNLPModel{T,VT}; kwargs...) where {T, VT}
         VT,
         n, m, nlb, nub, ind_lb, ind_ub
     )
-    
+
     cnt.init_time = time() - cnt.start_time
 
     return MadNLPSolver(
         nlp, cb, kkt,
-        opt, cnt, logger, 
+        opt, cnt, logger,
         n, m, nlb, nub,
         x, y, zl, zu, xl, xu,
-        zero(T), f, c, 
-        jacl, 
-        d, p, 
-        _w1, _w2, _w3, _w4, 
-        x_trial, c_trial, zero(T), c_slk, rhs, 
-        ind_cons.ind_ineq, ind_cons.ind_fixed, ind_cons.ind_llb, ind_cons.ind_uub, 
-        x_lr, x_ur, xl_r, xu_r, zl_r, zu_r, dx_lr, dx_ur, x_trial_lr, x_trial_ur, 
-        iterator, 
+        zero(T), f, c,
+        jacl,
+        d, p,
+        _w1, _w2, _w3, _w4,
+        x_trial, c_trial, zero(T), c_slk, rhs,
+        ind_cons.ind_ineq, ind_cons.ind_fixed, ind_cons.ind_llb, ind_cons.ind_uub,
+        x_lr, x_ur, xl_r, xu_r, zl_r, zu_r, dx_lr, dx_ur, x_trial_lr, x_trial_ur,
+        iterator,
         zero(T), zero(T), zero(T), zero(T), zero(T), zero(T), zero(T), zero(T), zero(T),
         " ",
         zero(T), zero(T), zero(T),
         Tuple{T, T}[],
         inertia_corrector, nothing,
-        INITIAL, Dict(), 
+        INITIAL, Dict(),
     )
 
 end
