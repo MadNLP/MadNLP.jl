@@ -47,6 +47,7 @@ end
     hessian_constant::Bool = false
     kkt_system::Type = SparseKKTSystem
     hessian_approximation::Type = ExactHessian
+    quasi_newton_options::QuasiNewtonOptions = QuasiNewtonOptions()
     callback::Type = SparseCallback
 
     # initialization options
@@ -163,7 +164,10 @@ function load_options(nlp; options...)
     check_option_sanity(opt_ipm)
     # Initiate linear-solver options
     opt_linear_solver = default_options(opt_ipm.linear_solver)
-    remaining_options = set_options!(opt_linear_solver, linear_solver_options)
+    iterator_options = set_options!(opt_linear_solver, linear_solver_options)
+    # Initiate iterator options
+    opt_iterator = default_options(opt_ipm.iterator)
+    remaining_options = set_options!(opt_iterator, iterator_options)
 
     # Initiate logger
     logger = MadNLPLogger(
@@ -177,6 +181,11 @@ function load_options(nlp; options...)
     if !isempty(remaining_options)
         print_ignored_options(logger, remaining_options)
     end
-    return opt_ipm, opt_linear_solver, logger
+    return (
+        interior_point=opt_ipm,
+        linear_solver=opt_linear_solver,
+        iterative_refinement=opt_iterator,
+        logger=logger,
+    )
 end
 

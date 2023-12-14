@@ -76,7 +76,10 @@ function create_kkt_system(
     fill!(du_diag, zero(T))
     fill!(diag_hess, zero(T))
 
-    quasi_newton = create_quasi_newton(opt.hessian_approximation, cb, n)
+    quasi_newton = create_quasi_newton(
+        opt.hessian_approximation, cb, n;
+        options=opt.quasi_newton_options,
+    )
     cnt.linear_solver_time += @elapsed linear_solver = opt.linear_solver(aug_com; opt = opt_linear_solver)
 
     return DenseKKTSystem(
@@ -179,7 +182,10 @@ function create_kkt_system(
     ind_eq_shifted = ind_cons.ind_eq .+ n .+ ns
     ind_ineq_shifted = ind_cons.ind_ineq .+ n .+ ns
 
-    quasi_newton = create_quasi_newton(opt.hessian_approximation, cb, n)
+    quasi_newton = create_quasi_newton(
+        opt.hessian_approximation, cb, n;
+        options=opt.quasi_newton_options,
+    )
     cnt.linear_solver_time += @elapsed linear_solver = opt.linear_solver(aug_com; opt = opt_linear_solver)
 
     return DenseCondensedKKTSystem(
