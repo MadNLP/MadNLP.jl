@@ -106,6 +106,7 @@ function MadNLPSolver(nlp::AbstractNLPModel{T,VT}; kwargs...) where {T, VT}
     options = load_options(nlp; kwargs...)
 
     ipm_opt = options.interior_point
+    logger = options.logger
     @assert is_supported(ipm_opt.linear_solver, T)
 
     cnt = MadNLPCounters(start_time=time())
@@ -115,7 +116,7 @@ function MadNLPSolver(nlp::AbstractNLPModel{T,VT}; kwargs...) where {T, VT}
     ipm_opt.disable_garbage_collector &&
         (GC.enable(false); @warn(logger,"Julia garbage collector is temporarily disabled"))
     set_blas_num_threads(ipm_opt.blas_num_threads; permanent=true)
-    @trace(options.logger,"Initializing variables.")
+    @trace(logger,"Initializing variables.")
 
     ind_cons = get_index_constraints(
         get_lvar(nlp), get_uvar(nlp),
@@ -134,7 +135,7 @@ function MadNLPSolver(nlp::AbstractNLPModel{T,VT}; kwargs...) where {T, VT}
     nlb = length(ind_lb)
     nub = length(ind_ub)
 
-    @trace(options.logger,"Initializing KKT system.")
+    @trace(logger,"Initializing KKT system.")
     kkt = create_kkt_system(
         ipm_opt.kkt_system,
         cb,
@@ -144,8 +145,8 @@ function MadNLPSolver(nlp::AbstractNLPModel{T,VT}; kwargs...) where {T, VT}
         ind_cons
     )
 
-    @trace(options.logger,"Initializing iterative solver.")
-    iterator = ipm_opt.iterator(kkt; cnt = cnt, logger = options.logger, opt = options.iterative_refinement)
+    @trace(logger,"Initializing iterative solver.")
+    iterator = ipm_opt.iterator(kkt; cnt = cnt, logger = logger, opt = options.iterative_refinement)
 
     x = PrimalVector(VT, nx, ns, ind_lb, ind_ub)
     xl = PrimalVector(VT, nx, ns, ind_lb, ind_ub)
