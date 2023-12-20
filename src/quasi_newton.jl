@@ -272,7 +272,7 @@ function _refresh_STS!(qn::CompactLBFGS{T, VT, MT}) where {T, VT, MT}
 end
 
 function update!(qn::CompactLBFGS{T, VT, MT}, Bk, sk, yk) where {T, VT, MT}
-    if dot(sk, yk) < sqrt(eps(T)) * norm(sk) * norm(yk)
+    if dot(sk, yk) <= sqrt(eps(T)) * norm(sk) * norm(yk)
         return false
     end
     # Refresh internal structures
