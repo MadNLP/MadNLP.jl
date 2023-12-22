@@ -175,6 +175,8 @@ function eval_lag_hess_wrapper!(
             init!(qn, Bk, sk, yk)
         end
         success = update!(qn, Bk, sk, yk)
+    else
+        Bk .= qn.init_value
     end
 
     # Backup data for next step

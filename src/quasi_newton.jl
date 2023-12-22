@@ -156,6 +156,7 @@ mutable struct CompactLBFGS{T, VT <: AbstractVector{T}, MT <: AbstractMatrix{T}}
     last_g::VT
     last_x::VT
     last_jv::VT
+    init_value::T
     max_mem::Int
     current_mem::Int
     skipped_iter::Int
@@ -180,6 +181,7 @@ function create_quasi_newton(
     cb::AbstractCallback{T,VT},
     n;
     max_mem=6,
+    init_value=1.0,
     init_strategy = SCALAR1
     ) where {T, VT}
     return CompactLBFGS(
@@ -189,6 +191,7 @@ function create_quasi_newton(
         fill!(create_array(cb, n), zero(T)),
         fill!(create_array(cb, n), zero(T)),
         fill!(create_array(cb, n), zero(T)),
+        init_value,
         max_mem,
         0,
         0,
