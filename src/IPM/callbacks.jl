@@ -176,7 +176,11 @@ function eval_lag_hess_wrapper!(
         end
         success = update!(qn, Bk, sk, yk)
     else
-        Bk .= qn.init_value
+        # Initiate B0 with Gilbert & Lemaréchal rule.
+        g0 = primal(solver.f)
+        f0 = solver.obj_val
+        rho0 = (f0 ≈ zero(T)) ? one(T) / dot(g0, g0) : f0 / dot(g0, g0)
+        Bk .= rho0 .* qn.init_value
     end
 
     # Backup data for next step

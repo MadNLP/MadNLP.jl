@@ -157,6 +157,8 @@ mutable struct CompactLBFGS{T, VT <: AbstractVector{T}, MT <: AbstractMatrix{T}}
     last_x::VT
     last_jv::VT
     init_value::T
+    sigma_min::T
+    sigma_max::T
     max_mem::Int
     current_mem::Int
     skipped_iter::Int
@@ -181,7 +183,9 @@ function create_quasi_newton(
     cb::AbstractCallback{T,VT},
     n;
     max_mem=6,
-    init_value=1.0,
+    sigma_min=1e-8,
+    sigma_max=1e8,
+    init_value=one(T),
     init_strategy = SCALAR1
     ) where {T, VT}
     return CompactLBFGS(
@@ -192,6 +196,8 @@ function create_quasi_newton(
         fill!(create_array(cb, n), zero(T)),
         fill!(create_array(cb, n), zero(T)),
         init_value,
+        sigma_min,
+        sigma_max,
         max_mem,
         0,
         0,
@@ -317,6 +323,7 @@ function update!(qn::CompactLBFGS{T, VT, MT}, Bk, sk, yk) where {T, VT, MT}
 
     # Step 1: σₖ I
     sigma = curvature(Val(qn.init_strategy), sk, yk)  # σₖ
+    sigma = clamp(sigma, qn.sigma_min, qn.sigma_max)
     Bk .= sigma                                       # Hₖ .= σₖ I (diagonal Hessian approx.)
 
     # Step 2: Mₖ = σₖ Sₖᵀ Sₖ + Lₖ Dₖ⁻¹ Lₖᵀ
