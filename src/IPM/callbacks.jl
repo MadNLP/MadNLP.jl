@@ -168,13 +168,13 @@ function eval_lag_hess_wrapper!(
             jtprod!(solver.jacl, kkt, l)
             yk .+= @view(solver.jacl[1:n])         # yₖ += J₊ᵀ l₊
             NLPModels.jtprod!(nlp, qn.last_x, l, qn.last_jv)
-            axpy!(-one(T), qn.last_jv, yk)           # yₖ += J₊ᵀ l₊ - Jᵀ l₊
+            axpy!(-one(T), qn.last_jv, yk)         # yₖ += J₊ᵀ l₊ - Jᵀ l₊
         end
 
         if cnt.obj_grad_cnt == 2
             init!(qn, Bk, sk, yk)
         end
-        update!(qn, Bk, sk, yk)
+        success = update!(qn, Bk, sk, yk)
     end
 
     # Backup data for next step

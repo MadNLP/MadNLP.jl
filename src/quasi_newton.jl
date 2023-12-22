@@ -158,6 +158,7 @@ mutable struct CompactLBFGS{T, VT <: AbstractVector{T}, MT <: AbstractMatrix{T}}
     last_jv::VT
     max_mem::Int
     current_mem::Int
+    skipped_iter::Int
     Sk::MT       # n x p
     Yk::MT       # n x p
     Lk::MT       # p x p
@@ -190,6 +191,7 @@ function create_quasi_newton(
         fill!(create_array(cb, n), zero(T)),
         max_mem,
         0,
+        0,
         fill!(create_array(cb, n, 0), zero(T)),
         fill!(create_array(cb, n, 0), zero(T)),
         fill!(create_array(cb, n, 0), zero(T)),
@@ -221,6 +223,17 @@ function _resize!(qn::CompactLBFGS{T, VT, MT}) where {T, VT, MT}
     qn._w1    = zeros(T, k)
     qn._w2    = zeros(T, 2*k)
     return
+end
+
+function _reset!(qn::CompactLBFGS{T, VT, MT}) where {T, VT, MT}
+    n, _ = size(qn)
+    qn.current_mem = 0
+    qn.skipped_iter = 0
+    fill!(qn.last_jv, zero(T))
+    qn.Dk  = zeros(T, 0)
+    qn.Sk  = zeros(T, n, 0)
+    qn.Yk  = zeros(T, n, 0)
+    _resize!(qn)
 end
 
 # augment / shift
@@ -272,9 +285,19 @@ function _refresh_STS!(qn::CompactLBFGS{T, VT, MT}) where {T, VT, MT}
 end
 
 function update!(qn::CompactLBFGS{T, VT, MT}, Bk, sk, yk) where {T, VT, MT}
-    if dot(sk, yk) <= sqrt(eps(T)) * norm(sk) * norm(yk)
+    norm_sk, norm_yk = norm(sk), norm(yk)
+    # Skip update if vectors are too small or local curvature is negative.
+    if ((norm_sk < T(100) * eps(T)) ||
+        (norm_yk < T(100) * eps(T)) ||
+        (dot(sk, yk) < sqrt(eps(T)) * norm_sk * norm_yk)
+    )
+        qn.skipped_iter += 1
+        if qn.skipped_iter >= 2
+            _reset!(qn)
+        end
         return false
     end
+
     # Refresh internal structures
     _update_SY!(qn, sk, yk)
     _refresh_D!(qn, sk, yk)

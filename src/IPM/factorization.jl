@@ -1,5 +1,6 @@
 function solve_refine_wrapper!(d, solver, p, w)
     result = false
+    primal(w)[solver.ind_fixed] .= 0
 
     solver.cnt.linear_solver_time += @elapsed begin
         if solve_refine!(d, solver.iterator, p, w)
@@ -12,6 +13,7 @@ function solve_refine_wrapper!(d, solver, p, w)
             end
         end
     end
+    primal(d)[solver.ind_fixed] .= 0
 
     return result
 end
