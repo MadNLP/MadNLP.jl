@@ -33,16 +33,18 @@ function initialize!(solver::AbstractMadNLPSolver{T}) where T
     fill!(solver.zu_r, one(T))
 
     # Initializing scaling factors
-    set_scaling!(
-        solver.cb,
-        solver.x,
-        solver.xl,
-        solver.xu,
-        solver.y,
-        solver.rhs,
-        solver.ind_ineq,
-        opt.nlp_scaling_max_gradient
-    )
+    if solver.opt.nlp_scaling
+        set_scaling!(
+            solver.cb,
+            solver.x,
+            solver.xl,
+            solver.xu,
+            solver.y,
+            solver.rhs,
+            solver.ind_ineq,
+            opt.nlp_scaling_max_gradient
+        )
+    end
 
     # Initializing KKT system
     initialize!(solver.kkt)
@@ -300,7 +302,7 @@ function regular!(solver::AbstractMadNLPSolver{T}) where T
                 break
             end
 
-            if false #solver.cnt.l==1 && theta_trial>=theta
+            if solver.cnt.l==1 && theta_trial>=theta
                 if second_order_correction(
                     solver,alpha_max,theta,varphi,theta_trial,varphi_d,switching_condition
                     )

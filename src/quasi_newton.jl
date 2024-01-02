@@ -50,6 +50,7 @@ The matrix is not updated if ``s_k^⊤ y_k < 10^{-8}``.
 """
 struct BFGS{T, VT <: AbstractVector{T}} <: AbstractQuasiNewton{T, VT}
     init_strategy::BFGSInitStrategy
+    is_instantiated::Base.RefValue{Bool}
     sk::VT
     yk::VT
     bsk::VT
@@ -57,6 +58,7 @@ struct BFGS{T, VT <: AbstractVector{T}} <: AbstractQuasiNewton{T, VT}
     last_x::VT
     last_jv::VT
 end
+
 function create_quasi_newton(
     ::Type{BFGS},
     cb::AbstractCallback{T,VT},
@@ -65,6 +67,7 @@ function create_quasi_newton(
     ) where {T,VT}
     BFGS(
         init_strategy,
+        Ref(false),
         VT(undef, n),
         VT(undef, n),
         VT(undef, n),
@@ -75,12 +78,20 @@ function create_quasi_newton(
 end
 
 function update!(qn::BFGS{T, VT}, Bk::AbstractMatrix, sk::AbstractVector, yk::AbstractVector) where {T, VT}
-    if dot(sk, yk) < T(1e-8)
+    yksk = dot(sk, yk)
+    if yksk < T(1e-8)
         return false
     end
+    # Initial approximation (Nocedal & Wright, p.143)
+    if !qn.is_instantiated[]
+        sksk = dot(sk, sk)
+        Bk[diagind(Bk)] .= yksk ./ sksk
+        qn.is_instantiated[] = true
+    end
+    # BFGS update
     mul!(qn.bsk, Bk, sk)
     alpha1 = one(T) / dot(sk, qn.bsk)
-    alpha2 = one(T) / dot(yk, sk)
+    alpha2 = one(T) / yksk
     _ger!(-alpha1, qn.bsk, qn.bsk, Bk)  # Bk = Bk - alpha1 * bsk * bsk'
     _ger!(alpha2, yk, yk, Bk)           # Bk = Bk + alpha2 * yk * yk'
     return true
@@ -88,6 +99,7 @@ end
 
 struct DampedBFGS{T, VT <: AbstractVector{T}} <: AbstractQuasiNewton{T, VT}
     init_strategy::BFGSInitStrategy
+    is_instantiated::Base.RefValue{Bool}
     sk::VT
     yk::VT
     bsk::VT
@@ -96,6 +108,7 @@ struct DampedBFGS{T, VT <: AbstractVector{T}} <: AbstractQuasiNewton{T, VT}
     last_x::VT
     last_jv::VT
 end
+
 function create_quasi_newton(
     ::Type{DampedBFGS},
     cb::AbstractCallback{T,VT},
@@ -104,6 +117,7 @@ function create_quasi_newton(
     ) where {T,VT}
     return DampedBFGS(
         init_strategy,
+        Ref(false),
         VT(undef, n),
         VT(undef, n),
         VT(undef, n),
@@ -115,12 +129,20 @@ function create_quasi_newton(
 end
 
 function update!(qn::DampedBFGS{T, VT}, Bk::AbstractMatrix, sk::AbstractVector, yk::AbstractVector) where {T, VT}
+    yksk = dot(sk, yk)
+    # Initial approximation (Nocedal & Wright, p.143)
+    if !qn.is_instantiated[]
+        sksk = dot(sk, sk)
+        Bk[diagind(Bk)] .= yksk ./ sksk
+        qn.is_instantiated[] = true
+    end
+
     mul!(qn.bsk, Bk, sk)
     sBs = dot(sk, qn.bsk)
 
     # Procedure 18.2 (Nocedal & Wright, page 537)
     theta = if dot(sk, yk) < T(0.2) * sBs
-        T(0.8) * sBs / (sBs - dot(sk, yk))
+        T(0.8) * sBs / (sBs - yksk)
     else
         one(T)
     end
@@ -137,11 +159,17 @@ function update!(qn::DampedBFGS{T, VT}, Bk::AbstractMatrix, sk::AbstractVector, 
     return true
 end
 
-# Initial update (Nocedal & Wright, p.143)
-function init!(qn::Union{BFGS, DampedBFGS}, Bk::AbstractMatrix, sk::AbstractVector, yk::AbstractVector)
-    yksk = dot(yk, sk)
-    sksk = dot(sk, sk)
-    Bk[diagind(Bk)] .= yksk ./ sksk
+function init!(qn::Union{BFGS, DampedBFGS}, Bk::AbstractMatrix{T}, g0::AbstractVector{T}, f0::T) where T
+    norm_g0 = dot(g0, g0)
+    # Initiate B0 with Gilbert & Lemaréchal rule.
+    rho0 = if norm_g0 < sqrt(eps(T))
+        one(T)
+    elseif f0 ≈ zero(T)
+        one(T) / norm_g0
+    else
+        abs(f0) / norm_g0
+    end
+    Bk[diagind(Bk)] .= T(2) * rho0
     return
 end
 
@@ -346,7 +374,17 @@ function update!(qn::CompactLBFGS{T, VT, MT}, Bk, sk, yk) where {T, VT, MT}
     return true
 end
 
-function init!(qn::CompactLBFGS, Bk::AbstractArray, sk::AbstractVector, yk::AbstractVector)
+function init!(qn::CompactLBFGS{T}, Bk::AbstractVector{T}, g0::AbstractVector{T}, f0::T) where T
+    norm_g0 = dot(g0, g0)
+    # Initiate B0 with Gilbert & Lemaréchal rule.
+    rho0 = if norm_g0 < sqrt(eps(T))
+        one(T)
+    elseif f0 ≈ zero(T)
+        one(T) / norm_g0
+    else
+        abs(f0) / norm_g0
+    end
+    Bk .= (T(2) * rho0 * qn.init_value)
     return
 end
 

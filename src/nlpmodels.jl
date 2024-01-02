@@ -498,7 +498,6 @@ function _eval_cons_wrapper!(cb::AbstractCallback,x::AbstractVector,c::AbstractV
     return c
 end
 
-
 function _eval_jac_wrapper!(
     cb::SparseCallback,
     x::AbstractVector,
@@ -511,6 +510,21 @@ function _eval_jac_wrapper!(
 
     _treat_fixed_variable_jac_coord!(cb.fixed_handler, cb, x, jac)
 end
+
+function _eval_jtprod_wrapper!(
+    cb::AbstractCallback{T},
+    x::AbstractVector,
+    v::AbstractVector,
+    jvt::AbstractVector,
+    ) where T
+
+    y = cb.con_buffer
+    y .= v .* cb.con_scale
+    NLPModels.jtprod!(cb.nlp, x, y, jvt)
+    _treat_fixed_variable_grad!(cb.fixed_handler, cb, x, jvt)
+    return jvt
+end
+
 function _treat_fixed_variable_jac_coord!(fixed_handler::RelaxBound, cb, x, jac) end
 function _treat_fixed_variable_jac_coord!(fixed_handler::MakeParameter, cb::SparseCallback{T}, x, jac) where T
     fill!(@view(jac[fixed_handler.fixedj]), zero(T))

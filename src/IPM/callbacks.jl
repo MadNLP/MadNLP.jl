@@ -146,7 +146,7 @@ function eval_lag_hess_wrapper!(
     l::AbstractVector{T};
     is_resto=false,
 ) where {T, VT, MT<:AbstractMatrix{T}, QN<:AbstractQuasiNewton{T, VT}}
-    nlp = solver.nlp
+    cb = solver.cb
     cnt = solver.cnt
     @trace(solver.logger, "Update BFGS matrices.")
 
@@ -160,35 +160,22 @@ function eval_lag_hess_wrapper!(
         # Build sk = x+ - x
         copyto!(sk, 1, variable(solver.x), 1, n)   # sₖ = x₊
         axpy!(-one(T), qn.last_x, sk)              # sₖ = x₊ - x
-
         # Build yk = ∇L+ - ∇L
         copyto!(yk, 1, variable(solver.f), 1, n)   # yₖ = ∇f₊
         axpy!(-one(T), qn.last_g, yk)              # yₖ = ∇f₊ - ∇f
         if m > 0
             jtprod!(solver.jacl, kkt, l)
             yk .+= @view(solver.jacl[1:n])         # yₖ += J₊ᵀ l₊
-            NLPModels.jtprod!(nlp, qn.last_x, l, qn.last_jv)
+            _eval_jtprod_wrapper!(cb, qn.last_x, l, qn.last_jv)
             axpy!(-one(T), qn.last_jv, yk)         # yₖ += J₊ᵀ l₊ - Jᵀ l₊
         end
-
-        if cnt.obj_grad_cnt == 2
-            init!(qn, Bk, sk, yk)
-        end
-        success = update!(qn, Bk, sk, yk)
+        # Update quasi-Newton approximation.
+        update!(qn, Bk, sk, yk)
     else
-        g0 = primal(solver.f)
-        norm_g0 = dot(g0, g0)
+        # Init quasi-Newton approximation
+        g0 = variable(solver.f)
         f0 = solver.obj_val
-        rho0 = (f0 ≈ zero(T)) ? one(T) / dot(g0, g0) : f0 / dot(g0, g0)
-        # Initiate B0 with Gilbert & Lemaréchal rule.
-        rho0 = if norm_g0 < sqrt(eps(T))
-            one(T)
-        elseif f0 ≈ zero(T)
-            one(T) / norm_g0
-        else
-            f0 / norm_g0
-        end
-        Bk .= (rho0 * qn.init_value)
+        init!(qn, Bk, g0, f0)
     end
 
     # Backup data for next step
@@ -198,5 +185,4 @@ function eval_lag_hess_wrapper!(
     compress_hessian!(kkt)
     return get_hessian(kkt)
 end
-
 
