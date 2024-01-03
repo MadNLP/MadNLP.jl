@@ -33,18 +33,16 @@ function initialize!(solver::AbstractMadNLPSolver{T}) where T
     fill!(solver.zu_r, one(T))
 
     # Initializing scaling factors
-    if solver.opt.nlp_scaling
-        set_scaling!(
-            solver.cb,
-            solver.x,
-            solver.xl,
-            solver.xu,
-            solver.y,
-            solver.rhs,
-            solver.ind_ineq,
-            opt.nlp_scaling_max_gradient
-        )
-    end
+    set_scaling!(
+        solver.cb,
+        solver.x,
+        solver.xl,
+        solver.xu,
+        solver.y,
+        solver.rhs,
+        solver.ind_ineq,
+        opt.nlp_scaling_max_gradient
+    )
 
     # Initializing KKT system
     initialize!(solver.kkt)
