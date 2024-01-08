@@ -142,10 +142,10 @@ function MadNLPSolver(nlp::AbstractNLPModel{T,VT}; kwargs...) where {T, VT}
     kkt = create_kkt_system(
         opt.kkt_system,
         cb,
-        opt,
-        opt_linear_solver,
-        cnt,
-        ind_cons
+        ind_cons,
+        opt.linear_solver;
+        hessian_approximation=opt.hessian_approximation,
+        opt_linear_solver=opt_linear_solver,
     )
 
     @trace(logger,"Initializing iterative solver.")
