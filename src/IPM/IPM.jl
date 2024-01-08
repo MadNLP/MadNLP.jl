@@ -108,7 +108,12 @@ function MadNLPSolver(nlp::AbstractNLPModel{T,VT}; kwargs...) where {T, VT}
     @assert is_supported(opt.linear_solver, T)
 
     cnt = MadNLPCounters(start_time=time())
-    cb = create_callback(opt.callback, nlp, opt)
+    cb = create_callback(
+        opt.callback,
+        nlp;
+        fixed_variable_treatment=opt.fixed_variable_treatment,
+        equality_treatment=opt.equality_treatment,
+    )
 
     # generic options
     opt.disable_garbage_collector &&
@@ -118,9 +123,9 @@ function MadNLPSolver(nlp::AbstractNLPModel{T,VT}; kwargs...) where {T, VT}
 
     ind_cons = get_index_constraints(
         get_lvar(nlp), get_uvar(nlp),
-        get_lcon(nlp), get_ucon(nlp),
-        opt.fixed_variable_treatment,
-        opt.equality_treatment
+        get_lcon(nlp), get_ucon(nlp);
+        fixed_variable_treatment=opt.fixed_variable_treatment,
+        equality_treatment=opt.equality_treatment
     )
 
     ind_lb = ind_cons.ind_lb

@@ -37,16 +37,10 @@ end
     cnt = MadNLP.MadNLPCounters(; start_time=time())
 
     nlp = MadNLPTests.HS15Model()
-    ind_cons = MadNLP.get_index_constraints(
-        nlp,
-        options.fixed_variable_treatment,
-        options.equality_treatment,
-    )
+    ind_cons = MadNLP.get_index_constraints(nlp)
 
     cb = MadNLP.create_callback(
-        Callback,
-        nlp,
-        options,
+        Callback, nlp,
     )
 
     kkt = MadNLP.create_kkt_system(
