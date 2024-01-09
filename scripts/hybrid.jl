@@ -1,8 +1,10 @@
 
 using LinearAlgebra
+using NLPModels
+using SparseArrays
 using MadNLP
 using Krylov
-import MadNLP: SparseMatrixCOO
+import MadNLP: SparseMatrixCOO, full
 
 function _extract_subjacobian(jac::SparseMatrixCOO{Tv, Ti}, index_rows::AbstractVector{Int}) where {Tv, Ti}
     m, n = size(jac)
@@ -43,7 +45,7 @@ function _extract_subjacobian(jac::SparseMatrixCOO{Tv, Ti}, index_rows::Abstract
     end
 
     G = sparse(G_i, G_j, G_v, nrows, n)
-    mapG = convert.(Ti, nonzeros(G))
+    mapG = convert.(Int, nonzeros(G))
 
     return G, mapG
 end
@@ -55,10 +57,23 @@ struct SchurComplementOperator{T, VT, SMT, LS}
     buf1::VT   # dimension n
 end
 
-function mul!(y::VT, S::SchurComplementOperator{T, VT}, x::VT, alpha::T, beta::T) where {T, VT}
+Base.size(S::SchurComplementOperator) = (size(S.G, 1), size(S.G, 1))
+Base.eltype(S::SchurComplementOperator{T}) where T = T
+
+function SchurComplementOperator(
+    K::MadNLP.AbstractLinearSolver,
+    G::AbstractMatrix,
+    buf::AbstractVector{T},
+) where T
+    return SchurComplementOperator{T, typeof(buf), typeof(G), typeof(K)}(
+        K, G, buf,
+    )
+end
+
+function LinearAlgebra.mul!(y::VT, S::SchurComplementOperator{T, VT}, x::VT, alpha::Number, beta::Number) where {T, VT}
     y .= beta .* y
     mul!(S.buf1, S.G', x, alpha, zero(T))
-    solve!(S.K, S.buf1)
+    MadNLP.solve!(S.K, S.buf1)
     mul!(y, S.G, S.buf1, one(T), one(T))
     return y
 end
@@ -135,10 +150,10 @@ function MadNLP.create_kkt_system(
 
     n = cb.nvar
     m = cb.ncon
-    n_slack = length(ind_ineq)
     ind_ineq = ind_cons.ind_ineq
+    n_slack = length(ind_ineq)
     ind_eq = setdiff(1:m, ind_ineq)
-    me = m - n_ineq
+    me = m - n_slack
 
     # Evaluate sparsity pattern
     jac_sparsity_I = MadNLP.create_array(cb, Int32, cb.nnzj)
@@ -186,7 +201,7 @@ function MadNLP.create_kkt_system(
     aug_com, dptr, hptr, jptr = MadNLP.build_condensed_aug_symbolic(
         hess_com,
         jt_csc
-        )
+    )
 
     # Build Jacobian of equality constraints
     jac_coo = SparseMatrixCOO(
@@ -197,16 +212,16 @@ function MadNLP.create_kkt_system(
     )
     G_csc, G_csc_map = _extract_subjacobian(jac_coo, ind_eq)
 
-    gamma = one(T)
+    gamma = T(1)
 
     cnt.linear_solver_time += @elapsed begin
         linear_solver = opt.linear_solver(aug_com; opt = opt_linear_solver)
     end
 
     buf1 = VT(undef, n)
-    S = SchurComplementOperator(linear_solver, G, buf1)
+    S = SchurComplementOperator(linear_solver, G_csc, buf1)
 
-    iterative_solver = Krylov.CgSolver(me, me, 1, VT)
+    iterative_linear_solver = Krylov.CgSolver(me, me, VT)
 
     ext = MadNLP.get_sparse_condensed_ext(VT, hess_com, jptr, jt_csc_map, hess_csc_map)
 
@@ -214,16 +229,33 @@ function MadNLP.create_kkt_system(
         hess, hess_raw, hess_com, hess_csc_map,
         jac, jt_coo, jt_csc, jt_csc_map,
         G_csc, G_csc_map,
+        S,
         gamma,
         quasi_newton,
         reg, pr_diag, du_diag,
         l_diag, u_diag, l_lower, u_lower,
-        buffer1, buffer2, buffer3,
+        buffer1, buffer2, buffer3, buffer4,
         aug_com, diag_buffer, dptr, hptr, jptr,
         linear_solver, iterative_linear_solver,
         ind_ineq, ind_eq, ind_cons.ind_lb, ind_cons.ind_ub,
         ext,
     )
+end
+
+function MadNLP.initialize!(kkt::HybridCondensedKKTSystem)
+    fill!(kkt.reg, 1.0)
+    fill!(kkt.pr_diag, 1.0)
+    fill!(kkt.du_diag, 0.0)
+    fill!(kkt.hess, 0.0)
+    fill!(kkt.l_lower, 0.0)
+    fill!(kkt.u_lower, 0.0)
+    fill!(kkt.l_diag, 1.0)
+    fill!(kkt.u_diag, 1.0)
+    fill!(kkt.hess_com.nzval, 0.) # so that mul! in the initial primal-dual solve has no effect
+end
+
+function MadNLP.is_inertia_correct(kkt::HybridCondensedKKTSystem, num_pos, num_zero, num_neg)
+    return (num_zero == 0) && (num_pos == size(kkt.aug_com, 1))
 end
 
 # mul!
@@ -238,16 +270,16 @@ function LinearAlgebra.mul!(w::MadNLP.AbstractKKTVector{T}, kkt::HybridCondensed
     xz = view(full(x), n+mi+1:n+mi+m)
 
     # Decompose buffers
-    wx = _madnlp_unsafe_wrap(full(w), n)
+    wx = view(full(w), 1:n) #MadNLP._madnlp_unsafe_wrap(full(w), n)
     ws = view(full(w), n+1:n+mi)
     wz = view(full(w), n+mi+1:n+mi+m)
 
     wz_ineq = view(wz, kkt.ind_ineq)
-    xz_ineq = view(full(x), kkt.ind_ineq)
+    xz_ineq = view(xz, kkt.ind_ineq)
 
     mul!(wx, Symmetric(kkt.hess_com, :L), xx, alpha, beta)
 
-    mul!(wx, kkt.jt_csc,  xz, alpha, one(T))
+    mul!(wx, kkt.jt_csc, xz, alpha, one(T))
     mul!(wz, kkt.jt_csc', xx, alpha, beta)
     axpy!(-alpha, xs, wz_ineq)
 
@@ -278,6 +310,10 @@ function MadNLP.jtprod!(y::AbstractVector, kkt::HybridCondensedKKTSystem, x::Abs
     return y
 end
 
+function MadNLP.compress_hessian!(kkt::HybridCondensedKKTSystem)
+    MadNLP.transfer!(kkt.hess_com, kkt.hess_raw, kkt.hess_csc_map)
+end
+
 # build_kkt!
 function MadNLP.build_kkt!(kkt::HybridCondensedKKTSystem)
     n = size(kkt.hess_com, 1)
@@ -289,9 +325,9 @@ function MadNLP.build_kkt!(kkt::HybridCondensedKKTSystem)
     Σd = kkt.du_diag # TODO: add support
 
     # Regularization for inequality
-    kkt.diag_buffer[ind_ineq] .= Σs
+    kkt.diag_buffer[kkt.ind_ineq] .= Σs
     # Regularization for equality
-    kkt.diag_buffer[ind_eq] .= kkt.gamma
+    kkt.diag_buffer[kkt.ind_eq] .= kkt.gamma
     MadNLP.build_condensed_aug_coord!(kkt)
     return
 end
@@ -305,7 +341,7 @@ function MadNLP.solve!(kkt::HybridCondensedKKTSystem{T}, w::MadNLP.AbstractKKTVe
     # Decompose buffers
     wx = MadNLP._madnlp_unsafe_wrap(full(w), n)
     ws = view(full(w), n+1:n+mi)
-    wc = view(full(w), n+mi+m+1:n+mi+m)
+    wc = view(full(w), n+mi+1:n+mi+m)
 
     wy = view(wc, kkt.ind_eq)
     wz = view(wc, kkt.ind_ineq)
@@ -315,22 +351,23 @@ function MadNLP.solve!(kkt::HybridCondensedKKTSystem{T}, w::MadNLP.AbstractKKTVe
 
     Σs = view(kkt.pr_diag, n+1:n+mi)
 
-    MadNLP.reduce_rhs!(w.xp_lr, dual_lb(w), kkt.l_diag, w.xp_ur, dual_ub(w), kkt.u_diag)
+    MadNLP.reduce_rhs!(w.xp_lr, MadNLP.dual_lb(w), kkt.l_diag, w.xp_ur, MadNLP.dual_ub(w), kkt.u_diag)
 
     # Condensation
-    fill!(kkt.buffer, zero(T))
-    kkt.buffer[kkt.ind_ineq] .= Σs .* wz .+ ws
-    mul!(wx, kkt.jt_csc, kkt.buffer, one(T), one(T))
+    fill!(kkt.buffer1, zero(T))
+    kkt.buffer1[kkt.ind_ineq] .= Σs .* wz .+ ws
+    mul!(wx, kkt.jt_csc, kkt.buffer1, one(T), one(T))
 
     #  Golub & Greif
     r1 .= wx
     mul!(r1, G', wy, kkt.gamma, one(T))    # r1 = wx + γ Gᵀ wy
-    wx .= r1                                   # (save for later)
-    solve!(kkt.linear_solver, r1)              # r1 = (Kγ)⁻¹ r1
-    mul!(wy, G, r1, one(T), -one(T))           # -wy + G (Kγ)⁻¹ [wx + γ Gᵀ wy]
+    wx .= r1                               # (save for later)
+    MadNLP.solve!(kkt.linear_solver, r1)   # r1 = (Kγ)⁻¹ [wx + γ Gᵀ wy]
+    mul!(wy, G, r1, one(T), -one(T))       # -wy + G (Kγ)⁻¹ [wx + γ Gᵀ wy]
 
     # Solve Schur-complement system with a Krylov iterative method.
-    Krylov.solve!(kkt.iterative_linear_solver, kkt.S, wy; atol=1e-8, rtol=0.0)
+    Krylov.solve!(kkt.iterative_linear_solver, kkt.S, wy; atol=1e-8, rtol=0.0, verbose=0)
+    copyto!(wy, kkt.iterative_linear_solver.x)
 
     # Extract solution of Golub & Greif
     mul!(wx, G', wy, -one(T), one(T))
@@ -338,7 +375,7 @@ function MadNLP.solve!(kkt::HybridCondensedKKTSystem{T}, w::MadNLP.AbstractKKTVe
 
     # Extract condensation
     mul!(kkt.buffer2, kkt.jt_csc', wx)
-    vj = view(kkt.buffer2, ind_ineq)
+    vj = view(kkt.buffer2, kkt.ind_ineq)
     vs .= ws    # (save a copy of ws for later)
     ws .= vj .- wz
     wz .= Σs .* ws .- vs

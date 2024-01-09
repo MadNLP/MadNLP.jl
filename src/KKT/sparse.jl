@@ -751,7 +751,7 @@ end
     end
 end
 
-function build_condensed_aug_coord!(kkt::SparseCondensedKKTSystem{T,VT,MT}) where {T, VT, MT <: SparseMatrixCSC{T}}
+function build_condensed_aug_coord!(kkt::AbstractCondensedKKTSystem{T,VT,MT}) where {T, VT, MT <: SparseMatrixCSC{T}}
     _build_condensed_aug_coord!(
         kkt.aug_com, kkt.pr_diag, kkt.hess_com, kkt.jt_csc, kkt.diag_buffer,
         kkt.dptr, kkt.hptr, kkt.jptr
