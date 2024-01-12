@@ -104,28 +104,31 @@ end
 
 function MadNLPSolver(nlp::AbstractNLPModel{T,VT}; kwargs...) where {T, VT}
 
-    opt, opt_linear_solver, logger = load_options(nlp; kwargs...)
-    @assert is_supported(opt.linear_solver, T)
+    options = load_options(nlp; kwargs...)
+    
+    ipm_opt = options.interior_point
+    logger = options.logger
+    @assert is_supported(ipm_opt.linear_solver, T)
 
     cnt = MadNLPCounters(start_time=time())
     cb = create_callback(
-        opt.callback,
+        ipm_opt.callback,
         nlp;
-        fixed_variable_treatment=opt.fixed_variable_treatment,
-        equality_treatment=opt.equality_treatment,
+        fixed_variable_treatment=ipm_opt.fixed_variable_treatment,
+        equality_treatment=ipm_opt.equality_treatment,
     )
 
     # generic options
-    opt.disable_garbage_collector &&
+    ipm_opt.disable_garbage_collector &&
         (GC.enable(false); @warn(logger,"Julia garbage collector is temporarily disabled"))
-    set_blas_num_threads(opt.blas_num_threads; permanent=true)
+    set_blas_num_threads(ipm_opt.blas_num_threads; permanent=true)
     @trace(logger,"Initializing variables.")
 
     ind_cons = get_index_constraints(
         get_lvar(nlp), get_uvar(nlp),
         get_lcon(nlp), get_ucon(nlp);
-        fixed_variable_treatment=opt.fixed_variable_treatment,
-        equality_treatment=opt.equality_treatment
+        fixed_variable_treatment=ipm_opt.fixed_variable_treatment,
+        equality_treatment=ipm_opt.equality_treatment
     )
 
     ind_lb = ind_cons.ind_lb
@@ -140,16 +143,16 @@ function MadNLPSolver(nlp::AbstractNLPModel{T,VT}; kwargs...) where {T, VT}
 
     @trace(logger,"Initializing KKT system.")
     kkt = create_kkt_system(
-        opt.kkt_system,
+        ipm_opt.kkt_system,
         cb,
         ind_cons,
-        opt.linear_solver;
-        hessian_approximation=opt.hessian_approximation,
-        opt_linear_solver=opt_linear_solver,
+        ipm_opt.linear_solver;
+        hessian_approximation=ipm_opt.hessian_approximation,
+        opt_linear_solver=options.linear_solver,
     )
 
     @trace(logger,"Initializing iterative solver.")
-    iterator = opt.iterator(kkt; cnt = cnt, logger = logger)
+    iterator = ipm_opt.iterator(kkt; cnt = cnt, logger = logger, opt = options.iterative_refinement)
 
     x = PrimalVector(VT, nx, ns, ind_lb, ind_ub)
     xl = PrimalVector(VT, nx, ns, ind_lb, ind_ub)
@@ -184,10 +187,10 @@ function MadNLPSolver(nlp::AbstractNLPModel{T,VT}; kwargs...) where {T, VT}
     dx_lr = view(d.xp, ind_cons.ind_lb) # TODO
     dx_ur = view(d.xp, ind_cons.ind_ub) # TODO
 
-    inertia_correction_method = if opt.inertia_correction_method == InertiaAuto
+    inertia_correction_method = if ipm_opt.inertia_correction_method == InertiaAuto
         is_inertia(kkt.linear_solver)::Bool ? InertiaBased : InertiaFree
     else
-        opt.inertia_correction_method
+        ipm_opt.inertia_correction_method
     end
 
     inertia_corrector = build_inertia_corrector(
@@ -200,7 +203,7 @@ function MadNLPSolver(nlp::AbstractNLPModel{T,VT}; kwargs...) where {T, VT}
 
     return MadNLPSolver(
         nlp, cb, kkt,
-        opt, cnt, logger,
+        ipm_opt, cnt, options.logger,
         n, m, nlb, nub,
         x, y, zl, zu, xl, xu,
         zero(T), f, c,
