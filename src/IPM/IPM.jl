@@ -103,14 +103,20 @@ mutable struct MadNLPSolver{
 end
 
 function MadNLPSolver(nlp::AbstractNLPModel{T,VT}; kwargs...) where {T, VT}
-    options = load_options(nlp; kwargs...)
 
+    options = load_options(nlp; kwargs...)
+    
     ipm_opt = options.interior_point
     logger = options.logger
     @assert is_supported(ipm_opt.linear_solver, T)
 
     cnt = MadNLPCounters(start_time=time())
-    cb = create_callback(ipm_opt.callback, nlp, ipm_opt)
+    cb = create_callback(
+        ipm_opt.callback,
+        nlp;
+        fixed_variable_treatment=ipm_opt.fixed_variable_treatment,
+        equality_treatment=ipm_opt.equality_treatment,
+    )
 
     # generic options
     ipm_opt.disable_garbage_collector &&
@@ -120,9 +126,9 @@ function MadNLPSolver(nlp::AbstractNLPModel{T,VT}; kwargs...) where {T, VT}
 
     ind_cons = get_index_constraints(
         get_lvar(nlp), get_uvar(nlp),
-        get_lcon(nlp), get_ucon(nlp),
-        ipm_opt.fixed_variable_treatment,
-        ipm_opt.equality_treatment
+        get_lcon(nlp), get_ucon(nlp);
+        fixed_variable_treatment=ipm_opt.fixed_variable_treatment,
+        equality_treatment=ipm_opt.equality_treatment
     )
 
     ind_lb = ind_cons.ind_lb
