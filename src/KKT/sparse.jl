@@ -192,9 +192,12 @@ end
 # Build KKT system directly from SparseCallback
 function create_kkt_system(
     ::Type{SparseKKTSystem},
-    cb::SparseCallback{T,VT}, opt,
-    opt_linear_solver,cnt, ind_cons
-    ) where {T,VT}
+    cb::SparseCallback{T,VT},
+    ind_cons,
+    linear_solver::Type;
+    opt_linear_solver=default_options(linear_solver),
+    hessian_approximation=ExactHessian,
+) where {T,VT}
 
     n_slack = length(ind_cons.ind_ineq)
     # Deduce KKT size.
@@ -206,11 +209,8 @@ function create_kkt_system(
     jac_sparsity_J = create_array(cb, Int32, cb.nnzj)
     _jac_sparsity_wrapper!(cb,jac_sparsity_I, jac_sparsity_J)
 
-    quasi_newton = create_quasi_newton(
-        opt.hessian_approximation, cb, n;
-        options=opt.quasi_newton_options,
-    )
-    hess_sparsity_I, hess_sparsity_J = build_hessian_structure(cb, opt.hessian_approximation)
+    quasi_newton = create_quasi_newton(hessian_approximation, cb, n)
+    hess_sparsity_I, hess_sparsity_J = build_hessian_structure(cb, hessian_approximation)
 
     nlb = length(ind_cons.ind_lb)
     nub = length(ind_cons.ind_ub)
@@ -278,7 +278,7 @@ function create_kkt_system(
     jac_com, jac_csc_map = coo_to_csc(jac_raw)
     hess_com, hess_csc_map = coo_to_csc(hess_raw)
 
-    cnt.linear_solver_time += @elapsed linear_solver = opt.linear_solver(
+    _linear_solver = linear_solver(
         aug_com; opt = opt_linear_solver
     )
 
@@ -288,7 +288,7 @@ function create_kkt_system(
         aug_raw, aug_com, aug_csc_map,
         hess_raw, hess_com, hess_csc_map,
         jac_raw, jac_com, jac_csc_map,
-        linear_solver,
+        _linear_solver,
         ind_ineq, ind_cons.ind_lb, ind_cons.ind_ub,
     )
 
@@ -304,9 +304,12 @@ num_variables(kkt::SparseKKTSystem) = length(kkt.pr_diag)
 
 function create_kkt_system(
     ::Type{SparseUnreducedKKTSystem},
-    cb::SparseCallback{T,VT}, opt,
-    opt_linear_solver,cnt, ind_cons
-    ) where {T, VT}
+    cb::SparseCallback{T,VT},
+    ind_cons,
+    linear_solver::Type;
+    opt_linear_solver=default_options(linear_solver),
+    hessian_approximation=ExactHessian,
+) where {T, VT}
     ind_ineq = ind_cons.ind_ineq
     ind_lb = ind_cons.ind_lb
     ind_ub = ind_cons.ind_ub
@@ -319,10 +322,7 @@ function create_kkt_system(
     m = cb.ncon
 
     # Quasi-newton
-    quasi_newton = create_quasi_newton(
-        opt.hessian_approximation, cb, n;
-        options=opt.quasi_newton_options,
-    )
+    quasi_newton = create_quasi_newton(hessian_approximation, cb, n)
 
     # Evaluate sparsity pattern
     jac_sparsity_I = create_array(cb, Int32, cb.nnzj)
@@ -403,17 +403,14 @@ function create_kkt_system(
     jac_com, jac_csc_map = coo_to_csc(jac_raw)
     hess_com, hess_csc_map = coo_to_csc(hess_raw)
 
-    cnt.linear_solver_time += @elapsed linear_solver = opt.linear_solver(aug_com; opt = opt_linear_solver)
-opt.linear_solver(
-        aug_com; opt = opt_linear_solver
-    )
+    _linear_solver = linear_solver(aug_com; opt = opt_linear_solver)
     return SparseUnreducedKKTSystem(
         hess, jac_callback, jac, quasi_newton, reg, pr_diag, du_diag,
         l_diag, u_diag, l_lower, u_lower, l_lower_aug, u_lower_aug,
         aug_raw, aug_com, aug_csc_map,
         hess_raw, hess_com, hess_csc_map,
         jac_raw, jac_com, jac_csc_map,
-        linear_solver,
+        _linear_solver,
         ind_ineq, ind_lb, ind_ub,
     )
 end
@@ -460,12 +457,11 @@ end
 function create_kkt_system(
     ::Type{SparseCondensedKKTSystem},
     cb::SparseCallback{T,VT},
-    opt,
-    opt_linear_solver,
-    cnt,
-    ind_cons
-    ) where {T, VT}
-
+    ind_cons,
+    linear_solver::Type;
+    opt_linear_solver=default_options(linear_solver),
+    hessian_approximation=ExactHessian,
+) where {T, VT}
     ind_ineq = ind_cons.ind_ineq
     n = cb.nvar
     m = cb.ncon
@@ -480,11 +476,8 @@ function create_kkt_system(
     jac_sparsity_J = create_array(cb, Int32, cb.nnzj)
     _jac_sparsity_wrapper!(cb,jac_sparsity_I, jac_sparsity_J)
 
-    quasi_newton = create_quasi_newton(
-        opt.hessian_approximation, cb, n;
-        options=opt.quasi_newton_options,
-    )
-    hess_sparsity_I, hess_sparsity_J = build_hessian_structure(cb, opt.hessian_approximation)
+    quasi_newton = create_quasi_newton(hessian_approximation, cb, n)
+    hess_sparsity_I, hess_sparsity_J = build_hessian_structure(cb, hessian_approximation)
 
     force_lower_triangular!(hess_sparsity_I,hess_sparsity_J)
 
@@ -525,7 +518,7 @@ function create_kkt_system(
         jt_csc
         )
 
-    cnt.linear_solver_time += @elapsed linear_solver = opt.linear_solver(aug_com; opt = opt_linear_solver)
+    _linear_solver = linear_solver(aug_com; opt = opt_linear_solver)
 
     ext = get_sparse_condensed_ext(VT, hess_com, jptr, jt_csc_map, hess_csc_map)
 
@@ -537,7 +530,7 @@ function create_kkt_system(
         l_diag, u_diag, l_lower, u_lower,
         buffer, buffer2,
         aug_com, diag_buffer, dptr, hptr, jptr,
-        linear_solver,
+        _linear_solver,
         ind_ineq, ind_cons.ind_lb, ind_cons.ind_ub,
         ext
     )
