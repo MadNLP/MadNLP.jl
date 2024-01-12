@@ -152,7 +152,8 @@ function MadNLP.create_kkt_system(
     m = cb.ncon
     ind_ineq = ind_cons.ind_ineq
     n_slack = length(ind_ineq)
-    ind_eq = setdiff(1:m, ind_ineq)
+    VI = typeof(ind_ineq)
+    ind_eq = VI(setdiff(1:m, ind_ineq))
     me = m - n_slack
 
     # Evaluate sparsity pattern
@@ -210,7 +211,10 @@ function MadNLP.create_kkt_system(
         jac_sparsity_J,
         jac,
     )
-    G_csc, G_csc_map = _extract_subjacobian(jac_coo, ind_eq)
+    G_csc_, G_csc_map_ = _extract_subjacobian(jac_coo, ind_eq)
+    MT = typeof(hess_com)
+    G_csc = MT(G_csc_)
+    G_csc_map = VI(G_csc_map_)
 
     gamma = T(1)
 
@@ -251,7 +255,7 @@ function MadNLP.initialize!(kkt::HybridCondensedKKTSystem)
     fill!(kkt.u_lower, 0.0)
     fill!(kkt.l_diag, 1.0)
     fill!(kkt.u_diag, 1.0)
-    fill!(kkt.hess_com.nzval, 0.) # so that mul! in the initial primal-dual solve has no effect
+    fill!(nonzeros(kkt.hess_com), 0.) # so that mul! in the initial primal-dual solve has no effect
 end
 
 function MadNLP.is_inertia_correct(kkt::HybridCondensedKKTSystem, num_pos, num_zero, num_neg)
