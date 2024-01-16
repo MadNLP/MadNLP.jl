@@ -1,7 +1,7 @@
 @kwdef struct RichardsonOptions
-    max_iter::Int = 10
+    max_iter::Int = 1
     tol::Float64 = 1e-10
-    acceptable_tol::Float64 = 1e-5
+    acceptable_tol::Float64 = 1e-2
 end
 
 struct RichardsonIterator{T, KKT <: AbstractKKTSystem{T}} <: AbstractIterator{T}
