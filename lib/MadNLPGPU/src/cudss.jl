@@ -7,10 +7,9 @@ end
 
 mutable struct CUDSSSolver{T} <: MadNLP.AbstractLinearSolver{T}
     inner::Union{Nothing, CUDSS.CudssSolver}
-    tril::SparseArrays.SparseMatrixCSC{T}
-    full::SparseArrays.SparseMatrixCSC{T}
-    tril_to_full_view::MadNLP.SubVector{T}
-    K::CUSPARSE.CuSparseMatrixCSR{T}
+    tril::CUSPARSE.CuSparseMatrixCSC{T}
+    full::CUSPARSE.CuSparseMatrixCSR{T}
+    tril_to_full_view::CuSubVector{T}
     x_gpu::CUDA.CuVector{T}
     b_gpu::CUDA.CuVector{T}
 
@@ -19,7 +18,7 @@ mutable struct CUDSSSolver{T} <: MadNLP.AbstractLinearSolver{T}
 end
 
 function CUDSSSolver(
-    csc::SparseArrays.SparseMatrixCSC{T};
+    csc::CUSPARSE.CuSparseMatrixCSC{T};
     opt=CudssSolverOptions(),
     logger=MadNLP.MadNLPLogger(),
 ) where T
@@ -27,9 +26,13 @@ function CUDSSSolver(
     @assert n == m
 
     full,tril_to_full_view = MadNLP.get_tril_to_full(csc)
-    full.nzval .= tril_to_full_view
 
-    K_gpu = CUSPARSE.CuSparseMatrixCSR(full)
+    full = CUSPARSE.CuSparseMatrixCSR(
+        full.colPtr,
+        full.rowVal,
+        full.nzVal,
+        full.dims
+    )
 
     view = 'L'
     structure = if opt.cudss_algorithm == MadNLP.LU
@@ -40,7 +43,7 @@ function CUDSSSolver(
         "S"
     end
 
-    matrix = CUDSS.CudssMatrix(K_gpu, structure, view)
+    matrix = CUDSS.CudssMatrix(full, structure, view)
     # TODO: pass config options here.
     config = CUDSS.CudssConfig()
     data = CUDSS.CudssData()
@@ -52,17 +55,15 @@ function CUDSSSolver(
     CUDSS.cudss("analysis", solver, x_gpu, b_gpu)
 
     return CUDSSSolver(
-        solver, csc, full, tril_to_full_view, K_gpu,
+        solver, csc, full, tril_to_full_view,
         x_gpu, b_gpu,
         opt, logger
     )
 end
 
 function MadNLP.factorize!(M::CUDSSSolver)
-    nzvals = SparseArrays.nonzeros(M.full)
-    copyto!(nzvals, M.tril_to_full_view)
-    copyto!(SparseArrays.nonzeros(M.K), nzvals)
-    CUDSS.cudss_set(M.inner.matrix, SparseArrays.nonzeros(M.K))
+    copyto!(M.full.nzVal, M.tril_to_full_view)
+    CUDSS.cudss_set(M.inner.matrix, SparseArrays.nonzeros(M.full))
     CUDSS.cudss("factorization", M.inner, M.x_gpu, M.b_gpu)
     return M
 end
@@ -76,7 +77,17 @@ end
 
 MadNLP.input_type(::Type{CUDSSSolver}) = :csc
 MadNLP.default_options(::Type{CUDSSSolver}) = CudssSolverOptions()
-MadNLP.is_inertia(M::CUDSSSolver) = false
+MadNLP.is_inertia(M::CUDSSSolver) = M.opt.cudss_algorithm == MadNLP.CHOLESKY
+function inertia(M::CUDSSSolver)
+    n = size(M.full, 1)
+    info = CUDSS.cudss_get(M.inner, "info")
+    if info == 0
+        return (n, 0, 0)
+    else
+        return (0, n, 0)
+    end
+end
+
 MadNLP.improve!(M::CUDSSSolver) = false
 MadNLP.is_supported(::Type{CUDSSSolver},::Type{Float32}) = true
 MadNLP.is_supported(::Type{CUDSSSolver},::Type{Float64}) = true
