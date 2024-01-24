@@ -35,7 +35,7 @@ MadNLP is interfaced with modeling packages:
 - [JuMP](https://github.com/jump-dev/JuMP.jl)
 - [NLPModels](https://github.com/JuliaSmoothOptimizers/NLPModels.jl).
 
-Users can pass various options to MadNLP also through the modeling packages. The interface-specific syntax are shown below. To see the list of MadNLP solver options, check the [OPTIONS.md](https://github.com/MadNLP/MadNLP/blob/master/OPTIONS.md) file.
+Users can pass various options to MadNLP also through the modeling packages. The interface-specific syntax are shown below. To see the list of MadNLP solver options, check the [OPTIONS.md](https://github.com/MadNLP/MadNLP.jl/blob/master/OPTIONS.md) file.
 
 #### JuMP interface
 

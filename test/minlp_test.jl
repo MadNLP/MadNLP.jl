@@ -14,6 +14,7 @@ const OPTIMIZER = ()->MadNLP.Optimizer(
         exclude = [
             "005_011",  # Uses the function `\`
             "006_010",  # User-defined function without Hessian (autodiff only provides 1st order)
+            "009_010",  # Objective is non-smooth
         ],
         objective_tol = 1e-5,
         primal_tol = 1e-5,

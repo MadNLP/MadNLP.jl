@@ -35,6 +35,11 @@ curvature(::Val{SCALAR2}, sk, yk) = dot(yk, yk) / dot(sk, yk)
 curvature(::Val{SCALAR3}, sk, yk) = 0.5 * (curvature(Val(SCALAR1), sk, yk) + curvature(Val(SCALAR2), sk, yk))
 curvature(::Val{SCALAR4}, sk, yk) = sqrt(curvature(Val(SCALAR1), sk, yk) * curvature(Val(SCALAR2), sk, yk))
 
+@kwdef mutable struct QuasiNewtonOptions <: AbstractOptions
+    init_strategy::BFGSInitStrategy = SCALAR1
+    max_history::Int = 6
+end
+
 
 """
     BFGS{T, VT} <: AbstractQuasiNewton{T, VT}
@@ -61,10 +66,10 @@ function create_quasi_newton(
     ::Type{BFGS},
     cb::AbstractCallback{T,VT},
     n;
-    init_strategy = SCALAR1
+    options=QuasiNewtonOptions(),
     ) where {T,VT}
     BFGS(
-        init_strategy,
+        options.init_strategy,
         VT(undef, n),
         VT(undef, n),
         VT(undef, n),
@@ -100,10 +105,10 @@ function create_quasi_newton(
     ::Type{DampedBFGS},
     cb::AbstractCallback{T,VT},
     n;
-    init_strategy = SCALAR1
+    options=QuasiNewtonOptions(),
     ) where {T,VT}
     return DampedBFGS(
-        init_strategy,
+        options.init_strategy,
         VT(undef, n),
         VT(undef, n),
         VT(undef, n),
@@ -178,17 +183,16 @@ function create_quasi_newton(
     ::Type{CompactLBFGS},
     cb::AbstractCallback{T,VT},
     n;
-    max_mem=6,
-    init_strategy = SCALAR1
+    options=QuasiNewtonOptions(),
     ) where {T, VT}
     return CompactLBFGS(
-        init_strategy,
+        options.init_strategy,
         fill!(create_array(cb, n), zero(T)),
         fill!(create_array(cb, n), zero(T)),
         fill!(create_array(cb, n), zero(T)),
         fill!(create_array(cb, n), zero(T)),
         fill!(create_array(cb, n), zero(T)),
-        max_mem,
+        options.max_history,
         0,
         fill!(create_array(cb, n, 0), zero(T)),
         fill!(create_array(cb, n, 0), zero(T)),
@@ -319,4 +323,4 @@ end
 
 
 struct ExactHessian{T, VT} <: AbstractHessian{T, VT} end
-create_quasi_newton(::Type{ExactHessian}, cb::AbstractCallback{T,VT}, n) where {T,VT} = ExactHessian{T, VT}()
+create_quasi_newton(::Type{ExactHessian}, cb::AbstractCallback{T,VT}, n; options...) where {T,VT} = ExactHessian{T, VT}()

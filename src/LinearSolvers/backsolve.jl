@@ -1,7 +1,7 @@
-@kwdef struct RichardsonOptions
-    max_iter::Int = 1
-    tol::Float64 = 1e-10
-    acceptable_tol::Float64 = 1e-2
+@kwdef mutable struct RichardsonOptions <: AbstractOptions
+    richardson_max_iter::Int = 10
+    richardson_tol::Float64 = 1e-10
+    richardson_acceptable_tol::Float64 = 1e-5
 end
 
 struct RichardsonIterator{T, KKT <: AbstractKKTSystem{T}} <: AbstractIterator{T}
@@ -21,6 +21,8 @@ function RichardsonIterator(
         kkt, opt, cnt, logger
     )
 end
+
+default_options(::Type{RichardsonIterator}) = RichardsonOptions()
 
 function solve_refine!(
     x::VT,
@@ -66,7 +68,7 @@ function solve_refine!(
         @debug(iterator.logger, @sprintf("%4i %6.2e", iter, residual_ratio))
         iter += 1
 
-        if (iter >= iterator.opt.max_iter) || (residual_ratio < iterator.opt.tol)
+        if (iter >= iterator.opt.richardson_max_iter) || (residual_ratio < iterator.opt.richardson_tol)
             break
         end
     end
@@ -79,6 +81,6 @@ function solve_refine!(
         ),
     )
 
-    return residual_ratio < iterator.opt.acceptable_tol
+    return residual_ratio < iterator.opt.richardson_acceptable_tol
 end
 
