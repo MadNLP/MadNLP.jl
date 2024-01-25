@@ -50,7 +50,7 @@ function MadNLP.MadNLPOptions(nlp::AbstractNLPModel{T,VT}) where {T, VT <: CuVec
     kkt_system = is_dense_callback ? MadNLP.DenseCondensedKKTSystem : MadNLP.SparseCondensedKKTSystem
 
     # if dense kkt system, we use a dense linear solver
-    linear_solver = is_dense_callback ? LapackGPUSolver : RFSolver
+    linear_solver = is_dense_callback ? LapackGPUSolver : CuCholeskySolver
 
     equality_treatment = is_dense_callback ? MadNLP.EnforceEquality : MadNLP.RelaxEquality
 
