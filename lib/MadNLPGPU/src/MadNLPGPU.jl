@@ -22,6 +22,9 @@ import MadNLP:
     introduce, factorize!, solve!, improve!, is_inertia, inertia, tril_to_full!,
     LapackOptions, input_type, is_supported, default_options, symul!
 
+# AMD
+import AMD
+
 symul!(y, A, x::CuVector{T}, α = 1., β = 0.) where T = CUBLAS.symv!('L', T(α), A, x, T(β), y)
 MadNLP._ger!(alpha::Number, x::CuVector{T}, y::CuVector{T}, A::CuMatrix{T}) where T = CUBLAS.ger!(alpha, x, y, A)
 function MadNLP._madnlp_unsafe_wrap(vec::VT, n, shift=1) where {T, VT <: CuVector{T}}
@@ -47,7 +50,7 @@ function MadNLP.MadNLPOptions(nlp::AbstractNLPModel{T,VT}) where {T, VT <: CuVec
     kkt_system = is_dense_callback ? MadNLP.DenseCondensedKKTSystem : MadNLP.SparseCondensedKKTSystem
 
     # if dense kkt system, we use a dense linear solver
-    linear_solver = is_dense_callback ? LapackGPUSolver : RFSolver
+    linear_solver = is_dense_callback ? LapackGPUSolver : CuCholeskySolver
 
     equality_treatment = is_dense_callback ? MadNLP.EnforceEquality : MadNLP.RelaxEquality
 

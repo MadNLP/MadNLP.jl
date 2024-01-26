@@ -174,3 +174,128 @@ MadNLP.improve!(M::GLUSolver) = false
 MadNLP.is_supported(::Type{GLUSolver},::Type{Float32}) = true
 MadNLP.is_supported(::Type{GLUSolver},::Type{Float64}) = true
 MadNLP.introduce(M::GLUSolver) = "GLU"
+
+
+
+#=
+    Undocumented Cholesky Solver
+=#
+
+@kwdef mutable struct CuCholeskySolverOptions <: MadNLP.AbstractOptions
+end
+
+mutable struct CuCholeskySolver{T} <: MadNLP.AbstractLinearSolver{T}
+    inner::Union{Nothing,CUSOLVER.SparseCholesky}
+
+    tril::CUSPARSE.CuSparseMatrixCSC{T}
+    full::CUSPARSE.CuSparseMatrixCSR{T}
+    tril_to_full_view::CuSubVector{T}
+    buffer::CUDA.CuVector{T}
+
+    fullp::CUSPARSE.CuSparseMatrixCSR{T}
+    p::CUDA.CuVector{Int}
+    pnzval::CUDA.CuVector{Int}
+    rhs::CUDA.CuVector{T}
+    
+    singularity::Bool
+    
+    opt::CuCholeskySolverOptions
+    logger::MadNLP.MadNLPLogger
+end
+
+function CuCholeskySolver(
+    csc::CUSPARSE.CuSparseMatrixCSC;
+    opt=CuCholeskySolverOptions(),
+    logger=MadNLP.MadNLPLogger(),
+)
+    n, m = size(csc)
+    @assert n == m
+
+    full,tril_to_full_view = MadNLP.get_tril_to_full(csc)
+    buffer = similar(csc.nzVal,1)
+
+    full = CUSPARSE.CuSparseMatrixCSR(
+        full.colPtr,
+        full.rowVal,
+        full.nzVal,
+        full.dims
+    )
+
+    full_cpu = MadNLP.SparseMatrixCSC(full)
+    full_cpu_order = MadNLP.SparseMatrixCSC(
+        n, m,
+        full_cpu.colptr,
+        full_cpu.rowval,
+        Array(1:length(full_cpu.nzval)),
+    )
+    p = AMD.amd(full_cpu_order)
+    full_cpu_reorder = full_cpu_order[p,p]
+    pnzval = full_cpu_reorder.nzval
+    
+    fullp = CUSPARSE.CuSparseMatrixCSR(
+        CuArray(full_cpu_reorder.colptr),
+        CuArray(full_cpu_reorder.rowval),
+        similar(full.nzVal),
+        (n, m),
+    )    
+    
+    rhs = similar(csc.nzVal, n)
+
+    return CuCholeskySolver(
+        nothing, csc, full, tril_to_full_view, buffer,
+        fullp, CuArray{Int}(p), CuArray{Int}(pnzval), rhs, false,
+        opt, logger
+    )
+end
+
+function MadNLP.factorize!(M::CuCholeskySolver)
+
+    copyto!(M.full.nzVal, M.tril_to_full_view)
+    _copy_to_perm_2!(CUDABackend())(M.fullp.nzVal, M.pnzval, M.full.nzVal; ndrange= length(M.pnzval))
+    synchronize(CUDABackend())
+    if M.inner == nothing
+        M.inner = CUSOLVER.SparseCholesky(M.fullp)
+        CUSOLVER.spcholesky_buffer(M.inner, M.fullp)
+    end
+    try
+        CUSOLVER.spcholesky_factorise(M.inner, M.fullp, eltype(M.fullp.nzVal) == Float32 ? 1e-6 : 1e-12)
+        M.singularity = false
+    catch e
+        println(e)
+        M.singularity = true
+    end
+
+    return M
+end
+
+function MadNLP.solve!(M::CuCholeskySolver{T}, x) where T
+    _copy_to_perm_2!(CUDABackend())(M.rhs, M.p, x; ndrange=length(M.p))
+    synchronize(CUDABackend())
+    CUSOLVER.spcholesky_solve(M.inner, M.rhs, x)
+    _copy_to_perm!(CUDABackend())(M.rhs, M.p, x; ndrange=length(M.p))
+    synchronize(CUDABackend())
+    copyto!(x, M.rhs)
+    return x
+end
+
+@kernel function _copy_to_perm!(y,p,x)
+    i = @index(Global)
+    @inbounds y[p[i]] = x[i]
+end
+@kernel function _copy_to_perm_2!(y,p,x)
+    i = @index(Global)
+    @inbounds y[i] = x[p[i]]
+end
+function MadNLP.inertia(M::CuCholeskySolver{T}) where T
+    return !(M.singularity) ? (size(M.fullp,1),0,0) : (size(M.fullp,1) - 2,1,1)
+end
+
+MadNLP.input_type(::Type{CuCholeskySolver}) = :csc
+MadNLP.default_options(::Type{CuCholeskySolver}) = CuCholeskySolverOptions()
+MadNLP.is_inertia(M::CuCholeskySolver) = true
+MadNLP.improve!(M::CuCholeskySolver) = false
+MadNLP.is_supported(::Type{CuCholeskySolver},::Type{Float32}) = true
+MadNLP.is_supported(::Type{CuCholeskySolver},::Type{Float64}) = true
+MadNLP.introduce(M::CuCholeskySolver) = "cuSolverCholesky"
+
+export CuCholeskySolver
