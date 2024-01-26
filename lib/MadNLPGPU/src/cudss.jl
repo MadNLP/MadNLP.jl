@@ -112,14 +112,20 @@ end
 
 MadNLP.input_type(::Type{CUDSSSolver}) = :csc
 MadNLP.default_options(::Type{CUDSSSolver}) = CudssSolverOptions()
-MadNLP.is_inertia(M::CUDSSSolver) = M.opt.cudss_algorithm == MadNLP.CHOLESKY
+MadNLP.is_inertia(M::CUDSSSolver) = (M.opt.cudss_algorithm ∈ (MadNLP.CHOLESKY, MadNLP.BUNCHKAUFMAN))
 function inertia(M::CUDSSSolver)
     n = size(M.full, 1)
-    info = CUDSS.cudss_get(M.inner, "info")
-    if info == 0
-        return (n, 0, 0)
-    else
-        return (0, n, 0)
+    if M.opt.cudss_algorithm == MadNLP.CHOLESKY
+        info = CUDSS.cudss_get(M.inner, "info")
+        if info == 0
+            return (n, 0, 0)
+        else
+            return (0, n, 0)
+        end
+    elseif M.opt.cudss_algorithm == MadNLP.BUNCHKAUFMAN
+        # N.B.: cuDSS does not always return the correct inertia.
+        (k, l) = CUDSS.cudss_get(M.inner, "inertia")
+        return (k, n - k - l, l)
     end
 end
 
