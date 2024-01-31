@@ -30,6 +30,21 @@ Return `true` if the update succeeded, `false` otherwise.
 """
 function update! end
 
+"""
+    init!(
+        qn::AbstractHessian{T},
+        Bk::AbstractArray{T},
+        g0::AbstractVector{T},
+        f0::T,
+    ) where T
+
+Instantiate the Hessian estimate `Bk` with the quasi-Newton algorithm `qn`.
+The function uses the initial gradient `g0` and the initial objective
+`f0` to build the initial estimate.
+
+"""
+function init! end
+
 curvature(::Val{SCALAR1}, sk, yk) = dot(yk, sk) / dot(sk, sk)
 curvature(::Val{SCALAR2}, sk, yk) = dot(yk, yk) / dot(sk, yk)
 curvature(::Val{SCALAR3}, sk, yk) = 0.5 * (curvature(Val(SCALAR1), sk, yk) + curvature(Val(SCALAR2), sk, yk))

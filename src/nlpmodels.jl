@@ -147,6 +147,24 @@ reformulations of the equality constraints and fixed variables.
 abstract type AbstractCallback{T,VT} end
 
 """
+    create_callback(
+        ::Type{Callback},
+        nlp::AbstractNLPModel{T, VT};
+        fixed_variable_treatment=MakeParameter,
+        equality_treatment=EnforceEquality,
+    ) where {T, VT}
+
+Wrap the nonlinear program `nlp` using the callback wrapper
+with type `Callback`. The option `fixed_variable_treatment`
+decides if the fixed variables are relaxed (`RelaxBound`)
+or removed (`MakeParameter`). The option `equality_treatment`
+decides if the the equality constraints are keep as is
+(`EnforceEquality`) or relaxed (`RelaxEquality`).
+
+"""
+function create_callback end
+
+"""
     SparseCallback{T, VT} < AbstractCallback{T, VT}
 
 Wrap an `AbstractNLPModel` using sparse structures.

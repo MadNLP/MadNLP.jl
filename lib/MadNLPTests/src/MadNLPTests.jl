@@ -56,7 +56,6 @@ function test_kkt_system(kkt, cb)
     (m, p) = size(kkt)
     # system should be square
     @test m == p
-    @test isa(MadNLP.is_reduced(kkt), Bool)
 
     # Interface
     MadNLP.initialize!(kkt)

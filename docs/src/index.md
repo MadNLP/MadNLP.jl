@@ -14,8 +14,9 @@ MadNLP targets the resolution of constrained nonlinear problems,
 formulating as
 ```math
   \begin{aligned}
-    \min_{x_\ell \leq x \leq x_u} \; & f(x) \\
-    \text{subject to} \quad & g_\ell \leq g(x) \leq g_u
+    \min_{x} \; & f(x) \\
+    \text{subject to} \quad & g_\ell \leq g(x) \leq g_u \\
+                            & x_\ell \leq x \leq x_u
   \end{aligned}
 ```
 where $$x \in \mathbb{R}^n$$ is the decision variable, $$f: \mathbb{R}^n \to \mathbb{R}$$
@@ -43,8 +44,10 @@ a slack variables $$s \in \mathbb{R}^m$$ to rewrite all the inequality
 constraints as equality constraints:
 ```math
   \begin{aligned}
-    \min_{x_\ell \leq x \leq x_u, s} \; & f(x) \\
-    \text{subject to} \quad & g(x) - s = 0 , \quad g_\ell \leq s \leq g_u
+    \min_{x, s} \; & f(x) \\
+    \text{subject to} \quad & g(x) - s = 0  \\
+                            & g_\ell \leq s \leq g_u \\
+                            & x_\ell \leq x \leq x_u
   \end{aligned}
 ```
 
