@@ -91,6 +91,7 @@ function inertia(M::CUDSSSolver)
     elseif M.opt.cudss_algorithm == MadNLP.BUNCHKAUFMAN
         # N.B.: cuDSS does not always return the correct inertia.
         (k, l) = CUDSS.cudss_get(M.inner, "inertia")
+        k = min(n, k) # TODO: add safeguard for inertia
         return (k, n - k - l, l)
     end
 end
