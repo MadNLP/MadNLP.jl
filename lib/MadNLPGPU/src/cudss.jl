@@ -13,11 +13,6 @@ mutable struct CUDSSSolver{T} <: MadNLP.AbstractLinearSolver{T}
     x_gpu::CUDA.CuVector{T}
     b_gpu::CUDA.CuVector{T}
 
-    # Permutation
-    full_permuted::CUSPARSE.CuSparseMatrixCSR{T}
-    perm::CUDA.CuVector{Int}
-    perm_nzval::CUDA.CuVector{Int}
-
     opt::CudssSolverOptions
     logger::MadNLP.MadNLPLogger
 end
@@ -39,24 +34,6 @@ function CUDSSSolver(
         full.dims
     )
 
-    # Reordering
-    full_cpu = MadNLP.SparseMatrixCSC(full)
-    full_cpu_order = MadNLP.SparseMatrixCSC(
-        n, m,
-        full_cpu.colptr,
-        full_cpu.rowval,
-        Array(1:length(full_cpu.nzval)),
-    )
-    perm = AMD.amd(full_cpu_order)
-    full_cpu_reorder = full_cpu_order[perm, perm]
-    pnzval = full_cpu_reorder.nzval
-
-    full_permuted = CUSPARSE.CuSparseMatrixCSR(
-        CuArray(full_cpu_reorder.colptr),
-        CuArray(full_cpu_reorder.rowval),
-        similar(full.nzVal),
-        (n, m),
-    )
 
     view = 'L'
     structure = if opt.cudss_algorithm == MadNLP.LU
@@ -67,7 +44,7 @@ function CUDSSSolver(
         "S"
     end
 
-    matrix = CUDSS.CudssMatrix(full_permuted, structure, view)
+    matrix = CUDSS.CudssMatrix(full, structure, view)
     # TODO: pass config options here.
     config = CUDSS.CudssConfig()
     data = CUDSS.CudssData()
@@ -78,35 +55,24 @@ function CUDSSSolver(
 
     CUDSS.cudss("analysis", solver, x_gpu, b_gpu)
 
-    g_perm = CuVector{Int}(perm)
-    g_pnzval = CuVector{Int}(pnzval)
-
     return CUDSSSolver(
         solver, csc, full, tril_to_full_view,
         x_gpu, b_gpu,
-        full_permuted, g_perm, g_pnzval,
         opt, logger
     )
 end
 
 function MadNLP.factorize!(M::CUDSSSolver)
     copyto!(M.full.nzVal, M.tril_to_full_view)
-    # Permutation
-    _copy_to_perm_2!(CUDABackend())(M.full_permuted.nzVal, M.perm_nzval, M.full.nzVal; ndrange= length(M.perm_nzval))
-    synchronize(CUDABackend())
-
-    CUDSS.cudss_set(M.inner.matrix, SparseArrays.nonzeros(M.full_permuted))
+    CUDSS.cudss_set(M.inner.matrix, SparseArrays.nonzeros(M.full))
     CUDSS.cudss("factorization", M.inner, M.x_gpu, M.b_gpu)
     return M
 end
 
 function MadNLP.solve!(M::CUDSSSolver{T}, x) where T
     copyto!(M.b_gpu, x)
-    _copy_to_perm_2!(CUDABackend())(M.b_gpu, M.perm, x; ndrange=length(M.perm))
-    synchronize(CUDABackend())
     CUDSS.cudss("solve", M.inner, M.x_gpu, M.b_gpu)
-    _copy_to_perm!(CUDABackend())(x, M.perm, M.x_gpu; ndrange=length(M.perm))
-    synchronize(CUDABackend())
+    copyto!(x, M.x_gpu)
     return x
 end
 
