@@ -38,11 +38,13 @@ _function_info(::MOI.ScalarQuadraticFunction) = _kFunctionTypeScalarQuadratic
     _kBoundTypeLessThan,
     _kBoundTypeGreaterThan,
     _kBoundTypeEqualTo,
+    _kBoundTypeInterval,
 )
 
 _set_info(s::MOI.LessThan) = _kBoundTypeLessThan, -Inf, s.upper
 _set_info(s::MOI.GreaterThan) = _kBoundTypeGreaterThan, s.lower, Inf
 _set_info(s::MOI.EqualTo) = _kBoundTypeEqualTo, s.value, s.value
+_set_info(s::MOI.Interval) = _kBoundTypeInterval, s.lower, s.upper
 
 function _bound_type_to_set(::Type{T}, k::_BoundType) where {T}
     if k == _kBoundTypeEqualTo
@@ -360,7 +362,7 @@ end
 function MOI.add_constraint(
     block::QPBlockData{T},
     f::Union{MOI.ScalarAffineFunction{T},MOI.ScalarQuadraticFunction{T}},
-    set::Union{MOI.LessThan{T},MOI.GreaterThan{T},MOI.EqualTo{T}},
+    set::Union{MOI.LessThan{T},MOI.GreaterThan{T},MOI.EqualTo{T},MOI.Interval{T}},
 ) where {T}
     push!(block.constraints, f)
     bound_type, l, u = _set_info(set)
