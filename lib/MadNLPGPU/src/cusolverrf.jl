@@ -186,7 +186,7 @@ MadNLP.introduce(M::GLUSolver) = "GLU"
     AMD_ORDERING = 2
 end
 @kwdef mutable struct CuCholeskySolverOptions <: MadNLP.AbstractOptions
-    ordering::CUCHOLESKYORDERING = METIS
+    ordering::CUCHOLESKYORDERING = METIS_ORDERING
 end
 
 mutable struct CuCholeskySolver{T} <: MadNLP.AbstractLinearSolver{T}
@@ -237,7 +237,8 @@ function CuCholeskySolver(
     if opt.ordering == AMD_ORDERING
         p = AMD.amd(full_cpu_order)
     else
-        p,~ = Metis.permutation(full_cpu_order)
+        g = Metis.graph(full_cpu_order; check_hermitian = false)
+        p,~ = Metis.permutation(g)
     end
     
     full_cpu_reorder = full_cpu_order[p,p]
