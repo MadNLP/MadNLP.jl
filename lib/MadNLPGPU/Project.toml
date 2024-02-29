@@ -9,6 +9,7 @@ CUSOLVERRF = "a8cc9031-bad2-4722-94f5-40deabb4245c"
 KernelAbstractions = "63c18a36-062a-441e-b654-da1e3ab1ce7c"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 MadNLP = "2621e9c9-9eb4-46b1-8089-e8c72242dfb6"
+Metis = "2679e427-3c69-5b7f-982b-ece356f1e94b"
 
 [compat]
 AMD = "0.5"
