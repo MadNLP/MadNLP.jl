@@ -141,4 +141,5 @@ include("backsolve.jl")
 # dense solvers
 include("lapack.jl")
 include("umfpack.jl")
+include("cholmod.jl")
 
