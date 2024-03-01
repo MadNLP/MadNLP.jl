@@ -11,6 +11,14 @@ testset = [
     [
         "LapackGPU-CUSOLVERRF",
         ()->MadNLP.Optimizer(
+            linear_solver=MadNLPGPU.CuCholeskySolver,
+            print_level=MadNLP.ERROR
+        ),
+        [],
+    ],
+    [
+        "LapackGPU-CUSOLVERRF",
+        ()->MadNLP.Optimizer(
             linear_solver=MadNLPGPU.GLUSolver,
             print_level=MadNLP.ERROR
         ),

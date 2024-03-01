@@ -22,8 +22,8 @@ import MadNLP:
     introduce, factorize!, solve!, improve!, is_inertia, inertia, tril_to_full!,
     LapackOptions, input_type, is_supported, default_options, symul!
 
-# AMD
-import AMD
+# AMD and Metis
+import AMD, Metis
 
 symul!(y, A, x::CuVector{T}, α = 1., β = 0.) where T = CUBLAS.symv!('L', T(α), A, x, T(β), y)
 MadNLP._ger!(alpha::Number, x::CuVector{T}, y::CuVector{T}, A::CuMatrix{T}) where T = CUBLAS.ger!(alpha, x, y, A)
@@ -51,21 +51,13 @@ function MadNLP.MadNLPOptions(nlp::AbstractNLPModel{T,VT}) where {T, VT <: CuVec
     kkt_system = is_dense_callback ? MadNLP.DenseCondensedKKTSystem : MadNLP.SparseCondensedKKTSystem
 
     # if dense kkt system, we use a dense linear solver
-    linear_solver = is_dense_callback ? LapackGPUSolver : RFSolver
-
-    equality_treatment = is_dense_callback ? MadNLP.EnforceEquality : MadNLP.RelaxEquality
-
-    fixed_variable_treatment = is_dense_callback ? MadNLP.MakeParameter : MadNLP.RelaxBound
-
-    tol = MadNLP.get_tolerance(T,kkt_system)
+    linear_solver = is_dense_callback ? LapackGPUSolver : CUDSSSolver
 
     return MadNLP.MadNLPOptions(
+        tol = MadNLP.get_tolerance(T,kkt_system),
         callback = callback,
         kkt_system = kkt_system,
         linear_solver = linear_solver,
-        equality_treatment = equality_treatment,
-        fixed_variable_treatment = fixed_variable_treatment,
-        tol = tol
     )
 end
 

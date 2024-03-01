@@ -51,9 +51,11 @@ function _bound_type_to_set(::Type{T}, k::_BoundType) where {T}
         return MOI.EqualTo{T}
     elseif k == _kBoundTypeLessThan
         return MOI.LessThan{T}
-    else
-        @assert k == _kBoundTypeGreaterThan
+    elseif k == _kBoundTypeGreaterThan
         return MOI.GreaterThan{T}
+    else
+        @assert k == _kBoundTypeInterval
+        return MOI.Interval{T}
     end
 end
 
@@ -323,7 +325,7 @@ function MOI.is_valid(
 ) where {
     T,
     F<:Union{MOI.ScalarAffineFunction{T},MOI.ScalarQuadraticFunction{T}},
-    S<:Union{MOI.LessThan{T},MOI.GreaterThan{T},MOI.EqualTo{T}},
+    S<:Union{MOI.LessThan{T},MOI.GreaterThan{T},MOI.EqualTo{T},MOI.Interval{T}},
 }
     return 1 <= ci.value <= length(block)
 end
@@ -334,7 +336,7 @@ function MOI.get(
 ) where {
     T,
     F<:Union{MOI.ScalarAffineFunction{T},MOI.ScalarQuadraticFunction{T}},
-    S<:Union{MOI.LessThan{T},MOI.GreaterThan{T},MOI.EqualTo{T}},
+    S<:Union{MOI.LessThan{T},MOI.GreaterThan{T},MOI.EqualTo{T},MOI.Interval{T}},
 }
     ret = MOI.ConstraintIndex{F,S}[]
     for i in 1:length(block)
@@ -354,7 +356,7 @@ function MOI.get(
 ) where {
     T,
     F<:Union{MOI.ScalarAffineFunction{T},MOI.ScalarQuadraticFunction{T}},
-    S<:Union{MOI.LessThan{T},MOI.GreaterThan{T},MOI.EqualTo{T}},
+    S<:Union{MOI.LessThan{T},MOI.GreaterThan{T},MOI.EqualTo{T},MOI.Interval{T}},
 }
     return length(MOI.get(block, MOI.ListOfConstraintIndices{F,S}()))
 end
@@ -392,9 +394,11 @@ function MOI.get(
         return MOI.EqualTo(block.g_L[row])
     elseif block.bound_type[row] == _kBoundTypeLessThan
         return MOI.LessThan(block.g_U[row])
-    else
-        @assert block.bound_type[row] == _kBoundTypeGreaterThan
+    elseif block.bound_type[row] == _kBoundTypeGreaterThan
         return MOI.GreaterThan(block.g_L[row])
+    else
+        @assert block.bound_type[row] == _kBoundTypeInterval
+        return MOI.Interval(block.g_L[row], block.g_U[row])
     end
 end
 
@@ -429,6 +433,18 @@ function MOI.set(
     row = c.value
     block.g_L[row] = set.value
     block.g_U[row] = set.value
+    return
+end
+
+function MOI.set(
+    block::QPBlockData{T},
+    ::MOI.ConstraintSet,
+    c::MOI.ConstraintIndex{F,MOI.Interval{T}},
+    set::MOI.Interval{T},
+) where {T,F}
+    row = c.value
+    block.g_L[row] = set.lower
+    block.g_U[row] = set.upper
     return
 end
 

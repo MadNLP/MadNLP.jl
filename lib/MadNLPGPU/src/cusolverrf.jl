@@ -181,7 +181,12 @@ MadNLP.introduce(M::GLUSolver) = "GLU"
     Undocumented Cholesky Solver
 =#
 
+@enum CUCHOLESKYORDERING begin
+    METIS_ORDERING = 1
+    AMD_ORDERING = 2
+end
 @kwdef mutable struct CuCholeskySolverOptions <: MadNLP.AbstractOptions
+    ordering::CUCHOLESKYORDERING = METIS_ORDERING
 end
 
 mutable struct CuCholeskySolver{T} <: MadNLP.AbstractLinearSolver{T}
@@ -228,7 +233,14 @@ function CuCholeskySolver(
         full_cpu.rowval,
         Array(1:length(full_cpu.nzval)),
     )
-    p = AMD.amd(full_cpu_order)
+
+    if opt.ordering == AMD_ORDERING
+        p = AMD.amd(full_cpu_order)
+    else
+        g = Metis.graph(full_cpu_order; check_hermitian = false)
+        p,~ = Metis.permutation(g)
+    end
+
     full_cpu_reorder = full_cpu_order[p,p]
     pnzval = full_cpu_reorder.nzval
     

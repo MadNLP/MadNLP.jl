@@ -38,6 +38,9 @@ curvature(::Val{SCALAR4}, sk, yk) = sqrt(curvature(Val(SCALAR1), sk, yk) * curva
 @kwdef mutable struct QuasiNewtonOptions <: AbstractOptions
     init_strategy::BFGSInitStrategy = SCALAR1
     max_history::Int = 6
+    init_value::Float64 = 1.0
+    sigma_min::Float64 = 1e-8
+    sigma_max::Float64 = 1e+8
 end
 
 
@@ -55,6 +58,7 @@ The matrix is not updated if ``s_k^⊤ y_k < 10^{-8}``.
 """
 struct BFGS{T, VT <: AbstractVector{T}} <: AbstractQuasiNewton{T, VT}
     init_strategy::BFGSInitStrategy
+    is_instantiated::Base.RefValue{Bool}
     sk::VT
     yk::VT
     bsk::VT
@@ -62,6 +66,7 @@ struct BFGS{T, VT <: AbstractVector{T}} <: AbstractQuasiNewton{T, VT}
     last_x::VT
     last_jv::VT
 end
+
 function create_quasi_newton(
     ::Type{BFGS},
     cb::AbstractCallback{T,VT},
@@ -70,6 +75,7 @@ function create_quasi_newton(
     ) where {T,VT}
     BFGS(
         options.init_strategy,
+        Ref(false),
         VT(undef, n),
         VT(undef, n),
         VT(undef, n),
@@ -80,12 +86,20 @@ function create_quasi_newton(
 end
 
 function update!(qn::BFGS{T, VT}, Bk::AbstractMatrix, sk::AbstractVector, yk::AbstractVector) where {T, VT}
-    if dot(sk, yk) < T(1e-8)
+    yksk = dot(sk, yk)
+    if yksk < T(1e-8)
         return false
     end
+    # Initial approximation (Nocedal & Wright, p.143)
+    if !qn.is_instantiated[]
+        sksk = dot(sk, sk)
+        Bk[diagind(Bk)] .= yksk ./ sksk
+        qn.is_instantiated[] = true
+    end
+    # BFGS update
     mul!(qn.bsk, Bk, sk)
     alpha1 = one(T) / dot(sk, qn.bsk)
-    alpha2 = one(T) / dot(yk, sk)
+    alpha2 = one(T) / yksk
     _ger!(-alpha1, qn.bsk, qn.bsk, Bk)  # Bk = Bk - alpha1 * bsk * bsk'
     _ger!(alpha2, yk, yk, Bk)           # Bk = Bk + alpha2 * yk * yk'
     return true
@@ -93,6 +107,7 @@ end
 
 struct DampedBFGS{T, VT <: AbstractVector{T}} <: AbstractQuasiNewton{T, VT}
     init_strategy::BFGSInitStrategy
+    is_instantiated::Base.RefValue{Bool}
     sk::VT
     yk::VT
     bsk::VT
@@ -101,6 +116,7 @@ struct DampedBFGS{T, VT <: AbstractVector{T}} <: AbstractQuasiNewton{T, VT}
     last_x::VT
     last_jv::VT
 end
+
 function create_quasi_newton(
     ::Type{DampedBFGS},
     cb::AbstractCallback{T,VT},
@@ -109,6 +125,7 @@ function create_quasi_newton(
     ) where {T,VT}
     return DampedBFGS(
         options.init_strategy,
+        Ref(false),
         VT(undef, n),
         VT(undef, n),
         VT(undef, n),
@@ -120,12 +137,20 @@ function create_quasi_newton(
 end
 
 function update!(qn::DampedBFGS{T, VT}, Bk::AbstractMatrix, sk::AbstractVector, yk::AbstractVector) where {T, VT}
+    yksk = dot(sk, yk)
+    # Initial approximation (Nocedal & Wright, p.143)
+    if !qn.is_instantiated[]
+        sksk = dot(sk, sk)
+        Bk[diagind(Bk)] .= yksk ./ sksk
+        qn.is_instantiated[] = true
+    end
+
     mul!(qn.bsk, Bk, sk)
     sBs = dot(sk, qn.bsk)
 
     # Procedure 18.2 (Nocedal & Wright, page 537)
     theta = if dot(sk, yk) < T(0.2) * sBs
-        T(0.8) * sBs / (sBs - dot(sk, yk))
+        T(0.8) * sBs / (sBs - yksk)
     else
         one(T)
     end
@@ -142,11 +167,17 @@ function update!(qn::DampedBFGS{T, VT}, Bk::AbstractMatrix, sk::AbstractVector, 
     return true
 end
 
-# Initial update (Nocedal & Wright, p.143)
-function init!(qn::Union{BFGS, DampedBFGS}, Bk::AbstractMatrix, sk::AbstractVector, yk::AbstractVector)
-    yksk = dot(yk, sk)
-    sksk = dot(sk, sk)
-    Bk[diagind(Bk)] .= yksk ./ sksk
+function init!(qn::Union{BFGS, DampedBFGS}, Bk::AbstractMatrix{T}, g0::AbstractVector{T}, f0::T) where T
+    norm_g0 = dot(g0, g0)
+    # Initiate B0 with Gilbert & Lemaréchal rule.
+    rho0 = if norm_g0 < sqrt(eps(T))
+        one(T)
+    elseif f0 ≈ zero(T)
+        one(T) / norm_g0
+    else
+        abs(f0) / norm_g0
+    end
+    Bk[diagind(Bk)] .= T(2) * rho0
     return
 end
 
@@ -161,8 +192,12 @@ mutable struct CompactLBFGS{T, VT <: AbstractVector{T}, MT <: AbstractMatrix{T}}
     last_g::VT
     last_x::VT
     last_jv::VT
+    init_value::T
+    sigma_min::T
+    sigma_max::T
     max_mem::Int
     current_mem::Int
+    skipped_iter::Int
     Sk::MT       # n x p
     Yk::MT       # n x p
     Lk::MT       # p x p
@@ -192,7 +227,11 @@ function create_quasi_newton(
         fill!(create_array(cb, n), zero(T)),
         fill!(create_array(cb, n), zero(T)),
         fill!(create_array(cb, n), zero(T)),
+        options.init_value,
+        options.sigma_min,
+        options.sigma_max,
         options.max_history,
+        0,
         0,
         fill!(create_array(cb, n, 0), zero(T)),
         fill!(create_array(cb, n, 0), zero(T)),
@@ -225,6 +264,17 @@ function _resize!(qn::CompactLBFGS{T, VT, MT}) where {T, VT, MT}
     qn._w1    = zeros(T, k)
     qn._w2    = zeros(T, 2*k)
     return
+end
+
+function _reset!(qn::CompactLBFGS{T, VT, MT}) where {T, VT, MT}
+    n, _ = size(qn)
+    qn.current_mem = 0
+    qn.skipped_iter = 0
+    fill!(qn.last_jv, zero(T))
+    qn.Dk  = zeros(T, 0)
+    qn.Sk  = zeros(T, n, 0)
+    qn.Yk  = zeros(T, n, 0)
+    _resize!(qn)
 end
 
 # augment / shift
@@ -276,9 +326,19 @@ function _refresh_STS!(qn::CompactLBFGS{T, VT, MT}) where {T, VT, MT}
 end
 
 function update!(qn::CompactLBFGS{T, VT, MT}, Bk, sk, yk) where {T, VT, MT}
-    if dot(sk, yk) < sqrt(eps(T)) * norm(sk) * norm(yk)
+    norm_sk, norm_yk = norm(sk), norm(yk)
+    # Skip update if vectors are too small or local curvature is negative.
+    if ((norm_sk < T(100) * eps(T)) ||
+        (norm_yk < T(100) * eps(T)) ||
+        (dot(sk, yk) < sqrt(eps(T)) * norm_sk * norm_yk)
+    )
+        qn.skipped_iter += 1
+        if qn.skipped_iter >= 2
+            _reset!(qn)
+        end
         return false
     end
+
     # Refresh internal structures
     _update_SY!(qn, sk, yk)
     _refresh_D!(qn, sk, yk)
@@ -295,6 +355,7 @@ function update!(qn::CompactLBFGS{T, VT, MT}, Bk, sk, yk) where {T, VT, MT}
 
     # Step 1: σₖ I
     sigma = curvature(Val(qn.init_strategy), sk, yk)  # σₖ
+    sigma = clamp(sigma, qn.sigma_min, qn.sigma_max)
     Bk .= sigma                                       # Hₖ .= σₖ I (diagonal Hessian approx.)
 
     # Step 2: Mₖ = σₖ Sₖᵀ Sₖ + Lₖ Dₖ⁻¹ Lₖᵀ
@@ -317,7 +378,17 @@ function update!(qn::CompactLBFGS{T, VT, MT}, Bk, sk, yk) where {T, VT, MT}
     return true
 end
 
-function init!(qn::CompactLBFGS, Bk::AbstractArray, sk::AbstractVector, yk::AbstractVector)
+function init!(qn::CompactLBFGS{T}, Bk::AbstractVector{T}, g0::AbstractVector{T}, f0::T) where T
+    norm_g0 = dot(g0, g0)
+    # Initiate B0 with Gilbert & Lemaréchal rule.
+    rho0 = if norm_g0 < sqrt(eps(T))
+        one(T)
+    elseif f0 ≈ zero(T)
+        one(T) / norm_g0
+    else
+        abs(f0) / norm_g0
+    end
+    Bk .= (T(2) * rho0 * qn.init_value)
     return
 end
 
