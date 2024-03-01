@@ -2,6 +2,7 @@
 
 parse_option(::Type{Module},str::String) = eval(Symbol(str))
 
+
 function set_options!(opt::AbstractOptions, options)
     other_options = Dict{Symbol, Any}()
     for (key, val) in options
@@ -106,9 +107,10 @@ is_dense_callback(nlp) = hasmethod(MadNLP.jac_dense!, Tuple{typeof(nlp), Abstrac
 # smart option presets
 function MadNLPOptions(
     nlp::AbstractNLPModel{T};
-    callback = is_dense_callback(nlp) ? DenseCallback : SparseCallback,
-    kkt_system = is_dense_callback ? DenseCondensedKKTSystem : SparseKKTSystem,
-    linear_solver = is_dense_callback ? LapackCPUSolver : default_sparse_solver(nlp),
+    dense_callback = MadNLP.is_dense_callback(nlp),
+    callback = dense_callback ? DenseCallback : SparseCallback,
+    kkt_system = dense_callback ? DenseCondensedKKTSystem : SparseKKTSystem,
+    linear_solver = dense_callback ? LapackCPUSolver : default_sparse_solver(nlp),
     tol = get_tolerance(T,kkt_system)
     ) where T
 
@@ -121,7 +123,7 @@ function MadNLPOptions(
 end
 
 get_tolerance(::Type{T},::Type{KKT}) where {T, KKT} = 10^round(log10(eps(T))/2)
-get_tolerance(::Type{T},::Type{SparseCondensedKKTSystem}) where T = 10^(round(log10(eps(T))/2)+2)
+get_tolerance(::Type{T},::Type{SparseCondensedKKTSystem}) where T = 10^(round(log10(eps(T))/4))
 
 function default_sparse_solver(nlp::AbstractNLPModel)
     if isdefined(Main, :MadNLPHSL)
@@ -153,9 +155,26 @@ function print_ignored_options(logger,option_dict)
     end
 end
 
+function get_primary_options(options)
+    primary_opt = Dict{Symbol,Any}()
+    remaining_opt = Dict{Symbol,Any}()
+    for (k,v) in options
+        if k in [:tol, :linear_solver, :callback, :kkt_system]
+            primary_opt[k] = v
+        else
+            remaining_opt[k] = v
+        end
+    end
+
+    return primary_opt, remaining_opt
+end
+
 function load_options(nlp; options...)
+    
+    primary_opt, options = get_primary_options(options)
+    
     # Initiate interior-point options
-    opt_ipm = MadNLPOptions(nlp)
+    opt_ipm = MadNLPOptions(nlp; primary_opt...)
     linear_solver_options = set_options!(opt_ipm, options)
     check_option_sanity(opt_ipm)
     # Initiate linear-solver options

@@ -38,23 +38,17 @@ include("cusolverrf.jl")
 include("cudss.jl")
 
 # option preset
-function MadNLP.MadNLPOptions(nlp::AbstractNLPModel{T,VT}) where {T, VT <: CuVector{T}}
-
-    # if dense callback is defined, we use dense callback
-    is_dense_callback =
-        hasmethod(MadNLP.jac_dense!, Tuple{typeof(nlp), AbstractVector, AbstractMatrix}) &&
-        hasmethod(MadNLP.hess_dense!, Tuple{typeof(nlp), AbstractVector, AbstractVector, AbstractMatrix})
-
-    callback = is_dense_callback ? MadNLP.DenseCallback : MadNLP.SparseCallback
-
-    # if dense callback is used, we use dense condensed kkt system
-    kkt_system = is_dense_callback ? MadNLP.DenseCondensedKKTSystem : MadNLP.SparseCondensedKKTSystem
-
-    # if dense kkt system, we use a dense linear solver
-    linear_solver = is_dense_callback ? LapackGPUSolver : CUDSSSolver
-
+function MadNLP.MadNLPOptions(
+    nlp::AbstractNLPModel{T,VT};
+    dense_callback = MadNLP.is_dense_callback(nlp),
+    tol = MadNLP.get_tolerance(T,kkt_system),
+    callback = dense_callback ? MadNLP.DenseCallback : MadNLP.SparseCallback,
+    kkt_system = dense_callback ? MadNLP.DenseCondensedKKTSystem : MadNLP.SparseCondensedKKTSystem,
+    linear_solver = dense_callback ? LapackGPUSolver : CUDSSSolver,
+    ) where {T, VT <: CuVector{T}}
+    
     return MadNLP.MadNLPOptions(
-        tol = MadNLP.get_tolerance(T,kkt_system),
+        tol = tol,
         callback = callback,
         kkt_system = kkt_system,
         linear_solver = linear_solver,
