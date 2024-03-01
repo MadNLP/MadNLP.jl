@@ -58,16 +58,7 @@ function initialize!(solver::AbstractMadNLPSolver{T}) where T
 
     @trace(solver.logger,"Initializing constraint duals.")
     if !solver.opt.dual_initialized
-        set_initial_rhs!(solver, solver.kkt)
-        factorize_wrapper!(solver)
-        is_solved = solve_refine_wrapper!(
-            solver.d, solver, solver.p, solver._w4
-        )
-        if !is_solved || (norm(dual(solver.d), Inf) > solver.opt.constr_mult_init_max)
-            fill!(solver.y, zero(T))
-        else
-            copyto!(solver.y, dual(solver.d))
-        end
+        dual_initialize(solver, opt.dual_initialization_method)
     end
 
     # Initializing
@@ -85,6 +76,25 @@ function initialize!(solver::AbstractMadNLPSolver{T}) where T
     return REGULAR
 end
 
+abstract type DualInitializeOptions end
+struct DualInitializeSetZero <: DualInitializeOptions end
+struct DualInitializeLeastSquares <: DualInitializeOptions end
+
+function dual_initialize(solver::MadNLPSolver{T}, ::Type{DualInitializeSetZero}) where T
+    fill!(solver.y, zero(T))
+end
+function dual_initialize(solver::MadNLPSolver{T}, ::Type{DualInitializeLeastSquares}) where T
+    set_initial_rhs!(solver, solver.kkt)
+    factorize_wrapper!(solver)
+    is_solved = solve_refine_wrapper!(
+        solver.d, solver, solver.p, solver._w4
+    )
+    if !is_solved || (norm(dual(solver.d), Inf) > solver.opt.constr_mult_init_max)
+        fill!(solver.y, zero(T))
+    else
+        copyto!(solver.y, dual(solver.d))
+    end
+end
 
 function reinitialize!(solver::AbstractMadNLPSolver)
     variable(solver.x) .= get_x0(solver.nlp)

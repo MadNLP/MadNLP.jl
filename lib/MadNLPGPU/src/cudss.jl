@@ -2,13 +2,15 @@ import CUDSS
 import SparseArrays
 
 @kwdef mutable struct CudssSolverOptions <: MadNLP.AbstractOptions
-    cudss_algorithm::MadNLP.LinearFactorization = MadNLP.LU
+    cudss_algorithm::MadNLP.LinearFactorization = MadNLP.BUNCHKAUFMAN
 end
 
 mutable struct CUDSSSolver{T} <: MadNLP.AbstractLinearSolver{T}
     inner::Union{Nothing, CUDSS.CudssSolver}
-    tril::SparseArrays.SparseMatrixCSC{T}
-    full::SparseArrays.SparseMatrixCSC{T}
+    # tril::CUSPARSE.CuSparseMatrixCSC{T}
+    # full::CUSPARSE.CuSparseMatrixCSC{T}
+    tril
+    full
     tril_to_full_view::MadNLP.SubVector{T}
     K::CUSPARSE.CuSparseMatrixCSR{T}
     x_gpu::CUDA.CuVector{T}
@@ -19,7 +21,7 @@ mutable struct CUDSSSolver{T} <: MadNLP.AbstractLinearSolver{T}
 end
 
 function CUDSSSolver(
-    csc::SparseArrays.SparseMatrixCSC{T};
+    csc::CUSPARSE.CuSparseMatrixCSC{T};
     opt=CudssSolverOptions(),
     logger=MadNLP.MadNLPLogger(),
 ) where T
@@ -27,7 +29,7 @@ function CUDSSSolver(
     @assert n == m
 
     full,tril_to_full_view = MadNLP.get_tril_to_full(csc)
-    full.nzval .= tril_to_full_view
+    full.nzVal .= tril_to_full_view
 
     K_gpu = CUSPARSE.CuSparseMatrixCSR(full)
 
@@ -44,10 +46,17 @@ function CUDSSSolver(
     # TODO: pass config options here.
     config = CUDSS.CudssConfig()
     data = CUDSS.CudssData()
+    
+    # CUDSS.cudss_set(config,"pivot_type", 'N')
+    # CUDSS.cudss_set(config,"pivot_threshold", 1e-8)
+    # CUDSS.cudss_set(config,"pivot_epsilon", 1e-8)
+
     solver = CUDSS.CudssSolver(matrix, config, data)
 
     x_gpu = CUDA.zeros(T, n)
     b_gpu = CUDA.zeros(T, n)
+
+
 
     CUDSS.cudss("analysis", solver, x_gpu, b_gpu)
 
@@ -60,23 +69,28 @@ end
 
 function MadNLP.factorize!(M::CUDSSSolver)
     nzvals = SparseArrays.nonzeros(M.full)
-    copyto!(nzvals, M.tril_to_full_view)
-    copyto!(SparseArrays.nonzeros(M.K), nzvals)
+    copyto!(SparseArrays.nonzeros(M.K), M.tril_to_full_view)
     CUDSS.cudss_set(M.inner.matrix, SparseArrays.nonzeros(M.K))
     CUDSS.cudss("factorization", M.inner, M.x_gpu, M.b_gpu)
+
     return M
 end
 
 function MadNLP.solve!(M::CUDSSSolver{T}, x) where T
-    copyto!(M.b_gpu, x)
-    CUDSS.cudss("solve", M.inner, M.x_gpu, M.b_gpu)
+    CUDSS.cudss("solve", M.inner, M.x_gpu, x)
     copyto!(x, M.x_gpu)
     return x
 end
 
+function MadNLP.inertia(M::CUDSSSolver)
+    pos, neg = CUDSS.cudss_get(M.inner.data, "inertia")
+
+    return neg == 0 ? (size(M.K,1),0,0) : (size(M.K,1) - 2,1,1)
+end
+
 MadNLP.input_type(::Type{CUDSSSolver}) = :csc
 MadNLP.default_options(::Type{CUDSSSolver}) = CudssSolverOptions()
-MadNLP.is_inertia(M::CUDSSSolver) = false
+MadNLP.is_inertia(M::CUDSSSolver) = M.opt.cudss_algorithm == MadNLP.BUNCHKAUFMAN
 MadNLP.improve!(M::CUDSSSolver) = false
 MadNLP.is_supported(::Type{CUDSSSolver},::Type{Float32}) = true
 MadNLP.is_supported(::Type{CUDSSSolver},::Type{Float64}) = true

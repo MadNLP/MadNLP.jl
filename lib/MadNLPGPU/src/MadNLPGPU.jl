@@ -51,21 +51,13 @@ function MadNLP.MadNLPOptions(nlp::AbstractNLPModel{T,VT}) where {T, VT <: CuVec
     kkt_system = is_dense_callback ? MadNLP.DenseCondensedKKTSystem : MadNLP.SparseCondensedKKTSystem
 
     # if dense kkt system, we use a dense linear solver
-    linear_solver = is_dense_callback ? LapackGPUSolver : CuCholeskySolver
-
-    equality_treatment = is_dense_callback ? MadNLP.EnforceEquality : MadNLP.RelaxEquality
-
-    fixed_variable_treatment = is_dense_callback ? MadNLP.MakeParameter : MadNLP.RelaxBound
-
-    tol = MadNLP.get_tolerance(T,kkt_system)
+    linear_solver = is_dense_callback ? LapackGPUSolver : CUDSSSolver
 
     return MadNLP.MadNLPOptions(
+        tol = MadNLP.get_tolerance(T,kkt_system),
         callback = callback,
         kkt_system = kkt_system,
         linear_solver = linear_solver,
-        equality_treatment = equality_treatment,
-        fixed_variable_treatment = fixed_variable_treatment,
-        tol = tol
     )
 end
 

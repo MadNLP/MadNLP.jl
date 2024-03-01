@@ -17,11 +17,15 @@ function set_options!(opt::AbstractOptions, options)
 end
 
 @kwdef mutable struct MadNLPOptions <: AbstractOptions
+    tol::Float64
+    callback::Type
+    kkt_system::Type
+    linear_solver::Type
+
     # General options
     rethrow_error::Bool = true
     disable_garbage_collector::Bool = false
     blas_num_threads::Int = 1
-    linear_solver::Type = LapackCPUSolver
     iterator::Type = RichardsonIterator
 
     # Output options
@@ -30,7 +34,6 @@ end
     file_print_level::LogLevels = INFO
 
     # Termination options
-    tol::Float64 = 1e-8
     acceptable_tol::Float64 = 1e-6
     acceptable_iter::Int = 15
     diverging_iterates_tol::Float64 = 1e20
@@ -40,18 +43,17 @@ end
 
     # NLP options
     kappa_d::Float64 = 1e-5
-    fixed_variable_treatment::Type = MakeParameter
-    equality_treatment::Type = EnforceEquality
+    fixed_variable_treatment::Type = kkt_system <: MadNLP.SparseCondensedKKTSystem ? MadNLP.RelaxBound : MadNLP.MakeParameter 
+    equality_treatment::Type = kkt_system <: MadNLP.SparseCondensedKKTSystem ? MadNLP.RelaxEquality : MadNLP.EnforceEquality
     boudn_relax_factor::Float64 = 1e-8
     jacobian_constant::Bool = false
     hessian_constant::Bool = false
-    kkt_system::Type = SparseKKTSystem
     hessian_approximation::Type = ExactHessian
     quasi_newton_options::QuasiNewtonOptions = QuasiNewtonOptions()
-    callback::Type = SparseCallback
 
     # initialization options
     dual_initialized::Bool = false
+    dual_initialization_method::Type = kkt_system <: MadNLP.SparseCondensedKKTSystem ? DualInitializeSetZero : DualInitializeLeastSquares
     inertia_correction_method::Type = InertiaAuto
     constr_mult_init_max::Float64 = 1e3
     bound_push::Float64 = 1e-2
@@ -98,34 +100,28 @@ end
     mu_linear_decrease_factor::Float64 = .2
 end
 
+is_dense_callback(nlp) = hasmethod(MadNLP.jac_dense!, Tuple{typeof(nlp), AbstractVector, AbstractMatrix}) &&
+    hasmethod(MadNLP.hess_dense!, Tuple{typeof(nlp), AbstractVector, AbstractVector, AbstractMatrix})
+
 # smart option presets
-function MadNLPOptions(nlp::AbstractNLPModel{T}) where T
-
-    # if dense callback is defined, we use dense callback
-    is_dense_callback =
-        hasmethod(MadNLP.jac_dense!, Tuple{typeof(nlp), AbstractVector, AbstractMatrix}) &&
-        hasmethod(MadNLP.hess_dense!, Tuple{typeof(nlp), AbstractVector, AbstractVector, AbstractMatrix})
-
-    callback = is_dense_callback ? DenseCallback : SparseCallback
-
-    # if dense callback is used, we use dense condensed kkt system
-    kkt_system = is_dense_callback ? DenseCondensedKKTSystem : SparseKKTSystem
-
-    # if dense kkt system, we use a dense linear solver
-    linear_solver = is_dense_callback ? LapackCPUSolver : default_sparse_solver(nlp)
-
+function MadNLPOptions(
+    nlp::AbstractNLPModel{T};
+    callback = is_dense_callback(nlp) ? DenseCallback : SparseCallback,
+    kkt_system = is_dense_callback ? DenseCondensedKKTSystem : SparseKKTSystem,
+    linear_solver = is_dense_callback ? LapackCPUSolver : default_sparse_solver(nlp),
     tol = get_tolerance(T,kkt_system)
+    ) where T
 
     return MadNLPOptions(
+        tol = tol,
         callback = callback,
         kkt_system = kkt_system,
         linear_solver = linear_solver,
-        tol = tol,
     )
 end
 
 get_tolerance(::Type{T},::Type{KKT}) where {T, KKT} = 10^round(log10(eps(T))/2)
-get_tolerance(::Type{T},::Type{SparseCondensedKKTSystem}) where T = 10^(round(log10(eps(T))/4))
+get_tolerance(::Type{T},::Type{SparseCondensedKKTSystem}) where T = 10^(round(log10(eps(T))/2)+2)
 
 function default_sparse_solver(nlp::AbstractNLPModel)
     if isdefined(Main, :MadNLPHSL)
