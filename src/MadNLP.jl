@@ -4,7 +4,7 @@ import Pkg.TOML: parsefile
 import MathOptInterface
 import Libdl: dlopen, dlext, RTLD_DEEPBIND, RTLD_GLOBAL
 import Printf: @sprintf
-import LinearAlgebra: BLAS, Adjoint, Symmetric, mul!, ldiv!, norm, dot, diagind, normInf, transpose!
+import LinearAlgebra: BLAS, Adjoint, Symmetric, mul!, ldiv!, norm, dot, diagind, normInf, transpose!, issuccess
 import LinearAlgebra: cholesky, qr, lu, cholesky!, axpy!
 import LinearAlgebra.BLAS: symv!, ger!, libblas, liblapack, BlasInt, @blasfunc
 import SparseArrays: SparseArrays, AbstractSparseMatrix, SparseMatrixCSC, sparse, getcolptr, rowvals, nnz

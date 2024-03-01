@@ -142,4 +142,5 @@ include("backsolve.jl")
 include("lapack.jl")
 include("umfpack.jl")
 include("cholmod.jl")
+include("ldl.jl")
 
