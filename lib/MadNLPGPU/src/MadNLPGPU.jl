@@ -41,10 +41,10 @@ include("cudss.jl")
 function MadNLP.MadNLPOptions(
     nlp::AbstractNLPModel{T,VT};
     dense_callback = MadNLP.is_dense_callback(nlp),
-    tol = MadNLP.get_tolerance(T,kkt_system),
     callback = dense_callback ? MadNLP.DenseCallback : MadNLP.SparseCallback,
     kkt_system = dense_callback ? MadNLP.DenseCondensedKKTSystem : MadNLP.SparseCondensedKKTSystem,
     linear_solver = dense_callback ? LapackGPUSolver : CUDSSSolver,
+    tol = MadNLP.get_tolerance(T,kkt_system),
     ) where {T, VT <: CuVector{T}}
     
     return MadNLP.MadNLPOptions(
