@@ -2,7 +2,7 @@ import CUDSS
 import SparseArrays
 
 @kwdef mutable struct CudssSolverOptions <: MadNLP.AbstractOptions
-    cudss_algorithm::MadNLP.LinearFactorization = MadNLP.BUNCHKAUFMAN
+    cudss_algorithm::MadNLP.LinearFactorization = MadNLP.LDL
 end
 
 mutable struct CUDSSSolver{T} <: MadNLP.AbstractLinearSolver{T}
@@ -28,7 +28,7 @@ function CUDSSSolver(
         "G"
     elseif opt.cudss_algorithm == MadNLP.CHOLESKY
         "SPD"
-    elseif opt.cudss_algorithm == MadNLP.BUNCHKAUFMAN
+    elseif opt.cudss_algorithm == MadNLP.LDL
         "S"
     end
 
@@ -73,7 +73,7 @@ end
 
 MadNLP.input_type(::Type{CUDSSSolver}) = :csc
 MadNLP.default_options(::Type{CUDSSSolver}) = CudssSolverOptions()
-MadNLP.is_inertia(M::CUDSSSolver) = (M.opt.cudss_algorithm ∈ (MadNLP.CHOLESKY, MadNLP.BUNCHKAUFMAN))
+MadNLP.is_inertia(M::CUDSSSolver) = (M.opt.cudss_algorithm ∈ (MadNLP.CHOLESKY, MadNLP.LDL))
 function inertia(M::CUDSSSolver)
     n = size(M.tril, 1)
     if M.opt.cudss_algorithm == MadNLP.CHOLESKY
@@ -83,7 +83,7 @@ function inertia(M::CUDSSSolver)
         else
             return (0, n, 0)
         end
-    elseif M.opt.cudss_algorithm == MadNLP.BUNCHKAUFMAN
+    elseif M.opt.cudss_algorithm == MadNLP.LDL
         # N.B.: cuDSS does not always return the correct inertia.
         (k, l) = CUDSS.cudss_get(M.inner, "inertia")
         k = min(n, k) # TODO: add safeguard for inertia
