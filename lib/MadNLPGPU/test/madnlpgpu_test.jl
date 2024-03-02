@@ -3,6 +3,14 @@ testset = [
     [
         "LapackGPU-CUSOLVERRF",
         ()->MadNLP.Optimizer(
+            linear_solver=MadNLPGPU.CUDSSSolver,
+            print_level=MadNLP.ERROR
+        ),
+        [],
+    ],
+    [
+        "LapackGPU-CUSOLVERRF",
+        ()->MadNLP.Optimizer(
             linear_solver=MadNLPGPU.RFSolver,
             print_level=MadNLP.ERROR
         ),
@@ -63,10 +71,8 @@ testset = [
 ]
 
 @testset "MadNLPGPU test" begin
-
     MadNLPTests.test_linear_solver(LapackGPUSolver,Float32)
     MadNLPTests.test_linear_solver(LapackGPUSolver,Float64)
-
     # Test LapackGPU wrapper
     for (name,optimizer_constructor,exclude) in testset
         test_madnlp(name,optimizer_constructor,exclude; Arr= CuArray)

@@ -22,8 +22,8 @@ import MadNLP:
     introduce, factorize!, solve!, improve!, is_inertia, inertia, tril_to_full!,
     LapackOptions, input_type, is_supported, default_options, symul!
 
-# AMD
-import AMD
+# AMD and Metis
+import AMD, Metis
 
 symul!(y, A, x::CuVector{T}, α = 1., β = 0.) where T = CUBLAS.symv!('L', T(α), A, x, T(β), y)
 MadNLP._ger!(alpha::Number, x::CuVector{T}, y::CuVector{T}, A::CuMatrix{T}) where T = CUBLAS.ger!(alpha, x, y, A)
@@ -35,36 +35,23 @@ include("kernels.jl")
 include("interface.jl")
 include("lapackgpu.jl")
 include("cusolverrf.jl")
+include("cudss.jl")
 
 # option preset
-function MadNLP.MadNLPOptions(nlp::AbstractNLPModel{T,VT}) where {T, VT <: CuVector{T}}
-
-    # if dense callback is defined, we use dense callback
-    is_dense_callback =
-        hasmethod(MadNLP.jac_dense!, Tuple{typeof(nlp), AbstractVector, AbstractMatrix}) &&
-        hasmethod(MadNLP.hess_dense!, Tuple{typeof(nlp), AbstractVector, AbstractVector, AbstractMatrix})
-
-    callback = is_dense_callback ? MadNLP.DenseCallback : MadNLP.SparseCallback
-
-    # if dense callback is used, we use dense condensed kkt system
-    kkt_system = is_dense_callback ? MadNLP.DenseCondensedKKTSystem : MadNLP.SparseCondensedKKTSystem
-
-    # if dense kkt system, we use a dense linear solver
-    linear_solver = is_dense_callback ? LapackGPUSolver : CuCholeskySolver
-
-    equality_treatment = is_dense_callback ? MadNLP.EnforceEquality : MadNLP.RelaxEquality
-
-    fixed_variable_treatment = is_dense_callback ? MadNLP.MakeParameter : MadNLP.RelaxBound
-
-    tol = MadNLP.get_tolerance(T,kkt_system)
-
+function MadNLP.MadNLPOptions(
+    nlp::AbstractNLPModel{T,VT};
+    dense_callback = MadNLP.is_dense_callback(nlp),
+    callback = dense_callback ? MadNLP.DenseCallback : MadNLP.SparseCallback,
+    kkt_system = dense_callback ? MadNLP.DenseCondensedKKTSystem : MadNLP.SparseCondensedKKTSystem,
+    linear_solver = dense_callback ? LapackGPUSolver : CUDSSSolver,
+    tol = MadNLP.get_tolerance(T,kkt_system),
+    ) where {T, VT <: CuVector{T}}
+    
     return MadNLP.MadNLPOptions(
+        tol = tol,
         callback = callback,
         kkt_system = kkt_system,
         linear_solver = linear_solver,
-        equality_treatment = equality_treatment,
-        fixed_variable_treatment = fixed_variable_treatment,
-        tol = tol
     )
 end
 

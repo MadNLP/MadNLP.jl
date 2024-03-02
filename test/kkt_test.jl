@@ -33,7 +33,6 @@ end
     (MadNLP.DenseCondensedKKTSystem, MadNLP.DenseCallback),
 ]
     linear_solver = MadNLP.LapackCPUSolver
-    options = MadNLP.MadNLPOptions(; linear_solver=linear_solver)
     cnt = MadNLP.MadNLPCounters(; start_time=time())
 
     nlp = MadNLPTests.HS15Model()
