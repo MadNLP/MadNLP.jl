@@ -2,6 +2,7 @@ import CUDSS
 import SparseArrays
 
 @kwdef mutable struct CudssSolverOptions <: MadNLP.AbstractOptions
+    # Use LDL by default in CUDSS as Cholesky can lead to undefined behavior. 
     cudss_algorithm::MadNLP.LinearFactorization = MadNLP.LDL
 end
 

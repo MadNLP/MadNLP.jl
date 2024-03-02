@@ -15,7 +15,7 @@ function LDLSolver(
     tril::SparseMatrixCSC{T};
     opt=LDLFactorizationsOptions(), logger=MadNLPLogger(),
 ) where T
-
+    # TODO: convert tril to triu, not full
     full, tril_to_full_view = get_tril_to_full(Float64,tril)
     
     return LDLSolver(
