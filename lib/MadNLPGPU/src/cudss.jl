@@ -8,8 +8,6 @@ end
 mutable struct CUDSSSolver{T} <: MadNLP.AbstractLinearSolver{T}
     inner::Union{Nothing, CUDSS.CudssSolver}
     tril::CUSPARSE.CuSparseMatrixCSC{T}
-    full::CUSPARSE.CuSparseMatrixCSR{T}
-    tril_to_full_view::CuSubVector{T}
     x_gpu::CUDA.CuVector{T}
     b_gpu::CUDA.CuVector{T}
 
@@ -25,18 +23,7 @@ function CUDSSSolver(
     n, m = size(csc)
     @assert n == m
 
-    full,tril_to_full_view = MadNLP.get_tril_to_full(csc)
-    full.nzVal .= tril_to_full_view
-
-    full = CUSPARSE.CuSparseMatrixCSR(
-        full.colPtr,
-        full.rowVal,
-        full.nzVal,
-        full.dims
-    )
-
-
-    view = 'L'
+    view = 'U'
     structure = if opt.cudss_algorithm == MadNLP.LU
         "G"
     elseif opt.cudss_algorithm == MadNLP.CHOLESKY
@@ -45,7 +32,12 @@ function CUDSSSolver(
         "S"
     end
 
-    matrix = CUDSS.CudssMatrix(full, structure, view)
+    matrix = CUDSS.CudssMatrix(
+        CUSPARSE.CuSparseMatrixCSR(csc.colPtr, csc.rowVal, csc.nzVal, csc.dims), 
+        structure,
+        view
+    )
+    
     # TODO: pass config options here.
     config = CUDSS.CudssConfig()
     data = CUDSS.CudssData()
@@ -58,15 +50,16 @@ function CUDSSSolver(
     CUDSS.cudss("analysis", solver, x_gpu, b_gpu)
 
     return CUDSSSolver(
-        solver, csc, full, tril_to_full_view,
+        solver, csc,
+        # full, tril_to_full_view,
         x_gpu, b_gpu,
         opt, logger
     )
 end
 
 function MadNLP.factorize!(M::CUDSSSolver)
-    copyto!(M.full.nzVal, M.tril_to_full_view)
-    CUDSS.cudss_set(M.inner.matrix, SparseArrays.nonzeros(M.full))
+    # copyto!(M.full.nzVal, M.tril_to_full_view)
+    CUDSS.cudss_set(M.inner.matrix, SparseArrays.nonzeros(M.tril))
     CUDSS.cudss("factorization", M.inner, M.x_gpu, M.b_gpu)
 
     return M
@@ -82,7 +75,7 @@ MadNLP.input_type(::Type{CUDSSSolver}) = :csc
 MadNLP.default_options(::Type{CUDSSSolver}) = CudssSolverOptions()
 MadNLP.is_inertia(M::CUDSSSolver) = (M.opt.cudss_algorithm ∈ (MadNLP.CHOLESKY, MadNLP.BUNCHKAUFMAN))
 function inertia(M::CUDSSSolver)
-    n = size(M.full, 1)
+    n = size(M.tril, 1)
     if M.opt.cudss_algorithm == MadNLP.CHOLESKY
         info = CUDSS.cudss_get(M.inner, "info")
         if info == 0

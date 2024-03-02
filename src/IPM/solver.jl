@@ -58,7 +58,7 @@ function initialize!(solver::AbstractMadNLPSolver{T}) where T
 
     @trace(solver.logger,"Initializing constraint duals.")
     if !solver.opt.dual_initialized
-        dual_initialize(solver, opt.dual_initialization_method)
+        initialize_dual(solver, opt.dual_initialization_method)
     end
 
     # Initializing
