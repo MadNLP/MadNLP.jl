@@ -28,6 +28,8 @@ AbstractCondensedKKTSystem
 Each `AbstractKKTSystem` follows the interface described below:
 ```@docs
 
+create_kkt_system
+
 num_variables
 get_kkt
 get_jacobian
@@ -39,11 +41,11 @@ compress_hessian!
 compress_jacobian!
 jtprod!
 regularize_diagonal!
-set_jacobian_scaling!
 is_inertia_correct
-is_reduced
 nnz_jacobian
 ```
+
+## Sparse KKT systems
 
 By default, MadNLP stores a `AbstractReducedKKTSystem` in sparse format,
 as implemented by `SparseKKTSystem`:
@@ -51,10 +53,14 @@ as implemented by `SparseKKTSystem`:
 SparseKKTSystem
 
 ```
-The user has the choice to store the KKT system as a sparse `AbstractUnreducedKKTSystem`:
+Alternatively, the user has the choice to store the KKT system as a `SparseUnreducedKKTSystem`
+or as a `SparseCondensedKKTSystem`:
 ```@docs
 SparseUnreducedKKTSystem
+SparseCondensedKKTSystem
 ```
+
+## Dense KKT systems
 
 MadNLP provides also two structures to store the KKT system
 in a dense matrix. Although less efficient than their sparse counterparts,
@@ -66,10 +72,8 @@ DenseCondensedKKTSystem
 
 ```
 
-
 ## AbstractKKTVector
-Each instance of `AbstractKKTVector` implements
-the following interface.
+Each instance of `AbstractKKTVector` implements the following interface.
 
 ```@docs
 AbstractKKTVector
@@ -85,10 +89,9 @@ dual_ub
 
 ```
 
-By default, MadNLP provides two different `AbstractKKTVector`.
+By default, MadNLP provides one implementation of an `AbstractKKTVector`.
 
 ```@docs
-ReducedKKTVector
 UnreducedKKTVector
 ```
 

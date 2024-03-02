@@ -231,14 +231,12 @@ function compress_jacobian!(kkt::AbstractDenseKKTSystem)
     return
 end
 
-get_raw_jacobian(kkt::AbstractDenseKKTSystem) = kkt.jac
 nnz_jacobian(kkt::AbstractDenseKKTSystem) = length(kkt.jac)
 
 #=
     DenseKKTSystem
 =#
 
-is_reduced(::DenseKKTSystem) = true
 num_variables(kkt::DenseKKTSystem) = length(kkt.pr_diag)
 
 function mul!(y::AbstractVector, kkt::DenseKKTSystem, x::AbstractVector)
@@ -310,7 +308,6 @@ end
     DenseCondensedKKTSystem
 =#
 
-is_reduced(kkt::DenseCondensedKKTSystem) = true
 num_variables(kkt::DenseCondensedKKTSystem) = size(kkt.hess, 1)
 
 function get_slack_regularization(kkt::DenseCondensedKKTSystem)

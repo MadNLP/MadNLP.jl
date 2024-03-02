@@ -9,11 +9,18 @@ using MadNLPTests
 # Build nonlinear model
 nlp = MadNLPTests.HS15Model()
 # Build KKT
-T = Float64
-VT = Vector{T}
-MT = Matrix{T}
-QN = MadNLP.ExactHessian{T, VT}
-kkt = MadNLP.SparseKKTSystem{T, VT, MT, QN}(nlp)
+cb = MadNLP.create_callback(
+    MadNLP.SparseCallback,
+    nlp,
+)
+ind_cons = MadNLP.get_index_constraints(nlp)
+linear_solver = LapackCPUSolver
+kkt = MadNLP.create_kkt_system(
+    MadNLP.SparseKKTSystem,
+    cb,
+    ind_cons,
+    linear_solver,
+)
 
 n = NLPModels.get_nvar(nlp)
 m = NLPModels.get_ncon(nlp)
@@ -65,8 +72,8 @@ a multiple of the identity to it: $$K_r = K + \alpha I$$.
 
 ## Factorization algorithm
 In nonlinear programming, it is common
-to employ a Bunch-Kaufman factorization (or LDL factorization)
-to factorize the matrix $$K$$, as this algorithm returns the inertia
+to employ a LBL factorization to decompose the symmetric indefinite
+matrix $$K$$, as this algorithm returns the inertia
 of the matrix directly as a result of the factorization.
 
 !!! note
@@ -94,7 +101,7 @@ linear_solver = LapackCPUSolver(K)
 The instance `linear_solver` does not copy the matrix $$K$$ and
 instead keep a reference to it.
 ```@example linear_solver_example
-linear_solver.dense === K
+linear_solver.A === K
 ```
 That way every time we re-assemble the matrix $$K$$ in `kkt`,
 the values are directly updated inside `linear_solver`.

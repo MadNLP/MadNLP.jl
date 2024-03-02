@@ -1,0 +1,54 @@
+```@meta
+CurrentModule = MadNLP
+```
+
+# Callbacks
+
+In MadNLP, a nonlinear program is implemented with a given `AbstractNLPModel`.
+The model may have a form unsuitable for the interior-point algorithm.
+For that reason, MadNLP wraps the `AbstractNLPModel` internally
+using custom data structures, encoded as a `AbstractCallback`.
+Depending on the setting, choose to wrap the `AbstractNLPModel`
+as a [`DenseCallback`](@ref) or alternatively, as a [`SparseCallback`](@ref).
+
+```@docs
+AbstractCallback
+DenseCallback
+SparseCallback
+
+```
+
+The function [`create_callback`](@ref) allows to instantiate a `AbstractCallback`
+from a given `NLPModel`:
+```@docs
+create_callback
+
+```
+
+Internally, a [`AbstractCallback`](@ref) reformulates the inequality
+constraints as equality constraints by introducing additional slack variables.
+The fixed variables are reformulated as parameters (using [`MakeParameter`](@ref))
+or are relaxed (using [`RelaxBound`](@ref)). The equality constraints can
+be keep as is with [`EnforceEquality`](@ref) (default option) or relaxed
+as inequality constraints with [`RelaxEquality`](@ref). In that later case,
+MadNLP solves a relaxation of the original problem.
+
+```@docs
+AbstractFixedVariableTreatment
+MakeParameter
+RelaxBound
+
+AbstractEqualityTreatment
+EnforceEquality
+RelaxEquality
+```
+
+MadNLP has to keep in memory all the indexes associated to the equality
+and inequality constraints. Similarly, MadNLP has to keep track
+of the indexes of the bounded variables and the fixed variables. MadNLP
+provides a utility [`get_index_constraints`](@ref) to import all the indexes required
+by MadNLP. Each index vector is encoded as a `Vector{Int}`.
+```@docs
+get_index_constraints
+
+```
