@@ -155,7 +155,7 @@ function print_ignored_options(logger,option_dict)
     end
 end
 
-function get_primary_options(options)
+function _get_primary_options(options)
     primary_opt = Dict{Symbol,Any}()
     remaining_opt = Dict{Symbol,Any}()
     for (k,v) in options
@@ -171,7 +171,7 @@ end
 
 function load_options(nlp; options...)
     
-    primary_opt, options = get_primary_options(options)
+    primary_opt, options = _get_primary_options(options)
     
     # Initiate interior-point options
     opt_ipm = MadNLPOptions(nlp; primary_opt...)

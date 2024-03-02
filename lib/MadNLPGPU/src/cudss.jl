@@ -54,9 +54,7 @@ function CUDSSSolver(
 
     x_gpu = CUDA.zeros(T, n)
     b_gpu = CUDA.zeros(T, n)
-
-
-
+    
     CUDSS.cudss("analysis", solver, x_gpu, b_gpu)
 
     return CUDSSSolver(

@@ -80,10 +80,10 @@ abstract type DualInitializeOptions end
 struct DualInitializeSetZero <: DualInitializeOptions end
 struct DualInitializeLeastSquares <: DualInitializeOptions end
 
-function dual_initialize(solver::MadNLPSolver{T}, ::Type{DualInitializeSetZero}) where T
+function initialize_dual(solver::MadNLPSolver{T}, ::Type{DualInitializeSetZero}) where T
     fill!(solver.y, zero(T))
 end
-function dual_initialize(solver::MadNLPSolver{T}, ::Type{DualInitializeLeastSquares}) where T
+function initialize_dual(solver::MadNLPSolver{T}, ::Type{DualInitializeLeastSquares}) where T
     set_initial_rhs!(solver, solver.kkt)
     factorize_wrapper!(solver)
     is_solved = solve_refine_wrapper!(
