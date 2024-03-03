@@ -1,12 +1,60 @@
-function MadNLP.coo_to_csc(coo::MadNLP.SparseMatrixCOO{T,I,VT,VI}) where {T,I, VT <: CuArray, VI <: CuArray}
-    csc, map = MadNLP.coo_to_csc(
-        MadNLP.SparseMatrixCOO(
-            coo.m, coo.n,
-            Array(coo.I), Array(coo.J), Array(coo.V)
-        )
-    )
+@kernel function _ker_index(cscmap, mapptr, coord)
+    index = @index(Global)
+    for l in mapptr[index]:mapptr[index+1]-1
+        ((i,j),k) = coord[l]
+        cscmap[k] = index
+    end        
+end
 
-    return CUDA.CUSPARSE.CuSparseMatrixCSC(csc), CuArray(map)
+function getptr(backend, array; cmp = isequal)
+
+    bitarray = similar(array, Bool, length(array) + 1)
+    kergetptr(backend)(cmp, bitarray, array; ndrange = length(array) + 1)
+    synchronize(backend)
+
+    return findall(identity, bitarray)
+end
+@kernel function kergetptr(cmp, bitarray, @Const(array))
+    I = @index(Global)
+    @inbounds if I == 1
+        bitarray[I] = true
+    elseif I == length(array) + 1
+        bitarray[I] = true
+    else
+        i0, j0 = array[I-1]
+        i1, j1 = array[I]
+
+        if !cmp(i0, i1)
+            bitarray[I] = true
+        else
+            bitarray[I] = false
+        end
+    end
+end
+
+function MadNLP.coo_to_csc(coo::MadNLP.SparseMatrixCOO{T,I,VT,VI}) where {T,I, VT <: CuArray, VI <: CuArray}
+    coord = map(
+        (i,j,k)->((i,j),k),
+        coo.I, coo.J, 1:length(coo.I)
+    )
+    sort!(coord, lt = (((i, j), k), ((n, m), l)) -> (j,i) < (m,n))
+    
+    mapptr = getptr(CUDABackend(), coord)
+
+    coord_csc = coord[@view(mapptr[1:end-1])]
+
+    colptr = getptr(CUDABackend(), coord_csc; cmp = ((i, j), (n, m)) -> j==m)
+    rowval = map(x -> x[1][1], coord_csc)
+    nzval = similar(rowval, T)
+
+    csc = CUDA.CUSPARSE.CuSparseMatrixCSC(colptr, rowval, nzval, size(coo))
+    
+    
+    cscmap = similar(coo.I, Int)
+    _ker_index(CUDABackend())(cscmap, mapptr, coord, ndrange = length(mapptr)-1)
+    synchronize(CUDABackend())
+    
+    return csc, cscmap
 end
 
 function CUSPARSE.CuSparseMatrixCSC{Tv,Ti}(A::MadNLP.SparseMatrixCSC{Tv,Ti}) where {Tv,Ti}
@@ -223,11 +271,17 @@ end
 end
 
 function MadNLP._set_con_scale_sparse!(con_scale::VT, jac_I, jac_buffer) where {T, VT <: CuVector{T}}
-    con_scale_cpu = Array(con_scale)
-    MadNLP._set_con_scale_sparse!(con_scale_cpu, Array(jac_I), Array(jac_buffer))
-    copyto!(con_scale, con_scale_cpu)
+    _ker_set_con_scale_sparse!(CUDABackend())(con_scale::VT, jac_I, jac_buffer; ndrange = length(jac_I))
+    synchronize(CUDABackend())
 end
 
+@kernel function _ker_set_con_scale_sparse!(con_scale, jac_I, jac_buffer)
+    index = @index(Global)
+    @inbounds begin
+        row = jac_I[index]
+        con_scale[row] = max(con_scale[row], abs(jac_buffer[index]))
+    end
+end
 
 function MadNLP._sym_length(Jt::CUDA.CUSPARSE.CuSparseMatrixCSC)
     return mapreduce(
@@ -258,17 +312,30 @@ end
     end
 end
 
-function MadNLP._build_condensed_aug_symbolic_jt(Jt::CUDA.CUSPARSE.CuSparseMatrixCSC{Tv,Ti}, sym, sym2) where {Tv,Ti}
-    sym_cpu = Array(sym)
-    sym2_cpu = Array(sym2)
-    MadNLP._build_condensed_aug_symbolic_jt(
-        MadNLP.SparseMatrixCSC(Jt),
-        sym_cpu,
-        sym2_cpu
-    )
+@kernel function ker_build_condensed_aug_symbolic_jt(@Const(colptr), @Const(rowval), @Const(offsets), sym, sym2) 
+    i = @index(Global)
+    @inbounds cnt = offsets[i] 
+    @inbounds for j in colptr[i]:colptr[i+1]-1
+        c1 = rowval[j]
+        for k in j:colptr[i+1]-1
+            c2 = rowval[k]
+            sym[cnt+=1] = (i,j,k)
+            sym2[cnt] = (c2,c1)
+        end
+    end
+end
 
-    copyto!(sym, sym_cpu)
-    copyto!(sym2, sym2_cpu)
+function MadNLP._build_condensed_aug_symbolic_jt(Jt::CUDA.CUSPARSE.CuSparseMatrixCSC{Tv,Ti}, sym, sym2) where {Tv,Ti}
+
+    _offsets = map((i,j) -> div((j-i)^2 + (j-i), 2), @view(Jt.colPtr[1:end-1]) , @view(Jt.colPtr[2:end]))
+    offsets = cumsum(_offsets)
+    CUDA.@allowscalar begin
+        offsets .-= offsets[1]
+    end
+
+
+    ker_build_condensed_aug_symbolic_jt(CUDABackend())(Jt.colPtr, Jt.rowVal, offsets, sym, sym2; ndrange = length(Jt.colPtr)-1)
+    synchronize(CUDABackend())
 end
 
 function MadNLP._first_and_last_col(sym2::CuVector,ptr2)

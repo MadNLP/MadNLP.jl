@@ -41,6 +41,7 @@ function CUDSSSolver(
     
     # TODO: pass config options here.
     config = CUDSS.CudssConfig()
+
     data = CUDSS.CudssData()
     
     solver = CUDSS.CudssSolver(matrix, config, data)
