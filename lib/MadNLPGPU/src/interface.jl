@@ -1,4 +1,51 @@
-@kernel function _ker_index(cscmap, mapptr, coord)
+function MadNLP.coo_to_csc(coo::MadNLP.SparseMatrixCOO{T,I,VT,VI}) where {T,I, VT <: CuArray, VI <: CuArray}
+    coord = map(
+        (i,j,k)->((i,j),k),
+        coo.I, coo.J, 1:length(coo.I)
+    )
+    sort!(coord, lt = (((i, j), k), ((n, m), l)) -> (j,i) < (m,n))
+    
+    mapptr = getptr(CUDABackend(), coord)
+
+    colptr = similar(coo.I, size(coo,2)+1)
+    
+    coord_csc = coord[@view(mapptr[1:end-1])]
+
+    ker_colptr!(CUDABackend())(colptr, coord_csc, ndrange = length(coord_csc))
+    rowval = map(x -> x[1][1], coord_csc)
+    nzval = similar(rowval, T)
+
+    csc = CUDA.CUSPARSE.CuSparseMatrixCSC(colptr, rowval, nzval, size(coo))
+    
+    
+    cscmap = similar(coo.I, Int)
+    ker_index(CUDABackend())(cscmap, mapptr, coord, ndrange = length(mapptr)-1)
+    
+    synchronize(CUDABackend())
+    
+    return csc, cscmap
+
+end
+
+@kernel function ker_colptr!(colptr, coord)
+    index = @index(Global)
+    if index == 1
+        ((i2,j2),k2) = coord[index]
+        colptr[1:j2] .= 1
+    else
+        ((i1,j1),k1) = coord[index-1]
+        ((i2,j2),k2) = coord[index]
+        if j1 != j2
+            colptr[j1+1:j2] .= index 
+        end
+        if index == length(coord)
+            colptr[j2+1:end] .= index+1
+        end
+    end
+    
+end
+
+@kernel function ker_index(cscmap, mapptr, coord)
     index = @index(Global)
     for l in mapptr[index]:mapptr[index+1]-1
         ((i,j),k) = coord[l]
@@ -30,31 +77,6 @@ end
             bitarray[I] = false
         end
     end
-end
-
-function MadNLP.coo_to_csc(coo::MadNLP.SparseMatrixCOO{T,I,VT,VI}) where {T,I, VT <: CuArray, VI <: CuArray}
-    coord = map(
-        (i,j,k)->((i,j),k),
-        coo.I, coo.J, 1:length(coo.I)
-    )
-    sort!(coord, lt = (((i, j), k), ((n, m), l)) -> (j,i) < (m,n))
-    
-    mapptr = getptr(CUDABackend(), coord)
-
-    coord_csc = coord[@view(mapptr[1:end-1])]
-
-    colptr = getptr(CUDABackend(), coord_csc; cmp = ((i, j), (n, m)) -> j==m)
-    rowval = map(x -> x[1][1], coord_csc)
-    nzval = similar(rowval, T)
-
-    csc = CUDA.CUSPARSE.CuSparseMatrixCSC(colptr, rowval, nzval, size(coo))
-    
-    
-    cscmap = similar(coo.I, Int)
-    _ker_index(CUDABackend())(cscmap, mapptr, coord, ndrange = length(mapptr)-1)
-    synchronize(CUDABackend())
-    
-    return csc, cscmap
 end
 
 function CUSPARSE.CuSparseMatrixCSC{Tv,Ti}(A::MadNLP.SparseMatrixCSC{Tv,Ti}) where {Tv,Ti}
@@ -271,11 +293,11 @@ end
 end
 
 function MadNLP._set_con_scale_sparse!(con_scale::VT, jac_I, jac_buffer) where {T, VT <: CuVector{T}}
-    _ker_set_con_scale_sparse!(CUDABackend())(con_scale::VT, jac_I, jac_buffer; ndrange = length(jac_I))
+    ker_set_con_scale_sparse!(CUDABackend())(con_scale::VT, jac_I, jac_buffer; ndrange = length(jac_I))
     synchronize(CUDABackend())
 end
 
-@kernel function _ker_set_con_scale_sparse!(con_scale, jac_I, jac_buffer)
+@kernel function ker_set_con_scale_sparse!(con_scale, jac_I, jac_buffer)
     index = @index(Global)
     @inbounds begin
         row = jac_I[index]
@@ -312,14 +334,32 @@ end
     end
 end
 
+# function MadNLP._build_condensed_aug_symbolic_jt(Jt::CUDA.CUSPARSE.CuSparseMatrixCSC{Tv,Ti}, sym, sym2) where {Tv,Ti}
+#     sym_cpu = Array(sym)
+#     sym2_cpu = Array(sym2)
+#     MadNLP._build_condensed_aug_symbolic_jt(
+#         MadNLP.SparseMatrixCSC(Jt),
+#         sym_cpu,
+#         sym2_cpu
+#     )
+
+#     copyto!(sym, sym_cpu)
+#     copyto!(sym2, sym2_cpu)
+# end
+
 @kernel function ker_build_condensed_aug_symbolic_jt(@Const(colptr), @Const(rowval), @Const(offsets), sym, sym2) 
     i = @index(Global)
-    @inbounds cnt = offsets[i] 
-    @inbounds for j in colptr[i]:colptr[i+1]-1
+    @inbounds cnt = if i==1
+        0
+    else
+        offsets[i-1]
+    end
+    for j in colptr[i]:colptr[i+1]-1
         c1 = rowval[j]
         for k in j:colptr[i+1]-1
             c2 = rowval[k]
-            sym[cnt+=1] = (i,j,k)
+            cnt += 1
+            sym[cnt] = (i,j,k)
             sym2[cnt] = (c2,c1)
         end
     end
@@ -329,12 +369,8 @@ function MadNLP._build_condensed_aug_symbolic_jt(Jt::CUDA.CUSPARSE.CuSparseMatri
 
     _offsets = map((i,j) -> div((j-i)^2 + (j-i), 2), @view(Jt.colPtr[1:end-1]) , @view(Jt.colPtr[2:end]))
     offsets = cumsum(_offsets)
-    CUDA.@allowscalar begin
-        offsets .-= offsets[1]
-    end
 
-
-    ker_build_condensed_aug_symbolic_jt(CUDABackend())(Jt.colPtr, Jt.rowVal, offsets, sym, sym2; ndrange = length(Jt.colPtr)-1)
+    ker_build_condensed_aug_symbolic_jt(CUDABackend())(Jt.colPtr, Jt.rowVal, offsets, sym, sym2; ndrange = size(Jt,2))
     synchronize(CUDABackend())
 end
 
@@ -372,9 +408,9 @@ end
 
         (~, prevcol) = sym2[i-1]
         (row, col)   = sym2[i]
-
+        g = guide[i]
         for j in prevcol+1:col
-            colptr[j] = guide[i]
+            colptr[j] = g
         end
     end
 end
