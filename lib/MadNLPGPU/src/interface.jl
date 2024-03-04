@@ -27,27 +27,29 @@ function MadNLP.coo_to_csc(coo::MadNLP.SparseMatrixCOO{T,I,VT,VI}) where {T,I, V
 
 end
 
-@kernel function ker_colptr!(colptr, coord)
+@kernel function ker_colptr!(colptr, @Const(coord))
     index = @index(Global)
-    if index == 1
-        ((i2,j2),k2) = coord[index]
-        colptr[1:j2] .= 1
-    else
-        ((i1,j1),k1) = coord[index-1]
-        ((i2,j2),k2) = coord[index]
-        if j1 != j2
-            colptr[j1+1:j2] .= index 
-        end
-        if index == length(coord)
-            colptr[j2+1:end] .= index+1
+
+    @inbounds begin
+        if index == 1
+            ((i2,j2),k2) = coord[index]
+            colptr[1:j2] .= 1
+        else
+            ((i1,j1),k1) = coord[index-1]
+            ((i2,j2),k2) = coord[index]
+            if j1 != j2
+                colptr[j1+1:j2] .= index 
+            end
+            if index == length(coord)
+                colptr[j2+1:end] .= index+1
+            end
         end
     end
-    
 end
 
-@kernel function ker_index(cscmap, mapptr, coord)
+@kernel function ker_index(cscmap, @Const(mapptr),@Const(coord))
     index = @index(Global)
-    for l in mapptr[index]:mapptr[index+1]-1
+    @inbounds for l in mapptr[index]:mapptr[index+1]-1
         ((i,j),k) = coord[l]
         cscmap[k] = index
     end        
@@ -61,7 +63,7 @@ function getptr(backend, array; cmp = isequal)
 
     return findall(identity, bitarray)
 end
-@kernel function kergetptr(cmp, bitarray, @Const(array))
+@kernel function kergetptr(@Const(cmp), bitarray, @Const(array))
     I = @index(Global)
     @inbounds if I == 1
         bitarray[I] = true
@@ -292,20 +294,24 @@ end
     end
 end
 
-function MadNLP._set_con_scale_sparse!(con_scale::VT, jac_I, jac_buffer) where {T, VT <: CuVector{T}}
-    con_scale_cpu = Array(con_scale)
-    MadNLP._set_con_scale_sparse!(con_scale_cpu, Array(jac_I), Array(jac_buffer))
-    copyto!(con_scale, con_scale_cpu)
-    # _ker_set_con_scale_sparse!(CUDABackend())(con_scale, jac_I, jac_buffer; ndrange = length(jac_I))
-    # synchronize(CUDABackend())
-end
+@kernel function ker_set_con_scale_sparse!(@Const(ptr), @Const(inds), con_scale, @Const(jac_I), @Const(jac_buffer))
+    index = @index(Global)
 
-# TODO fix bug
-# @kernel function _ker_set_con_scale_sparse!(con_scale, jac_I, jac_buffer)
-#     i = @index(Global)
-#     row = jac_I[i]
-#     con_scale[row] = max(con_scale[row], abs(jac_buffer[i]))
-# end
+        @inbounds begin
+            rng = ptr[index]:ptr[index+1]-1
+            
+            for k in rng
+                (row, i) = inds[k]
+                con_scale[row] = max(con_scale[row], abs(jac_buffer[i]))
+            end
+        end
+end
+function MadNLP._set_con_scale_sparse!(con_scale::VT, jac_I, jac_buffer) where {T, VT <: CuVector{T}}
+    inds = sort!(map((i,j)->(i,j),  jac_I, 1:length(jac_I)))
+    ptr = getptr(CUDABackend(), inds)
+    ker_set_con_scale_sparse!(CUDABackend())(ptr, inds, con_scale, jac_I, jac_buffer; ndrange=length(ptr)-1)
+    synchronize(CUDABackend())
+end
 
 function MadNLP._sym_length(Jt::CUDA.CUSPARSE.CuSparseMatrixCSC)
     return mapreduce(
@@ -336,33 +342,22 @@ end
     end
 end
 
-# function MadNLP._build_condensed_aug_symbolic_jt(Jt::CUDA.CUSPARSE.CuSparseMatrixCSC{Tv,Ti}, sym, sym2) where {Tv,Ti}
-#     sym_cpu = Array(sym)
-#     sym2_cpu = Array(sym2)
-#     MadNLP._build_condensed_aug_symbolic_jt(
-#         MadNLP.SparseMatrixCSC(Jt),
-#         sym_cpu,
-#         sym2_cpu
-#     )
-
-#     copyto!(sym, sym_cpu)
-#     copyto!(sym2, sym2_cpu)
-# end
-
 @kernel function ker_build_condensed_aug_symbolic_jt(@Const(colptr), @Const(rowval), @Const(offsets), sym, sym2) 
     i = @index(Global)
-    @inbounds cnt = if i==1
-        0
-    else
-        offsets[i-1]
-    end
-    for j in colptr[i]:colptr[i+1]-1
-        c1 = rowval[j]
-        for k in j:colptr[i+1]-1
-            c2 = rowval[k]
-            cnt += 1
-            sym[cnt] = (i,j,k)
-            sym2[cnt] = (c2,c1)
+    @inbounds begin
+        cnt = if i==1
+            0
+        else
+            offsets[i-1]
+        end
+        for j in colptr[i]:colptr[i+1]-1
+            c1 = rowval[j]
+            for k in j:colptr[i+1]-1
+                c2 = rowval[k]
+                cnt += 1
+                sym[cnt] = (i,j,k)
+                sym2[cnt] = (c2,c1)
+            end
         end
     end
 end
