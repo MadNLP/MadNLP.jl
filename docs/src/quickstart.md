@@ -1,5 +1,8 @@
 # Quickstart
 
+```@meta
+CurrentModule = MadNLP
+```
 ```@setup quickstart
 using NLPModels
 
@@ -43,9 +46,11 @@ model = Model()
 @variable(model, x1 <= 0.5)
 @variable(model, x2)
 
-@NLobjective(model, Min, 100.0 * (x2 - x1^2)^2 + (1.0 - x1)^2)
-@NLconstraint(model, x1 * x2 >= 1.0)
-@NLconstraint(model, x1 + x2^2 >= 0.0)
+@objective(model, Min, 100.0 * (x2 - x1^2)^2 + (1.0 - x1)^2)
+@constraint(model, x1 * x2 >= 1.0)
+@constraint(model, x1 + x2^2 >= 0.0)
+
+println(model)
 
 ```
 
@@ -190,16 +195,17 @@ a new MadNLP instance and solve it:
 ```@example quickstart
 x0 = zeros(2) # initial position
 nlp = HS15Model(x0)
-ips = MadNLP.MadNLPSolver(nlp; print_level=MadNLP.INFO)
-MadNLP.solve!(ips)
+solver = MadNLP.MadNLPSolver(nlp; print_level=MadNLP.INFO)
+results = MadNLP.solve!(solver)
 ```
 
 MadNLP converges in 19 iterations to a (local) optimal solution.
-We can query the primal and the dual solutions respectively by
+MadNLP returns a [`MadNLPExecutionStats`](@ref) storing all the
+results. We can query the primal and the dual solutions respectively by
 ```@example quickstart
-ips.x
+results.solution
 ```
 and
 ```@example quickstart
-ips.y
+results.multipliers
 ```

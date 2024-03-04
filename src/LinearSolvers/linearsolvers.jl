@@ -103,7 +103,7 @@ end
 abstract type AbstractIterator{T} end
 
 """
-    solve_refine!(x, ::AbstractIterator, b)
+    solve_refine!(x::VT, ::AbstractIterator, b::VT, w::VT) where {VT <: AbstractKKTVector}
 
 Solve the linear system ``Ax = b`` using iterative
 refinement. The object `AbstractIterator` stores an instance

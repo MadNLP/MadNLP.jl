@@ -1,3 +1,11 @@
+"""
+    madnlp(model::AbstractNLPModel; options...)
+
+Build a [`MadNLPSolver`](@ref) and solve it using
+the interior-point method. Return the solution
+as a [`MadNLPExecutionStats`](@ref).
+
+"""
 function madnlp(model::AbstractNLPModel; kwargs...)
     solver = MadNLPSolver(model;kwargs...)
     return solve!(solver)

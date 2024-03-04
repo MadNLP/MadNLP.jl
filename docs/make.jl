@@ -9,19 +9,21 @@ makedocs(
     ),
     modules = [MadNLP],
     repo = "https://github.com/MadNLP/MadNLP.jl/blob/{commit}{path}#{line}",
-    strict = true,
     checkdocs = :exports,
+    clean=true,
     pages = [
         "Home" => "index.md",
         "Installation" => "installation.md",
         "Quickstart" => "quickstart.md",
         "Options" => "options.md",
         "Manual" => [
-            "Solver" => "man/solver.md",
+            "IPM solver" => "man/solver.md",
             "KKT systems" => "man/kkt.md",
             "Linear Solvers" => "man/linear_solvers.md",
         ],
         "API Reference" => [
+            "IPM solver" => "lib/ipm.md",
+            "Callback wrappers" => "lib/callbacks.md",
             "KKT systems" => "lib/kkt.md",
             "Linear Solvers" => "lib/linear_solvers.md",
         ]

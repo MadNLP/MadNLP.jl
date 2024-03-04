@@ -1,3 +1,10 @@
+"""
+    MadNLPExecutionStats{T, VT} <: AbstractExecutionStats
+
+Store the results returned by MadNLP once the interior-point
+algorithm has terminated.
+
+"""
 mutable struct MadNLPExecutionStats{T, VT} <: AbstractExecutionStats
     options::MadNLPOptions
     status::Status
@@ -72,7 +79,7 @@ function get_vars_info(solver)
     num_fixed = length(solver.ind_fixed)
     num_var = get_nvar(nlp) - num_fixed
     num_llb_vars = length(solver.ind_llb)
-    
+
     # TODO make this non-allocating
     num_lu_vars = sum((x_lb .!=-Inf) .& (x_ub .!= Inf)) - num_fixed
     num_uub_vars = length(solver.ind_uub)
@@ -87,7 +94,7 @@ end
 
 function get_cons_info(solver)
     nlp = solver.nlp
-    
+
     g_lb = get_lcon(nlp)
     g_ub = get_ucon(nlp)
 
@@ -97,7 +104,7 @@ function get_cons_info(solver)
     num_le_cons = sum((g_lb .!= -Inf) .& (g_ub .==  Inf))
     num_ue_cons = sum((g_ub .!=  Inf) .& (g_lb .== -Inf))
     num_lu_cons = num_ineq_cons - num_le_cons - num_ue_cons
-                           
+
     return (
         n_eq=num_eq_cons,
         n_ineq=num_ineq_cons,
@@ -158,7 +165,7 @@ function print_summary(solver::AbstractMadNLPSolver)
     # TODO inquire this from nlpmodel wrapper
     obj_scale = solver.cb.obj_scale[]
     solver.cnt.solver_time = solver.cnt.total_time-solver.cnt.linear_solver_time-solver.cnt.eval_function_time
-    
+
     @notice(solver.logger,"")
     @notice(solver.logger,"Number of Iterations....: $(solver.cnt.k)\n")
     @notice(solver.logger,"                                   (scaled)                 (unscaled)")
@@ -170,7 +177,7 @@ function print_summary(solver::AbstractMadNLPSolver)
     @notice(solver.logger,@sprintf("Overall NLP error.......:   %1.16e    %1.16e\n",
                                 max(solver.inf_du*obj_scale,norm(solver.c,Inf),solver.inf_compl),
                                 max(solver.inf_du,solver.inf_pr,solver.inf_compl)))
-    
+
     @notice(solver.logger,"Number of objective function evaluations             = $(solver.cnt.obj_cnt)")
     @notice(solver.logger,"Number of objective gradient evaluations             = $(solver.cnt.obj_grad_cnt)")
     @notice(solver.logger,"Number of constraint evaluations                     = $(solver.cnt.con_cnt)")

@@ -294,7 +294,6 @@ function create_kkt_system(
 
 end
 
-is_reduced(::SparseKKTSystem) = true
 num_variables(kkt::SparseKKTSystem) = length(kkt.pr_diag)
 
 
@@ -441,7 +440,6 @@ function initialize!(kkt::SparseUnreducedKKTSystem)
     fill!(kkt.hess_com.nzval, 0.) # so that mul! in the initial primal-dual solve has no effect
 end
 
-is_reduced(::SparseUnreducedKKTSystem) = false
 num_variables(kkt::SparseUnreducedKKTSystem) = length(kkt.pr_diag)
 
 function is_inertia_correct(kkt::SparseUnreducedKKTSystem, num_pos, num_zero, num_neg)
@@ -537,7 +535,6 @@ end
 get_sparse_condensed_ext(::Type{Vector{T}},args...) where T = nothing
 
 
-is_reduced(::SparseCondensedKKTSystem) = true
 num_variables(kkt::SparseCondensedKKTSystem) = length(kkt.pr_diag)
 function is_inertia_correct(kkt::SparseCondensedKKTSystem, num_pos, num_zero, num_neg)
     return (num_zero == 0) && (num_pos == size(kkt.aug_com, 1))
@@ -545,12 +542,10 @@ end
 
 
 Base.size(kkt::SparseCondensedKKTSystem,n::Int) = size(kkt.aug_com,n)
-# nnz_jacobian(kkt::SparseCondensedKKTSystem) = nnz(kkt.jac_raw)
 
 
 function compress_jacobian!(kkt::SparseCondensedKKTSystem{T, VT, MT}) where {T, VT, MT<:SparseMatrixCSC{T, Int32}}
     ns = length(kkt.ind_ineq)
-    # kkt.jac[end-ns+1:end] .= -1.0
     transfer!(kkt.jt_csc, kkt.jt_coo, kkt.jt_csc_map)
 end
 

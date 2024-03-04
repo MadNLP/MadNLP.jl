@@ -76,9 +76,30 @@ with
 """
 abstract type AbstractCondensedKKTSystem{T, VT, MT, QN} <: AbstractKKTSystem{T, VT, MT, QN} end
 
+
 #=
     Templates
 =#
+
+"""
+    create_kkt_system(
+        ::Type{KKT},
+        cb::AbstractCallback,
+        ind_cons::NamedTuple,
+        linear_solver::Type{LinSol};
+        opt_linear_solver=default_options(linear_solver),
+        hessian_approximation=ExactHessian,
+    ) where {KKT<:AbstractKKTSystem, LinSol<:AbstractLinearSolver}
+
+Instantiate a new KKT system with type `KKT`, associated to the
+the nonlinear program encoded inside the callback `cb`. The
+`NamedTuple` `ind_cons` stores the indexes of all the variables and
+constraints in the callback `cb`. In addition, the user should pass
+the linear solver `linear_solver` that will be used to solve the KKT system
+after it has been assembled.
+
+"""
+function create_kkt_system end
 
 "Number of primal variables (including slacks) associated to the KKT system."
 function num_variables end
@@ -145,7 +166,16 @@ in `y`, such that ``y = A' x`` (with ``A`` current Jacobian).
 function jtprod! end
 
 """
-    regularize_diagonal!(kkt::AbstractKKTSystem, primal_values::AbstractVector, dual_values::AbstractVector)
+    solve!(kkt::AbstractKKTSystem, w::AbstractKKTVector)
+
+Solve the KKT system ``K x = w`` with the linear solver stored
+inside `kkt` and stores the result inplace inside the `AbstractKKTVector` `w`.
+
+"""
+function solve! end
+
+"""
+    regularize_diagonal!(kkt::AbstractKKTSystem, primal_values::Number, dual_values::Number)
 
 Regularize the values in the diagonal of the KKT system.
 Called internally inside the interior-point routine.
@@ -160,10 +190,6 @@ to the KKT system implemented in `kkt`.
 
 """
 function is_inertia_correct end
-
-# TODO: temporary
-"Return true if KKT system is reduced."
-function is_reduced end
 
 "Nonzero in Jacobian"
 function nnz_jacobian end
@@ -200,7 +226,6 @@ Base.size(kkt::AbstractKKTSystem, dim::Int) = size(kkt.aug_com, dim)
 get_kkt(kkt::AbstractKKTSystem) = kkt.aug_com
 get_jacobian(kkt::AbstractKKTSystem) = kkt.jac
 get_hessian(kkt::AbstractKKTSystem) = kkt.hess
-get_raw_jacobian(kkt::AbstractKKTSystem) = kkt.jac_raw
 
 
 function is_inertia_correct(kkt::AbstractKKTSystem, num_pos, num_zero, num_neg)

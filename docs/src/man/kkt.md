@@ -2,6 +2,7 @@
 CurrentModule = MadNLP
 ```
 ```@setup kkt_example
+using LinearAlgebra
 using SparseArrays
 using NLPModels
 using MadNLP
@@ -98,36 +99,40 @@ diagonal matrices $$\Sigma_x = X^{1}V$$ and $$\Sigma_s = S^{-1}W$$.
 Hence, we have to update the KKT system at each iteration
 of the interior-point algorithm.
 
-In what follows, we illustrate the inner working of any `AbstractKKTSystem`
-by using the KKT system used by default inside MadNLP: [`SparseKKTSystem`](@ref).
+By default, MadNLP stores the KKT system as a [`SparseKKTSystem`](@ref).
+The KKT system takes as input a [`SparseCallback`](@ref) wrapping
+a given `NLPModel` `nlp`. We instantiate the callback `cb` with
+the function [`create_callback`](@ref):
+```@example kkt_example
+cb = MadNLP.create_callback(
+    MadNLP.SparseCallback,
+    nlp,
+)
+ind_cons = MadNLP.get_index_constraints(nlp)
+
+```
 
 ### Initializing a KKT system
 
 The size of the KKT system depends directly on the problem's characteristics
 (number of variables, number of of equality and inequality constraints).
 A [`SparseKKTSystem`](@ref) stores the Hessian and the Jacobian in sparse
-(COO) format. Depending on how we parameterize the system,
-it can output either a sparse matrix or a dense matrix (according to the linear solver
-we are employing under the hood).
-
-For instance, we can parameterize a sparse KKT system as
+(COO) format. The KKT matrix can be factorized using either a
+dense or a sparse linear solvers. Here we use the solver provided
+in Lapack:
 ```@example kkt_example
-T = Float64
-VT = Vector{T}
-MT = SparseMatrixCSC{T, Int}
-QN = MadNLP.ExactHessian{T, VT}
-kkt = MadNLP.SparseKKTSystem{T, VT, MT, QN}(nlp)
-kkt.aug_com
-
+linear_solver = LapackCPUSolver
 ```
-and a dense KKT system as
+
+We can instantiate a `SparseKKTSystem` using
+the function [`create_kkt_system`](@ref):
 ```@example kkt_example
-T = Float64
-VT = Vector{T}
-MT = Matrix{T}
-QN = MadNLP.ExactHessian{T, VT}
-kkt = MadNLP.SparseKKTSystem{T, VT, MT, QN}(nlp)
-kkt.aug_com
+kkt = MadNLP.create_kkt_system(
+    MadNLP.SparseKKTSystem,
+    cb,
+    ind_cons,
+    linear_solver,
+)
 
 ```
 
@@ -163,13 +168,13 @@ Then, one can update the vector `hess_values` by using NLPModels.jl:
 ```@example kkt_example
 n = NLPModels.get_nvar(nlp)
 m = NLPModels.get_ncon(nlp)
-x = NLPModels.get_x0(nlp)
-l = zeros(m)
+x = NLPModels.get_x0(nlp) # primal variables
+l = zeros(m) # dual variables
 
 NLPModels.hess_coord!(nlp, x, l, hess_values)
 
 ```
-Eventually, a post-processing step can be applied to refresh all the values internally:
+Eventually, a post-processing step is applied to refresh all the values internally:
 ```@example kkt_example
 MadNLP.compress_hessian!(kkt)
 
@@ -198,42 +203,80 @@ MadNLP.compress_jacobian!(kkt)
 
 ```
 
-!!! note
-    On the contrary to `compress_hessian!`, `compress_jacobian!` is not
-    doing nothing by default. Instead, the post-processing step scales the values
-    of the Jacobian row by row, applying the scaling of the constraints
-    as computed initially by MadNLP.
-
 #### Updating the values of the diagonal matrices
-Once the Hessian and the Jacobian updated, it remains
-to udpate the values of the diagonal matrix $$\Sigma_x = X^{-1} V$$
-and $$\Sigma_s = S^{-1} W$$. In the KKT's interface, this amounts
-to call the [`regularize_diagonal!`](@ref) function:
+Once the Hessian and the Jacobian updated, the algorithm
+can apply primal and dual regularization terms on the diagonal
+of the KKT system, to improve the numerical behavior in the linear solver.
+This operation is implemented inside the [`regularize_diagonal!`](@ref) function:
 ```@example kkt_example
-pr_values = ones(n + m)
-du_values = zeros(m)
+pr_value = 1.0
+du_value = 0.0
 
-MadNLP.regularize_diagonal!(kkt, pr_values, du_values)
+MadNLP.regularize_diagonal!(kkt, pr_value, du_value)
 
 ```
-where `pr_values` stores the diagonal values for the primal
-terms (accounting both for $$\Sigma_x$$ and $$\Sigma_s$$) and `du_values`
-stores the diagonal values for the dual terms (mostly used during
-feasibility restoration).
 
 ### Assembling the KKT matrix
 Once the values updated, one can assemble the resulting KKT matrix.
 This translates to
 ```@example kkt_example
 MadNLP.build_kkt!(kkt)
-kkt_matrix
 ```
 By doing so, the values stored inside `kkt` will be transferred
-to the KKT matrix `kkt_matrix` (as returned by the function [`get_kkt`](@ref)).
+to the KKT matrix `kkt_matrix` (as returned by the function [`get_kkt`](@ref)):
+```@example kkt_example
+kkt_matrix
+```
 
-In details, a [`SparseKKTSystem`](@ref) stores internally the KKT system's values using
+Internally, a [`SparseKKTSystem`](@ref) stores the KKT system in
 a sparse COO format. When [`build_kkt!`](@ref) is called, the sparse COO matrix
-is transferred to `SparseMatrixCSC` (if `MT = SparseMatrixCSC`) or a `Matrix`
-(if `MT = Matrix`), or any format suitable for factorizing the KKT system
-inside a [linear solver](linear_solvers.md).
+is transferred to `SparseMatrixCSC` if the linear solver is sparse,
+or alternatively to a `Matrix` if the linear solver is dense.
+
+!!! note
+    The KKT system stores only the lower-triangular part of the KKT system,
+    as it is symmetric.
+
+
+## Solution of the KKT system
+Now the KKT system is assembled in a matrix ``K`` (here stored in `kkt_matrix`), we want
+to solve a linear system ``K x = b``, for instance to evaluate the
+next descent direction. To do so, we use the linear solver stored
+internally inside `kkt` (here an instance of `LapackCPUSolver`).
+
+We start by factorizing the KKT matrix ``K``:
+```@example kkt_example
+MadNLP.factorize!(kkt.linear_solver)
+
+```
+By default, MadNLP uses a LBL factorization to decompose the symmetric
+indefinite KKT matrix.
+
+Once the KKT matrix has been factorized, we can compute the solution of the linear
+system with a backsolve. The function takes as input a [`AbstractKKTVector`](@ref),
+an object used to do algebraic manipulation with a [`AbstractKKTSystem`](@ref).
+We start by instantiating two [`UnreducedKKTVector`](@ref) (encoding respectively
+the right-hand-side and the solution):
+```@example kkt_example
+b = MadNLP.UnreducedKKTVector(kkt)
+fill!(MadNLP.full(b), 1.0)
+x = copy(b)
+
+```
+The right-hand-side encodes a vector of 1:
+```@example kkt_example
+MadNLP.full(b)
+```
+We solve the system ``K x = b`` using the [`solve!`](@ref) function:
+```@example kkt_example
+MadNLP.solve!(kkt, x)
+MadNLP.full(x)
+```
+We verify that the solution is correct by multiplying it on the left
+with the KKT system, using `mul!`:
+```@example kkt_example
+mul!(b, kkt, x) # overwrite b!
+MadNLP.full(b)
+```
+We recover a vector filled with `1`, which was the initial right-hand-side.
 
