@@ -293,17 +293,19 @@ end
 end
 
 function MadNLP._set_con_scale_sparse!(con_scale::VT, jac_I, jac_buffer) where {T, VT <: CuVector{T}}
-    ker_set_con_scale_sparse!(CUDABackend())(con_scale::VT, jac_I, jac_buffer; ndrange = length(jac_I))
-    synchronize(CUDABackend())
+    con_scale_cpu = Array(con_scale)
+    MadNLP._set_con_scale_sparse!(con_scale_cpu, Array(jac_I), Array(jac_buffer))
+    copyto!(con_scale, con_scale_cpu)
+    # _ker_set_con_scale_sparse!(CUDABackend())(con_scale, jac_I, jac_buffer; ndrange = length(jac_I))
+    # synchronize(CUDABackend())
 end
 
-@kernel function ker_set_con_scale_sparse!(con_scale, jac_I, jac_buffer)
-    index = @index(Global)
-    @inbounds begin
-        row = jac_I[index]
-        con_scale[row] = max(con_scale[row], abs(jac_buffer[index]))
-    end
-end
+# TODO fix bug
+# @kernel function _ker_set_con_scale_sparse!(con_scale, jac_I, jac_buffer)
+#     i = @index(Global)
+#     row = jac_I[i]
+#     con_scale[row] = max(con_scale[row], abs(jac_buffer[i]))
+# end
 
 function MadNLP._sym_length(Jt::CUDA.CUSPARSE.CuSparseMatrixCSC)
     return mapreduce(
