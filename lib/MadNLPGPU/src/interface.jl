@@ -3,7 +3,9 @@ function MadNLP.coo_to_csc(coo::MadNLP.SparseMatrixCOO{T,I,VT,VI}) where {T,I, V
         (i,j,k)->((i,j),k),
         coo.I, coo.J, 1:length(coo.I)
     )
-    sort!(coord, lt = (((i, j), k), ((n, m), l)) -> (j,i) < (m,n))
+    if length(coord) > 0 
+        sort!(coord, lt = (((i, j), k), ((n, m), l)) -> (j,i) < (m,n))
+    end
     
     mapptr = getptr(CUDABackend(), coord)
 
@@ -307,10 +309,12 @@ end
         end
 end
 function MadNLP._set_con_scale_sparse!(con_scale::VT, jac_I, jac_buffer) where {T, VT <: CuVector{T}}
-    inds = sort!(map((i,j)->(i,j),  jac_I, 1:length(jac_I)))
-    ptr = getptr(CUDABackend(), inds)
-    ker_set_con_scale_sparse!(CUDABackend())(ptr, inds, con_scale, jac_I, jac_buffer; ndrange=length(ptr)-1)
-    synchronize(CUDABackend())
+    if length(jac_I) > 0
+        inds = sort!(map((i,j)->(i,j),  jac_I, 1:length(jac_I)))
+        ptr = getptr(CUDABackend(), inds)
+        ker_set_con_scale_sparse!(CUDABackend())(ptr, inds, con_scale, jac_I, jac_buffer; ndrange=length(ptr)-1)
+        synchronize(CUDABackend())
+    end
 end
 
 function MadNLP._sym_length(Jt::CUDA.CUSPARSE.CuSparseMatrixCSC)
