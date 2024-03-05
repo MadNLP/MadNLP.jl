@@ -19,7 +19,7 @@ function MadNLP.coo_to_csc(coo::MadNLP.SparseMatrixCOO{T,I,VT,VI}) where {T,I, V
     rowval = map(x -> x[1][1], coord_csc)
     nzval = similar(rowval, T)
 
-    csc = CUDA.CUSPARSE.CuSparseMatrixCSC(colptr, rowval, nzval, size(coo))
+    csc = CUSPARSE.CuSparseMatrixCSC(colptr, rowval, nzval, size(coo))
     
     
     cscmap = similar(coo.I, Int)
@@ -34,7 +34,7 @@ function MadNLP.coo_to_csc(coo::MadNLP.SparseMatrixCOO{T,I,VT,VI}) where {T,I, V
 end
 
 function CUSPARSE.CuSparseMatrixCSC{Tv,Ti}(A::MadNLP.SparseMatrixCSC{Tv,Ti}) where {Tv,Ti}
-    return CUDA.CUSPARSE.CuSparseMatrixCSC{Tv,Ti}(
+    return CUSPARSE.CuSparseMatrixCSC{Tv,Ti}(
         CuArray(A.colptr),
         CuArray(A.rowval),
         CuArray(A.nzval),
@@ -42,7 +42,7 @@ function CUSPARSE.CuSparseMatrixCSC{Tv,Ti}(A::MadNLP.SparseMatrixCSC{Tv,Ti}) whe
     )
 end
 
-function MadNLP.get_tril_to_full(csc::CUDA.CUSPARSE.CuSparseMatrixCSC{Tv,Ti}) where {Tv,Ti}
+function MadNLP.get_tril_to_full(csc::CUSPARSE.CuSparseMatrixCSC{Tv,Ti}) where {Tv,Ti}
     cscind = MadNLP.SparseMatrixCSC{Int,Ti}(
         MadNLP.Symmetric(
             MadNLP.SparseMatrixCSC{Int,Ti}(
@@ -54,7 +54,7 @@ function MadNLP.get_tril_to_full(csc::CUDA.CUSPARSE.CuSparseMatrixCSC{Tv,Ti}) wh
             :L
         )
     )
-    return CUDA.CUSPARSE.CuSparseMatrixCSC{Tv,Ti}(
+    return CUSPARSE.CuSparseMatrixCSC{Tv,Ti}(
         CuArray(cscind.colptr),
         CuArray(cscind.rowval),
         CuVector{Tv}(undef,MadNLP.nnz(cscind)),
@@ -65,11 +65,11 @@ end
 
 
 
-function MadNLP.transfer!(dest::CUDA.CUSPARSE.CuSparseMatrixCSC, src::MadNLP.SparseMatrixCOO, map)
+function MadNLP.transfer!(dest::CUSPARSE.CuSparseMatrixCSC, src::MadNLP.SparseMatrixCOO, map)
     copyto!(view(dest.nzVal, map), src.V)
 end
 
-function MadNLP.build_condensed_aug_coord!(kkt::MadNLP.AbstractCondensedKKTSystem{T,VT,MT}) where {T, VT, MT <: CUDA.CUSPARSE.CuSparseMatrixCSC{T}}
+function MadNLP.build_condensed_aug_coord!(kkt::MadNLP.AbstractCondensedKKTSystem{T,VT,MT}) where {T, VT, MT <: CUSPARSE.CuSparseMatrixCSC{T}}
     fill!(kkt.aug_com.nzVal, zero(T))
     if length(kkt.hptr) > 0
         _transfer_kernel!(CUDABackend())(kkt.aug_com.nzVal, kkt.hptr, kkt.hess_com.nzVal; ndrange = length(kkt.hptr))
@@ -207,7 +207,7 @@ function MadNLP.initialize!(kkt::MadNLP.AbstractSparseKKTSystem{T,VT}) where {T,
     fill!(kkt.hess_com.nzVal, 0.) # so that mul! in the initial primal-dual solve has no effect
 end
 
-function MadNLP.compress_hessian!(kkt::MadNLP.AbstractSparseKKTSystem{T, VT, MT}) where {T, VT, MT<:CUDA.CUSPARSE.CuSparseMatrixCSC{T, Int32}}
+function MadNLP.compress_hessian!(kkt::MadNLP.AbstractSparseKKTSystem{T, VT, MT}) where {T, VT, MT<:CUSPARSE.CuSparseMatrixCSC{T, Int32}}
     fill!(kkt.hess_com.nzVal, zero(T))
     if length(kkt.ext.hess_com_ptrptr) > 1
         _transfer_kernel!(CUDABackend())(kkt.hess_com.nzVal, kkt.ext.hess_com_ptr, kkt.ext.hess_com_ptrptr, kkt.hess_raw.V; ndrange = length(kkt.ext.hess_com_ptrptr)-1)
@@ -231,7 +231,7 @@ function MadNLP._set_con_scale_sparse!(con_scale::VT, jac_I, jac_buffer) where {
     end
 end
 
-function MadNLP._sym_length(Jt::CUDA.CUSPARSE.CuSparseMatrixCSC)
+function MadNLP._sym_length(Jt::CUSPARSE.CuSparseMatrixCSC)
     return mapreduce(
         (x,y) -> begin
             z = x-y
@@ -243,7 +243,7 @@ function MadNLP._sym_length(Jt::CUDA.CUSPARSE.CuSparseMatrixCSC)
     )
 end
 
-function MadNLP._build_condensed_aug_symbolic_hess(H::CUDA.CUSPARSE.CuSparseMatrixCSC{Tv,Ti}, sym, sym2) where {Tv,Ti}
+function MadNLP._build_condensed_aug_symbolic_hess(H::CUSPARSE.CuSparseMatrixCSC{Tv,Ti}, sym, sym2) where {Tv,Ti}
     if size(H,2) > 0
         _build_condensed_aug_symbolic_hess_kernel!(CUDABackend())(
             sym, sym2, H.colPtr, H.rowVal;
@@ -253,7 +253,7 @@ function MadNLP._build_condensed_aug_symbolic_hess(H::CUDA.CUSPARSE.CuSparseMatr
     end
 end
 
-function MadNLP._build_condensed_aug_symbolic_jt(Jt::CUDA.CUSPARSE.CuSparseMatrixCSC{Tv,Ti}, sym, sym2) where {Tv,Ti}
+function MadNLP._build_condensed_aug_symbolic_jt(Jt::CUSPARSE.CuSparseMatrixCSC{Tv,Ti}, sym, sym2) where {Tv,Ti}
     if size(Jt,2) > 0
         _offsets = map((i,j) -> div((j-i)^2 + (j-i), 2), @view(Jt.colPtr[1:end-1]) , @view(Jt.colPtr[2:end]))
         offsets = cumsum(_offsets)
@@ -270,7 +270,7 @@ function MadNLP._first_and_last_col(sym2::CuVector,ptr2)
     return (first, last)
 end
 
-MadNLP.nzval(H::CUDA.CUSPARSE.CuSparseMatrixCSC) = H.nzVal
+MadNLP.nzval(H::CUSPARSE.CuSparseMatrixCSC) = H.nzVal
 
 function MadNLP._set_colptr!(colptr::CuVector, ptr2, sym2, guide)
     if length(ptr2) == 1 # otherwise error is thrown
@@ -290,7 +290,7 @@ end
 
 
 function MadNLP._get_sparse_csc(dims, colptr::CuVector, rowval, nzval)
-    return CUDA.CUSPARSE.CuSparseMatrixCSC(
+    return CUSPARSE.CuSparseMatrixCSC(
         colptr,
         rowval,
         nzval,
@@ -352,18 +352,28 @@ end
     @inbounds begin
         if index == 1
             ((i2,j2),k2) = coord[index]
-            colptr[1:j2] .= 1
+            for k in 1:j2
+                colptr[k] = 1
+            end
             if index == length(coord)
-                colptr[j2+1:end] .= index+1
+                ip1 = index+1
+                for k in j2+1:length(colptr)
+                    colptr[k] .= ip1
+                end
             end
         else
             ((i1,j1),k1) = coord[index-1]
             ((i2,j2),k2) = coord[index]
             if j1 != j2
-                colptr[j1+1:j2] .= index 
+                for k in j1+1:j2
+                    colptr[k] = index
+                end
             end
             if index == length(coord)
-                colptr[j2+1:end] .= index+1
+                ip1 = index+1
+                for k in j2+1:length(colptr)
+                    colptr[k] = ip1
+                end
             end
         end
     end
@@ -411,14 +421,14 @@ end
 @kernel function _set_con_scale_sparse_kernel!(con_scale, @Const(ptr), @Const(inds), @Const(jac_I), @Const(jac_buffer))
     index = @index(Global)
 
-        @inbounds begin
-            rng = ptr[index]:ptr[index+1]-1
-            
-            for k in rng
-                (row, i) = inds[k]
-                con_scale[row] = max(con_scale[row], abs(jac_buffer[i]))
-            end
+    @inbounds begin
+        rng = ptr[index]:ptr[index+1]-1
+        
+        for k in rng
+            (row, i) = inds[k]
+            con_scale[row] = max(con_scale[row], abs(jac_buffer[i]))
         end
+    end
 end
 
 @kernel function _build_condensed_aug_symbolic_hess_kernel!(sym, sym2, @Const(colptr), @Const(rowval))
