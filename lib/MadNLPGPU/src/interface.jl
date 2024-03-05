@@ -13,7 +13,9 @@ function MadNLP.coo_to_csc(coo::MadNLP.SparseMatrixCOO{T,I,VT,VI}) where {T,I, V
     
     coord_csc = coord[@view(mapptr[1:end-1])]
 
-    ker_colptr!(CUDABackend())(colptr, coord_csc, ndrange = length(coord_csc))
+    if length(coord) > 0 
+        ker_colptr!(CUDABackend())(colptr, coord_csc, ndrange = length(coord_csc))
+    end
     rowval = map(x -> x[1][1], coord_csc)
     nzval = similar(rowval, T)
 
@@ -21,7 +23,9 @@ function MadNLP.coo_to_csc(coo::MadNLP.SparseMatrixCOO{T,I,VT,VI}) where {T,I, V
     
     
     cscmap = similar(coo.I, Int)
-    ker_index(CUDABackend())(cscmap, mapptr, coord, ndrange = length(mapptr)-1)
+    if length(coord) > 0 
+        ker_index(CUDABackend())(cscmap, mapptr, coord, ndrange = length(mapptr)-1)
+    end
     
     synchronize(CUDABackend())
     
@@ -36,6 +40,9 @@ end
         if index == 1
             ((i2,j2),k2) = coord[index]
             colptr[1:j2] .= 1
+            if index == length(coord)
+                colptr[j2+1:end] .= index+1
+            end
         else
             ((i1,j1),k1) = coord[index-1]
             ((i2,j2),k2) = coord[index]
@@ -121,14 +128,18 @@ end
 
 function MadNLP.build_condensed_aug_coord!(kkt::MadNLP.AbstractCondensedKKTSystem{T,VT,MT}) where {T, VT, MT <: CUDA.CUSPARSE.CuSparseMatrixCSC{T}}
     fill!(kkt.aug_com.nzVal, zero(T))
-    _transfer!(CUDABackend())(kkt.aug_com.nzVal, kkt.hptr, kkt.hess_com.nzVal; ndrange = length(kkt.hptr))
-    synchronize(CUDABackend())
-    _transfer!(CUDABackend())(kkt.aug_com.nzVal, kkt.dptr, kkt.pr_diag; ndrange = length(kkt.dptr))
-    synchronize(CUDABackend())
+    if length(kkt.hptr) > 0
+        _transfer!(CUDABackend())(kkt.aug_com.nzVal, kkt.hptr, kkt.hess_com.nzVal; ndrange = length(kkt.hptr))
+        synchronize(CUDABackend())
+    end
+    if length(kkt.dptr) > 0
+        _transfer!(CUDABackend())(kkt.aug_com.nzVal, kkt.dptr, kkt.pr_diag; ndrange = length(kkt.dptr))
+        synchronize(CUDABackend())
+    end
     if length(kkt.ext.jptrptr) > 1 # otherwise error is thrown
         _jtsj!(CUDABackend())(kkt.aug_com.nzVal, kkt.jptr, kkt.ext.jptrptr, kkt.jt_csc.nzVal, kkt.diag_buffer; ndrange = length(kkt.ext.jptrptr)-1)
+        synchronize(CUDABackend())
     end
-    synchronize(CUDABackend())
 end
 
 @kernel function _transfer!(y, @Const(ptr), @Const(x))
@@ -277,7 +288,9 @@ end
 
 function MadNLP.compress_hessian!(kkt::MadNLP.AbstractSparseKKTSystem{T, VT, MT}) where {T, VT, MT<:CUDA.CUSPARSE.CuSparseMatrixCSC{T, Int32}}
     fill!(kkt.hess_com.nzVal, zero(T))
-    _transfer!(CUDABackend())(kkt.hess_com.nzVal, kkt.ext.hess_com_ptr, kkt.ext.hess_com_ptrptr, kkt.hess_raw.V; ndrange = length(kkt.ext.hess_com_ptrptr)-1)
+    if length(kkt.ext.hess_com_ptrptr) > 1
+        _transfer!(CUDABackend())(kkt.hess_com.nzVal, kkt.ext.hess_com_ptr, kkt.ext.hess_com_ptrptr, kkt.hess_raw.V; ndrange = length(kkt.ext.hess_com_ptrptr)-1)
+    end
     synchronize(CUDABackend())
 end
 function MadNLP.compress_jacobian!(kkt::MadNLP.SparseCondensedKKTSystem{T, VT, MT}) where {T, VT, MT<:CUDA.CUSOLVER.CuSparseMatrixCSC{T, Int32}}
@@ -330,11 +343,13 @@ function MadNLP._sym_length(Jt::CUDA.CUSPARSE.CuSparseMatrixCSC)
 end
 
 function MadNLP._build_condensed_aug_symbolic_hess(H::CUDA.CUSPARSE.CuSparseMatrixCSC{Tv,Ti}, sym, sym2) where {Tv,Ti}
-    ker_build_condensed_aug_symbolic_hess(CUDABackend())(
-        sym, sym2, H.colPtr, H.rowVal;
-        ndrange = size(H,2)
-    )
-    synchronize(CUDABackend())
+    if size(H,2) > 0
+        ker_build_condensed_aug_symbolic_hess(CUDABackend())(
+            sym, sym2, H.colPtr, H.rowVal;
+            ndrange = size(H,2)
+        )
+        synchronize(CUDABackend())
+    end
 end
 
 @kernel function ker_build_condensed_aug_symbolic_hess(sym, sym2, @Const(colptr), @Const(rowval))
@@ -367,12 +382,12 @@ end
 end
 
 function MadNLP._build_condensed_aug_symbolic_jt(Jt::CUDA.CUSPARSE.CuSparseMatrixCSC{Tv,Ti}, sym, sym2) where {Tv,Ti}
-
-    _offsets = map((i,j) -> div((j-i)^2 + (j-i), 2), @view(Jt.colPtr[1:end-1]) , @view(Jt.colPtr[2:end]))
-    offsets = cumsum(_offsets)
-
-    ker_build_condensed_aug_symbolic_jt(CUDABackend())(Jt.colPtr, Jt.rowVal, offsets, sym, sym2; ndrange = size(Jt,2))
-    synchronize(CUDABackend())
+    if size(Jt,2) > 0
+        _offsets = map((i,j) -> div((j-i)^2 + (j-i), 2), @view(Jt.colPtr[1:end-1]) , @view(Jt.colPtr[2:end]))
+        offsets = cumsum(_offsets)
+        ker_build_condensed_aug_symbolic_jt(CUDABackend())(Jt.colPtr, Jt.rowVal, offsets, sym, sym2; ndrange = size(Jt,2))
+        synchronize(CUDABackend())
+    end
 end
 
 function MadNLP._first_and_last_col(sym2::CuVector,ptr2)
