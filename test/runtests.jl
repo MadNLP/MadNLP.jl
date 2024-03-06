@@ -1,5 +1,6 @@
 using Test, MadNLP, MadNLPTests, MINLPTests
 using NLPModels
+using Quadmath
 import MathOptInterface
 import SparseArrays: sparse
 

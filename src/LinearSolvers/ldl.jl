@@ -3,7 +3,7 @@ end
 const LDLF = NLPModels.LinearOperators.LDLFactorizations
 
 mutable struct LDLSolver{T} <: AbstractLinearSolver{T}
-    inner::LDLF.LDLFactorization{Float64, Int32}
+    inner::LDLF.LDLFactorization{T, Int32}
     tril::SparseMatrixCSC{T,Int32}
     full::SparseMatrixCSC{T,Int32}
     tril_to_full_view::SubVector{T}
@@ -16,7 +16,7 @@ function LDLSolver(
     opt=LDLFactorizationsOptions(), logger=MadNLPLogger(),
 ) where T
     # TODO: convert tril to triu, not full
-    full, tril_to_full_view = get_tril_to_full(Float64,tril)
+    full, tril_to_full_view = get_tril_to_full(T,tril)
     
     return LDLSolver(
         LDLF.ldl(
@@ -63,5 +63,4 @@ function improve!(M::LDLSolver)
     return false
 end
 introduce(::LDLSolver) = "LDLFactorizations"
-is_supported(::Type{LDLSolver},::Type{Float32}) = true
-is_supported(::Type{LDLSolver},::Type{Float64}) = true
+is_supported(::Type{LDLSolver},::Type{T}) where T <: AbstractFloat = true

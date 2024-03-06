@@ -30,6 +30,10 @@ end
 end
 
 
+MadNLPTests.test_linear_solver(LDLSolver,Float32)
+MadNLPTests.test_linear_solver(LDLSolver,Float64)
+MadNLPTests.test_linear_solver(LDLSolver,Float128)
 MadNLPTests.test_linear_solver(UmfpackSolver,Float64)
+MadNLPTests.test_linear_solver(CHOLMODSolver,Float64)
 MadNLPTests.test_linear_solver(LapackCPUSolver,Float32)
 MadNLPTests.test_linear_solver(LapackCPUSolver,Float64)
