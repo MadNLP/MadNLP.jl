@@ -184,7 +184,7 @@ end
     nlp = MadNLPTests.HS15Model(Float128)
     result = madnlp(
         nlp;
-        print_level = 0,
+        print_level = MadNLP.ERROR,
         callback = MadNLP.SparseCallback,
         linear_solver=LDLSolver,
         kkt_system = MadNLP.SparseCondensedKKTSystem
