@@ -29,7 +29,7 @@ function CHOLMODSolver(
         A = CHOLMOD.Sparse(full)
         inner = CHOLMOD.symbolic(A)
     else
-        inner = cholesky(A; check=false)
+        inner = cholesky(full; check=false)
     end
 
     return CHOLMODSolver(inner, csc, full, tril_to_full_view, p, d, opt, logger)
