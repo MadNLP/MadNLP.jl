@@ -7,7 +7,7 @@ function MadNLP.coo_to_csc(coo::MadNLP.SparseMatrixCOO{T,I,VT,VI}) where {T,I, V
         sort!(coord, lt = (((i, j), k), ((n, m), l)) -> (j,i) < (m,n))
     end
     
-    mapptr = MadNLP.getptr(coord)
+    mapptr = MadNLP.getptr(coord; by = ((x1,x2),(y1,y2))->x1 != y1)
 
     colptr = similar(coo.I, size(coo,2)+1)
     
@@ -225,7 +225,7 @@ end
 function MadNLP._set_con_scale_sparse!(con_scale::VT, jac_I, jac_buffer) where {T, VT <: CuVector{T}}
     if length(jac_I) > 0
         inds = sort!(map((i,j)->(i,j),  jac_I, 1:length(jac_I)))
-        ptr = MadNLP.getptr(inds)
+        ptr = MadNLP.getptr(inds; by = ((x1,x2),(y1,y2))->x1 != y1)
         _set_con_scale_sparse_kernel!(CUDABackend())(con_scale, ptr, inds, jac_I, jac_buffer; ndrange=length(ptr)-1)
         synchronize(CUDABackend())
     end
