@@ -24,9 +24,13 @@ function CHOLMODSolver(
     full, tril_to_full_view = get_tril_to_full(Float64,csc)
     full.nzval .= 1.0
 
-    A = CHOLMOD.Sparse(full)
     # TODO: use AMD permutation here
-    inner = CHOLMOD.symbolic(A)
+    if VERSION >= v"1.10"
+        A = CHOLMOD.Sparse(full)
+        inner = CHOLMOD.symbolic(A)
+    else
+        inner = cholesky(A; check=false)
+    end
 
     return CHOLMODSolver(inner, csc, full, tril_to_full_view, p, d, opt, logger)
 end
