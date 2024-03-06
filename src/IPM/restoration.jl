@@ -52,20 +52,20 @@ function RobustRestorer(solver::AbstractMadNLPSolver{T}) where {T}
     nn_trial = similar(solver.y, solver.m)
 
     return RobustRestorer(
-        0.,
-        f_R,
-        x_ref,
-        0.,
-        D_R,
-        0.,
-        pp,
-        nn,
-        zp, zn,
-        dpp, dnn, dzp, dzn,
-        pp_trial,
-        nn_trial,
-        0.,0.,0.,0.,0.,0.,
-        Tuple{T,T}[],
+        zero(T), 
+        f_R, 
+        x_ref, 
+        zero(T), 
+        D_R, 
+        zero(T), 
+        pp, 
+        nn, 
+        zp, zn, 
+        dpp, dnn, dzp, dzn, 
+        pp_trial, 
+        nn_trial, 
+        zero(T), zero(T), zero(T), zero(T), zero(T), zero(T), 
+        Tuple{T, T}[], 
     )
 end
 

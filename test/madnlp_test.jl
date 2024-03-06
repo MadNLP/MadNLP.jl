@@ -182,6 +182,11 @@ end
 
 @testset "Quadmath test" begin
     nlp = MadNLPTests.HS15Model(Float128)
-    result = madnlp(nlp; linear_solver=LDLSolver, kkt_system = MadNLP.SparseCondensedKKTSystem)
+    result = madnlp(
+        nlp;
+        callback = MadNLP.SparseCallback,
+        linear_solver=LDLSolver,
+        kkt_system = MadNLP.SparseCondensedKKTSystem
+    )
     @test result.status == MadNLP.SOLVE_SUCCEEDED
 end
