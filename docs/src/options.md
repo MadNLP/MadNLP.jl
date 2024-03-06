@@ -21,7 +21,7 @@ These options are used to set the values for other options. The default values a
 
 ## General options
 
-- `iterator::Module = Richardson `\
+- `iterator::Type = RichardsonIterator `\
     Iterator used for iterative refinement. Valid values are: {`MadNLPRichardson`,`MadNLPKrylov`}.
     - `Richardson` uses [Richardson iteration](https://en.wikipedia.org/wiki/Modified_Richardson_iteration)
     - `Krylov` uses [restarted Generalized Minimal Residual](https://en.wikipedia.org/wiki/Generalized_minimal_residual_method) method implemented in [IterativeSolvers.jl](https://github.com/JuliaMath/IterativeSolvers.jl).
@@ -90,12 +90,6 @@ These options are used to set the values for other options. The default values a
 - `nlp_scaling::Bool = true`: \
     If `true`, MadNLP scales the nonlinear problem during the resolution.
 - `nlp_scaling_max_gradient::Float64 = 100.`
-
-
----
-## Inertia options
-
-
 
 ---
 ## Hessian perturbation options
@@ -235,36 +229,6 @@ is printed.
 
 #### LapackCPU
 - `lapackcpu_algorithm::LapackCPU.Algorithms = BUNCHKAUFMAN`
-
-#### Schur (requires `MadNLPGraphs`)
-- `schur_subproblem_solver::Module = DefaultLinearSolver` \
-   Linear solver used for solving subproblem. Valid values are: {`MadNLPUmfpack`, `MadNLPMa27`, `MadNLPMa57`, `MadNLPMa97`, `MadNLPMumps`}.
-- `schur_dense_solver::Module = DefaultDenseSolver` \
-   Linear solver used for solving Schur complement system
-- `schur_custom_partition::Bool = false` \
-   If `false`, Schur solver automatically detects the partition using `Metis`. If `true`, the partition information given in `schur_part` is used. `schur_num_parts` and `schur_part` should be properly set by the user. When using with `Plasmo`, `schur_num_parts` and `schur_part` are automatically set by the `Plasmo` interface.
-- `schur_num_parts::Int = 2` \
-   Number of parts (excluding the parent node). Valid range is ``[1,\infty)``
-- `schur_part::Vector{Int} = Int[]` \
-   Custom partition information in a vector form. The parent node should be labeled as `0`. Only valid if `schur_custom_partition` is `true`.
-
-#### Schwarz (requires `MadNLPGraphs`)
-- `schwarz_subproblem_solver::Module = DefaultSubproblemSolver` \
-   Linear solver used for solving subproblem. Valid values are: {`MadNLPUmfpack`, `MadNLPPardisoMKL`, `MadNLPMa27`, `MadNLPMa57`, `MadNLPMa77`, `MadNLPMa86`, `MadNLPMa97`, `MadNLPPardiso`}.
-- `schwarz_custom_partition::Bool = false` \
-    If `false`, Schwarz solver automatically detects the partition using `Metis`. If `true`, the partition information given in `schur_part` is used. `schur_num_parts` and `schur_part` should be properly set by the user. When using with `Plasmo`, `schur_num_parts` and `schur_part` are automatically set by the `Plasmo` interface.
-- `schwarz_num_parts::Int = 2` \
-    Number of parts. Valid range is ``[1,\infty)``
-- `schwarz_part::Vector{Int} = Int[]` \
-    Custom partition information in a vector form. Only valid if `schwar_custom_partition` is `true`.
-- `schwarz_num_parts_upper::Int = 0` \
-    Number of parts in upper level partition. If `schwarz_num_parts_upper!=0`, a bilevel partitioning scheme is used. Valid range is ``[1,\infty)``
-- `schwarz_part_upper::Vector{Int} = Int[]` \
-    Custom partition for the upper level partition.
-- `schwarz_fully_improve_subproblem_solver::Bool = true` \
-    If `true`, the subproblem solvers are fully improved when the linear solver is initialized.
-- `schwarz_max_expand_factor::Int = 4` \
-    The size of overlap is fully saturated when the `improve!` is called `schwarz_max_expand_factor-1` times. Valid range is ``[2,\infty)``.
 
 ### Iterator Options
 #### Richardson
