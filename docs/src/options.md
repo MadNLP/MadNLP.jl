@@ -8,10 +8,19 @@ Depth=3
 ```
 
 ---
+## Primary options
+These options are used to set the values for other options. The default values are inferred from the NLP model.
+- `tol::Float64`\
+    Termination tolerance. The default value is `1e-8` for double precision. The solver terminates if the scaled primal, dual, complementary infeasibility is less than `tol`. Valid range is ``(0,\infty)``.
+- `callback::Type` 	
+  Valid values are: `MadNLP`.{`DenseCallback`,`SparseCallback`}.
+- `kkt_system::Type` 
+  The type of KKT system. Valid values are `MadNLP`.{`SpasreKKTSystem`,`SparseUnreducedKKTSystem`,`SparseCondensedKKTSystem`,`DenseKKTSystem`,`DenseCondensedKKTSystem`}.
+- `linear_solver::Type`\
+  Linear solver used for solving primal-dual system. Valid values are: {`MadNLP.UmfpackSolver`,`MadNLP.LDLSolver`,`MadNLP.CHOLMODSolver`, `MadNLP.MumpsSolver`, `MadNLP.PardisoSolver`, `MadNLP.PardisoMKLSolver`, `MadNLP.Ma27Solver`, `MadNLP.Ma57Solver`, `MadNLP.Ma77Solver`, `MadNLP.Ma86Solver`, `MadNLP.Ma97Solver`, `MadNLP.LapackCPUSolver`, `MadNLPGPU.LapackGPUSolver`,`MadNLPGPU.RFSolver`,`MadNLPGPU.GLUSolver`,`MadNLPGPU.CuCholeskySolver`,`MadNLPGPU.CUDSSSolver`} (some may require using extension packages). The selected solver should be properly built in the build procedure. See [README.md](https://github.com/sshin23/MadNLP.jl) file.
+
 ## General options
 
-- `linear_solver::Module = DefaultLinearSolver`:\
-    Linear solver used for solving primal-dual system. Valid values are: {`MadNLPUmfpack`, `MadNLPMumps`, `MadNLPPardisoMKL`, `MadNLPMa27`, `MadNLPMa57`, `MadNLPMa77`, `MadNLPMa86`, `MadNLPMa97`, `MadNLPPardiso`, `MadNLPSchur`, `MadNLPSchwarz`, `MadNLPLapackCPU`, `MadNLPLapackGPU`} (some may require using extension packages). The selected solver should be properly built in the build procedure. See [README.md](https://github.com/sshin23/MadNLP.jl) file.
 - `iterator::Module = Richardson `\
     Iterator used for iterative refinement. Valid values are: {`MadNLPRichardson`,`MadNLPKrylov`}.
     - `Richardson` uses [Richardson iteration](https://en.wikipedia.org/wiki/Modified_Richardson_iteration)
@@ -40,8 +49,6 @@ Depth=3
 
 - `max_iter::Int = 3000`\
     Maximum number of interior point iterations. The solver terminates with exit symbol `:Maximum_Iterations_Exceeded` if the interior point iteration count exceeds `max_iter`.
-- `tol::Float64 = 1e-8`\
-    Termination tolerance. The solver terminates if the scaled primal, dual, complementary infeasibility is less than `tol`. Valid range is ``(0,\infty)``.
 - `acceptable_tol::Float64 = 1e-6`\
     Acceptable tolerance. The solver terminates if the scaled primal, dual, complementary infeasibility is less than `acceptable_tol`, for `acceptable_iter` consecutive interior point iteration steps.
 - `acceptable_iter::Int = 15`\
@@ -54,31 +61,40 @@ Depth=3
 
 
 ---
-## Nonlinear options
-- `nlp_scaling::Bool = true`: \
-    If `true`, MadNLP scales the nonlinear problem during the resolution.
-- `nlp_scaling_max_gradient::Float64 = 100.`
-- `fixed_variable_treatment::FixedVariableTreatments = MAKE_PARAMETER`\
-    Valid values are: `MadNLP`.{`RELAX_BOUND`,`MAKE_PARAMETER`}.
+## NLP options
+- `kappa_d::Float64 = 1e-5`
+- `fixed_variable_treatment::FixedVariableTreatments = MakeParameter`\
+    Valid values are: `MadNLP`.{`RelaxBound`,`MakeParameter`}.
+- `equality_treatment::FixedVariableTreatments = MakeParameter`\
+    Valid values are: `MadNLP`.{`RelaxEquality`,`EnforceEquality`}.
 - `jacobian_constant::Bool = false`\
     If `true`, constraint Jacobian is only evaluated once and reused.
 - `hessian_constant::Bool = false`\
     If `true`, Lagrangian Hessian is only evaluated once and reused.
-- `constr_mult_init_max::Float64 = 1e3`
 - `bound_push::Float64 = 1e-2`
 - `bound_fac::Float64 = 1e-2`
-- `kappa_d::Float64 = 1e-5`
-
-
----
-## Inertia options
-
+- `hessian_approximation::Type = ExactHessian`
+- `quasi_newton_options::QuasiNewtonOptions = QuasiNewtonOptions()`
 - `inertia_correction_method::InertiaCorrectionMethods = INERTIA_AUTO`\
     Valid values are: `MadNLP`.{`INERTIA_AUTO`,`INERTIA_BASED`, `INERTIA_FREE`}.
     - `INERTIA_BASED` uses the strategy in Ipopt.
     - `INERTIA_FREE` uses the strategy in Chiang (2016).
     - `INERTIA_AUTO` uses `INERTIA_BASED` if inertia information is available and uses `INERTIA_FREE` otherwise.
 - `inertia_free_tol::Float64 = 0.`
+
+---
+## Initialization Options
+    dual_initialized::Bool = false
+    dual_initialization_method::Type = kkt_system <: MadNLP.SparseCondensedKKTSystem ? DualInitializeSetZero : DualInitializeLeastSquares
+- `constr_mult_init_max::Float64 = 1e3`
+- `nlp_scaling::Bool = true`: \
+    If `true`, MadNLP scales the nonlinear problem during the resolution.
+- `nlp_scaling_max_gradient::Float64 = 100.`
+
+
+---
+## Inertia options
+
 
 
 ---

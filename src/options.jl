@@ -18,6 +18,7 @@ function set_options!(opt::AbstractOptions, options)
 end
 
 @kwdef mutable struct MadNLPOptions <: AbstractOptions
+    # Primary options
     tol::Float64
     callback::Type
     kkt_system::Type
@@ -51,17 +52,17 @@ end
     hessian_constant::Bool = false
     hessian_approximation::Type = ExactHessian
     quasi_newton_options::QuasiNewtonOptions = QuasiNewtonOptions()
+    inertia_correction_method::Type = InertiaAuto
+    inertia_free_tol::Float64 = 0.
 
     # initialization options
     dual_initialized::Bool = false
     dual_initialization_method::Type = kkt_system <: MadNLP.SparseCondensedKKTSystem ? DualInitializeSetZero : DualInitializeLeastSquares
-    inertia_correction_method::Type = InertiaAuto
     constr_mult_init_max::Float64 = 1e3
     bound_push::Float64 = 1e-2
     bound_fac::Float64 = 1e-2
     nlp_scaling::Bool = true
     nlp_scaling_max_gradient::Float64 = 100.
-    inertia_free_tol::Float64 = 0.
 
     # Hessian Perturbation
     min_hessian_perturbation::Float64 = 1e-20
