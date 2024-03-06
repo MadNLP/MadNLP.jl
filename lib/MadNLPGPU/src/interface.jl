@@ -14,7 +14,7 @@ function MadNLP.coo_to_csc(coo::MadNLP.SparseMatrixCOO{T,I,VT,VI}) where {T,I, V
     coord_csc = coord[@view(mapptr[1:end-1])]
 
     if length(coord) > 0 
-        _set_colptr_kernel!(CUDABackend())(colptr, coord_csc, ndrange = length(coord_csc))
+        _set_coo_to_colptr_kernel!(CUDABackend())(colptr, coord_csc, ndrange = length(coord_csc))
     end
     rowval = map(x -> x[1][1], coord_csc)
     nzval = similar(rowval, T)
@@ -346,7 +346,7 @@ end
     end
 end
 
-@kernel function _set_colptr_kernel!(colptr, @Const(coord))
+@kernel function _set_coo_to_colptr_kernel!(colptr, @Const(coord))
     index = @index(Global)
 
     @inbounds begin
@@ -358,7 +358,7 @@ end
             if index == length(coord)
                 ip1 = index+1
                 for k in j2+1:length(colptr)
-                    colptr[k] .= ip1
+                    colptr[k] = ip1
                 end
             end
         else
