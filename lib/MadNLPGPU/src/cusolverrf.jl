@@ -273,7 +273,6 @@ function MadNLP.factorize!(M::CuCholeskySolver)
         CUSOLVER.spcholesky_factorise(M.inner, M.fullp, eltype(M.fullp.nzVal) == Float32 ? 1e-6 : 1e-12)
         M.singularity = false
     catch e
-        println(e)
         M.singularity = true
     end
 
