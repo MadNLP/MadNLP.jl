@@ -1,6 +1,5 @@
 module MadNLPMumps
 
-import StaticArrays: SVector, setindex
 import MUMPS_seq_jll
 import MadNLP:
     parsefile, dlopen,
@@ -24,12 +23,12 @@ const version = parsefile(joinpath(dirname(pathof(MUMPS_seq_jll)),"..","Project.
 
 @kwdef mutable struct MumpsOptions <: AbstractOptions
     mumps_dep_tol::Float64 = 0.
-    mumps_mem_percent::Int = 1000
-    mumps_permuting_scaling::Int = 7
-    mumps_pivot_order::Int = 7
+    mumps_mem_percent::Cint = 1000
+    mumps_permuting_scaling::Cint = 7
+    mumps_pivot_order::Cint = 7
     mumps_pivtol::Float64 = 1e-6
     mumps_pivtolmax::Float64 = .1
-    mumps_scaling::Int = 77
+    mumps_scaling::Cint = 77
 end
 
 @kwdef mutable struct Struc{T}
@@ -39,11 +38,11 @@ end
 
     comm_fortran::Cint = 0
 
-    icntl::SVector{60,Cint} = zeros(60)
-    keep::SVector{500,Cint} = zeros(500)
-    cntl::SVector{15,T} = zeros(15)
-    dkeep::SVector{230,T} = zeros(230)
-    keep8::SVector{150,Int64} = zeros(150)
+    icntl::NTuple{60,Cint} = Tuple(zero(Cint) for i=1:60)
+    keep::NTuple{500,Cint} = Tuple(zero(Cint) for i=1:500)
+    cntl::NTuple{15,T} = Tuple(zero(T) for i=1:15)
+    dkeep::NTuple{230,T} = Tuple(zero(T) for i=1:230)
+    keep8::NTuple{150,Int64} = Tuple(zero(Cint) for i=1:150)
     n::Cint = 0
     nblk::Cint = 0
 
@@ -107,10 +106,10 @@ end
     nprow::Cint = 0
     npcol::Cint = 0
 
-    info::SVector{80,Cint} = zeros(80)
-    infog::SVector{80,Cint} = zeros(80)
-    rinfo::SVector{40,T} = zeros(40)
-    rinfog::SVector{40,T} = zeros(40)
+    info::NTuple{80,Cint} = Tuple(zero(Cint) for i=1:80)
+    infog::NTuple{80,Cint} = Tuple(zero(Cint) for i=1:80)
+    rinfo::NTuple{40,T} = Tuple(zero(T) for i=1:40)
+    rinfog::NTuple{40,T} = Tuple(zero(T) for i=1:40)
 
     deficiency::Cint = 0
     pivnul_list::Ptr{Cint} = C_NULL
@@ -123,18 +122,18 @@ end
     instance_number::Cint = 0
     wk_user::Ptr{T} = C_NULL
 
-    version_number::SVector{32,Cchar} = zeros(32)
+    version_number::NTuple{32,Cchar} = Tuple(zero(Cchar) for i=1:32)
 
-    ooc_tmpdir::SVector{256,Cchar} = zeros(256)
-    ooc_prefix::SVector{64,Cchar} = zeros(64)
+    ooc_tmpdir::NTuple{256,Cchar} = Tuple(zero(Cchar) for i=1:256)
+    ooc_prefix::NTuple{64,Cchar} = Tuple(zero(Cchar) for i=1:64)
 
-    write_problem::SVector{256,Cchar} = zeros(256)
+    write_problem::NTuple{256,Cchar} = Tuple(zero(Cchar) for i=1:256)
     lwk_user::Cint = 0
 
-    save_dir::SVector{256,Cchar} = zeros(256)
-    save_prefix::SVector{256,Cchar} = zeros(256)
+    save_dir::NTuple{256,Cchar} = Tuple(zero(Cchar) for i=1:256)
+    save_prefix::NTuple{256,Cchar} = Tuple(zero(Cchar) for i=1:256)
 
-    metis_options::SVector{40,Cint} = zeros(40)
+    metis_options::NTuple{40,Cint} = Tuple(zero(Cint) for i=1:40)
 end
 
 mutable struct MumpsSolver{T} <: AbstractLinearSolver{T}
@@ -198,17 +197,32 @@ function MumpsSolver(csc::SparseMatrixCSC{T,Int32};
     # symbolic factorization
     mumps_struc.job = 1;
 
-    mumps_struc.icntl = setindex(mumps_struc.icntl,0,2)
-    mumps_struc.icntl = setindex(mumps_struc.icntl,0,3)
-    mumps_struc.icntl = setindex(mumps_struc.icntl,0,4)
-    mumps_struc.icntl = setindex(mumps_struc.icntl,opt.mumps_permuting_scaling,6)
-    mumps_struc.icntl = setindex(mumps_struc.icntl,opt.mumps_pivot_order,7)
-    mumps_struc.icntl = setindex(mumps_struc.icntl,opt.mumps_scaling,8)
-    mumps_struc.icntl = setindex(mumps_struc.icntl,0,10)
-    mumps_struc.icntl = setindex(mumps_struc.icntl,1,13)
-    mumps_struc.icntl = setindex(mumps_struc.icntl,opt.mumps_mem_percent,14)
+    mumps_struc.icntl = (
+        (zero(Cint) for i=1:5)...,
+        opt.mumps_permuting_scaling, # 6
+        opt.mumps_pivot_order, # 7
+        opt.mumps_scaling, # 8
+        (zero(Cint) for i=9:12)...,
+        one(Cint), # 13
+        opt.mumps_mem_percent, # 14
+        (zero(Cint) for i=15:60)...
+            )
 
-    mumps_struc.cntl = setindex(mumps_struc.cntl,opt.mumps_pivtol,1)
+    mumps_struc.cntl = (
+        opt.mumps_pivtol,
+        (zero(T) for i=2:15)...
+    )
+    # mumps_struc.cntl = setindex(mumps_struc.cntl,opt.mumps_pivtol,1)
+    # mumps_struc.icntl = setindex(mumps_struc.icntl,0,2)
+    # mumps_struc.icntl = setindex(mumps_struc.icntl,0,3)
+    # mumps_struc.icntl = setindex(mumps_struc.icntl,0,4)
+    # mumps_struc.icntl = setindex(mumps_struc.icntl,opt.mums_permuting_scaling,6)
+    # mumps_struc.icntl = setindex(mumps_struc.icntl,opt.mumps_pivot_order,7)
+    # mumps_struc.icntl = setindex(mumps_struc.icntl,opt.mumps_scaling,8)
+    # mumps_struc.icntl = setindex(mumps_struc.icntl,0,10)
+    # mumps_struc.icntl = setindex(mumps_struc.icntl,1,13)
+    # mumps_struc.icntl = setindex(mumps_struc.icntl,opt.mumps_mem_percent,14)
+
 
     a = copy(csc.nzval) # would there be a better way?
     csc.nzval.=1
@@ -232,7 +246,11 @@ function factorize!(M::MumpsSolver)
         locked_dmumps_c(M.mumps_struc)
         if M.mumps_struc.info[1] in [-8,-9]
             cnt >= 10 && throw(FactorizationException())
-            M.mumps_struc.icntl = setindex(M.mumps_struc.icntl,M.mumps_struc.icntl[14]*2.,14)
+            M.mumps_struc.icntl = (
+                M.mumps_struct.icntl[1:13]...,
+                M.mumps_struc.icntl[14]*2.,
+                M.mumps_struct.icntl[15:end]...
+                    )
             cnt += 1
         elseif M.mumps_struc.info[1] == -10
             M.is_singular = true
@@ -268,7 +286,7 @@ function improve!(M::MumpsSolver)
         @debug(M.logger,"improve quality failed.")
         return false
     end
-    M.mumps_struc.cntl = setindex(M.mumps_struc.cntl,min(M.opt.mumps_pivtolmax,M.mumps_struc.cntl[1]^.5),1)
+    M.mumps_struc.cntl = (min(M.opt.mumps_pivtolmax,M.mumps_struc.cntl[1]^.5), M.mumps_struc.cntl[2:end]...)
     @debug(M.logger,"improved quality: pivtol = $(M.mumps_struc.cntl[1])")
     return true
 end
