@@ -1,5 +1,9 @@
-# MadNLP.jl
-# Modified from Ipopt.jl (https://github.com/jump-dev/Ipopt.jl)
+module MadNLPMOI
+
+import MadNLP, MathOptInterface, NLPModels
+
+const MOI = MathOptInterface
+const MOIU = MathOptInterface.Utilities
 
 include("utils.jl")
 
@@ -15,9 +19,9 @@ _is_parameter(term::MOI.ScalarAffineTerm) = _is_parameter(term.variable)
 Create a new MadNLP optimizer.
 """
 mutable struct Optimizer <: MOI.AbstractOptimizer
-    solver::Union{Nothing,MadNLPSolver}
-    nlp::Union{Nothing,AbstractNLPModel}
-    result::Union{Nothing,MadNLPExecutionStats{Float64}}
+    solver::Union{Nothing,MadNLP.MadNLPSolver}
+    nlp::Union{Nothing,NLPModels.AbstractNLPModel}
+    result::Union{Nothing,MadNLP.MadNLPExecutionStats{Float64}}
 
     name::String
     invalid_model::Bool
@@ -41,7 +45,7 @@ mutable struct Optimizer <: MOI.AbstractOptimizer
     nlp_model::Union{Nothing,MOI.Nonlinear.Model}
 end
 
-function Optimizer(; kwargs...)
+function MadNLP.Optimizer(; kwargs...)
     option_dict = Dict{Symbol, Any}()
     for (name, value) in kwargs
         option_dict[name] = value
@@ -739,31 +743,31 @@ function MOI.eval_hessian_lagrangian(model::Optimizer, H, x, σ, μ)
 end
 
 ### NLPModels wrapper
-struct MOIModel{T} <: AbstractNLPModel{T,Vector{T}}
-    meta::NLPModelMeta{T, Vector{T}}
+struct MOIModel{T} <: NLPModels.AbstractNLPModel{T,Vector{T}}
+    meta::NLPModels.NLPModelMeta{T, Vector{T}}
     model::Optimizer
     counters::NLPModels.Counters
 end
 
-obj(nlp::MOIModel, x::AbstractVector{Float64}) = MOI.eval_objective(nlp.model,x)
+NLPModels.obj(nlp::MOIModel, x::AbstractVector{Float64}) = MOI.eval_objective(nlp.model,x)
 
-function grad!(nlp::MOIModel, x::AbstractVector{Float64}, g::AbstractVector{Float64})
+function NLPModels. grad!(nlp::MOIModel, x::AbstractVector{Float64}, g::AbstractVector{Float64})
     MOI.eval_objective_gradient(nlp.model, g, x)
 end
 
-function cons!(nlp::MOIModel, x::AbstractVector{Float64}, c::AbstractVector{Float64})
+function NLPModels. cons!(nlp::MOIModel, x::AbstractVector{Float64}, c::AbstractVector{Float64})
     MOI.eval_constraint(nlp.model, c, x)
 end
 
-function jac_coord!(nlp::MOIModel, x::AbstractVector{Float64}, jac::AbstractVector{Float64})
+function NLPModels. jac_coord!(nlp::MOIModel, x::AbstractVector{Float64}, jac::AbstractVector{Float64})
     MOI.eval_constraint_jacobian(nlp.model, jac, x)
 end
 
-function hess_coord!(nlp::MOIModel, x::AbstractVector{Float64}, l::AbstractVector{Float64}, hess::AbstractVector{Float64}; obj_weight::Float64=1.0)
+function NLPModels. hess_coord!(nlp::MOIModel, x::AbstractVector{Float64}, l::AbstractVector{Float64}, hess::AbstractVector{Float64}; obj_weight::Float64=1.0)
     MOI.eval_hessian_lagrangian(nlp.model, hess, x, obj_weight, l)
 end
 
-function hess_structure!(nlp::MOIModel, I::AbstractVector{T}, J::AbstractVector{T}) where T
+function NLPModels. hess_structure!(nlp::MOIModel, I::AbstractVector{T}, J::AbstractVector{T}) where T
     @assert length(I) == length(J) == length(MOI.hessian_lagrangian_structure(nlp.model))
     cnt = 1
     for (row, col) in  MOI.hessian_lagrangian_structure(nlp.model)
@@ -772,7 +776,7 @@ function hess_structure!(nlp::MOIModel, I::AbstractVector{T}, J::AbstractVector{
     end
 end
 
-function jac_structure!(nlp::MOIModel, I::AbstractVector{T}, J::AbstractVector{T}) where T
+function NLPModels.jac_structure!(nlp::MOIModel, I::AbstractVector{T}, J::AbstractVector{T}) where T
     @assert length(I) == length(J) == length(MOI.jacobian_structure(nlp.model))
     cnt = 1
     for (row, col) in  MOI.jacobian_structure(nlp.model)
@@ -856,7 +860,7 @@ function MOIModel(model::Optimizer)
     end
 
     return MOIModel(
-        NLPModelMeta(
+        NLPModels.NLPModelMeta(
             nvar,
             x0 = x0,
             lvar = model.variables.lower,
@@ -894,37 +898,34 @@ function MOI.optimize!(model::Optimizer)
     if model.silent
         model.options[:print_level] = MadNLP.ERROR
     end
-    model.solver = MadNLPSolver(model.nlp; model.options...)
-    model.result = solve!(model.solver)
+    model.solver = MadNLP.MadNLPSolver(model.nlp; model.options...)
+    model.result = MadNLP.solve!(model.solver)
     model.solve_time = model.solver.cnt.total_time
     model.solve_iterations = model.solver.cnt.k
     return
 end
 
 # From Ipopt/src/Interfaces/IpReturnCodes_inc.h
-const _STATUS_CODES = Dict{Status,MOI.TerminationStatusCode}(
-    SOLVE_SUCCEEDED => MOI.LOCALLY_SOLVED,
-    SOLVED_TO_ACCEPTABLE_LEVEL => MOI.ALMOST_LOCALLY_SOLVED,
-    SEARCH_DIRECTION_BECOMES_TOO_SMALL => MOI.SLOW_PROGRESS,
-    DIVERGING_ITERATES => MOI.INFEASIBLE_OR_UNBOUNDED,
-    INFEASIBLE_PROBLEM_DETECTED => MOI.LOCALLY_INFEASIBLE,
-    MAXIMUM_ITERATIONS_EXCEEDED => MOI.ITERATION_LIMIT,
-    MAXIMUM_WALLTIME_EXCEEDED => MOI.TIME_LIMIT,
-    INITIAL => MOI.OPTIMIZE_NOT_CALLED,
-    # REGULAR
-    # RESTORE
-    # ROBUST
-    RESTORATION_FAILED => MOI.NUMERICAL_ERROR,
-    INVALID_NUMBER_DETECTED => MOI.INVALID_MODEL,
-    ERROR_IN_STEP_COMPUTATION => MOI.NUMERICAL_ERROR,
-    NOT_ENOUGH_DEGREES_OF_FREEDOM => MOI.INVALID_MODEL,
-    USER_REQUESTED_STOP => MOI.INTERRUPTED,
-    INTERNAL_ERROR => MOI.OTHER_ERROR,
-    INVALID_NUMBER_OBJECTIVE => MOI.INVALID_MODEL,
-    INVALID_NUMBER_GRADIENT => MOI.INVALID_MODEL,
-    INVALID_NUMBER_CONSTRAINTS => MOI.INVALID_MODEL,
-    INVALID_NUMBER_JACOBIAN => MOI.INVALID_MODEL,
-    INVALID_NUMBER_HESSIAN_LAGRANGIAN => MOI.INVALID_MODEL,
+const _STATUS_CODES = Dict{MadNLP.Status,MOI.TerminationStatusCode}(
+    MadNLP.SOLVE_SUCCEEDED => MOI.LOCALLY_SOLVED,
+    MadNLP.SOLVED_TO_ACCEPTABLE_LEVEL => MOI.ALMOST_LOCALLY_SOLVED,
+    MadNLP.SEARCH_DIRECTION_BECOMES_TOO_SMALL => MOI.SLOW_PROGRESS,
+    MadNLP.DIVERGING_ITERATES => MOI.INFEASIBLE_OR_UNBOUNDED,
+    MadNLP.INFEASIBLE_PROBLEM_DETECTED => MOI.LOCALLY_INFEASIBLE,
+    MadNLP.MAXIMUM_ITERATIONS_EXCEEDED => MOI.ITERATION_LIMIT,
+    MadNLP.MAXIMUM_WALLTIME_EXCEEDED => MOI.TIME_LIMIT,
+    MadNLP.INITIAL => MOI.OPTIMIZE_NOT_CALLED,
+    MadNLP.RESTORATION_FAILED => MOI.NUMERICAL_ERROR,
+    MadNLP.INVALID_NUMBER_DETECTED => MOI.INVALID_MODEL,
+    MadNLP.ERROR_IN_STEP_COMPUTATION => MOI.NUMERICAL_ERROR,
+    MadNLP.NOT_ENOUGH_DEGREES_OF_FREEDOM => MOI.INVALID_MODEL,
+    MadNLP.USER_REQUESTED_STOP => MOI.INTERRUPTED,
+    MadNLP.INTERNAL_ERROR => MOI.OTHER_ERROR,
+    MadNLP.INVALID_NUMBER_OBJECTIVE => MOI.INVALID_MODEL,
+    MadNLP.INVALID_NUMBER_GRADIENT => MOI.INVALID_MODEL,
+    MadNLP.INVALID_NUMBER_CONSTRAINTS => MOI.INVALID_MODEL,
+    MadNLP.INVALID_NUMBER_JACOBIAN => MOI.INVALID_MODEL,
+    MadNLP.INVALID_NUMBER_HESSIAN_LAGRANGIAN => MOI.INVALID_MODEL,
 )
 
 ### MOI.ResultCount
@@ -953,7 +954,7 @@ function MOI.get(model::Optimizer, ::MOI.RawStatusString)
     elseif model.solver === nothing
         return "Optimize not called"
     end
-    return get_status_output(model.result.status, model.result.options)
+    return MadNLP.get_status_output(model.result.status, model.result.options) 
 end
 
 
@@ -964,11 +965,11 @@ function MOI.get(model::Optimizer, attr::MOI.PrimalStatus)
         return MOI.NO_SOLUTION
     end
     status = model.result.status
-    if status == SOLVE_SUCCEEDED
+    if status == MadNLP.SOLVE_SUCCEEDED
         return MOI.FEASIBLE_POINT
-    elseif status == SOLVED_TO_ACCEPTABLE_LEVEL
+    elseif status == MadNLP.SOLVED_TO_ACCEPTABLE_LEVEL
         return MOI.NEARLY_FEASIBLE_POINT
-    elseif status == INFEASIBLE_PROBLEM_DETECTED
+    elseif status == MadNLP.INFEASIBLE_PROBLEM_DETECTED
         return MOI.INFEASIBLE_POINT
     else
         return MOI.UNKNOWN_RESULT_STATUS
@@ -982,11 +983,11 @@ function MOI.get(model::Optimizer, attr::MOI.DualStatus)
         return MOI.NO_SOLUTION
     end
     status = model.result.status
-    if status == SOLVE_SUCCEEDED
+    if status == MadNLP.SOLVE_SUCCEEDED
         return MOI.FEASIBLE_POINT
-    elseif status == SOLVED_TO_ACCEPTABLE_LEVEL
+    elseif status == MadNLP.SOLVED_TO_ACCEPTABLE_LEVEL
         return MOI.NEARLY_FEASIBLE_POINT
-    elseif status == INFEASIBLE_PROBLEM_DETECTED
+    elseif status == MadNLP.INFEASIBLE_PROBLEM_DETECTED
         return MOI.INFEASIBLE_POINT
     else
         return MOI.UNKNOWN_RESULT_STATUS
@@ -1122,3 +1123,4 @@ end
 ### MOI.BarrierIterations
 MOI.get(model::Optimizer,::MOI.BarrierIterations) = model.solve_iterations
 
+end # module

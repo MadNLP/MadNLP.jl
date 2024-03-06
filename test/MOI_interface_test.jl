@@ -3,7 +3,8 @@ module TestMOIWrapper
 using MadNLP
 using Test
 
-const MOI = MadNLP.MathOptInterface
+using MathOptInterface
+const MOI = MathOptInterface
 
 function runtests()
     for name in names(@__MODULE__; all = true)
