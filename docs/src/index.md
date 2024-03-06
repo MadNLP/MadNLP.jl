@@ -95,6 +95,12 @@ For that reason we recommend using efficient sparse-linear solvers
 If you use MadNLP.jl in your research, we would greatly appreciate your citing it.
 
 ```bibtex
+@article{shin2023accelerating,
+  title={Accelerating optimal power flow with {GPU}s: {SIMD} abstraction of nonlinear programs and condensed-space interior-point methods},
+  author={Shin, Sungho and Pacaud, Fran{\c{c}}ois and Anitescu, Mihai},
+  journal={arXiv preprint arXiv:2307.16830},
+  year={2023}
+}
 @article{shin2020graph,
   title={Graph-Based Modeling and Decomposition of Energy Infrastructures},
   author={Shin, Sungho and Coffrin, Carleton and Sundar, Kaarthik and Zavala, Victor M},
