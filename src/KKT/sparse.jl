@@ -508,18 +508,15 @@ function create_kkt_system(
         jac_sparsity_I,
         jac,
     )
-
     jt_csc, jt_csc_map = coo_to_csc(jt_coo)
     hess_com, hess_csc_map = coo_to_csc(hess_raw)
+    
     aug_com, dptr, hptr, jptr = build_condensed_aug_symbolic(
         hess_com,
         jt_csc
-        )
-
+    )
     _linear_solver = linear_solver(aug_com; opt = opt_linear_solver)
-
     ext = get_sparse_condensed_ext(VT, hess_com, jptr, jt_csc_map, hess_csc_map)
-
     return SparseCondensedKKTSystem(
         hess, hess_raw, hess_com, hess_csc_map,
         jac, jt_coo, jt_csc, jt_csc_map,
