@@ -87,7 +87,7 @@ const _FUNCTIONS = Union{
     MOI.ScalarNonlinearFunction,
 }
 
-MOI.get(::Optimizer, ::MOI.SolverVersion) = version()
+MOI.get(::Optimizer, ::MOI.SolverVersion) = MadNLP.version()
 
 ### _EmptyNLPEvaluator
 
