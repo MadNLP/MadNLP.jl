@@ -8,11 +8,20 @@ Depth=3
 ```
 
 ---
+## Primary options
+These options are used to set the values for other options. The default values are inferred from the NLP model.
+- `tol::Float64`\
+    Termination tolerance. The default value is `1e-8` for double precision. The solver terminates if the scaled primal, dual, complementary infeasibility is less than `tol`. Valid range is ``(0,\infty)``.
+- `callback::Type` 	
+  Valid values are: `MadNLP`.{`DenseCallback`,`SparseCallback`}.
+- `kkt_system::Type` 
+  The type of KKT system. Valid values are `MadNLP`.{`SpasreKKTSystem`,`SparseUnreducedKKTSystem`,`SparseCondensedKKTSystem`,`DenseKKTSystem`,`DenseCondensedKKTSystem`}.
+- `linear_solver::Type`\
+  Linear solver used for solving primal-dual system. Valid values are: {`MadNLP.UmfpackSolver`,`MadNLP.LDLSolver`,`MadNLP.CHOLMODSolver`, `MadNLP.MumpsSolver`, `MadNLP.PardisoSolver`, `MadNLP.PardisoMKLSolver`, `MadNLP.Ma27Solver`, `MadNLP.Ma57Solver`, `MadNLP.Ma77Solver`, `MadNLP.Ma86Solver`, `MadNLP.Ma97Solver`, `MadNLP.LapackCPUSolver`, `MadNLPGPU.LapackGPUSolver`,`MadNLPGPU.RFSolver`,`MadNLPGPU.GLUSolver`,`MadNLPGPU.CuCholeskySolver`,`MadNLPGPU.CUDSSSolver`} (some may require using extension packages). The selected solver should be properly built in the build procedure. See [README.md](https://github.com/sshin23/MadNLP.jl) file.
+
 ## General options
 
-- `linear_solver::Module = DefaultLinearSolver`:\
-    Linear solver used for solving primal-dual system. Valid values are: {`MadNLPUmfpack`, `MadNLPMumps`, `MadNLPPardisoMKL`, `MadNLPMa27`, `MadNLPMa57`, `MadNLPMa77`, `MadNLPMa86`, `MadNLPMa97`, `MadNLPPardiso`, `MadNLPSchur`, `MadNLPSchwarz`, `MadNLPLapackCPU`, `MadNLPLapackGPU`} (some may require using extension packages). The selected solver should be properly built in the build procedure. See [README.md](https://github.com/sshin23/MadNLP.jl) file.
-- `iterator::Module = Richardson `\
+- `iterator::Type = RichardsonIterator `\
     Iterator used for iterative refinement. Valid values are: {`MadNLPRichardson`,`MadNLPKrylov`}.
     - `Richardson` uses [Richardson iteration](https://en.wikipedia.org/wiki/Modified_Richardson_iteration)
     - `Krylov` uses [restarted Generalized Minimal Residual](https://en.wikipedia.org/wiki/Generalized_minimal_residual_method) method implemented in [IterativeSolvers.jl](https://github.com/JuliaMath/IterativeSolvers.jl).
@@ -40,8 +49,6 @@ Depth=3
 
 - `max_iter::Int = 3000`\
     Maximum number of interior point iterations. The solver terminates with exit symbol `:Maximum_Iterations_Exceeded` if the interior point iteration count exceeds `max_iter`.
-- `tol::Float64 = 1e-8`\
-    Termination tolerance. The solver terminates if the scaled primal, dual, complementary infeasibility is less than `tol`. Valid range is ``(0,\infty)``.
 - `acceptable_tol::Float64 = 1e-6`\
     Acceptable tolerance. The solver terminates if the scaled primal, dual, complementary infeasibility is less than `acceptable_tol`, for `acceptable_iter` consecutive interior point iteration steps.
 - `acceptable_iter::Int = 15`\
@@ -54,25 +61,20 @@ Depth=3
 
 
 ---
-## Nonlinear options
-- `nlp_scaling::Bool = true`: \
-    If `true`, MadNLP scales the nonlinear problem during the resolution.
-- `nlp_scaling_max_gradient::Float64 = 100.`
-- `fixed_variable_treatment::FixedVariableTreatments = MAKE_PARAMETER`\
-    Valid values are: `MadNLP`.{`RELAX_BOUND`,`MAKE_PARAMETER`}.
+## NLP options
+- `kappa_d::Float64 = 1e-5`
+- `fixed_variable_treatment::FixedVariableTreatments = MakeParameter`\
+    Valid values are: `MadNLP`.{`RelaxBound`,`MakeParameter`}.
+- `equality_treatment::FixedVariableTreatments = MakeParameter`\
+    Valid values are: `MadNLP`.{`RelaxEquality`,`EnforceEquality`}.
 - `jacobian_constant::Bool = false`\
     If `true`, constraint Jacobian is only evaluated once and reused.
 - `hessian_constant::Bool = false`\
     If `true`, Lagrangian Hessian is only evaluated once and reused.
-- `constr_mult_init_max::Float64 = 1e3`
 - `bound_push::Float64 = 1e-2`
 - `bound_fac::Float64 = 1e-2`
-- `kappa_d::Float64 = 1e-5`
-
-
----
-## Inertia options
-
+- `hessian_approximation::Type = ExactHessian`
+- `quasi_newton_options::QuasiNewtonOptions = QuasiNewtonOptions()`
 - `inertia_correction_method::InertiaCorrectionMethods = INERTIA_AUTO`\
     Valid values are: `MadNLP`.{`INERTIA_AUTO`,`INERTIA_BASED`, `INERTIA_FREE`}.
     - `INERTIA_BASED` uses the strategy in Ipopt.
@@ -80,6 +82,14 @@ Depth=3
     - `INERTIA_AUTO` uses `INERTIA_BASED` if inertia information is available and uses `INERTIA_FREE` otherwise.
 - `inertia_free_tol::Float64 = 0.`
 
+---
+## Initialization Options
+    dual_initialized::Bool = false
+    dual_initialization_method::Type = kkt_system <: MadNLP.SparseCondensedKKTSystem ? DualInitializeSetZero : DualInitializeLeastSquares
+- `constr_mult_init_max::Float64 = 1e3`
+- `nlp_scaling::Bool = true`: \
+    If `true`, MadNLP scales the nonlinear problem during the resolution.
+- `nlp_scaling_max_gradient::Float64 = 100.`
 
 ---
 ## Hessian perturbation options
@@ -219,36 +229,6 @@ is printed.
 
 #### LapackCPU
 - `lapackcpu_algorithm::LapackCPU.Algorithms = BUNCHKAUFMAN`
-
-#### Schur (requires `MadNLPGraphs`)
-- `schur_subproblem_solver::Module = DefaultLinearSolver` \
-   Linear solver used for solving subproblem. Valid values are: {`MadNLPUmfpack`, `MadNLPMa27`, `MadNLPMa57`, `MadNLPMa97`, `MadNLPMumps`}.
-- `schur_dense_solver::Module = DefaultDenseSolver` \
-   Linear solver used for solving Schur complement system
-- `schur_custom_partition::Bool = false` \
-   If `false`, Schur solver automatically detects the partition using `Metis`. If `true`, the partition information given in `schur_part` is used. `schur_num_parts` and `schur_part` should be properly set by the user. When using with `Plasmo`, `schur_num_parts` and `schur_part` are automatically set by the `Plasmo` interface.
-- `schur_num_parts::Int = 2` \
-   Number of parts (excluding the parent node). Valid range is ``[1,\infty)``
-- `schur_part::Vector{Int} = Int[]` \
-   Custom partition information in a vector form. The parent node should be labeled as `0`. Only valid if `schur_custom_partition` is `true`.
-
-#### Schwarz (requires `MadNLPGraphs`)
-- `schwarz_subproblem_solver::Module = DefaultSubproblemSolver` \
-   Linear solver used for solving subproblem. Valid values are: {`MadNLPUmfpack`, `MadNLPPardisoMKL`, `MadNLPMa27`, `MadNLPMa57`, `MadNLPMa77`, `MadNLPMa86`, `MadNLPMa97`, `MadNLPPardiso`}.
-- `schwarz_custom_partition::Bool = false` \
-    If `false`, Schwarz solver automatically detects the partition using `Metis`. If `true`, the partition information given in `schur_part` is used. `schur_num_parts` and `schur_part` should be properly set by the user. When using with `Plasmo`, `schur_num_parts` and `schur_part` are automatically set by the `Plasmo` interface.
-- `schwarz_num_parts::Int = 2` \
-    Number of parts. Valid range is ``[1,\infty)``
-- `schwarz_part::Vector{Int} = Int[]` \
-    Custom partition information in a vector form. Only valid if `schwar_custom_partition` is `true`.
-- `schwarz_num_parts_upper::Int = 0` \
-    Number of parts in upper level partition. If `schwarz_num_parts_upper!=0`, a bilevel partitioning scheme is used. Valid range is ``[1,\infty)``
-- `schwarz_part_upper::Vector{Int} = Int[]` \
-    Custom partition for the upper level partition.
-- `schwarz_fully_improve_subproblem_solver::Bool = true` \
-    If `true`, the subproblem solvers are fully improved when the linear solver is initialized.
-- `schwarz_max_expand_factor::Int = 4` \
-    The size of overlap is fully saturated when the `improve!` is called `schwarz_max_expand_factor-1` times. Valid range is ``[2,\infty)``.
 
 ### Iterator Options
 #### Richardson

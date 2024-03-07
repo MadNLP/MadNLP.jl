@@ -35,7 +35,7 @@ MadNLP is interfaced with modeling packages:
 - [JuMP](https://github.com/jump-dev/JuMP.jl)
 - [NLPModels](https://github.com/JuliaSmoothOptimizers/NLPModels.jl).
 
-Users can pass various options to MadNLP also through the modeling packages. The interface-specific syntax are shown below. To see the list of MadNLP solver options, check the [OPTIONS.md](https://github.com/MadNLP/MadNLP.jl/blob/master/OPTIONS.md) file.
+Users can pass various options to MadNLP also through the modeling packages. The interface-specific syntax are shown below. To see the list of MadNLP solver options, check the [documentation](https://madnlp.github.io/MadNLP.jl/dev/options/).
 
 #### JuMP interface
 
@@ -66,6 +66,7 @@ MadNLP is interfaced with non-Julia sparse/dense linear solvers:
 - [Pardiso-MKL](https://software.intel.com/content/www/us/en/develop/documentation/mkl-developer-reference-fortran/top/sparse-solver-routines/intel-mkl-pardiso-parallel-direct-sparse-solver-interface.html) (requires extension)
 - [Mumps](http://mumps.enseeiht.fr/)  (requires extension)
 - [cuSOLVER](https://docs.nvidia.com/cuda/cusolver/index.html) (requires extension)
+- [cuDSS](https://docs.nvidia.com/cuda/cudss/index.html) (requires extension)
 
 Each linear solver in MadNLP is a Julia type, and the `linear_solver` option should be specified by the actual type. Note that the linear solvers are always exported to `Main`.
 
@@ -75,6 +76,8 @@ Each linear solver in MadNLP is a Julia type, and the `linear_solver` option sho
 using MadNLP, JuMP
 # ...
 model = Model(()->MadNLP.Optimizer(linear_solver=UmfpackSolver)) # default
+model = Model(()->MadNLP.Optimizer(linear_solver=LDLSolver))     # works only for convex problems
+model = Model(()->MadNLP.Optimizer(linear_solver=CHOLMODSolver)) # works only for convex problems
 model = Model(()->MadNLP.Optimizer(linear_solver=LapackCPUSolver))
 ```
 
@@ -107,12 +110,16 @@ model = Model(()->MadNLP.Optimizer(linear_solver=PardisoSolver))
 model = Model(()->MadNLP.Optimizer(linear_solver=PardisoMKLSolver))
 ```
 
-#### LapackGPU (requires extension `MadNLPGPU`)
+#### CUDA (requires extension `MadNLPGPU`)
 
 ```julia
 using MadNLP, MadNLPGPU, JuMP
 # ...
-model = Model(()->MadNLP.Optimizer(linear_solver=LapackGPUSolver))
+model = Model(()->MadNLP.Optimizer(linear_solver=LapackGPUSolver))  # for dense problems
+model = Model(()->MadNLP.Optimizer(linear_solver=CUDSSSolver))      # for sparse problems
+model = Model(()->MadNLP.Optimizer(linear_solver=CuCholeskySolver)) # for sparse problems
+model = Model(()->MadNLP.Optimizer(linear_solver=GLUSolver))        # for sparse problems
+model = Model(()->MadNLP.Optimizer(linear_solver=RFSolver))         # for sparse problems
 ```
 
 ## Citing MadNLP.jl
@@ -120,6 +127,12 @@ model = Model(()->MadNLP.Optimizer(linear_solver=LapackGPUSolver))
 If you use MadNLP.jl in your research, we would greatly appreciate your citing it.
 
 ```bibtex
+@article{shin2023accelerating,
+  title={Accelerating optimal power flow with {GPU}s: {SIMD} abstraction of nonlinear programs and condensed-space interior-point methods},
+  author={Shin, Sungho and Pacaud, Fran{\c{c}}ois and Anitescu, Mihai},
+  journal={arXiv preprint arXiv:2307.16830},
+  year={2023}
+}
 @article{shin2020graph,
   title={Graph-Based Modeling and Decomposition of Energy Infrastructures},
   author={Shin, Sungho and Coffrin, Carleton and Sundar, Kaarthik and Zavala, Victor M},
@@ -128,6 +141,6 @@ If you use MadNLP.jl in your research, we would greatly appreciate your citing i
 }
 ```
 
-## Bug reports and support
-
-Please report issues and feature requests via the [GitHub issue tracker](https://github.com/MadNLP/MadNLP.jl/issues).
+## Supporting MadNLP.jl
+- Please report issues and feature requests via the [GitHub issue tracker](https://github.com/MadNLP/MadNLP.jl/issues).
+- Questions are welcome at [GitHub discussion forum](https://github.com/MadNLP/MadNLP.jl/discussions).
