@@ -24,9 +24,10 @@ julia = "1.9"
 
 [extras]
 MINLPTests = "ee0a3090-8ee9-5cdb-b8cb-8eeba3165522"
+Quadmath = "be4d8f0f-7fa4-5f49-b795-2f01399ab2dd"
 MadNLPTests = "b52a2a03-04ab-4a5f-9698-6a2deff93217"
 Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [targets]
-test = ["Test", "MadNLPTests", "MINLPTests", "Random"]
+test = ["Test", "MadNLPTests", "MINLPTests", "Random", "Quadmath"]

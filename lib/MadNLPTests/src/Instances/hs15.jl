@@ -1,9 +1,9 @@
-struct HS15Model <: NLPModels.AbstractNLPModel{Float64,Vector{Float64}}
-    meta::NLPModels.NLPModelMeta{Float64, Vector{Float64}}
+struct HS15Model{T} <: NLPModels.AbstractNLPModel{T,Vector{T}}
+    meta::NLPModels.NLPModelMeta{T, Vector{T}}
     counters::NLPModels.Counters
 end
 
-function HS15Model(; x0=zeros(2), y0=zeros(2))
+function HS15Model(;T = Float64, x0=zeros(T,2), y0=zeros(T,2))
     return HS15Model(
         NLPModels.NLPModelMeta(
             2,     #nvar
@@ -12,10 +12,10 @@ function HS15Model(; x0=zeros(2), y0=zeros(2))
             nnzh = 3,
             x0 = x0,
             y0 = y0,
-            lvar = [-Inf, -Inf],
-            uvar = [0.5, Inf],
-            lcon = [1.0, 0.0],
-            ucon = [Inf, Inf],
+            lvar = T[-Inf, -Inf],
+            uvar = T[0.5, Inf],
+            lcon = T[1.0, 0.0],
+            ucon = T[Inf, Inf],
             minimize = true
         ),
         NLPModels.Counters()
