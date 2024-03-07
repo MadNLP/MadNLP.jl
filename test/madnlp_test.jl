@@ -181,7 +181,7 @@ end
 end
 
 @testset "Quadmath test" begin
-    nlp = MadNLPTests.HS15Model(Float128)
+    nlp = MadNLPTests.HS15Model(T = Float128)
     result = madnlp(
         nlp;
         print_level = MadNLP.ERROR,
