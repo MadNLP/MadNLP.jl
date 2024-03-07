@@ -5,7 +5,7 @@ end
 mutable struct CHOLMODSolver{T} <: AbstractLinearSolver{T}
     inner::CHOLMOD.Factor{Float64}
     tril::SparseMatrixCSC{T,Int32}
-    full::SparseMatrixCSC{Float64,Int32}
+    full::SparseMatrixCSC{Float64,Int}
     tril_to_full_view::SubVector{T}
 
     p::Vector{Float64}
@@ -21,11 +21,19 @@ function CHOLMODSolver(
 ) where T
     p = Vector{Float64}(undef,csc.n)
     d = Vector{Float64}(undef,csc.n)
-    full, tril_to_full_view = get_tril_to_full(Float64,csc)
+    full, tril_to_full_view = get_tril_to_full(Float64, csc)
+
+    full = SparseMatrixCSC{Float64,Int}(
+        full.m,
+        full.n,
+        Vector{Int64}(full.colptr),
+        Vector{Int64}(full.rowval),
+        full.nzval
+    )
     full.nzval .= 1.0
 
-    A = CHOLMOD.Sparse(full)
     # TODO: use AMD permutation here
+    A = CHOLMOD.Sparse(full)
     inner = CHOLMOD.symbolic(A)
 
     return CHOLMODSolver(inner, csc, full, tril_to_full_view, p, d, opt, logger)
