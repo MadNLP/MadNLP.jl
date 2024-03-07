@@ -26,6 +26,6 @@ include(joinpath("KKT", "KKTsystem.jl"))
 include(joinpath("LinearSolvers","linearsolvers.jl"))
 include("options.jl")
 include(joinpath("IPM", "IPM.jl"))
-include("ext.jl")
+include("extension_templates.jl")
 
 end # end module
