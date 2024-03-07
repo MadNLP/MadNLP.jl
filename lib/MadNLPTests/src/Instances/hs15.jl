@@ -3,7 +3,7 @@ struct HS15Model{T} <: NLPModels.AbstractNLPModel{T,Vector{T}}
     counters::NLPModels.Counters
 end
 
-function HS15Model(T = Float64; x0=zeros(T,2), y0=zeros(T,2))
+function HS15Model(;T = Float64, x0=zeros(T,2), y0=zeros(T,2))
     return HS15Model(
         NLPModels.NLPModelMeta(
             2,     #nvar
