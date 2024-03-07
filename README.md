@@ -110,13 +110,16 @@ model = Model(()->MadNLP.Optimizer(linear_solver=PardisoSolver))
 model = Model(()->MadNLP.Optimizer(linear_solver=PardisoMKLSolver))
 ```
 
-#### LapackGPU (requires extension `MadNLPGPU`)
+#### CUDA (requires extension `MadNLPGPU`)
 
 ```julia
 using MadNLP, MadNLPGPU, JuMP
 # ...
-model = Model(()->MadNLP.Optimizer(linear_solver=LapackGPUSolver))
-model = Model(()->MadNLP.Optimizer(linear_solver=LapackGPUSolver))
+model = Model(()->MadNLP.Optimizer(linear_solver=LapackGPUSolver))  # for dense problems
+model = Model(()->MadNLP.Optimizer(linear_solver=CUDSSSolver))      # for sparse problems
+model = Model(()->MadNLP.Optimizer(linear_solver=CuCholeskySolver)) # for sparse problems
+model = Model(()->MadNLP.Optimizer(linear_solver=GLUSolver))        # for sparse problems
+model = Model(()->MadNLP.Optimizer(linear_solver=RFSolver))         # for sparse problems
 ```
 
 ## Citing MadNLP.jl
