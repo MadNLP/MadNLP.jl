@@ -1,6 +1,37 @@
 # Release notes
 
-## v0.7.0 (June 123th, 2023)
+## v0.8.0 (Mar 7th, 2024)
+### Bug Fixes
+- fix non-deterministic behavior by forcing instantiations (#284)
+
+### New features
+- LDL factorization improvement (#300)
+- add support for MOI.ScalarNonLinearFunction (#280)
+- [Linear Solver] Added undocumented cholesky solver (#292)
+- ss/init_improve Add supports to CUDSS.jl (#296)
+- ss/cudss_option_cholmod [MOI] add support for MOI.Interval{Float64} (#295)
+
+### Performance and maintenance
+- Update README, OPTIONS, CITATION, and documentation (#304)
+- MOI interface moved to ext (#268)
+- Improve kkt creation on GPUs (#299)
+- CompatHelper: add new compat entry for Metis at version 1 for package MadNLPGPU, (keep existing compat) (#298)
+- CompatHelper: add new compat entry for CUDSS at version 0.1 for package MadNLPGPU, (keep existing compat) (#297)
+- update documentation (#293)
+- [Algorithm] Improve LBFGS performance (#290)
+- [API] Expose the options for iterative refinements and quasi-Newton (#287)
+- [README] Fix Options.md typo (#291)
+- [Options] Deactivate scaling if `nlp_scaling=false` (#289)
+- [API] Simplify arguments of create_kkt_system (#286)
+- [Tests] Remove test nlp_009_010 from MINLPTests tests (#288)
+- Simplify API of SparseCallback and DenseCallback (#285)
+- [MadNLPHSL] Use HSL.jl (#277)
+- add support for CUDA.jl v5 (#283)
+- simplify implementation of kernels (#281)
+- add proper testing for KKT systems (#278)
+
+
+## v0.7.0 (June 12th, 2023)
 
 ### Performance and maintenance
 - CompatHelper: bump compat for NLPModels to 0.20, (keep existing compat) (#252)
