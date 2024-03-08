@@ -4,6 +4,7 @@ using MadNLP
 makedocs(
     sitename = "MadNLP.jl",
     format = Documenter.HTML(
+        assets = ["assets/favicon.ico"],
         prettyurls = Base.get(ENV, "CI", nothing) == "true",
         mathengine = Documenter.KaTeX()
     ),
