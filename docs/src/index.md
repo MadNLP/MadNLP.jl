@@ -1,4 +1,4 @@
-![Logo](logo-full.svg)
+![Logo](assets/logo-full.svg)
 
 MadNLP is an open-source nonlinear programming solver,
 purely implemented in Julia. MadNLP implements a filter line-search
