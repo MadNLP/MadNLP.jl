@@ -63,12 +63,16 @@ function MadNLP.factorize!(M::CUDSSSolver)
     CUDSS.cudss_set(M.inner.matrix, SparseArrays.nonzeros(M.tril))
     CUDSS.cudss("factorization", M.inner, M.x_gpu, M.b_gpu)
 
+    synchronize(CUDABackend())
+
     return M
 end
 
 function MadNLP.solve!(M::CUDSSSolver{T}, x) where T
     CUDSS.cudss("solve", M.inner, M.x_gpu, x)
     copyto!(x, M.x_gpu)
+    
+    synchronize(CUDABackend())
     return x
 end
 
