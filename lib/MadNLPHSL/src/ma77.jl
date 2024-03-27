@@ -186,7 +186,7 @@ function improve!(M::Ma77Solver)
     return true
 end
 
-introduce(::Ma77Solver)="ma77"
+introduce(::Ma77Solver)="ma77 v$(HSL.HSL_MA77_version())"
 input_type(::Type{Ma77Solver}) = :csc
 default_options(::Type{Ma77Solver}) = Ma77Options()
 is_supported(::Type{Ma77Solver},::Type{Float32}) = true

@@ -62,5 +62,5 @@ default_options(::Type{LDLSolver}) = LDLFactorizationsOptions()
 function improve!(M::LDLSolver)
     return false
 end
-introduce(::LDLSolver) = "LDLFactorizations"
+introduce(::LDLSolver) = "LDLFactorizations v$(pkgversion(LDLF))"
 is_supported(::Type{LDLSolver},::Type{T}) where T <: AbstractFloat = true

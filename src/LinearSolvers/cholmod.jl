@@ -70,6 +70,6 @@ input_type(::Type{CHOLMODSolver}) = :csc
 default_options(::Type{CHOLMODSolver}) = CHOLMODOptions()
 
 improve!(M::CHOLMODSolver) = false
-introduce(::CHOLMODSolver) = "cholmod"
+introduce(::CHOLMODSolver) = "cholmod v$(CHOLMOD.BUILD_VERSION)"
 is_supported(::Type{CHOLMODSolver},::Type{Float32}) = true
 is_supported(::Type{CHOLMODSolver},::Type{Float64}) = true

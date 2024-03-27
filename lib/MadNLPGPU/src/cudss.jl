@@ -94,5 +94,5 @@ end
 MadNLP.improve!(M::CUDSSSolver) = false
 MadNLP.is_supported(::Type{CUDSSSolver},::Type{Float32}) = true
 MadNLP.is_supported(::Type{CUDSSSolver},::Type{Float64}) = true
-MadNLP.introduce(M::CUDSSSolver) = "cuDSS"
+MadNLP.introduce(M::CUDSSSolver) = "cuDSS v$(CUDSS.version())"
 
