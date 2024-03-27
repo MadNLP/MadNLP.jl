@@ -127,7 +127,7 @@ function improve!(M::Ma86Solver)
     @debug(M.logger,"improved quality: pivtol = $(M.control.u)")
     return true
 end
-introduce(::Ma86Solver)="ma86"
+introduce(::Ma86Solver)="ma86 v$(HSL.HSL_MA86_version())"
 input_type(::Type{Ma86Solver}) = :csc
 default_options(::Type{Ma86Solver}) = Ma86Options()
 is_supported(::Type{Ma86Solver},::Type{Float32}) = true

@@ -117,7 +117,7 @@ function improve!(M::Ma97Solver)
     @debug(M.logger,"improved quality: pivtol = $(M.control.u)")
     return true
 end
-introduce(::Ma97Solver)="ma97"
+introduce(::Ma97Solver)="ma97 v$(HSL.HSL_MA97_version())"
 input_type(::Type{Ma97Solver}) = :csc
 default_options(::Type{Ma97Solver}) = Ma97Options()
 is_supported(::Type{Ma97Solver},::Type{Float32}) = true

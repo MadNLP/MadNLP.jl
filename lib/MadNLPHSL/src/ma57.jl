@@ -152,7 +152,7 @@ function improve!(M::Ma57Solver)
     return true
 end
 
-introduce(::Ma57Solver)="ma57"
+introduce(::Ma57Solver)="ma57 v$(HSL.MA57_version())"
 input_type(::Type{Ma57Solver}) = :csc
 default_options(::Type{Ma57Solver}) = Ma57Options()
 is_supported(::Type{Ma57Solver},::Type{Float32}) = true
