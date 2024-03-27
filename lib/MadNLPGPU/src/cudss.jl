@@ -63,6 +63,8 @@ function MadNLP.factorize!(M::CUDSSSolver)
     CUDSS.cudss_set(M.inner.matrix, SparseArrays.nonzeros(M.tril))
     CUDSS.cudss("factorization", M.inner, M.x_gpu, M.b_gpu)
 
+    synchronize(CUDABackend())
+
     return M
 end
 
