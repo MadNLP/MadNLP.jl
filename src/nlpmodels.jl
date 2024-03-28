@@ -88,8 +88,8 @@ end
 function get_index_constraints(
     lvar, uvar,
     lcon, ucon;
-    fixed_variable_treatment=EnforceEquality,
-    equality_treatment=MakeParameter,
+    fixed_variable_treatment=MakeParameter,
+    equality_treatment=EnforceEquality,
 )
     ncon = length(lcon)
 
