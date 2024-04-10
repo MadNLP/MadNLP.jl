@@ -1,5 +1,14 @@
 # Release notes
 
+## v0.8.1 (Apr 9th, 2024)
+### Bug Fixes
+- fix optional arguments in get_index_constraints (#316)
+- CuDSS synchronize added (#314)
+
+### Performance and maintenance
+- Introduce linear solvers with version info (#315)
+- Add logos to documentation (#310)
+
 ## v0.8.0 (Mar 7th, 2024)
 ### Bug Fixes
 - fix non-deterministic behavior by forcing instantiations (#284)
