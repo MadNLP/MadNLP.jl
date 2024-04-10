@@ -1,6 +1,6 @@
 name = "MadNLPHSL"
 uuid = "7fb6135f-58fe-4112-84ca-653cf5be0c77"
-version = "0.5.0"
+version = "0.5.1"
 
 [deps]
 HSL = "34c5aeac-e683-54a6-a0e9-6e0fdc586c50"
