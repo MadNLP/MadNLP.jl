@@ -34,7 +34,7 @@ end
 
 @testset "MadNLP: LBFGS" begin
     @testset "HS15" begin
-        nlp = MadNLPTests.HS15Model()
+        nlp = MadNLPTests.HS15NoHessianModel()
         solver_qn = MadNLP.MadNLPSolver(
             nlp;
             callback = MadNLP.SparseCallback,
