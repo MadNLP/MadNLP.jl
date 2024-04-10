@@ -1,13 +1,27 @@
 testset = [
     [
-        "Umfpack",
+        "SparseKKTSystem + Umfpack",
         ()->MadNLP.Optimizer(
             linear_solver=MadNLP.UmfpackSolver,
             print_level=MadNLP.ERROR),
         []
     ],
     [
-        "LapackCPU-BUNCHKAUFMAN",
+        "SparseKKTSystem + InertiaFree",
+        ()->MadNLP.Optimizer(
+            inertia_correction_method=MadNLP.InertiaFree,
+            print_level=MadNLP.ERROR),
+        []
+    ],
+    [
+        "SparseKKTSystem + RelaxBound",
+        ()->MadNLP.Optimizer(
+            fixed_variable_treatment=MadNLP.RelaxBound,
+            print_level=MadNLP.ERROR),
+        []
+    ],
+    [
+        "DenseKKTSystem + LapackCPU-BUNCHKAUFMAN",
         ()->MadNLP.Optimizer(
             kkt_system=MadNLP.DenseKKTSystem,
             linear_solver=MadNLP.LapackCPUSolver,
@@ -16,7 +30,7 @@ testset = [
         []
     ],
     [
-        "LapackCPU-LU",
+        "DenseKKTSystem + LapackCPU-LU",
         ()->MadNLP.Optimizer(
             kkt_system=MadNLP.DenseKKTSystem,
             linear_solver=MadNLP.LapackCPUSolver,
@@ -25,7 +39,7 @@ testset = [
         []
     ],
     [
-        "LapackCPU-QR",
+        "DenseKKTSystem + LapackCPU-QR",
         ()->MadNLP.Optimizer(
             kkt_system=MadNLP.DenseKKTSystem,
             linear_solver=MadNLP.LapackCPUSolver,
@@ -34,7 +48,7 @@ testset = [
         []
     ],
     [
-        "LapackCPU-CHOLESKY",
+        "DenseKKTSystem + LapackCPU-CHOLESKY",
         ()->MadNLP.Optimizer(
             kkt_system=MadNLP.DenseKKTSystem,
             linear_solver=MadNLP.LapackCPUSolver,
@@ -43,38 +57,14 @@ testset = [
         ["infeasible", "lootsma", "eigmina"]
     ],
     [
-        "Option: RELAX_BOUND",
-        ()->MadNLP.Optimizer(
-            fixed_variable_treatment=MadNLP.RelaxBound,
-            print_level=MadNLP.ERROR),
-        []
-    ],
-    [
-        "Option: AUGMENTED KKT SYSTEM",
+        "SparseUnreducedKKTSystem",
         ()->MadNLP.Optimizer(
             kkt_system=MadNLP.SparseUnreducedKKTSystem,
             print_level=MadNLP.ERROR),
         []
     ],
     [
-        "Option: SPARSE CONDENSED KKT SYSTEM",
-        ()->MadNLP.Optimizer(
-            kkt_system=MadNLP.SparseCondensedKKTSystem,
-            equality_treatment = MadNLP.RelaxEquality,
-            fixed_variable_treatment = MadNLP.RelaxBound,
-            tol = 1e-4,
-            print_level=MadNLP.ERROR),
-        []
-    ],
-    [
-        "Option: InertiaFree",
-        ()->MadNLP.Optimizer(
-            inertia_correction_method=MadNLP.InertiaFree,
-            print_level=MadNLP.ERROR),
-        []
-    ],
-    [
-        "Option: InertiaFree & AUGMENTED KKT SYSTEM",
+        "SparseUnreducedKKTSystem + InertiaFree",
         ()->MadNLP.Optimizer(
             inertia_correction_method=MadNLP.InertiaFree,
             kkt_system=MadNLP.SparseUnreducedKKTSystem,
@@ -82,13 +72,33 @@ testset = [
         []
     ],
     [
-        "Option: InertiaFree & SPARSE CONDENSED KKT SYSTEM",
+        "SparseCondensedKKTSystem + CHOLMOD",
+        ()->MadNLP.Optimizer(
+            kkt_system=MadNLP.SparseCondensedKKTSystem,
+            equality_treatment = MadNLP.RelaxEquality,
+            fixed_variable_treatment = MadNLP.RelaxBound,
+            linear_solver=MadNLP.CHOLMODSolver,
+            print_level=MadNLP.INFO),
+        []
+    ],
+    [
+        "SparseCondensedKKTSystem + CHOLMOD-LDL",
+        ()->MadNLP.Optimizer(
+            kkt_system=MadNLP.SparseCondensedKKTSystem,
+            equality_treatment = MadNLP.RelaxEquality,
+            fixed_variable_treatment = MadNLP.RelaxBound,
+            linear_solver=MadNLP.CHOLMODSolver,
+            cholmod_algorithm=MadNLP.LDL,
+            print_level=MadNLP.INFO),
+        []
+    ],
+    [
+        "SparseCondensedKKTSystem + InertiaFree",
         ()->MadNLP.Optimizer(
             inertia_correction_method=MadNLP.InertiaFree,
             kkt_system=MadNLP.SparseCondensedKKTSystem,
             equality_treatment = MadNLP.RelaxEquality,
             fixed_variable_treatment = MadNLP.RelaxBound,
-            tol = 1e-4,
             print_level=MadNLP.ERROR),
         []
     ],

@@ -1,5 +1,5 @@
-# TODO: check options in CHOLMOD
 @kwdef mutable struct CHOLMODOptions <: AbstractOptions
+    cholmod_algorithm::LinearFactorization = CHOLESKY
 end
 
 mutable struct CHOLMODSolver{T} <: AbstractLinearSolver{T}
@@ -32,7 +32,6 @@ function CHOLMODSolver(
     )
     full.nzval .= 1.0
 
-    # TODO: use AMD permutation here
     A = CHOLMOD.Sparse(full)
     inner = CHOLMOD.symbolic(A)
 
@@ -42,7 +41,11 @@ end
 function factorize!(M::CHOLMODSolver)
     M.full.nzval .= M.tril_to_full_view
     # We check the factorization succeeded later in the backsolve
-    CHOLMOD.cholesky!(M.inner, M.full; check=false)
+    if M.opt.cholmod_algorithm == LDL
+        CHOLMOD.ldlt!(M.inner, M.full; check=false)
+    elseif M.opt.cholmod_algorithm == CHOLESKY
+        CHOLMOD.cholesky!(M.inner, M.full; check=false)
+    end
     return M
 end
 
@@ -57,13 +60,62 @@ function solve!(M::CHOLMODSolver{T}, rhs::Vector{T}) where T
     return rhs
 end
 
+# Utils function to copy the diagonal entries directly from CHOLMOD's factor.
+function _get_diagonal!(F::CHOLMOD.Factor{T}, d::Vector{T}) where T
+    s = unsafe_load(CHOLMOD.typedpointer(F))
+    # Wrap in memory the factor LD stored in CHOLMOD.
+    colptr = unsafe_wrap(Array, s.p, s.n+1, own=false)
+    nz = unsafe_wrap(Array, s.nz, s.n, own=false)
+    rowval = unsafe_wrap(Array, s.i, s.nzmax, own=false)
+    nzvals = unsafe_wrap(Array, Ptr{T}(s.x), s.nzmax, own=false)
+    # Read LD factor and load diagonal entries
+    for j in 1:s.n
+        for c in colptr[j]:colptr[j]+nz[j]-1
+            i = rowval[c+1] + 1  # convert to 1-based indexing
+            if i == j
+                d[i] = nzvals[c+1]
+            end
+        end
+    end
+    return d
+end
+
 is_inertia(::CHOLMODSolver) = true
-function inertia(M::CHOLMODSolver)
+function _inertia_cholesky(M::CHOLMODSolver)
     n = size(M.full, 1)
     if issuccess(M.inner)
         return (n, 0, 0)
     else
         return (0, n, 0)
+    end
+end
+function _inertia_ldlt(M::CHOLMODSolver{T}) where T
+    n = size(M.full, 1)
+    if !issuccess(M.inner)
+        return (0, n, 0)
+    end
+    D = M.d
+    # Extract diagonal elements
+    _get_diagonal!(M.inner, D)
+    (pos, zero, neg) = (0, 0, 0)
+    @inbounds for i in 1:n
+        d = D[i]
+        if d > 0
+            pos += 1
+        elseif d == 0
+            zero += 1
+        else
+            neg += 1
+        end
+    end
+    @assert pos + zero + neg == n
+    return pos, zero, neg
+end
+function inertia(M::CHOLMODSolver)
+    if M.opt.cholmod_algorithm == CHOLESKY
+        return _inertia_cholesky(M)
+    elseif M.opt.cholmod_algorithm == LDL
+        return _inertia_ldlt(M)
     end
 end
 input_type(::Type{CHOLMODSolver}) = :csc
