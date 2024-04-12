@@ -1,6 +1,6 @@
 module MadNLPHSL
 
-import MadNLP: @kwdef, MadNLPLogger, @debug, @warn, @error,
+import MadNLP: MadNLP, @kwdef, MadNLPLogger, @debug, @warn, @error,
     AbstractOptions, AbstractLinearSolver, set_options!, SparseMatrixCSC, SubVector,
     SymbolicException,FactorizationException,SolveException,InertiaException,
     introduce, factorize!, solve!, improve!, is_inertia, inertia, findIJ, nnz,
