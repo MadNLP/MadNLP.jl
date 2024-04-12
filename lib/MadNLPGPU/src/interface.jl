@@ -194,13 +194,13 @@ function get_diagonal_mapping(colptr, rowval)
     inds1 = findall(map((x,y)-> ((x <= nnz) && (x != y)), @view(colptr[1:end-1]), @view(colptr[2:end])))
     ptrs = colptr[inds1]
     rows = rowval[ptrs]
-    inds2 = if isempty(rows)
-        similar(rowval,0)
+    inds2 = findall(inds1 .== rows)
+    
+    if isempty(inds2)
+        return similar(rows, 0), similar(ptrs, 0)
     else
-        findall(inds1 .== rows)
+        return rows[inds2], ptrs[inds2]
     end
-
-    return rows[inds2], ptrs[inds2]
 end
 
 function MadNLP.initialize!(kkt::MadNLP.AbstractSparseKKTSystem{T,VT}) where {T, VT <: CuVector{T}}
