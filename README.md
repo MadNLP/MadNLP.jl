@@ -84,7 +84,7 @@ model = Model(()->MadNLP.Optimizer(linear_solver=LapackCPUSolver))
 #### HSL (requires extension `MadNLPHSL`)
 
 ```julia
-using MadNLP, MadNLPHSL, JuMP
+using MadNLPHSL, JuMP
 # ...
 model = Model(()->MadNLP.Optimizer(linear_solver=Ma27Solver))
 model = Model(()->MadNLP.Optimizer(linear_solver=Ma57Solver))
@@ -96,7 +96,7 @@ model = Model(()->MadNLP.Optimizer(linear_solver=Ma97Solver))
 #### Mumps (requires extension `MadNLPMumps`)
 
 ```julia
-using MadNLP, MadNLPMumps, JuMP
+using MadNLPMumps, JuMP
 # ...
 model = Model(()->MadNLP.Optimizer(linear_solver=MumpsSolver))
 ```
@@ -104,7 +104,7 @@ model = Model(()->MadNLP.Optimizer(linear_solver=MumpsSolver))
 #### Pardiso (requires extension `MadNLPPardiso`)
 
 ```julia
-using MadNLP, MadNLPPardiso, JuMP
+using MadNLPPardiso, JuMP
 # ...
 model = Model(()->MadNLP.Optimizer(linear_solver=PardisoSolver))
 model = Model(()->MadNLP.Optimizer(linear_solver=PardisoMKLSolver))
@@ -113,7 +113,7 @@ model = Model(()->MadNLP.Optimizer(linear_solver=PardisoMKLSolver))
 #### CUDA (requires extension `MadNLPGPU`)
 
 ```julia
-using MadNLP, MadNLPGPU, JuMP
+using MadNLPGPU, JuMP
 # ...
 model = Model(()->MadNLP.Optimizer(linear_solver=LapackGPUSolver))  # for dense problems
 model = Model(()->MadNLP.Optimizer(linear_solver=CUDSSSolver))      # for sparse problems

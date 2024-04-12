@@ -1,6 +1,6 @@
 module MadNLPHSL
 
-import MadNLP: @kwdef, MadNLPLogger, @debug, @warn, @error,
+import MadNLP: MadNLP, @kwdef, MadNLPLogger, @debug, @warn, @error,
     AbstractOptions, AbstractLinearSolver, set_options!, SparseMatrixCSC, SubVector,
     SymbolicException,FactorizationException,SolveException,InertiaException,
     introduce, factorize!, solve!, improve!, is_inertia, inertia, findIJ, nnz,
@@ -20,5 +20,13 @@ include("ma86.jl")
 include("ma97.jl")
 
 export Ma27Solver, Ma57Solver, Ma77Solver, Ma86Solver, Ma97Solver
+
+# re-export MadNLP, including deprecated names
+for name in names(MadNLP, all=true)
+    if Base.isexported(MadNLP, name)
+        @eval using MadNLP: $(name)
+        @eval export $(name)
+    end
+end
 
 end # module

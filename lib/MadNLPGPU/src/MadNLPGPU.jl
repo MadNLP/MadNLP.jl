@@ -57,4 +57,12 @@ end
 
 export LapackGPUSolver
 
+# re-export MadNLP, including deprecated names
+for name in names(MadNLP, all=true)
+    if Base.isexported(MadNLP, name)
+        @eval using MadNLP: $(name)
+        @eval export $(name)
+    end
+end
+
 end # module

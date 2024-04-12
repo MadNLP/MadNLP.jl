@@ -3,7 +3,7 @@ module MadNLPMumps
 import StaticArrays: SVector, setindex
 import MUMPS_seq_jll
 import MadNLP:
-    parsefile, dlopen,
+    MadNLP, parsefile, dlopen,
     @kwdef, MadNLPLogger, @debug, @warn, @error,
     SparseMatrixCSC, SubVector,
     SymbolicException,FactorizationException,SolveException,InertiaException,
@@ -285,5 +285,13 @@ is_supported(::Type{MumpsSolver},::Type{Float32}) = true
 is_supported(::Type{MumpsSolver},::Type{Float64}) = true
 
 export MumpsSolver
+
+# re-export MadNLP, including deprecated names
+for name in names(MadNLP, all=true)
+    if Base.isexported(MadNLP, name)
+        @eval using MadNLP: $(name)
+        @eval export $(name)
+    end
+end
 
 end # module
