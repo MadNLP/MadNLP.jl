@@ -21,4 +21,12 @@ include("ma97.jl")
 
 export Ma27Solver, Ma57Solver, Ma77Solver, Ma86Solver, Ma97Solver
 
+# re-export MadNLP, including deprecated names
+for name in names(MadNLP, all=true)
+    if Base.isexported(MadNLP, name)
+        @eval using MadNLP: $(name)
+        @eval export $(name)
+    end
+end
+
 end # module
