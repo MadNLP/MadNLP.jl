@@ -150,8 +150,8 @@ function MadNLP.mul!(
             kkt.ext.diag_map_fr;
             ndrange = length(kkt.ext.diag_map_to)
         )
-        synchronize(CUDABackend())
     end
+    synchronize(CUDABackend())
 
     MadNLP.mul!(wz, kkt.jt_csc', xx, alpha, one(T))
     MadNLP.axpy!(-alpha, xz, ws)
