@@ -143,13 +143,15 @@ function MadNLP.mul!(
     MadNLP.mul!(wx, kkt.hess_com , xx, alpha, beta)
     MadNLP.mul!(wx, kkt.hess_com', xx, alpha, one(T))
     MadNLP.mul!(wx, kkt.jt_csc,  xz, alpha, beta)
-    diag_operation(CUDABackend())(
-        wx, kkt.hess_com.nzVal, xx, alpha,
-        kkt.ext.diag_map_to,
-        kkt.ext.diag_map_fr;
-        ndrange = length(kkt.ext.diag_map_to)
-    )
-    synchronize(CUDABackend())
+    if !isempty(kkt.ext.diag_map_to)
+        diag_operation(CUDABackend())(
+            wx, kkt.hess_com.nzVal, xx, alpha,
+            kkt.ext.diag_map_to,
+            kkt.ext.diag_map_fr;
+            ndrange = length(kkt.ext.diag_map_to)
+        )
+        synchronize(CUDABackend())
+    end
 
     MadNLP.mul!(wz, kkt.jt_csc', xx, alpha, one(T))
     MadNLP.axpy!(-alpha, xz, ws)
@@ -190,7 +192,11 @@ function get_diagonal_mapping(colptr, rowval)
     inds1 = findall(map((x,y)-> ((x <= nnz) && (x != y)), @view(colptr[1:end-1]), @view(colptr[2:end])))
     ptrs = colptr[inds1]
     rows = rowval[ptrs]
-    inds2 = findall(inds1 .== rows)
+    inds2 = if isempty(rows)
+        similar(rowval,0)
+    else
+        findall(inds1 .== rows)
+    end
 
     return rows[inds2], ptrs[inds2]
 end
@@ -312,7 +318,9 @@ end
 
 
 function MadNLP.force_lower_triangular!(I::CuVector{T},J) where T
-    _force_lower_triangular!(CUDABackend())(I,J; ndrange=length(I))
+    if !isempty(I)
+        _force_lower_triangular!(CUDABackend())(I,J; ndrange=length(I))
+    end
     synchronize(CUDABackend())
 end
 
