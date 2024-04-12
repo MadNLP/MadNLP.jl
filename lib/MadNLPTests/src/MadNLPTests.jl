@@ -334,12 +334,12 @@ end
 function lp(optimizer_constructor::Function; Arr = Array)
     @testset "lp" begin
         
-        model = Model()
-        @variable(model, x >= 0)
-        @variable(model, 0 <= y <= 3)
-        @NLobjective(model, Min, 12x + 20y)
-        @NLconstraint(model, c1, 6x + 8y >= 100)
-        @NLconstraint(model, c2, 7x + 12y >= 120)
+        m = Model()
+        @variable(m, x >= 0)
+        @variable(m, 0 <= y <= 3)
+        @NLobjective(m, Min, 12x + 20y)
+        @NLconstraint(m, c1, 6x + 8y >= 100)
+        @NLconstraint(m, c2, 7x + 12y >= 120)
 
         nlp = SparseWrapperModel(
             Arr,
