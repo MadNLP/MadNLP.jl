@@ -111,7 +111,7 @@ end
 
 function test_madnlp(name,optimizer_constructor::Function,exclude; Arr = Array)
     @testset "$name" begin
-        for f in [infeasible,unbounded,lootsma,eigmina,lp]
+        for f in [infeasible,unbounded,lootsma,eigmina,lp_examodels_issue75]
             !(string(f) in exclude) && f(optimizer_constructor; Arr = Arr)
         end
     end
@@ -331,8 +331,8 @@ function eigmina(optimizer_constructor::Function; Arr = Array)
     end
 end
 
-function lp(optimizer_constructor::Function; Arr = Array)
-    @testset "lp" begin
+function lp_examodels_issue75(optimizer_constructor::Function; Arr = Array)
+    @testset "lp_examodels_issue75" begin
         
         m = Model()
         @variable(m, x >= 0)

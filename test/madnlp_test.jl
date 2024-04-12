@@ -40,7 +40,7 @@ testset = [
             linear_solver=MadNLP.LapackCPUSolver,
             lapack_algorithm=MadNLP.CHOLESKY,
             print_level=MadNLP.ERROR),
-        ["infeasible", "lootsma", "eigmina", "lp"]
+        ["infeasible", "lootsma", "eigmina", "lp_examodels_issue75"]
     ],
     [
         "Option: RELAX_BOUND",
