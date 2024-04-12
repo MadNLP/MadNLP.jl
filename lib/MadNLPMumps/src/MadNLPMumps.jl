@@ -3,7 +3,7 @@ module MadNLPMumps
 import StaticArrays: SVector, setindex
 import MUMPS_seq_jll
 import MadNLP:
-    parsefile, dlopen,
+    MadNLP, parsefile, dlopen,
     @kwdef, MadNLPLogger, @debug, @warn, @error,
     SparseMatrixCSC, SubVector,
     SymbolicException,FactorizationException,SolveException,InertiaException,
