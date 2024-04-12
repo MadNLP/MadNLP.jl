@@ -84,7 +84,7 @@ testset = [
             lapack_algorithm=MadNLP.CHOLESKY,
             print_level=MadNLP.ERROR
         ),
-        ["infeasible", "lootsma", "eigmina"], # KKT system not PD
+        ["infeasible", "lootsma", "eigmina", "lp_examodels_issue75"], # KKT system not PD
     ],
 ]
 

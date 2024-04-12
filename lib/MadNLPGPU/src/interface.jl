@@ -173,12 +173,14 @@ function MadNLP.mul_hess_blk!(
 
     MadNLP.mul!(wxx, kkt.hess_com , tx, one(T), zero(T))
     MadNLP.mul!(wxx, kkt.hess_com', tx, one(T), one(T))
-    diag_operation(CUDABackend())(
-        wxx, kkt.hess_com.nzVal, tx, one(T),
-        kkt.ext.diag_map_to,
-        kkt.ext.diag_map_fr;
-        ndrange = length(kkt.ext.diag_map_to)
-    )
+    if !isempty(kkt.ext.diag_map_to)
+        diag_operation(CUDABackend())(
+            wxx, kkt.hess_com.nzVal, tx, one(T),
+            kkt.ext.diag_map_to,
+            kkt.ext.diag_map_fr;
+            ndrange = length(kkt.ext.diag_map_to)
+        )
+    end
     synchronize(CUDABackend())
 
     fill!(@view(wx[n+1:end]), 0)
