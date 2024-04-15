@@ -181,12 +181,14 @@ MadNLP.introduce(M::GLUSolver) = "GLU"
     Undocumented Cholesky Solver
 =#
 
-@enum CUCHOLESKYORDERING begin
+@enum ORDERING begin
+    DEFAULT_ORDERING = 0
     METIS_ORDERING = 1
     AMD_ORDERING = 2
+    USER_ORDERING = 3
 end
 @kwdef mutable struct CuCholeskySolverOptions <: MadNLP.AbstractOptions
-    ordering::CUCHOLESKYORDERING = METIS_ORDERING
+    ordering::ORDERING = METIS_ORDERING
 end
 
 mutable struct CuCholeskySolver{T} <: MadNLP.AbstractLinearSolver{T}

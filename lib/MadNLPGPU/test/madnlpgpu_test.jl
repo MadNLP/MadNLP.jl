@@ -1,7 +1,7 @@
 testset = [
     # Temporarily commented out since LapackGPUSolver does not currently support sparse callbacks
     [
-        "LapackGPU-CUSOLVERRF",
+        "CUDSS",
         ()->MadNLP.Optimizer(
             linear_solver=MadNLPGPU.CUDSSSolver,
             print_level=MadNLP.ERROR
@@ -9,7 +9,25 @@ testset = [
         [],
     ],
     [
-        "LapackGPU-CUSOLVERRF",
+        "CUDSS-AMD",
+        ()->MadNLP.Optimizer(
+            linear_solver=MadNLPGPU.CUDSSSolver,
+            print_level=MadNLP.ERROR,
+            ordering=MadNLPGPU.AMD_ORDERING,
+        ),
+        [],
+    ],
+    [
+        "CUDSS-METIS",
+        ()->MadNLP.Optimizer(
+            linear_solver=MadNLPGPU.CUDSSSolver,
+            print_level=MadNLP.ERROR,
+            ordering=MadNLPGPU.METIS_ORDERING,
+        ),
+        [],
+    ],
+    [
+        "CUSOLVERRF",
         ()->MadNLP.Optimizer(
             linear_solver=MadNLPGPU.RFSolver,
             print_level=MadNLP.ERROR
@@ -17,7 +35,7 @@ testset = [
         [],
     ],
     [
-        "LapackGPU-CUSOLVERRF",
+        "CUSOLVER-CHOLESKY",
         ()->MadNLP.Optimizer(
             linear_solver=MadNLPGPU.CuCholeskySolver,
             print_level=MadNLP.ERROR
@@ -25,7 +43,7 @@ testset = [
         [],
     ],
     [
-        "LapackGPU-CUSOLVERRF",
+        "GLU",
         ()->MadNLP.Optimizer(
             linear_solver=MadNLPGPU.GLUSolver,
             print_level=MadNLP.ERROR
@@ -75,6 +93,6 @@ testset = [
     MadNLPTests.test_linear_solver(LapackGPUSolver,Float64)
     # Test LapackGPU wrapper
     for (name,optimizer_constructor,exclude) in testset
-        test_madnlp(name,optimizer_constructor,exclude; Arr= CuArray)
+        test_madnlp(name,optimizer_constructor,exclude; Arr=CuArray)
     end
 end

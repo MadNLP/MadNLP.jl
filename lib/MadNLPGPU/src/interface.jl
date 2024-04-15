@@ -300,6 +300,7 @@ end
 function MadNLP.tril_to_full!(dense::CuMatrix{T}) where T
     n = size(dense,1)
     _tril_to_full_kernel!(CUDABackend())(dense; ndrange = div(n^2 + n,2))
+    synchronize(CUDABackend())
 end
 
 function getij(idx,n)
@@ -312,6 +313,7 @@ end
 
 function MadNLP.force_lower_triangular!(I::CuVector{T},J) where T
     _force_lower_triangular!(CUDABackend())(I,J; ndrange=length(I))
+    synchronize(CUDABackend())
 end
 
 @kernel function _set_colptr_kernel!(colptr, @Const(sym2), @Const(ptr2), @Const(guide))

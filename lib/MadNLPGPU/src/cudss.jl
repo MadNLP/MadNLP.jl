@@ -2,8 +2,10 @@ import CUDSS
 import SparseArrays
 
 @kwdef mutable struct CudssSolverOptions <: MadNLP.AbstractOptions
-    # Use LDL by default in CUDSS as Cholesky can lead to undefined behavior. 
+    # Use LDLᵀ by default in CUDSS as Cholesky can lead to undefined behavior.
     cudss_algorithm::MadNLP.LinearFactorization = MadNLP.LDL
+    ordering::ORDERING = DEFAULT_ORDERING
+    perm::Vector{Cint} = Cint[]
 end
 
 mutable struct CUDSSSolver{T} <: MadNLP.AbstractLinearSolver{T}
@@ -42,8 +44,24 @@ function CUDSSSolver(
     # TODO: pass config options here.
     config = CUDSS.CudssConfig()
     data = CUDSS.CudssData()
-    
     solver = CUDSS.CudssSolver(matrix, config, data)
+
+    if opt.ordering != DEFAULT_ORDERING
+        if opt.ordering == METIS_ORDERING
+            A = SparseArrays.SparseMatrixCSC(csc)
+            A = A + A' - LinearAlgebra.Diagonal(A)
+            G = Metis.graph(A, check_hermitian=false)
+            opt.perm, _ = Metis.permutation(G)
+        elseif opt.ordering == AMD_ORDERING
+            A = SparseArrays.SparseMatrixCSC(csc)
+            opt.perm = AMD.amd(A)
+        elseif opt.ordering == USER_ORDERING
+            (!isempty(opt.perm) && isperm(opt.perm)) || error("The vector opt.perm is not a valid permutation.")
+        else
+            error("The ordering $(opt.ordering) is not supported.")
+        end
+        CUDSS.cudss_set(solver, "user_perm", opt.perm)
+    end
 
     x_gpu = CUDA.zeros(T, n)
     b_gpu = CUDA.zeros(T, n)
@@ -97,4 +115,3 @@ MadNLP.improve!(M::CUDSSSolver) = false
 MadNLP.is_supported(::Type{CUDSSSolver},::Type{Float32}) = true
 MadNLP.is_supported(::Type{CUDSSSolver},::Type{Float64}) = true
 MadNLP.introduce(M::CUDSSSolver) = "cuDSS v$(CUDSS.version())"
-
