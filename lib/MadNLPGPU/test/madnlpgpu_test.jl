@@ -9,7 +9,7 @@ testset = [
         [],
     ],
     [
-        "CUDSS",
+        "CUDSS-AMD",
         ()->MadNLP.Optimizer(
             linear_solver=MadNLPGPU.CUDSSSolver,
             print_level=MadNLP.ERROR,
@@ -18,7 +18,7 @@ testset = [
         [],
     ],
     [
-        "CUDSS",
+        "CUDSS-METIS",
         ()->MadNLP.Optimizer(
             linear_solver=MadNLPGPU.CUDSSSolver,
             print_level=MadNLP.ERROR,
