@@ -189,7 +189,10 @@ end
 
 
 function get_diagonal_mapping(colptr, rowval)
-
+    if isempty(rowval)
+        return similar(rowval, 0), similar(colptr, 0)
+    end
+    
     nnz = length(rowval)
     inds1 = findall(map((x,y)-> ((x <= nnz) && (x != y)), @view(colptr[1:end-1]), @view(colptr[2:end])))
     if isempty(inds1)
