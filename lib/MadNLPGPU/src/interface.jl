@@ -81,8 +81,8 @@ function MadNLP.build_condensed_aug_coord!(kkt::MadNLP.AbstractCondensedKKTSyste
     end
     if length(kkt.ext.jptrptr) > 1 # otherwise error is thrown
         _jtsj!(CUDABackend())(kkt.aug_com.nzVal, kkt.jptr, kkt.ext.jptrptr, kkt.jt_csc.nzVal, kkt.diag_buffer; ndrange = length(kkt.ext.jptrptr)-1)
-        synchronize(CUDABackend())
     end
+    synchronize(CUDABackend())
 end
 
 
@@ -152,7 +152,7 @@ function MadNLP.mul!(
         )
     end
     synchronize(CUDABackend())
-
+    
     MadNLP.mul!(wz, kkt.jt_csc', xx, alpha, one(T))
     MadNLP.axpy!(-alpha, xz, ws)
     MadNLP.axpy!(-alpha, xs, wz)
@@ -241,8 +241,8 @@ function MadNLP._set_con_scale_sparse!(con_scale::VT, jac_I, jac_buffer) where {
         inds = sort!(map((i,j)->(i,j),  jac_I, 1:length(jac_I)))
         ptr = MadNLP.getptr(inds; by = ((x1,x2),(y1,y2))->x1 != y1)
         _set_con_scale_sparse_kernel!(CUDABackend())(con_scale, ptr, inds, jac_I, jac_buffer; ndrange=length(ptr)-1)
-        synchronize(CUDABackend())
     end
+    synchronize(CUDABackend())
 end
 
 function MadNLP._sym_length(Jt::CUSPARSE.CuSparseMatrixCSC)
@@ -263,8 +263,8 @@ function MadNLP._build_condensed_aug_symbolic_hess(H::CUSPARSE.CuSparseMatrixCSC
             sym, sym2, H.colPtr, H.rowVal;
             ndrange = size(H,2)
         )
-        synchronize(CUDABackend())
     end
+    synchronize(CUDABackend())
 end
 
 function MadNLP._build_condensed_aug_symbolic_jt(Jt::CUSPARSE.CuSparseMatrixCSC{Tv,Ti}, sym, sym2) where {Tv,Ti}
@@ -272,8 +272,8 @@ function MadNLP._build_condensed_aug_symbolic_jt(Jt::CUSPARSE.CuSparseMatrixCSC{
         _offsets = map((i,j) -> div((j-i)^2 + (j-i), 2), @view(Jt.colPtr[1:end-1]) , @view(Jt.colPtr[2:end]))
         offsets = cumsum(_offsets)
         _build_condensed_aug_symbolic_jt_kernel!(CUDABackend())(sym, sym2, Jt.colPtr, Jt.rowVal, offsets; ndrange = size(Jt,2))
-        synchronize(CUDABackend())
     end
+    synchronize(CUDABackend())
 end
 
 function MadNLP._first_and_last_col(sym2::CuVector,ptr2)
@@ -287,17 +287,15 @@ end
 MadNLP.nzval(H::CUSPARSE.CuSparseMatrixCSC) = H.nzVal
 
 function MadNLP._set_colptr!(colptr::CuVector, ptr2, sym2, guide)
-    if length(ptr2) == 1 # otherwise error is thrown
-        return
+    if length(ptr2) > 1 # otherwise error is thrown
+        _set_colptr_kernel!(CUDABackend())(
+            colptr,
+            sym2,
+            ptr2,
+            guide;
+            ndrange = length(ptr2)-1
+        )
     end
-
-    _set_colptr_kernel!(CUDABackend())(
-        colptr,
-        sym2,
-        ptr2,
-        guide;
-        ndrange = length(ptr2)-1
-    )
     synchronize(CUDABackend())
     return
 end
