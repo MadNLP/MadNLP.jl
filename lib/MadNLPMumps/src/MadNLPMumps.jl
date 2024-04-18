@@ -1,6 +1,5 @@
 module MadNLPMumps
 
-import StaticArrays: SVector, setindex
 import MUMPS_seq_jll
 import MadNLP:
     MadNLP, parsefile, dlopen,
@@ -22,6 +21,9 @@ end
 
 const version = parsefile(joinpath(dirname(pathof(MUMPS_seq_jll)),"..","Project.toml"))["version"]
 
+setindex(tup,a,n) = (tup[1:n-1]...,a,tup[n+1:end]...)
+tzeros(n) = tuple((0 for i=1:n)...)
+
 @kwdef mutable struct MumpsOptions <: AbstractOptions
     mumps_dep_tol::Float64 = 0.
     mumps_mem_percent::Int = 1000
@@ -39,11 +41,11 @@ end
 
     comm_fortran::Cint = 0
 
-    icntl::SVector{60,Cint} = zeros(60)
-    keep::SVector{500,Cint} = zeros(500)
-    cntl::SVector{15,T} = zeros(15)
-    dkeep::SVector{230,T} = zeros(230)
-    keep8::SVector{150,Int64} = zeros(150)
+    icntl::NTuple{60,Cint} = tzeros(60)
+    keep::NTuple{500,Cint} = tzeros(500)
+    cntl::NTuple{15,T} = tzeros(15)
+    dkeep::NTuple{230,T} = tzeros(230)
+    keep8::NTuple{150,Int64} = tzeros(150)
     n::Cint = 0
     nblk::Cint = 0
 
@@ -107,10 +109,10 @@ end
     nprow::Cint = 0
     npcol::Cint = 0
 
-    info::SVector{80,Cint} = zeros(80)
-    infog::SVector{80,Cint} = zeros(80)
-    rinfo::SVector{40,T} = zeros(40)
-    rinfog::SVector{40,T} = zeros(40)
+    info::NTuple{80,Cint} = tzeros(80)
+    infog::NTuple{80,Cint} = tzeros(80)
+    rinfo::NTuple{40,T} = tzeros(40)
+    rinfog::NTuple{40,T} = tzeros(40)
 
     deficiency::Cint = 0
     pivnul_list::Ptr{Cint} = C_NULL
@@ -123,18 +125,18 @@ end
     instance_number::Cint = 0
     wk_user::Ptr{T} = C_NULL
 
-    version_number::SVector{32,Cchar} = zeros(32)
+    version_number::NTuple{32,Cchar} = tzeros(32)
 
-    ooc_tmpdir::SVector{256,Cchar} = zeros(256)
-    ooc_prefix::SVector{64,Cchar} = zeros(64)
+    ooc_tmpdir::NTuple{256,Cchar} = tzeros(256)
+    ooc_prefix::NTuple{64,Cchar} = tzeros(64)
 
-    write_problem::SVector{256,Cchar} = zeros(256)
+    write_problem::NTuple{256,Cchar} = tzeros(256)
     lwk_user::Cint = 0
 
-    save_dir::SVector{256,Cchar} = zeros(256)
-    save_prefix::SVector{256,Cchar} = zeros(256)
+    save_dir::NTuple{256,Cchar} = tzeros(256)
+    save_prefix::NTuple{256,Cchar} = tzeros(256)
 
-    metis_options::SVector{40,Cint} = zeros(40)
+    metis_options::NTuple{40,Cint} = tzeros(40)
 end
 
 mutable struct MumpsSolver{T} <: AbstractLinearSolver{T}
