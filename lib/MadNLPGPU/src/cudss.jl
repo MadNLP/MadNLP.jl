@@ -63,7 +63,7 @@ function CUDSSSolver(
         end
         CUDSS.cudss_set(solver, "user_perm", opt.perm)
     end
-    CUDSS.cudss_set(solver, "ir_n_steps", opt.ir)
+    (opt.ir > 0) && CUDSS.cudss_set(solver, "ir_n_steps", opt.ir)
 
     x_gpu = CUDA.zeros(T, n)
     b_gpu = CUDA.zeros(T, n)
