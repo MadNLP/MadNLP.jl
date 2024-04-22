@@ -9,7 +9,9 @@ end
 
 function MadNLP.diag!(dest::CuVector{T}, src::CuMatrix{T}) where T
     @assert length(dest) == size(src, 1)
-    ev = _copy_diag!(CUDABackend())(dest, src, ndrange=length(dest))
+    if !isempty(dest)
+        ev = _copy_diag!(CUDABackend())(dest, src, ndrange=length(dest))
+    end
     synchronize(CUDABackend())
 end
 
@@ -19,7 +21,9 @@ end
 end
 
 function MadNLP.diag_add!(dest::CuMatrix, src1::CuVector, src2::CuVector)
-    ev = _add_diagonal!(CUDABackend())(dest, src1, src2, ndrange=size(dest, 1))
+    if size(dest,1) > 0
+        ev = _add_diagonal!(CUDABackend())(dest, src1, src2, ndrange=size(dest, 1))
+    end
     synchronize(CUDABackend())
 end
 
@@ -84,10 +88,12 @@ function MadNLP._build_dense_kkt_system!(
 ) 
     ind_ineq_gpu = ind_ineq |> CuArray
     ndrange = (n+m+ns, n)
-    ev = _build_dense_kkt_system_kernel!(CUDABackend())(
-        dest, hess, jac, pr_diag, du_diag, diag_hess, ind_ineq_gpu, n, m, ns,
-        ndrange=ndrange
-    )
+    if n > 0
+        ev = _build_dense_kkt_system_kernel!(CUDABackend())(
+            dest, hess, jac, pr_diag, du_diag, diag_hess, ind_ineq_gpu, n, m, ns,
+            ndrange=ndrange
+        )
+    end
     synchronize(CUDABackend())
 end
 
@@ -116,10 +122,12 @@ function MadNLP._build_ineq_jac!(
     (m_ineq == 0) && return # nothing to do if no ineq. constraints
     ind_ineq_gpu = ind_ineq |> CuArray
     ndrange = (m_ineq, n)
-    ev = _build_jacobian_condensed_kernel!(CUDABackend())(
-        dest, jac, diag_buffer, ind_ineq_gpu, m_ineq,
-        ndrange=ndrange,
-    )
+    if m_ineq > 0 && n > 0
+        ev = _build_jacobian_condensed_kernel!(CUDABackend())(
+            dest, jac, diag_buffer, ind_ineq_gpu, m_ineq,
+            ndrange=ndrange,
+        )
+    end
     synchronize(CUDABackend())
     return
 end
@@ -153,10 +161,12 @@ function MadNLP._build_condensed_kkt_system!(
 )
     ind_eq_gpu = ind_eq |> CuArray
     ndrange = (n + m_eq, n)
-    ev = _build_condensed_kkt_system_kernel!(CUDABackend())(
-        dest, hess, jac, pr_diag, du_diag, ind_eq_gpu, n, m_eq,
-        ndrange=ndrange,
-    )
+    if n > 0 
+        ev = _build_condensed_kkt_system_kernel!(CUDABackend())(
+            dest, hess, jac, pr_diag, du_diag, ind_eq_gpu, n, m_eq,
+            ndrange=ndrange,
+        )
+    end
     synchronize(CUDABackend())
 end
 
@@ -166,8 +176,8 @@ function MadNLP._set_diag!(A::CuMatrix, inds, a)
             A, inds, a;
             ndrange = length(inds)
         )
-        synchronize(CUDABackend())
     end
+    synchronize(CUDABackend())
 end
 
 @kernel function _set_diag_kernel!(

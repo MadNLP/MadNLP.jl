@@ -265,7 +265,9 @@ end
 function MadNLP.factorize!(M::CuCholeskySolver)
 
     copyto!(M.full.nzVal, M.tril_to_full_view)
-    _copy_to_perm_2!(CUDABackend())(M.fullp.nzVal, M.pnzval, M.full.nzVal; ndrange= length(M.pnzval))
+    if !isempty(M.pnzval)
+        _copy_to_perm_2!(CUDABackend())(M.fullp.nzVal, M.pnzval, M.full.nzVal; ndrange= length(M.pnzval))
+    end
     synchronize(CUDABackend())
     if M.inner == nothing
         M.inner = CUSOLVER.SparseCholesky(M.fullp)
@@ -277,15 +279,19 @@ function MadNLP.factorize!(M::CuCholeskySolver)
     catch e
         M.singularity = true
     end
-
+    synchronize(CUDABackend())
     return M
 end
 
 function MadNLP.solve!(M::CuCholeskySolver{T}, x) where T
-    _copy_to_perm_2!(CUDABackend())(M.rhs, M.p, x; ndrange=length(M.p))
+    if !isempty(M.p)
+        _copy_to_perm_2!(CUDABackend())(M.rhs, M.p, x; ndrange=length(M.p))
+    end
     synchronize(CUDABackend())
     CUSOLVER.spcholesky_solve(M.inner, M.rhs, x)
-    _copy_to_perm!(CUDABackend())(M.rhs, M.p, x; ndrange=length(M.p))
+    if !isempty(M.p)
+        _copy_to_perm!(CUDABackend())(M.rhs, M.p, x; ndrange=length(M.p))
+    end
     synchronize(CUDABackend())
     copyto!(x, M.rhs)
     return x

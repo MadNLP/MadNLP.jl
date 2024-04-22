@@ -220,7 +220,10 @@ _copyto!(y,x) = copyto!(y,x)
 function _copyto!(y, x::CUSPARSE.CuSparseMatrixCSC{T}) where T
     n = size(y,2)
     fill!(y, zero(T))
-    kernel_copyto!(CUDABackend())(y, x.colPtr, x.rowVal, x.nzVal, ndrange=n)
+    if n > 0
+        kernel_copyto!(CUDABackend())(y, x.colPtr, x.rowVal, x.nzVal, ndrange=n)
+    end
+    synchronize(CUDABackend())
 end
 @kernel function kernel_copyto!(y, @Const(colptr), @Const(rowval), @Const(nzval))
     col = @index(Global)
