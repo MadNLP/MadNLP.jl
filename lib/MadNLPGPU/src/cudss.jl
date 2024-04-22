@@ -88,7 +88,6 @@ end
 
 function MadNLP.solve!(M::CUDSSSolver{T}, x) where T
     CUDSS.cudss("solve", M.inner, M.x_gpu, x)
-    synchronize(CUDABackend())
     copyto!(x, M.x_gpu)
     return x
 end
