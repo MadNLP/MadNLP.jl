@@ -80,9 +80,7 @@ function MadNLP.factorize!(M::CUDSSSolver)
     # copyto!(M.full.nzVal, M.tril_to_full_view)
     CUDSS.cudss_set(M.inner.matrix, SparseArrays.nonzeros(M.tril))
     CUDSS.cudss("factorization", M.inner, M.x_gpu, M.b_gpu)
-
     synchronize(CUDABackend())
-
     return M
 end
 

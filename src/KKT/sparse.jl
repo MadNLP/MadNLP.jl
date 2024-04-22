@@ -600,7 +600,7 @@ end
 
 nzval(H) = H.nzval
 
-function build_condensed_aug_symbolic(H::AbstractSparseMatrix{Tv,Ti}, Jt) where {Tv, Ti}
+@inbounds function build_condensed_aug_symbolic(H::AbstractSparseMatrix{Tv,Ti}, Jt) where {Tv, Ti}
     nnzjtsj = _sym_length(Jt)
 
     sym = similar(nzval(H), Tuple{Int,Int,Int},
