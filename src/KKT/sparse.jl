@@ -600,7 +600,7 @@ end
 
 nzval(H) = H.nzval
 
-@inbounds function build_condensed_aug_symbolic(H::AbstractSparseMatrix{Tv,Ti}, Jt) where {Tv, Ti}
+function build_condensed_aug_symbolic(H::AbstractSparseMatrix{Tv,Ti}, Jt) where {Tv, Ti}
     nnzjtsj = _sym_length(Jt)
 
     sym = similar(nzval(H), Tuple{Int,Int,Int},
@@ -622,7 +622,6 @@ nzval(H) = H.nzval
         similar(nzval(H), Ti, size(H,1)+1),
         one(Tv)
     )
-    rowval = Ti[]
 
     n = size(H,2)
 
@@ -636,7 +635,6 @@ nzval(H) = H.nzval
         @view(sym2[1:n]),
         1:size(H,2)
     )
-
 
     _build_condensed_aug_symbolic_hess(
         H,
