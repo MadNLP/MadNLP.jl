@@ -72,24 +72,13 @@ testset = [
         []
     ],
     [
-        "SparseCondensedKKTSystem + CHOLMOD",
+        "SparseCondensedKKTSystem + CHOLMOD-CHOLESKY",
         ()->MadNLP.Optimizer(
             kkt_system=MadNLP.SparseCondensedKKTSystem,
             equality_treatment = MadNLP.RelaxEquality,
             fixed_variable_treatment = MadNLP.RelaxBound,
             linear_solver=MadNLP.CHOLMODSolver,
-            print_level=MadNLP.INFO),
-        []
-    ],
-    [
-        "SparseCondensedKKTSystem + CHOLMOD-LDL",
-        ()->MadNLP.Optimizer(
-            kkt_system=MadNLP.SparseCondensedKKTSystem,
-            equality_treatment = MadNLP.RelaxEquality,
-            fixed_variable_treatment = MadNLP.RelaxBound,
-            linear_solver=MadNLP.CHOLMODSolver,
-            cholmod_algorithm=MadNLP.LDL,
-            print_level=MadNLP.INFO),
+            print_level=MadNLP.ERROR),
         []
     ],
     [
@@ -103,6 +92,24 @@ testset = [
         []
     ],
 ]
+
+# N.B. Current CHOLMOD interface is supported only starting from Julia v1.10.
+if VERSION >= v"1.10"
+    push!(
+        testset,
+        [
+            "SparseCondensedKKTSystem + CHOLMOD-LDL",
+            ()->MadNLP.Optimizer(
+                kkt_system=MadNLP.SparseCondensedKKTSystem,
+                equality_treatment = MadNLP.RelaxEquality,
+                fixed_variable_treatment = MadNLP.RelaxBound,
+                linear_solver=MadNLP.CHOLMODSolver,
+                cholmod_algorithm=MadNLP.LDL,
+                print_level=MadNLP.ERROR),
+            []
+        ]
+    )
+end
 
 
 for (name,optimizer_constructor,exclude) in testset

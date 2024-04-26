@@ -23,6 +23,10 @@ function CHOLMODSolver(
     d = Vector{Float64}(undef,csc.n)
     full, tril_to_full_view = get_tril_to_full(Float64, csc)
 
+    if opt.cholmod_algorithm == LDL && VERSION <= v"1.9"
+        error("[CHOLMOD] Option `cholmod_algorithm=LDL` is not supported for Julia version <= 1.9")
+    end
+
     full = SparseMatrixCSC{Float64,Int}(
         full.m,
         full.n,
@@ -30,7 +34,7 @@ function CHOLMODSolver(
         Vector{Int64}(full.rowval),
         full.nzval
     )
-    full.nzval .= 1.0
+    fill!(full.nzval, one(T))
 
     A = CHOLMOD.Sparse(full)
     inner = CHOLMOD.symbolic(A)
