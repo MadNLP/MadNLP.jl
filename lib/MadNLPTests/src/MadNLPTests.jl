@@ -111,7 +111,7 @@ end
 
 function test_madnlp(name,optimizer_constructor::Function,exclude; Arr = Array)
     @testset "$name" begin
-        for f in [infeasible,unbounded,lootsma,eigmina]
+        for f in [infeasible,unbounded,lootsma,eigmina,lp_examodels_issue75]
             !(string(f) in exclude) && f(optimizer_constructor; Arr = Arr)
         end
     end
@@ -319,6 +319,27 @@ function eigmina(optimizer_constructor::Function; Arr = Array)
         @NLconstraint(m, x[99]*x[101] - 99*x[99] == 0)
         @NLconstraint(m, x[100]*x[101] - 100*x[100] == 0)
         @NLobjective(m, Min, x[101])
+
+        nlp = SparseWrapperModel(
+            Arr,
+            NLPModelsJuMP.MathOptNLPModel(m)
+        )
+        optimizer = optimizer_constructor()
+        result = MadNLP.madnlp(nlp; optimizer.options...)
+
+        @test result.status == MadNLP.SOLVE_SUCCEEDED
+    end
+end
+
+function lp_examodels_issue75(optimizer_constructor::Function; Arr = Array)
+    @testset "lp_examodels_issue75" begin
+        
+        m = Model()
+        @variable(m, x >= 0)
+        @variable(m, 0 <= y <= 3)
+        @NLobjective(m, Min, 12x + 20y)
+        @NLconstraint(m, c1, 6x + 8y >= 100)
+        @NLconstraint(m, c2, 7x + 12y >= 120)
 
         nlp = SparseWrapperModel(
             Arr,
