@@ -99,6 +99,7 @@ MOI.eval_constraint(::_EmptyNLPEvaluator, g, x) = nothing
 MOI.jacobian_structure(::_EmptyNLPEvaluator) = Tuple{Int64,Int64}[]
 MOI.hessian_lagrangian_structure(::_EmptyNLPEvaluator) = Tuple{Int64,Int64}[]
 MOI.eval_constraint_jacobian(::_EmptyNLPEvaluator, J, x) = nothing
+MOI.eval_constraint_jacobian_transpose_product(::_EmptyNLPEvaluator, Jtv, x, v) = nothing
 MOI.eval_hessian_lagrangian(::_EmptyNLPEvaluator, H, x, σ, μ) = nothing
 
 function MOI.empty!(model::Optimizer)
@@ -123,6 +124,9 @@ function MOI.empty!(model::Optimizer)
     if haskey(model.options, :jacobian_constant)
         delete!(model.options, :jacobian_constant)
     end
+    if haskey(model.options, :hessian_approximation)
+        delete!(model.options, :hessian_approximation)
+    end
     return
 end
 
@@ -139,6 +143,16 @@ MOI.supports_incremental_interface(::Optimizer) = true
 
 function MOI.copy_to(model::Optimizer, src::MOI.ModelLike)
     return MOI.Utilities.default_copy_to(model, src)
+end
+
+function _init_nlp_model(model)
+    if model.nlp_model === nothing
+        if !(model.nlp_data.evaluator isa _EmptyNLPEvaluator)
+            error("Cannot mix the new and legacy nonlinear APIs")
+        end
+        model.nlp_model = MOI.Nonlinear.Model()
+    end
+    return
 end
 
 MOI.get(::Optimizer, ::MOI.SolverName) = "MadNLP"
@@ -487,6 +501,28 @@ function MOI.get(model::Optimizer, attr::MOI.ListOfSupportedNonlinearOperators)
     return MOI.get(model.nlp_model, attr)
 end
 
+### UserDefinedFunction
+
+MOI.supports(model::Optimizer, ::MOI.UserDefinedFunction) = true
+
+function MOI.set(model::Optimizer, attr::MOI.UserDefinedFunction, args)
+    _init_nlp_model(model)
+    MOI.Nonlinear.register_operator(
+        model.nlp_model,
+        attr.name,
+        attr.arity,
+        args...,
+    )
+    return
+end
+
+### ListOfSupportedNonlinearOperators
+
+function MOI.get(model::Optimizer, attr::MOI.ListOfSupportedNonlinearOperators)
+    _init_nlp_model(model)
+    return MOI.get(model.nlp_model, attr)
+end
+
 ### MOI.VariablePrimalStart
 
 function MOI.supports(
@@ -726,6 +762,13 @@ function MOI.eval_constraint_jacobian(model::Optimizer, values, x)
     return
 end
 
+function MOI.eval_constraint_jacobian_transpose_product(model::Optimizer, Jtv, x, v)
+    MOI.eval_constraint_jacobian_transpose_product(model.nlp_data.evaluator, Jtv, x, v)
+    # Evaluate QPBlockData after NLPEvaluator to ensure that Jtv is not reset.
+    MOI.eval_constraint_jacobian_transpose_product(model.qp_data, Jtv, x, v)
+    return
+end
+
 ### Eval_H_CB
 
 function MOI.hessian_lagrangian_structure(model::Optimizer)
@@ -751,23 +794,27 @@ end
 
 NLPModels.obj(nlp::MOIModel, x::AbstractVector{Float64}) = MOI.eval_objective(nlp.model,x)
 
-function NLPModels. grad!(nlp::MOIModel, x::AbstractVector{Float64}, g::AbstractVector{Float64})
+function NLPModels.grad!(nlp::MOIModel, x::AbstractVector{Float64}, g::AbstractVector{Float64})
     MOI.eval_objective_gradient(nlp.model, g, x)
 end
 
-function NLPModels. cons!(nlp::MOIModel, x::AbstractVector{Float64}, c::AbstractVector{Float64})
+function NLPModels.cons!(nlp::MOIModel, x::AbstractVector{Float64}, c::AbstractVector{Float64})
     MOI.eval_constraint(nlp.model, c, x)
 end
 
-function NLPModels. jac_coord!(nlp::MOIModel, x::AbstractVector{Float64}, jac::AbstractVector{Float64})
+function NLPModels.jac_coord!(nlp::MOIModel, x::AbstractVector{Float64}, jac::AbstractVector{Float64})
     MOI.eval_constraint_jacobian(nlp.model, jac, x)
 end
 
-function NLPModels. hess_coord!(nlp::MOIModel, x::AbstractVector{Float64}, l::AbstractVector{Float64}, hess::AbstractVector{Float64}; obj_weight::Float64=1.0)
+function NLPModels.jtprod!(nlp::MOIModel, x::AbstractVector{Float64}, v::Vector{Float64}, Jtv::AbstractVector{Float64})
+    MOI.eval_constraint_jacobian_transpose_product(nlp.model, Jtv, x, v)
+end
+
+function NLPModels.hess_coord!(nlp::MOIModel, x::AbstractVector{Float64}, l::AbstractVector{Float64}, hess::AbstractVector{Float64}; obj_weight::Float64=1.0)
     MOI.eval_hessian_lagrangian(nlp.model, hess, x, obj_weight, l)
 end
 
-function NLPModels. hess_structure!(nlp::MOIModel, I::AbstractVector{T}, J::AbstractVector{T}) where T
+function NLPModels.hess_structure!(nlp::MOIModel, I::AbstractVector{T}, J::AbstractVector{T}) where T
     @assert length(I) == length(J) == length(MOI.hessian_lagrangian_structure(nlp.model))
     cnt = 1
     for (row, col) in  MOI.hessian_lagrangian_structure(nlp.model)
@@ -804,11 +851,11 @@ function MOIModel(model::Optimizer)
         any(isequal(_kFunctionTypeScalarQuadratic), model.qp_data.function_type)
     has_nlp_constraints = !isempty(model.nlp_data.constraint_bounds)
     has_nlp_objective = model.nlp_data.has_objective
-    has_nlp_hessian = :Hess in MOI.features_available(model.nlp_data.evaluator)
+    has_hessian = :Hess in MOI.features_available(model.nlp_data.evaluator)
     is_nlp = has_nlp_constraints || has_nlp_objective
     # Initialize evaluator using model's structure.
     init_feat = [:Grad]
-    if has_nlp_hessian
+    if has_hessian
         push!(init_feat, :Hess)
     end
     if has_nlp_constraints
@@ -836,7 +883,11 @@ function MOIModel(model::Optimizer)
 
     # Sparsity
     jacobian_sparsity = MOI.jacobian_structure(model)
-    hessian_sparsity = MOI.hessian_lagrangian_structure(model)
+    hessian_sparsity = if has_hessian
+        MOI.hessian_lagrangian_structure(model)
+    else
+        Tuple{Int,Int}[]
+    end
     nnzh = length(hessian_sparsity)
     nnzj = length(jacobian_sparsity)
 
@@ -857,6 +908,9 @@ function MOIModel(model::Optimizer)
 
     if !has_nlp_constraints && !has_quadratic_constraints
         model.options[:jacobian_constant] = true
+    end
+    if !has_hessian
+        model.options[:hessian_approximation] = MadNLP.CompactLBFGS
     end
 
     return MOIModel(
@@ -954,7 +1008,7 @@ function MOI.get(model::Optimizer, ::MOI.RawStatusString)
     elseif model.solver === nothing
         return "Optimize not called"
     end
-    return MadNLP.get_status_output(model.result.status, model.result.options) 
+    return MadNLP.get_status_output(model.result.status, model.result.options)
 end
 
 

@@ -357,7 +357,9 @@ function create_callback(
     jac_scale = similar(jac_buffer, nnzj) ; fill!(jac_scale, one(T))
 
     NLPModels.jac_structure!(nlp, jac_I, jac_J)
-    NLPModels.hess_structure!(nlp, hess_I, hess_J)
+    if nnzh > 0
+        NLPModels.hess_structure!(nlp, hess_I, hess_J)
+    end
 
     fixed_handler, nnzj, nnzh = create_sparse_fixed_handler(
         fixed_variable_treatment,

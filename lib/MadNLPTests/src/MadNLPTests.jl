@@ -354,6 +354,7 @@ end
 
 include("Instances/dummy_qp.jl")
 include("Instances/hs15.jl")
+include("Instances/hs15nohessian.jl")
 include("Instances/nls.jl")
 include("wrapper.jl")
 

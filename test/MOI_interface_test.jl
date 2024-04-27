@@ -50,8 +50,6 @@ function test_MOI_Test()
             # - Excluded because Hessian information is needed
             "test_nonlinear_hs071_hessian_vector_product",
             # - Excluded because Hessian information is needed
-            "test_nonlinear_hs071_no_hessian",
-            # - Excluded because Hessian information is needed
             "test_nonlinear_invalid",
 
             #  - Excluded because this test is optional
@@ -97,6 +95,20 @@ function test_invalid_number_in_hessian_lagrangian()
     MOI.optimize!(model)
     @test MOI.get(model, MOI.TerminationStatus()) == MOI.LOCALLY_SOLVED
     return
+end
+
+# See issue #318
+function test_user_defined_function()
+    model = MadNLP.Optimizer()
+    MOI.set(model, MOI.Silent(), true)
+    # Define custom function.
+    f(a, b) = a^2 + b^2
+    x = MOI.add_variables(model, 2)
+    MOI.set(model, MOI.UserDefinedFunction(:f, 2), (f,))
+    obj_f = MOI.ScalarNonlinearFunction(:f, Any[x[1], x[2]])
+    MOI.set(model, MOI.ObjectiveFunction{typeof(obj_f)}(), obj_f)
+    MOI.optimize!(model)
+    @test MOI.get(model, MOI.TerminationStatus()) == MOI.LOCALLY_SOLVED
 end
 
 end

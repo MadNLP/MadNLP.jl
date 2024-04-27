@@ -201,24 +201,25 @@ function eval_sparse_gradient(
     f::MOI.ScalarQuadraticFunction{T},
     x::Vector{T},
     p::Dict{Int64,T},
+    adj::T,
 )::Int where {T}
     i = 0
     for term in f.affine_terms
         if !_is_parameter(term.variable)
             i += 1
-            ∇f[i] = term.coefficient
+            ∇f[i] += term.coefficient * adj
         end
     end
     for term in f.quadratic_terms
         if !_is_parameter(term.variable_1)
             v = _value(term.variable_2, x, p)
             i += 1
-            ∇f[i] = term.coefficient * v
+            ∇f[i] += term.coefficient * v * adj
         end
         if term.variable_1 != term.variable_2 && !_is_parameter(term.variable_2)
             v = _value(term.variable_1, x, p)
             i += 1
-            ∇f[i] = term.coefficient * v
+            ∇f[i] += term.coefficient * v * adj
         end
     end
     return i
@@ -229,12 +230,13 @@ function eval_sparse_gradient(
     f::MOI.ScalarAffineFunction{T},
     x::Vector{T},
     p::Dict{Int64,T},
+    adj::T,
 )::Int where {T}
     i = 0
     for term in f.terms
         if !_is_parameter(term.variable)
             i += 1
-            ∇f[i] = term.coefficient
+            ∇f[i] += term.coefficient * adj
         end
     end
     return i
@@ -508,11 +510,24 @@ function MOI.eval_constraint_jacobian(
     x::AbstractVector{T},
 ) where {T}
     i = 1
+    fill!(J, zero(T))
     for constraint in block.constraints
         ∇f = view(J, i:length(J))
-        i += eval_sparse_gradient(∇f, constraint, x, block.parameters)
+        i += eval_sparse_gradient(∇f, constraint, x, block.parameters, one(T))
     end
     return i
+end
+
+function MOI.eval_constraint_jacobian_transpose_product(
+    block::QPBlockData{T},
+    Jtv::AbstractVector{T},
+    x::AbstractVector{T},
+    v::AbstractVector{T},
+) where {T}
+    for (i, constraint) in enumerate(block.constraints)
+        eval_sparse_gradient(∇f, constraint, x, block.parameters, v[i])
+    end
+    return Jtv
 end
 
 function MOI.hessian_lagrangian_structure(block::QPBlockData)
