@@ -133,20 +133,21 @@ function eval_dense_gradient(
     f::MOI.ScalarQuadraticFunction{T},
     x::Vector{T},
     p::Dict{Int64,T},
+    adj::T,
 )::Nothing where {T}
     for term in f.affine_terms
         if !_is_parameter(term.variable)
-            ∇f[term.variable.value] += term.coefficient
+            ∇f[term.variable.value] += term.coefficient * adj
         end
     end
     for term in f.quadratic_terms
         if !_is_parameter(term.variable_1)
             v = _value(term.variable_2, x, p)
-            ∇f[term.variable_1.value] += term.coefficient * v
+            ∇f[term.variable_1.value] += term.coefficient * v * adj
         end
         if term.variable_1 != term.variable_2 && !_is_parameter(term.variable_2)
             v = _value(term.variable_1, x, p)
-            ∇f[term.variable_2.value] += term.coefficient * v
+            ∇f[term.variable_2.value] += term.coefficient * v * adj
         end
     end
     return
@@ -157,10 +158,11 @@ function eval_dense_gradient(
     f::MOI.ScalarAffineFunction{T},
     x::Vector{T},
     p::Dict{Int64,T},
+    adj::T,
 )::Nothing where {T}
     for term in f.terms
         if !_is_parameter(term.variable)
-            ∇f[term.variable.value] += term.coefficient
+            ∇f[term.variable.value] += term.coefficient * adj
         end
     end
     return
@@ -201,25 +203,24 @@ function eval_sparse_gradient(
     f::MOI.ScalarQuadraticFunction{T},
     x::Vector{T},
     p::Dict{Int64,T},
-    adj::T,
 )::Int where {T}
     i = 0
     for term in f.affine_terms
         if !_is_parameter(term.variable)
             i += 1
-            ∇f[i] += term.coefficient * adj
+            ∇f[i] = term.coefficient
         end
     end
     for term in f.quadratic_terms
         if !_is_parameter(term.variable_1)
             v = _value(term.variable_2, x, p)
             i += 1
-            ∇f[i] += term.coefficient * v * adj
+            ∇f[i] = term.coefficient * v
         end
         if term.variable_1 != term.variable_2 && !_is_parameter(term.variable_2)
             v = _value(term.variable_1, x, p)
             i += 1
-            ∇f[i] += term.coefficient * v * adj
+            ∇f[i] = term.coefficient * v
         end
     end
     return i
@@ -230,13 +231,12 @@ function eval_sparse_gradient(
     f::MOI.ScalarAffineFunction{T},
     x::Vector{T},
     p::Dict{Int64,T},
-    adj::T,
 )::Int where {T}
     i = 0
     for term in f.terms
         if !_is_parameter(term.variable)
             i += 1
-            ∇f[i] += term.coefficient * adj
+            ∇f[i] = term.coefficient
         end
     end
     return i
@@ -481,7 +481,7 @@ function MOI.eval_objective_gradient(
     x::AbstractVector{T},
 ) where {T}
     ∇f .= zero(T)
-    eval_dense_gradient(∇f, block.objective, x, block.parameters)
+    eval_dense_gradient(∇f, block.objective, x, block.parameters, one(T))
     return
 end
 
@@ -513,7 +513,7 @@ function MOI.eval_constraint_jacobian(
     fill!(J, zero(T))
     for constraint in block.constraints
         ∇f = view(J, i:length(J))
-        i += eval_sparse_gradient(∇f, constraint, x, block.parameters, one(T))
+        i += eval_sparse_gradient(∇f, constraint, x, block.parameters)
     end
     return i
 end
@@ -525,7 +525,7 @@ function MOI.eval_constraint_jacobian_transpose_product(
     v::AbstractVector{T},
 ) where {T}
     for (i, constraint) in enumerate(block.constraints)
-        eval_sparse_gradient(∇f, constraint, x, block.parameters, v[i])
+        eval_dense_gradient(Jtv, constraint, x, block.parameters, v[i])
     end
     return Jtv
 end
