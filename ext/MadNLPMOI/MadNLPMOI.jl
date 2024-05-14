@@ -492,15 +492,6 @@ function MOI.set(
     return
 end
 
-### ListOfSupportedNonlinearOperators
-
-function MOI.get(model::Optimizer, attr::MOI.ListOfSupportedNonlinearOperators)
-    if model.nlp_model === nothing
-        model.nlp_model = MOI.Nonlinear.Model()
-    end
-    return MOI.get(model.nlp_model, attr)
-end
-
 ### UserDefinedFunction
 
 MOI.supports(model::Optimizer, ::MOI.UserDefinedFunction) = true
