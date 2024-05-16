@@ -1,4 +1,18 @@
 # Release notes
+## v0.8.2 (May 15th, 2024)
+### Bug Fixes
+- [MOI] fix eval_constraint_jacobian_product (#337)
+- [MOI] Add support for nonlinear problems without Hessian (#322)
+- [MadNLPGPU] Bug fix for empty Hessian (#326)
+
+### New feature
+- [LinearSolvers] Add support for LDL factorization in CHOLMOD (#321)
+- Add an ordering for cuDSS (#317)
+
+### Performance and maintenance
+- Reexport MadNLP from MadNLP/libs (#325)
+- Use GH Action Julia cache (#339)
+- [MAdNLPMumps] sarrays removed (#328)
 
 ## v0.8.1 (Apr 9th, 2024)
 ### Bug Fixes

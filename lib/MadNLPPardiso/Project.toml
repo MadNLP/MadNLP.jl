@@ -1,6 +1,6 @@
 name = "MadNLPPardiso"
 uuid = "312ee924-cb12-49df-b284-7304c3902fc0"
-version = "0.3.3"
+version = "0.3.4"
 
 [deps]
 MadNLP = "2621e9c9-9eb4-46b1-8089-e8c72242dfb6"
