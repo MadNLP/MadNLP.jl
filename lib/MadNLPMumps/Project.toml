@@ -1,6 +1,6 @@
 name = "MadNLPMumps"
 uuid = "3b83494e-c0a4-4895-918b-9157a7a085a1"
-version = "0.4.0"
+version = "0.4.1"
 
 [deps]
 MUMPS_seq_jll = "d7ed1dd3-d0ae-5e8e-bfb4-87a502085b8d"
