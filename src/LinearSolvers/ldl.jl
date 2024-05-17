@@ -1,6 +1,6 @@
 @kwdef mutable struct LDLFactorizationsOptions <: AbstractOptions
 end
-const LDLF = NLPModels.LinearOperators.LDLFactorizations
+const LDLF = LDLFactorizations
 
 mutable struct LDLSolver{T} <: AbstractLinearSolver{T}
     inner::LDLF.LDLFactorization{T, Int32}
