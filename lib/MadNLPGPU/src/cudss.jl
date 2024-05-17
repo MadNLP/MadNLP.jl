@@ -6,6 +6,7 @@ import SparseArrays
     cudss_algorithm::MadNLP.LinearFactorization = MadNLP.LDL
     ordering::ORDERING = DEFAULT_ORDERING
     perm::Vector{Cint} = Cint[]
+    ir::Int = 0
 end
 
 mutable struct CUDSSSolver{T} <: MadNLP.AbstractLinearSolver{T}
@@ -62,6 +63,7 @@ function CUDSSSolver(
         end
         CUDSS.cudss_set(solver, "user_perm", opt.perm)
     end
+    (opt.ir > 0) && CUDSS.cudss_set(solver, "ir_n_steps", opt.ir)
 
     x_gpu = CUDA.zeros(T, n)
     b_gpu = CUDA.zeros(T, n)
