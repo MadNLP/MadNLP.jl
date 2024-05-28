@@ -1,5 +1,4 @@
 import CUDSS
-import SparseArrays
 
 @kwdef mutable struct CudssSolverOptions <: MadNLP.AbstractOptions
     # Use LDLᵀ by default in CUDSS as Cholesky can lead to undefined behavior.
@@ -36,11 +35,11 @@ function CUDSSSolver(
     end
 
     matrix = CUDSS.CudssMatrix(
-        CUSPARSE.CuSparseMatrixCSR(csc.colPtr, csc.rowVal, csc.nzVal, csc.dims), 
+        CUSPARSE.CuSparseMatrixCSR(csc.colPtr, csc.rowVal, csc.nzVal, csc.dims),
         structure,
         view
     )
-    
+
     # TODO: pass config options here.
     config = CUDSS.CudssConfig()
     data = CUDSS.CudssData()
@@ -48,12 +47,12 @@ function CUDSSSolver(
 
     if opt.ordering != DEFAULT_ORDERING
         if opt.ordering == METIS_ORDERING
-            A = SparseArrays.SparseMatrixCSC(csc)
+            A = SparseMatrixCSC(csc)
             A = A + A' - LinearAlgebra.Diagonal(A)
             G = Metis.graph(A, check_hermitian=false)
             opt.perm, _ = Metis.permutation(G)
         elseif opt.ordering == AMD_ORDERING
-            A = SparseArrays.SparseMatrixCSC(csc)
+            A = SparseMatrixCSC(csc)
             opt.perm = AMD.amd(A)
         elseif opt.ordering == USER_ORDERING
             (!isempty(opt.perm) && isperm(opt.perm)) || error("The vector opt.perm is not a valid permutation.")
@@ -65,7 +64,7 @@ function CUDSSSolver(
 
     x_gpu = CUDA.zeros(T, n)
     b_gpu = CUDA.zeros(T, n)
-    
+
     CUDSS.cudss("analysis", solver, x_gpu, b_gpu)
 
     return CUDSSSolver(
@@ -78,7 +77,7 @@ end
 
 function MadNLP.factorize!(M::CUDSSSolver)
     # copyto!(M.full.nzVal, M.tril_to_full_view)
-    CUDSS.cudss_set(M.inner.matrix, SparseArrays.nonzeros(M.tril))
+    CUDSS.cudss_set(M.inner.matrix, nonzeros(M.tril))
     CUDSS.cudss("factorization", M.inner, M.x_gpu, M.b_gpu)
     synchronize(CUDABackend())
     return M

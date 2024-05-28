@@ -1,6 +1,8 @@
 module MadNLPGPU
 
 import LinearAlgebra
+import SparseArrays: SparseMatrixCSC, nonzeros
+import LinearAlgebra: Symmetric
 # CUDA
 import CUDA: CUDA, CUSPARSE, CUBLAS, CUSOLVER, CuVector, CuMatrix, CuArray, R_64F,
     has_cuda, @allowscalar, runtime_version, CUDABackend
@@ -25,17 +27,12 @@ import MadNLP:
 # AMD and Metis
 import AMD, Metis
 
-symul!(y, A, x::CuVector{T}, α = 1., β = 0.) where T = CUBLAS.symv!('L', T(α), A, x, T(β), y)
-MadNLP._ger!(alpha::Number, x::CuVector{T}, y::CuVector{T}, A::CuMatrix{T}) where T = CUBLAS.ger!(alpha, x, y, A)
-function MadNLP._madnlp_unsafe_wrap(vec::VT, n, shift=1) where {T, VT <: CuVector{T}}
-    return view(vec,shift:shift+n-1)
-end
-
-include("kernels.jl")
-include("interface.jl")
-include("lapackgpu.jl")
-include("cusolverrf.jl")
-include("cudss.jl")
+include("utils.jl")
+include("KKT/dense.jl")
+include("KKT/sparse.jl")
+include("LinearSolvers/lapackgpu.jl")
+include("LinearSolvers/cusolverrf.jl")
+include("LinearSolvers/cudss.jl")
 
 # option preset
 function MadNLP.MadNLPOptions(
@@ -46,7 +43,7 @@ function MadNLP.MadNLPOptions(
     linear_solver = dense_callback ? LapackGPUSolver : CUDSSSolver,
     tol = MadNLP.get_tolerance(T,kkt_system),
     ) where {T, VT <: CuVector{T}}
-    
+
     return MadNLP.MadNLPOptions(
         tol = tol,
         callback = callback,
@@ -55,7 +52,7 @@ function MadNLP.MadNLPOptions(
     )
 end
 
-export LapackGPUSolver
+export LapackGPUSolver, CuCholeskySolver, RFSolver
 
 # re-export MadNLP, including deprecated names
 for name in names(MadNLP, all=true)
