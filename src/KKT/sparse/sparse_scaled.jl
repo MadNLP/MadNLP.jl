@@ -1,10 +1,10 @@
 """
-    SparseKKTSystem{T, VT, MT, QN} <: AbstractReducedKKTSystem{T, VT, MT, QN}
+    ScaledSparseKKTSystem{T, VT, MT, QN} <: AbstractReducedKKTSystem{T, VT, MT, QN}
 
 Implement the [`AbstractReducedKKTSystem`](@ref) in sparse COO format.
 
 """
-struct SparseKKTSystem{T, VT, MT, QN, LS, VI, VI32} <: AbstractReducedKKTSystem{T, VT, MT, QN}
+struct ScaledSparseKKTSystem{T, VT, MT, QN, LS, VI, VI32} <: AbstractReducedKKTSystem{T, VT, MT, QN}
     hess::VT
     jac_callback::VT
     jac::VT
@@ -38,12 +38,12 @@ end
 
 
 """
-    SparseUnreducedKKTSystem{T, VT, MT, QN} <: AbstractUnreducedKKTSystem{T, VT, MT, QN}
+    ScaledSparseUnreducedKKTSystem{T, VT, MT, QN} <: AbstractUnreducedKKTSystem{T, VT, MT, QN}
 
 Implement the [`AbstractUnreducedKKTSystem`](@ref) in sparse COO format.
 
 """
-struct SparseUnreducedKKTSystem{T, VT, MT, QN, LS, VI, VI32} <: AbstractUnreducedKKTSystem{T, VT, MT, QN}
+struct ScaledSparseUnreducedKKTSystem{T, VT, MT, QN, LS, VI, VI32} <: AbstractUnreducedKKTSystem{T, VT, MT, QN}
     hess::VT
     jac_callback::VT
     jac::VT
@@ -83,12 +83,12 @@ struct SparseUnreducedKKTSystem{T, VT, MT, QN, LS, VI, VI32} <: AbstractUnreduce
 end
 
 """
-    SparseCondensedKKTSystem{T, VT, MT, QN} <: AbstractCondensedKKTSystem{T, VT, MT, QN}
+    ScaledSparseCondensedKKTSystem{T, VT, MT, QN} <: AbstractCondensedKKTSystem{T, VT, MT, QN}
 
 Implement the [`AbstractCondensedKKTSystem`](@ref) in sparse COO format.
 
 """
-struct SparseCondensedKKTSystem{T, VT, MT, QN, LS, VI, VI32, VTu1, VTu2, EXT} <: AbstractCondensedKKTSystem{T, VT, MT, QN}
+struct ScaledSparseCondensedKKTSystem{T, VT, MT, QN, LS, VI, VI32, VTu1, VTu2, EXT} <: AbstractCondensedKKTSystem{T, VT, MT, QN}
     # Hessian
     hess::VT
     hess_raw::SparseMatrixCOO{T,Int32,VT, VI32}
@@ -136,62 +136,19 @@ struct SparseCondensedKKTSystem{T, VT, MT, QN, LS, VI, VI32, VTu1, VTu2, EXT} <:
 end
 
 # Template to dispatch on sparse representation
-const AbstractSparseKKTSystem{T, VT, MT, QN} = Union{
-    SparseKKTSystem{T, VT, MT, QN},
-    SparseCondensedKKTSystem{T, VT, MT, QN},
-    SparseUnreducedKKTSystem{T, VT, MT, QN},
+const AbstractScaledSparseKKTSystem{T, VT, MT, QN} = Union{
+    ScaledSparseKKTSystem{T, VT, MT, QN},
+    ScaledSparseCondensedKKTSystem{T, VT, MT, QN},
+    ScaledSparseUnreducedKKTSystem{T, VT, MT, QN},
 }
 
 #=
-    Generic sparse methods
-=#
-function build_hessian_structure(cb::SparseCallback, ::Type{<:ExactHessian})
-    hess_I = create_array(cb, Int32, cb.nnzh)
-    hess_J = create_array(cb, Int32, cb.nnzh)
-    _hess_sparsity_wrapper!(cb,hess_I,hess_J)
-    return hess_I, hess_J
-end
-# NB. Quasi-Newton methods require only the sparsity pattern
-#     of the diagonal term to store the term ξ I.
-function build_hessian_structure(cb::SparseCallback, ::Type{<:AbstractQuasiNewton})
-    hess_I = collect(Int32, 1:cb.nvar)
-    hess_J = collect(Int32, 1:cb.nvar)
-    return hess_I, hess_J
-end
-
-function jtprod!(y::AbstractVector, kkt::AbstractSparseKKTSystem, x::AbstractVector)
-    mul!(y, kkt.jac_com', x)
-end
-
-get_jacobian(kkt::AbstractSparseKKTSystem) = kkt.jac_callback
-
-nnz_jacobian(kkt::AbstractSparseKKTSystem) = nnz(kkt.jac_raw)
-
-function compress_jacobian!(kkt::AbstractSparseKKTSystem)
-    ns = length(kkt.ind_ineq)
-    kkt.jac[end-ns+1:end] .= -1.0
-    transfer!(kkt.jac_com, kkt.jac_raw, kkt.jac_csc_map)
-end
-
-function compress_jacobian!(kkt::AbstractSparseKKTSystem{T, VT, MT}) where {T, VT, MT<:Matrix{T}}
-    ns = length(kkt.ind_ineq)
-    kkt.jac[end-ns+1:end] .= -1.0
-    copyto!(kkt.jac_com, kkt.jac_raw)
-end
-
-function compress_hessian!(kkt::AbstractSparseKKTSystem)
-    transfer!(kkt.hess_com, kkt.hess_raw, kkt.hess_csc_map)
-end
-
-
-
-#=
-    SparseKKTSystem
+    ScaledSparseKKTSystem
 =#
 
 # Build KKT system directly from SparseCallback
 function create_kkt_system(
-    ::Type{SparseKKTSystem},
+    ::Type{ScaledSparseKKTSystem},
     cb::SparseCallback{T,VT},
     ind_cons,
     linear_solver::Type;
@@ -282,7 +239,7 @@ function create_kkt_system(
         aug_com; opt = opt_linear_solver
     )
 
-    return SparseKKTSystem(
+    return ScaledSparseKKTSystem(
         hess, jac_callback, jac, quasi_newton, reg, pr_diag, du_diag,
         l_diag, u_diag, l_lower, u_lower,
         aug_raw, aug_com, aug_csc_map,
@@ -294,15 +251,15 @@ function create_kkt_system(
 
 end
 
-num_variables(kkt::SparseKKTSystem) = length(kkt.pr_diag)
+num_variables(kkt::ScaledSparseKKTSystem) = length(kkt.pr_diag)
 
 
 #=
-    SparseUnreducedKKTSystem
+    ScaledSparseUnreducedKKTSystem
 =#
 
 function create_kkt_system(
-    ::Type{SparseUnreducedKKTSystem},
+    ::Type{ScaledSparseUnreducedKKTSystem},
     cb::SparseCallback{T,VT},
     ind_cons,
     linear_solver::Type;
@@ -404,7 +361,7 @@ function create_kkt_system(
     hess_com, hess_csc_map = coo_to_csc(hess_raw)
 
     _linear_solver = linear_solver(aug_com; opt = opt_linear_solver)
-    return SparseUnreducedKKTSystem(
+    return ScaledSparseUnreducedKKTSystem(
         hess, jac_callback, jac, quasi_newton, reg, pr_diag, du_diag,
         l_diag, u_diag, l_lower, u_lower, l_lower_aug, u_lower_aug,
         aug_raw, aug_com, aug_csc_map,
@@ -415,46 +372,46 @@ function create_kkt_system(
     )
 end
 
-function initialize!(kkt::AbstractSparseKKTSystem{T}) where T
-    fill!(kkt.reg, one(T))
-    fill!(kkt.pr_diag, one(T))
-    fill!(kkt.du_diag, zero(T))
-    fill!(kkt.hess, zero(T))
-    fill!(kkt.l_lower, zero(T))
-    fill!(kkt.u_lower, zero(T))
-    fill!(kkt.l_diag, one(T))
-    fill!(kkt.u_diag, one(T))
-    fill!(nonzeros(kkt.hess_com), zero(T)) # so that mul! in the initial primal-dual solve has no effect
+function initialize!(kkt::AbstractScaledSparseKKTSystem)
+    fill!(kkt.reg, 1.0)
+    fill!(kkt.pr_diag, 1.0)
+    fill!(kkt.du_diag, 0.0)
+    fill!(kkt.hess, 0.0)
+    fill!(kkt.l_lower, 0.0)
+    fill!(kkt.u_lower, 0.0)
+    fill!(kkt.l_diag, 1.0)
+    fill!(kkt.u_diag, 1.0)
+    fill!(kkt.hess_com.nzval, 0.) # so that mul! in the initial primal-dual solve has no effect
 end
 
-function initialize!(kkt::SparseUnreducedKKTSystem{T}) where T
-    fill!(kkt.reg, one(T))
-    fill!(kkt.pr_diag, one(T))
-    fill!(kkt.du_diag, zero(T))
-    fill!(kkt.hess, zero(T))
-    fill!(kkt.l_lower, zero(T))
-    fill!(kkt.u_lower, zero(T))
-    fill!(kkt.l_diag, one(T))
-    fill!(kkt.u_diag, one(T))
-    fill!(kkt.l_lower_aug, zero(T))
-    fill!(kkt.u_lower_aug, zero(T))
-    fill!(nonzeros(kkt.hess_com), zero(T)) # so that mul! in the initial primal-dual solve has no effect
+function initialize!(kkt::SparseScaledUnreducedKKTSystem)
+    fill!(kkt.reg, 1.0)
+    fill!(kkt.pr_diag, 1.0)
+    fill!(kkt.du_diag, 0.0)
+    fill!(kkt.hess, 0.0)
+    fill!(kkt.l_lower, 0.0)
+    fill!(kkt.u_lower, 0.0)
+    fill!(kkt.l_diag, 1.0)
+    fill!(kkt.u_diag, 1.0)
+    fill!(kkt.l_lower_aug, 0.0)
+    fill!(kkt.u_lower_aug, 0.0)
+    fill!(kkt.hess_com.nzval, 0.) # so that mul! in the initial primal-dual solve has no effect
 end
 
-num_variables(kkt::SparseUnreducedKKTSystem) = length(kkt.pr_diag)
+num_variables(kkt::SparseScaledUnreducedKKTSystem) = length(kkt.pr_diag)
 
-function is_inertia_correct(kkt::SparseUnreducedKKTSystem, num_pos, num_zero, num_neg)
+function is_inertia_correct(kkt::SparseScaledUnreducedKKTSystem, num_pos, num_zero, num_neg)
     n, nlb, nub = num_variables(kkt), length(kkt.ind_lb), length(kkt.ind_ub)
     return (num_zero == 0) && (num_pos == n + nlb + nub)
 end
 
 #=
-    SparseCondensedKKTSystem
+    ScaledSparseCondensedKKTSystem
 =#
 
 # Build KKT system directly from SparseCallback
 function create_kkt_system(
-    ::Type{SparseCondensedKKTSystem},
+    ::Type{ScaledSparseCondensedKKTSystem},
     cb::SparseCallback{T,VT},
     ind_cons,
     linear_solver::Type;
@@ -467,7 +424,7 @@ function create_kkt_system(
     n_slack = length(ind_ineq)
 
     if n_slack != m
-        error("SparseCondensedKKTSystem does not support equality constrained NLPs.")
+        error("ScaledSparseCondensedKKTSystem does not support equality constrained NLPs.")
     end
 
     # Evaluate sparsity pattern
@@ -511,14 +468,14 @@ function create_kkt_system(
     )
     jt_csc, jt_csc_map = coo_to_csc(jt_coo)
     hess_com, hess_csc_map = coo_to_csc(hess_raw)
-
+    
     aug_com, dptr, hptr, jptr = build_condensed_aug_symbolic(
         hess_com,
         jt_csc
     )
     _linear_solver = linear_solver(aug_com; opt = opt_linear_solver)
     ext = get_sparse_condensed_ext(VT, hess_com, jptr, jt_csc_map, hess_csc_map)
-    return SparseCondensedKKTSystem(
+    return ScaledSparseCondensedKKTSystem(
         hess, hess_raw, hess_com, hess_csc_map,
         jac, jt_coo, jt_csc, jt_csc_map,
         quasi_newton,
@@ -532,25 +489,20 @@ function create_kkt_system(
     )
 end
 
+num_variables(kkt::ScaledSparseCondensedKKTSystem) = length(kkt.pr_diag)
 
-get_sparse_condensed_ext(::Type{Vector{T}},args...) where T = nothing
-
-
-num_variables(kkt::SparseCondensedKKTSystem) = length(kkt.pr_diag)
-function is_inertia_correct(kkt::SparseCondensedKKTSystem, num_pos, num_zero, num_neg)
+function is_inertia_correct(kkt::ScaledSparseCondensedKKTSystem, num_pos, num_zero, num_neg)
     return (num_zero == 0) && (num_pos == size(kkt.aug_com, 1))
 end
 
+Base.size(kkt::ScaledSparseCondensedKKTSystem,n::Int) = size(kkt.aug_com,n)
 
-Base.size(kkt::SparseCondensedKKTSystem,n::Int) = size(kkt.aug_com,n)
-
-
-function compress_jacobian!(kkt::SparseCondensedKKTSystem{T, VT, MT}) where {T, VT, MT<:SparseMatrixCSC{T, Int32}}
+function compress_jacobian!(kkt::ScaledSparseCondensedKKTSystem{T, VT, MT}) where {T, VT, MT<:SparseMatrixCSC{T, Int32}}
     ns = length(kkt.ind_ineq)
     transfer!(kkt.jt_csc, kkt.jt_coo, kkt.jt_csc_map)
 end
 
-function jtprod!(y::AbstractVector, kkt::SparseCondensedKKTSystem, x::AbstractVector)
+function jtprod!(y::AbstractVector, kkt::ScaledSparseCondensedKKTSystem, x::AbstractVector)
     n = size(kkt.hess_com, 1)
     m = size(kkt.jt_csc, 2)
 
@@ -558,50 +510,7 @@ function jtprod!(y::AbstractVector, kkt::SparseCondensedKKTSystem, x::AbstractVe
     y[size(kkt.jt_csc,1)+1:end] .= -x
 end
 
-function _sym_length(Jt)
-    len = 0
-    for i=1:size(Jt,2)
-        n = Jt.colptr[i+1] - Jt.colptr[i]
-        len += div(n^2 + n, 2)
-    end
-    return len
-end
-
-function _build_condensed_aug_symbolic_hess(H, sym, sym2)
-    for i in 1:size(H,2)
-        for j in H.colptr[i]:H.colptr[i+1]-1
-            c = H.rowval[j]
-            sym[j] = (0,j,0)
-            sym2[j] = (c,i)
-        end
-    end
-end
-
-function _build_condensed_aug_symbolic_jt(Jt, sym, sym2)
-
-    cnt = 0
-    for i in 1:size(Jt,2)
-        for j in Jt.colptr[i]:Jt.colptr[i+1]-1
-            for k in j:Jt.colptr[i+1]-1
-                c1 = Jt.rowval[j]
-                c2 = Jt.rowval[k]
-                sym[cnt+=1] = (i,j,k)
-                sym2[cnt] = (c2,c1)
-            end
-        end
-    end
-end
-
-function getptr(array; by = (x,y)->x != y)
-    bitarray = similar(array, Bool, length(array)+1)
-    fill!(bitarray, true)
-    bitarray[2:end-1] .= by.(@view(array[1:end-1]),  @view(array[2:end]))
-    findall(bitarray)
-end
-
-nzval(H) = H.nzval
-
-@inbounds function build_condensed_aug_symbolic(H::AbstractSparseMatrix{Tv,Ti}, Jt) where {Tv, Ti}
+function build_condensed_aug_symbolic(H::AbstractScaledSparseMatrix{Tv,Ti}, Jt) where {Tv, Ti}
     nnzjtsj = _sym_length(Jt)
 
     sym = similar(nzval(H), Tuple{Int,Int,Int},
@@ -700,67 +609,28 @@ nzval(H) = H.nzval
     return aug_com, dptr, hptr, jptr
 end
 
-function _get_sparse_csc(dims, colptr, rowval, nzval)
-    SparseMatrixCSC(
-        dims...,
-        colptr,
-        rowval,
-        nzval
-    )
-end
-
-function _first_and_last_col(sym2,ptr2)
-    first= sym2[1][2]
-    last = sym2[ptr2[end]][2]
-    return (first, last)
-end
-
-function _set_colptr!(colptr, ptr2, sym2, guide)
-    for i in @view(ptr2[2:end])
-
-        (~,prevcol) = sym2[i-1]
-        (row,col) = sym2[i]
-
-        fill!(@view(colptr[prevcol+1:col]), guide[i])
-    end
-end
-
-@inbounds function _build_condensed_aug_coord!(aug_com::SparseMatrixCSC{Tv,Ti}, pr_diag, H, Jt, diag_buffer, dptr, hptr, jptr) where {Tv, Ti}
-    fill!(aug_com.nzval, zero(Tv))
-
-    @simd for idx in eachindex(hptr)
-        i,j = hptr[idx]
-        aug_com.nzval[i] += H.nzval[j]
-    end
-
-    @simd for idx in eachindex(dptr)
-        i,j = dptr[idx]
-        aug_com.nzval[i] += pr_diag[j]
-    end
-
-    @simd for idx in eachindex(jptr)
-        (i,(j,k,l)) = jptr[idx]
-        aug_com.nzval[i] += diag_buffer[j] * Jt.nzval[k] * Jt.nzval[l]
-    end
-end
-
-function build_condensed_aug_coord!(kkt::AbstractCondensedKKTSystem{T,VT,MT}) where {T, VT, MT <: SparseMatrixCSC{T}}
+function build_condensed_aug_coord!(kkt::AbstractScaledCondensedKKTSystem{T,VT,MT}) where {T, VT, MT <: SparseMatrixCSC{T}}
     _build_condensed_aug_coord!(
         kkt.aug_com, kkt.pr_diag, kkt.hess_com, kkt.jt_csc, kkt.diag_buffer,
         kkt.dptr, kkt.hptr, kkt.jptr
     )
 end
 
-
-function build_kkt!(kkt::SparseKKTSystem)
+function build_kkt!(kkt::ScaledSparseKKTSystem)
+    # nz = length(kkt.aug_raw)
+    # for k = 1:nz
+    #     row = kkt.aug_raw.I[k]
+    #     col = kkt.aug_raw.J[k]
+    #     kkt.aug_raw.V[k] *= sqrt(kkt.l_diag[row]) * sqrt(kkt.l_diag[col])
+    # end
     transfer!(kkt.aug_com, kkt.aug_raw, kkt.aug_csc_map)
 end
 
-function build_kkt!(kkt::SparseUnreducedKKTSystem)
+function build_kkt!(kkt::ScaledSparseUnreducedKKTSystem)
     transfer!(kkt.aug_com, kkt.aug_raw, kkt.aug_csc_map)
 end
 
-function build_kkt!(kkt::SparseCondensedKKTSystem)
+function build_kkt!(kkt::ScaledSparseCondensedKKTSystem)
 
     n = size(kkt.hess_com, 1)
     m = size(kkt.jt_csc, 2)
@@ -774,4 +644,4 @@ function build_kkt!(kkt::SparseCondensedKKTSystem)
     build_condensed_aug_coord!(kkt)
 end
 
-get_jacobian(kkt::SparseCondensedKKTSystem) = kkt.jac
+get_jacobian(kkt::ScaledSparseCondensedKKTSystem) = kkt.jac
