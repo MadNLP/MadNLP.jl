@@ -1,147 +1,3 @@
-"""
-    ScaledSparseKKTSystem{T, VT, MT, QN} <: AbstractReducedKKTSystem{T, VT, MT, QN}
-
-Implement the [`AbstractReducedKKTSystem`](@ref) in sparse COO format.
-
-"""
-struct ScaledSparseKKTSystem{T, VT, MT, QN, LS, VI, VI32} <: AbstractReducedKKTSystem{T, VT, MT, QN}
-    hess::VT
-    jac_callback::VT
-    jac::VT
-    quasi_newton::QN
-    reg::VT
-    pr_diag::VT
-    du_diag::VT
-    l_diag::VT
-    u_diag::VT
-    l_lower::VT
-    u_lower::VT
-    # Augmented system
-    aug_raw::SparseMatrixCOO{T,Int32,VT, VI32}
-    aug_com::MT
-    aug_csc_map::Union{Nothing, VI}
-    # Hessian
-    hess_raw::SparseMatrixCOO{T,Int32,VT, VI32}
-    hess_com::MT
-    hess_csc_map::Union{Nothing, VI}
-    # Jacobian
-    jac_raw::SparseMatrixCOO{T,Int32,VT, VI32}
-    jac_com::MT
-    jac_csc_map::Union{Nothing, VI}
-    # LinearSolver
-    linear_solver::LS
-    # Info
-    ind_ineq::VI
-    ind_lb::VI
-    ind_ub::VI
-end
-
-
-"""
-    ScaledSparseUnreducedKKTSystem{T, VT, MT, QN} <: AbstractUnreducedKKTSystem{T, VT, MT, QN}
-
-Implement the [`AbstractUnreducedKKTSystem`](@ref) in sparse COO format.
-
-"""
-struct ScaledSparseUnreducedKKTSystem{T, VT, MT, QN, LS, VI, VI32} <: AbstractUnreducedKKTSystem{T, VT, MT, QN}
-    hess::VT
-    jac_callback::VT
-    jac::VT
-    quasi_newton::QN
-    reg::VT
-    pr_diag::VT
-    du_diag::VT
-    l_diag::VT
-    u_diag::VT
-    l_lower::VT
-    u_lower::VT
-    l_lower_aug::VT
-    u_lower_aug::VT
-
-    # Augmented system
-    aug_raw::SparseMatrixCOO{T,Int32,VT, VI32}
-    aug_com::MT
-    aug_csc_map::Union{Nothing, VI}
-
-    # Hessian
-    hess_raw::SparseMatrixCOO{T,Int32,VT, VI32}
-    hess_com::MT
-    hess_csc_map::Union{Nothing, VI}
-
-    # Jacobian
-    jac_raw::SparseMatrixCOO{T,Int32,VT, VI32}
-    jac_com::MT
-    jac_csc_map::Union{Nothing, VI}
-
-    # LinearSolver
-    linear_solver::LS
-
-    # Info
-    ind_ineq::VI
-    ind_lb::VI
-    ind_ub::VI
-end
-
-"""
-    ScaledSparseCondensedKKTSystem{T, VT, MT, QN} <: AbstractCondensedKKTSystem{T, VT, MT, QN}
-
-Implement the [`AbstractCondensedKKTSystem`](@ref) in sparse COO format.
-
-"""
-struct ScaledSparseCondensedKKTSystem{T, VT, MT, QN, LS, VI, VI32, VTu1, VTu2, EXT} <: AbstractCondensedKKTSystem{T, VT, MT, QN}
-    # Hessian
-    hess::VT
-    hess_raw::SparseMatrixCOO{T,Int32,VT, VI32}
-    hess_com::MT
-    hess_csc_map::Union{Nothing, VI}
-
-    # Jacobian
-    jac::VT
-    jt_coo::SparseMatrixCOO{T,Int32,VT, VI32}
-    jt_csc::MT
-    jt_csc_map::Union{Nothing, VI}
-
-    quasi_newton::QN
-    reg::VT
-    pr_diag::VT
-    du_diag::VT
-    l_diag::VT
-    u_diag::VT
-    l_lower::VT
-    u_lower::VT
-
-    # buffer
-    buffer::VT
-    buffer2::VT
-
-    # Augmented system
-    aug_com::MT
-
-    # slack diagonal buffer
-    diag_buffer::VT
-    dptr::VTu1
-    hptr::VTu1
-    jptr::VTu2
-
-    # LinearSolver
-    linear_solver::LS
-
-    # Info
-    ind_ineq::VI
-    ind_lb::VI
-    ind_ub::VI
-
-    # extra
-    ext::EXT
-end
-
-# Template to dispatch on sparse representation
-const AbstractScaledSparseKKTSystem{T, VT, MT, QN} = Union{
-    ScaledSparseKKTSystem{T, VT, MT, QN},
-    ScaledSparseCondensedKKTSystem{T, VT, MT, QN},
-    ScaledSparseUnreducedKKTSystem{T, VT, MT, QN},
-}
-
 #=
     ScaledSparseKKTSystem
 =#
@@ -384,7 +240,7 @@ function initialize!(kkt::AbstractScaledSparseKKTSystem)
     fill!(kkt.hess_com.nzval, 0.) # so that mul! in the initial primal-dual solve has no effect
 end
 
-function initialize!(kkt::SparseScaledUnreducedKKTSystem)
+function initialize!(kkt::ScaledSparseUnreducedKKTSystem)
     fill!(kkt.reg, 1.0)
     fill!(kkt.pr_diag, 1.0)
     fill!(kkt.du_diag, 0.0)
@@ -398,9 +254,9 @@ function initialize!(kkt::SparseScaledUnreducedKKTSystem)
     fill!(kkt.hess_com.nzval, 0.) # so that mul! in the initial primal-dual solve has no effect
 end
 
-num_variables(kkt::SparseScaledUnreducedKKTSystem) = length(kkt.pr_diag)
+num_variables(kkt::ScaledSparseUnreducedKKTSystem) = length(kkt.pr_diag)
 
-function is_inertia_correct(kkt::SparseScaledUnreducedKKTSystem, num_pos, num_zero, num_neg)
+function is_inertia_correct(kkt::ScaledSparseUnreducedKKTSystem, num_pos, num_zero, num_neg)
     n, nlb, nub = num_variables(kkt), length(kkt.ind_lb), length(kkt.ind_ub)
     return (num_zero == 0) && (num_pos == n + nlb + nub)
 end
@@ -508,112 +364,6 @@ function jtprod!(y::AbstractVector, kkt::ScaledSparseCondensedKKTSystem, x::Abst
 
     mul!(view(y, 1:n), kkt.jt_csc, x)
     y[size(kkt.jt_csc,1)+1:end] .= -x
-end
-
-function build_condensed_aug_symbolic(H::AbstractScaledSparseMatrix{Tv,Ti}, Jt) where {Tv, Ti}
-    nnzjtsj = _sym_length(Jt)
-
-    sym = similar(nzval(H), Tuple{Int,Int,Int},
-        size(H,2) + nnz(H) + nnzjtsj
-    )
-    sym2 = similar(nzval(H), Tuple{Int,Int},
-        size(H,2) + nnz(H) + nnzjtsj
-    )
-    dptr = similar(nzval(H), Tuple{Ti,Ti},
-        size(H,2)
-    )
-    hptr = similar(nzval(H), Tuple{Ti,Ti},
-        nnz(H)
-    )
-    jptr = similar(nzval(H), Tuple{Ti,Tuple{Ti,Ti,Ti}},
-        nnzjtsj
-    )
-    colptr = fill!(
-        similar(nzval(H), Ti, size(H,1)+1),
-        one(Tv)
-    )
-
-    n = size(H,2)
-
-    map!(
-        i->(-1,i,0),
-        @view(sym[1:n]),
-        1:size(H,2)
-    )
-    map!(
-        i->(i,i),
-        @view(sym2[1:n]),
-        1:size(H,2)
-    )
-
-    _build_condensed_aug_symbolic_hess(
-        H,
-        @view(sym[n+1:n+nnz(H)]),
-        @view(sym2[n+1:n+nnz(H)])
-    )
-    _build_condensed_aug_symbolic_jt(
-        Jt,
-        @view(sym[n+nnz(H)+1:n+nnz(H) + nnzjtsj]),
-        @view(sym2[n+nnz(H)+1:n+nnz(H)+nnzjtsj])
-    )
-
-    p = sortperm(sym2; by = ((i,j),) -> (j,i))
-    permute!(sym, p)
-    permute!(sym2, p)
-
-    by(x,y) = x != y
-
-    bitarray = similar(sym2, Bool, length(sym2))
-    fill!(bitarray, true)
-    bitarray[2:end] .= by.(@view(sym2[1:end-1]),  @view(sym2[2:end]))
-    guide = cumsum(bitarray)
-
-    b = findall(x->x[1] == -1, sym)
-    dptr = map((x,y)->(Int32(x),Int32(y[2])), @view(guide[b]), @view(sym[b]))
-
-    b = findall(x->x[1] == 0, sym)
-    hptr = map((x,y)->(Int32(x),Int32(y[2])), @view(guide[b]), @view(sym[b]))
-
-    b = findall(x->x[1] != -1 && x[1] != 0, sym)
-    jptr = map((x,y)->(Int32(x),y), @view(guide[b]), @view(sym[b]))
-
-
-    ptr = findall(bitarray)
-    rowval = map(((row,col),)->Int32(row), @view(sym2[ptr]))
-
-    by2(x,y) = x[2] != y[2]
-    bitarray[2:end] .= by2.(@view(sym2[1:end-1]),  @view(sym2[2:end]))
-    ptr2 = findall(bitarray)
-
-    first, last = _first_and_last_col(sym2,ptr2)
-
-    fill!(
-        @view(colptr[1:first]),
-        1
-    )
-
-    _set_colptr!(colptr, ptr2, sym2, guide)
-
-    fill!(
-        @view(colptr[last+1:end]),
-        length(ptr)+1
-    )
-
-    aug_com = _get_sparse_csc(
-        size(H),
-        colptr,
-        rowval,
-        similar(nzval(H), length(ptr))
-    )
-
-    return aug_com, dptr, hptr, jptr
-end
-
-function build_condensed_aug_coord!(kkt::AbstractScaledCondensedKKTSystem{T,VT,MT}) where {T, VT, MT <: SparseMatrixCSC{T}}
-    _build_condensed_aug_coord!(
-        kkt.aug_com, kkt.pr_diag, kkt.hess_com, kkt.jt_csc, kkt.diag_buffer,
-        kkt.dptr, kkt.hptr, kkt.jptr
-    )
 end
 
 function build_kkt!(kkt::ScaledSparseKKTSystem)

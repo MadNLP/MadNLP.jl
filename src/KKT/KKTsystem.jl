@@ -238,6 +238,7 @@ compress_hessian!(kkt::AbstractKKTSystem) = nothing
 
 
 include("rhs.jl")
+include("sparse/sparse_structure.jl")
 include("sparse/sparse_utils.jl")
 include("sparse/sparse.jl")
 include("sparse/sparse_scaled.jl")

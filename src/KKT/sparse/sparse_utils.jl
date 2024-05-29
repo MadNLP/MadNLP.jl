@@ -1,4 +1,3 @@
-
 #=
     Generic sparse methods
 =#
@@ -66,7 +65,7 @@ function compress_hessian!(kkt::AbstractScaledSparseKKTSystem)
     transfer!(kkt.hess_com, kkt.hess_raw, kkt.hess_csc_map)
 end
 
-#-------------------------------------------------------------------------------------
+#-------------------------------------------------------------------------------------#
 
 get_sparse_condensed_ext(::Type{Vector{T}},args...) where T = nothing
 
@@ -155,4 +154,110 @@ function _build_condensed_aug_coord!(aug_com::SparseMatrixCSC{Tv,Ti}, pr_diag, H
         (i,(j,k,l)) = jptr[idx]
         aug_com.nzval[i] += diag_buffer[j] * Jt.nzval[k] * Jt.nzval[l]
     end
+end
+
+function build_condensed_aug_coord!(kkt::AbstractCondensedKKTSystem{T,VT,MT}) where {T, VT, MT <: SparseMatrixCSC{T}}
+    _build_condensed_aug_coord!(
+        kkt.aug_com, kkt.pr_diag, kkt.hess_com, kkt.jt_csc, kkt.diag_buffer,
+        kkt.dptr, kkt.hptr, kkt.jptr
+    )
+end
+
+function build_condensed_aug_symbolic(H::AbstractSparseMatrix{Tv,Ti}, Jt) where {Tv, Ti}
+    nnzjtsj = _sym_length(Jt)
+
+    sym = similar(nzval(H), Tuple{Int,Int,Int},
+        size(H,2) + nnz(H) + nnzjtsj
+    )
+    sym2 = similar(nzval(H), Tuple{Int,Int},
+        size(H,2) + nnz(H) + nnzjtsj
+    )
+    dptr = similar(nzval(H), Tuple{Ti,Ti},
+        size(H,2)
+    )
+    hptr = similar(nzval(H), Tuple{Ti,Ti},
+        nnz(H)
+    )
+    jptr = similar(nzval(H), Tuple{Ti,Tuple{Ti,Ti,Ti}},
+        nnzjtsj
+    )
+    colptr = fill!(
+        similar(nzval(H), Ti, size(H,1)+1),
+        one(Tv)
+    )
+
+    n = size(H,2)
+
+    map!(
+        i->(-1,i,0),
+        @view(sym[1:n]),
+        1:size(H,2)
+    )
+    map!(
+        i->(i,i),
+        @view(sym2[1:n]),
+        1:size(H,2)
+    )
+
+    _build_condensed_aug_symbolic_hess(
+        H,
+        @view(sym[n+1:n+nnz(H)]),
+        @view(sym2[n+1:n+nnz(H)])
+    )
+    _build_condensed_aug_symbolic_jt(
+        Jt,
+        @view(sym[n+nnz(H)+1:n+nnz(H) + nnzjtsj]),
+        @view(sym2[n+nnz(H)+1:n+nnz(H)+nnzjtsj])
+    )
+
+    p = sortperm(sym2; by = ((i,j),) -> (j,i))
+    permute!(sym, p)
+    permute!(sym2, p)
+
+    by(x,y) = x != y
+
+    bitarray = similar(sym2, Bool, length(sym2))
+    fill!(bitarray, true)
+    bitarray[2:end] .= by.(@view(sym2[1:end-1]),  @view(sym2[2:end]))
+    guide = cumsum(bitarray)
+
+    b = findall(x->x[1] == -1, sym)
+    dptr = map((x,y)->(Int32(x),Int32(y[2])), @view(guide[b]), @view(sym[b]))
+
+    b = findall(x->x[1] == 0, sym)
+    hptr = map((x,y)->(Int32(x),Int32(y[2])), @view(guide[b]), @view(sym[b]))
+
+    b = findall(x->x[1] != -1 && x[1] != 0, sym)
+    jptr = map((x,y)->(Int32(x),y), @view(guide[b]), @view(sym[b]))
+
+
+    ptr = findall(bitarray)
+    rowval = map(((row,col),)->Int32(row), @view(sym2[ptr]))
+
+    by2(x,y) = x[2] != y[2]
+    bitarray[2:end] .= by2.(@view(sym2[1:end-1]),  @view(sym2[2:end]))
+    ptr2 = findall(bitarray)
+
+    first, last = _first_and_last_col(sym2,ptr2)
+
+    fill!(
+        @view(colptr[1:first]),
+        1
+    )
+
+    _set_colptr!(colptr, ptr2, sym2, guide)
+
+    fill!(
+        @view(colptr[last+1:end]),
+        length(ptr)+1
+    )
+
+    aug_com = _get_sparse_csc(
+        size(H),
+        colptr,
+        rowval,
+        similar(nzval(H), length(ptr))
+    )
+
+    return aug_com, dptr, hptr, jptr
 end
