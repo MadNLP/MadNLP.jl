@@ -234,8 +234,12 @@ end
 
 compress_hessian!(kkt::AbstractKKTSystem) = nothing
 
-
 include("rhs.jl")
-include("sparse.jl")
-include("dense.jl")
+include("Dense/augmented.jl")
+include("Dense/condensed.jl")
+include("Dense/utils.jl")
+include("Sparse/unreduced.jl")
+include("Sparse/augmented.jl")
+include("Sparse/condensed.jl")
+include("Sparse/utils.jl")
 
