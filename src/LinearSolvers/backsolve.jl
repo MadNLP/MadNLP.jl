@@ -62,12 +62,17 @@ function solve_refine!(
         norm_x = norm(full(x), Inf)
         residual_ratio = norm_w / (min(norm_x, 1e6 * norm_b) + norm_b)
 
+
         if mod(iter, 10)==0
             @debug(iterator.logger,"iter ||res||")
         end
         @debug(iterator.logger, @sprintf("%4i %6.2e", iter, residual_ratio))
         iter += 1
 
+        # Check residual is finite. Otherwise throw an exception.
+        if isnan(residual_ratio)
+            throw(SolveException())
+        end
         if (iter >= iterator.opt.richardson_max_iter) || (residual_ratio < iterator.opt.richardson_tol)
             break
         end

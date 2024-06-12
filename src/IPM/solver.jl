@@ -185,7 +185,6 @@ function solve!(
             solver.status=NOT_ENOUGH_DEGREES_OF_FREEDOM
         elseif e isa LinearSolverException
             solver.status=ERROR_IN_STEP_COMPUTATION;
-            solver.opt.rethrow_error && rethrow(e)
         elseif e isa InterruptException
             solver.status=USER_REQUESTED_STOP
             solver.opt.rethrow_error && rethrow(e)
@@ -216,7 +215,7 @@ function regular!(solver::AbstractMadNLPSolver{T}) where T
         if (solver.cnt.k!=0 && !solver.opt.jacobian_constant)
             eval_jac_wrapper!(solver, solver.kkt, solver.x)
         end
-        
+
         jtprod!(solver.jacl, solver.kkt, solver.y)
         sd = get_sd(solver.y,solver.zl_r,solver.zu_r,T(solver.opt.s_max))
         sc = get_sc(solver.zl_r,solver.zu_r,T(solver.opt.s_max))
