@@ -14,12 +14,12 @@ conditions at the current primal-dual iterate ``(x, s, y, z, ν, w)``.
 
 The associated matrix is
 ```
-[Wₓₓ  0  Aₑ'  Aᵢ'  -I   0 ]  [Δx]
-[ 0   0   0   -I    0  -I ]  [Δs]
-[Aₑ   0   0    0    0   0 ]  [Δy]
-[Aᵢ  -I   0    0    0   0 ]  [Δz]
-[V    0   0    0    X   0 ]  [Δν]
-[0    W   0    0    0   S ]  [Δw]
+[Wₓₓ  0   Aₑ'  Aᵢ' V½  0  ]  [Δx]
+[0    0   0   -I   0   W½ ]  [Δs]
+[Aₑ   0   0    0   0   0  ]  [Δy]
+[Aᵢ  -I   0    0   0   0  ]  [Δz]
+[V½   0   0    0  -X   0  ]  [Δτ]
+[0    W½  0    0   0  -S  ]  [Δρ]
 ```
 with
 * ``Wₓₓ``: Hessian of the Lagrangian.
@@ -29,6 +29,8 @@ with
 * ``S = diag(s)``
 * ``V = diag(ν)``
 * ``W = diag(w)``
+* ``Δτ = -W^{-½}Δν``
+* ``Δρ = -W^{-½}Δw``
 """
 abstract type AbstractUnreducedKKTSystem{T, VT, MT, QN} <: AbstractKKTSystem{T, VT, MT, QN} end
 
@@ -42,7 +44,7 @@ the two last rows associated to the bounds' duals ``(ν, w)``.
 At a primal-dual iterate ``(x, s, y, z)``, the matrix writes
 ```
 [Wₓₓ + Σₓ   0    Aₑ'   Aᵢ']  [Δx]
-[ 0         Σₛ    0    -I ]  [Δs]
+[0          Σₛ    0    -I ]  [Δs]
 [Aₑ         0     0     0 ]  [Δy]
 [Aᵢ        -I     0     0 ]  [Δz]
 ```
