@@ -1,13 +1,13 @@
 module MadNLPSchwarz
 
 import ..MadNLPGraph:
-    @kwdef, Logger, @debug, @warn, @error,
+    @kwdef, MadNLPLogger, @debug, @warn, @error,
     default_linear_solver,SparseMatrixCSC, SubVector, get_cscsy_view, nnz,
     SymbolicException,FactorizationException,SolveException,InertiaException,
     AbstractOptions, AbstractLinearSolver, set_options!,
     MonolevelPartition, MonolevelStruc, BilevelPartition, BilevelStruc,
     expand!, get_current_V, get_current_size, get_full_size,
-    EmptyLinearSolver, introduce, factorize!, solve!, improve!, is_inertia, inertia,
+    introduce, factorize!, solve!, improve!, is_inertia, inertia,
     set_blas_num_threads, blas_num_threads, @blas_safe_threads, @sprintf
 
 const INPUT_MATRIX_TYPE = :csc
@@ -40,7 +40,7 @@ mutable struct SolverWorker
     q_restricted::AbstractVector{Float64}
 end
 
-mutable struct Solver <: AbstractLinearSolver
+mutable struct Solver{T} <: AbstractLinearSolver{T}
     partition::Union{MonolevelPartition,BilevelPartition}
 
     csc::SparseMatrixCSC{Float64}
@@ -50,13 +50,13 @@ mutable struct Solver <: AbstractLinearSolver
     w::Vector{Float64}
     sws::Vector{SolverWorker}
     opt::Options
-    logger::Logger
+    logger::MadNLPLogger
 end
 
 
 function Solver(csc::SparseMatrixCSC{Float64};
                 option_dict::Dict{Symbol,Any}=Dict(),
-                opt=Options(schwarz_subproblem_solver=default_linear_solver()),logger=Logger(),
+                opt=Options(schwarz_subproblem_solver=default_linear_solver()),logger=MadNLPLogger(),
                 kwargs...)
 
     set_options!(opt,option_dict,kwargs...)
@@ -99,7 +99,7 @@ end
 function SolverWorker(
     partition,csc::SparseMatrixCSC{Float64},inds::Vector{Int},p::Vector{Float64},
     k::Int,max_expand_factor::Int,SubproblemSolverModule::Module,fully_improve_subproblem_solver::Bool,
-    logger::Logger,option_dict::Dict{Symbol,Any})
+    logger::MadNLPLogger,option_dict::Dict{Symbol,Any})
     struc= partition isa MonolevelPartition ?
         MonolevelStruc(partition,k) : BilevelStruc(partition,k)
     overlap_increase_factor =
@@ -110,11 +110,10 @@ function SolverWorker(
     expand!(struc,partition,max_size)
     csc,csc_view = get_cscsy_view(csc,get_current_V(struc),inds=inds)
     if csc.n == 0
-        M = EmptyLinearSolver()
+        # M = EmptyLinearSolver()
         @warn(logger,"empty subproblem at partition $k")
-    else
-        M = SubproblemSolverModule.Solver(csc;option_dict = option_dict,logger=logger)
     end
+    M = SubproblemSolverModule.Solver(csc;option_dict = option_dict,logger=logger)
     fully_improve_subproblem_solver && while improve!(M) end # starts with fully improved
     q = Vector{Float64}(undef,length(get_current_V(struc)))
     q_restricted = view(q,restrictor)
@@ -140,11 +139,12 @@ function improve!(M::Solver)
         M.sws[k].max_size *= M.sws[k].overlap_increase_factor
         expand!(M.sws[k].struc,M.partition,M.sws[k].max_size)
         M.sws[k].csc,M.sws[k].csc_view = get_cscsy_view(M.csc,get_current_V(M.sws[k].struc);inds=M.inds)
-        if M.sws[k].csc.n == 0
-            M.sws[k].M = EmptyLinearSolver()
-        else
-            M.sws[k].M = M.opt.schwarz_subproblem_solver.Solver(M.sws[k].csc;opt=M.sws[k].M.opt)
-        end
+        # if M.sws[k].csc.n == 0
+        #     M.sws[k].M = EmptyLinearSolver()
+        # else
+        #     M.sws[k].M = M.opt.schwarz_subproblem_solver.Solver(M.sws[k].csc;opt=M.sws[k].M.opt)
+        # end
+        M.sws[k].M = M.opt.schwarz_subproblem_solver.Solver(M.sws[k].csc;opt=M.sws[k].M.opt)
         M.opt.schwarz_fully_improve_subproblem_solver && while improve!(M.sws[k].M) end
         resize!(M.sws[k].q,length(get_current_V(M.sws[k].struc)))
     end
