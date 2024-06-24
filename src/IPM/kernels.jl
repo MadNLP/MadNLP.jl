@@ -10,8 +10,8 @@ function set_aug_diagonal!(kkt::AbstractKKTSystem{T}, solver::MadNLPSolver{T}) w
 
     fill!(kkt.reg, zero(T))
     fill!(kkt.du_diag, zero(T))
-    kkt.l_diag .= solver.xl_r .- solver.x_lr
-    kkt.u_diag .= solver.x_ur .- solver.xu_r
+    kkt.l_diag .= solver.xl_r .- solver.x_lr   # (Xˡ - X)
+    kkt.u_diag .= solver.x_ur .- solver.xu_r   # (X - Xᵘ)
     copyto!(kkt.l_lower, solver.zl_r)
     copyto!(kkt.u_lower, solver.zu_r)
 
@@ -33,6 +33,41 @@ function _set_aug_diagonal!(kkt::AbstractUnreducedKKTSystem)
     return
 end
 
+function set_aug_diagonal!(kkt::ScaledSparseKKTSystem{T}, solver::MadNLPSolver{T}) where T
+    fill!(kkt.reg, zero(T))
+    fill!(kkt.du_diag, zero(T))
+    # Ensure l_diag and u_diag have only non negative entries
+    kkt.l_diag .= solver.x_lr .- solver.xl_r   # (X - Xˡ)
+    kkt.u_diag .= solver.xu_r .- solver.x_ur   # (Xᵘ - X)
+    copyto!(kkt.l_lower, solver.zl_r)
+    copyto!(kkt.u_lower, solver.zu_r)
+    _set_aug_diagonal!(kkt)
+end
+
+function _set_aug_diagonal!(kkt::ScaledSparseKKTSystem{T}) where T
+    xlzu = kkt.buffer1
+    xuzl = kkt.buffer2
+    fill!(xlzu, zero(T))
+    fill!(xuzl, zero(T))
+
+    xlzu[kkt.ind_ub] .= kkt.u_lower    # zᵘ
+    xlzu[kkt.ind_lb] .*= kkt.l_diag    # (X - Xˡ) zᵘ
+
+    xuzl[kkt.ind_lb] .= kkt.l_lower    # zˡ
+    xuzl[kkt.ind_ub] .*= kkt.u_diag    # (Xᵘ - X) zˡ
+
+    kkt.pr_diag .= xlzu .+ xuzl
+
+    fill!(kkt.scaling_factor, one(T))
+    kkt.scaling_factor[kkt.ind_lb] .*= sqrt.(kkt.l_diag)
+    kkt.scaling_factor[kkt.ind_ub] .*= sqrt.(kkt.u_diag)
+
+    # Scale regularization by scaling factor.
+    kkt.pr_diag .+= kkt.reg .* kkt.scaling_factor.^2
+    return
+end
+
+
 # Robust restoration
 function set_aug_RR!(kkt::AbstractKKTSystem, solver::MadNLPSolver, RR::RobustRestorer)
     x = full(solver.x)
@@ -48,7 +83,23 @@ function set_aug_RR!(kkt::AbstractKKTSystem, solver::MadNLPSolver, RR::RobustRes
     kkt.u_diag .= solver.x_ur .- solver.xu_r
 
     _set_aug_diagonal!(kkt)
+    return
+end
 
+function set_aug_RR!(kkt::ScaledSparseKKTSystem, solver::MadNLPSolver, RR::RobustRestorer)
+    x = full(solver.x)
+    xl = full(solver.xl)
+    xu = full(solver.xu)
+    zl = full(solver.zl)
+    zu = full(solver.zu)
+    kkt.reg .= RR.zeta .* RR.D_R .^ 2
+    kkt.du_diag .= .- RR.pp ./ RR.zp .- RR.nn ./ RR.zn
+    copyto!(kkt.l_lower, solver.zl_r)
+    copyto!(kkt.u_lower, solver.zu_r)
+    kkt.l_diag .= solver.x_lr .- solver.xl_r
+    kkt.u_diag .= solver.xu_r .- solver.x_ur
+
+    _set_aug_diagonal!(kkt)
     return
 end
 
