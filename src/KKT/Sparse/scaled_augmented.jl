@@ -1,7 +1,7 @@
 """
     ScaledSparseKKTSystem{T, VT, MT, QN} <: AbstractReducedKKTSystem{T, VT, MT, QN}
 
-Scaled version of the [`AbstractReducedKKTSystem`](@ref) (using the K2.5 formulation introduced in [1]).
+Scaled version of the [`AbstractReducedKKTSystem`](@ref) (using the K2.5 formulation introduced in [GOS]).
 
 The K2.5 formulation of the augmented KKT system has a better conditioning
 than the original (K2) formulation. It is recommend switching to a `ScaledSparseKKTSystem`
@@ -24,8 +24,9 @@ with
 * ``Ξₛ = Sₗ Sᵤ``
 
 # References
-[1] Saunders, M. A. (2019). CME 338 Class Notes 9: PDCO: Primal-Dual Interior Methods. url:
-http://stanford.edu/class/cme338/notes.html
+[GOS] Ghannad, Alexandre, Dominique Orban, and Michael A. Saunders.
+"Linear systems arising in interior methods for convex optimization: a symmetric formulation with bounded condition number."
+Optimization Methods and Software 37, no. 4 (2022): 1344-1369.
 
 """
 struct ScaledSparseKKTSystem{T, VT, MT, QN, LS, VI, VI32} <: AbstractReducedKKTSystem{T, VT, MT, QN}
