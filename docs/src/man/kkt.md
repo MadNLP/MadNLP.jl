@@ -51,7 +51,7 @@ The Newton step associated to the KKT equations writes
  A & -I & 0& 0 & 0 \\
  V & 0 & 0 & X & 0 \\
  0 & W & 0 & 0 & S
-\end{pmatrix}}^{K_{1}}
+\end{pmatrix}}^{K_{3}}
 \begin{pmatrix}
     \Delta x \\
     \Delta s \\
@@ -64,7 +64,7 @@ The Newton step associated to the KKT equations writes
     F_1 \\ F_2 \\ F_3 \\ F_4 \\ F_5
 \end{pmatrix}
 ```
-The matrix $$K_1$$ is unsymmetric, but we can obtain an equivalent symmetric
+The matrix $$K_3$$ is unsymmetric, but we can obtain an equivalent symmetric
 system by eliminating the two last rows:
 ```math
 \overline{
@@ -87,13 +87,13 @@ with $$\Sigma_x = X^{-1} v$$ and $$\Sigma_s = S^{-1} w$$.
 The matrix $$K_2$$, symmetric, has a structure more favorable
 for a direct linear solver.
 
-In MadNLP, the matrix $$K_1$$ is encoded as an [`AbstractUnreducedKKTSystem`](@ref)
+In MadNLP, the matrix $$K_3$$ is encoded as an [`AbstractUnreducedKKTSystem`](@ref)
 and the matrix $$K_2$$ is encoded as an [`AbstractReducedKKTSystem`](@ref).
 
 
 ## Assembling a KKT system, step by step
 
-We note that both $$K_1$$ and $$K_2$$ depend on the Hessian
+We note that both $$K_3$$ and $$K_2$$ depend on the Hessian
 of the Lagrangian $$W$$, the Jacobian $$A$$ and the
 diagonal matrices $$\Sigma_x = X^{1}V$$ and $$\Sigma_s = S^{-1}W$$.
 Hence, we have to update the KKT system at each iteration
