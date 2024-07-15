@@ -1,6 +1,7 @@
 module MadNLP
 
 import Pkg.TOML: parsefile
+import RelocatableFolders: @path
 import Printf: @sprintf
 import LinearAlgebra: BLAS, Adjoint, Symmetric, mul!, ldiv!, norm, dot, diagind, normInf, transpose!, issuccess
 import LinearAlgebra: cholesky, qr, lu, cholesky!, axpy!
@@ -15,7 +16,9 @@ export MadNLPSolver, MadNLPOptions, UmfpackSolver, LDLSolver, CHOLMODSolver, Lap
 import LDLFactorizations
 
 # Version info
-version() = parsefile(joinpath(@__DIR__,"..","Project.toml"))["version"]
+# version() = parsefile(joinpath(@__DIR__,"..","Project.toml"))["version"]
+const PROJECT_TOML = @path joinpath(@__DIR__,"..","Project.toml")
+version() = parsefile(PROJECT_TOML)["version"]
 introduce() = "MadNLP version v$(version())"
 
 include("enums.jl")
