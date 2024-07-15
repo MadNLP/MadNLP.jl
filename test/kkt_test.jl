@@ -29,6 +29,7 @@ end
     (MadNLP.SparseKKTSystem, MadNLP.SparseCallback),
     (MadNLP.SparseUnreducedKKTSystem, MadNLP.SparseCallback),
     (MadNLP.SparseCondensedKKTSystem, MadNLP.SparseCallback),
+    (MadNLP.ScaledSparseKKTSystem, MadNLP.SparseCallback),
     (MadNLP.DenseKKTSystem, MadNLP.DenseCallback),
     (MadNLP.DenseCondensedKKTSystem, MadNLP.DenseCallback),
 ]

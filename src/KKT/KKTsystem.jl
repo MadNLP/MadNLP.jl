@@ -243,5 +243,6 @@ include("Dense/utils.jl")
 include("Sparse/unreduced.jl")
 include("Sparse/augmented.jl")
 include("Sparse/condensed.jl")
+include("Sparse/scaled_augmented.jl")
 include("Sparse/utils.jl")
 

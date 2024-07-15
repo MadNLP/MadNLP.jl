@@ -41,6 +41,34 @@ function solve!(kkt::AbstractReducedKKTSystem, w::AbstractKKTVector)
     return w
 end
 
+function solve!(kkt::ScaledSparseKKTSystem, w::AbstractKKTVector)
+    r3 = kkt.buffer1
+    r4 = kkt.buffer2
+    fill!(r3, 0.0)
+    fill!(r4, 0.0)
+
+    wzl = dual_lb(w)  # size nlb
+    wzu = dual_ub(w)  # size nub
+
+    r3[kkt.ind_lb] .= wzl
+    r3[kkt.ind_ub] .*= sqrt.(kkt.u_diag)
+    r3[kkt.ind_lb] ./= sqrt.(kkt.l_diag)
+    r4[kkt.ind_ub] .= wzu
+    r4[kkt.ind_lb] .*= sqrt.(kkt.l_diag)
+    r4[kkt.ind_ub] ./= sqrt.(kkt.u_diag)
+    # Build RHS
+    w.xp .*= kkt.scaling_factor
+    w.xp .+= (r3 .+ r4)
+    # Backsolve
+    solve!(kkt.linear_solver, primal_dual(w))
+    # Unpack solution
+    w.xp .*= kkt.scaling_factor
+
+    wzl .= (wzl .- kkt.l_lower .* w.xp_lr) ./ kkt.l_diag
+    wzu .= (.-wzu .+ kkt.u_lower .* w.xp_ur) ./ kkt.u_diag
+    return w
+end
+
 function solve!(
     kkt::SparseKKTSystem{T, VT, MT, QN},
     w::AbstractKKTVector
@@ -164,6 +192,20 @@ function mul!(w::AbstractKKTVector{T}, kkt::Union{SparseKKTSystem{T,VT,MT,QN},Sp
     mul!(primal(w), kkt.jac_com', dual(x), alpha, one(T))
     mul!(dual(w), kkt.jac_com,  primal(x), alpha, beta)
     _kktmul!(w,x,kkt.reg,kkt.du_diag,kkt.l_lower,kkt.u_lower,kkt.l_diag,kkt.u_diag, alpha, beta)
+    return w
+end
+
+function mul!(w::AbstractKKTVector{T}, kkt::ScaledSparseKKTSystem{T,VT,MT,QN}, x::AbstractKKTVector, alpha = one(T), beta = zero(T)) where {T, VT, MT, QN<:ExactHessian}
+    mul!(primal(w), Symmetric(kkt.hess_com, :L), primal(x), alpha, beta)
+    mul!(primal(w), kkt.jac_com', dual(x), alpha, one(T))
+    mul!(dual(w), kkt.jac_com,  primal(x), alpha, beta)
+    # Custom reduction
+    primal(w) .+= alpha .* kkt.reg .* primal(x)
+    dual(w) .+= alpha .* kkt.du_diag .* dual(x)
+    w.xp_lr .-= alpha .* dual_lb(x)
+    w.xp_ur .+= alpha .* dual_ub(x)
+    dual_lb(w) .= beta .* dual_lb(w) .+ alpha .* (x.xp_lr .* kkt.l_lower .+ dual_lb(x) .* kkt.l_diag)
+    dual_ub(w) .= beta .* dual_ub(w) .+ alpha .* (x.xp_ur .* kkt.u_lower .- dual_ub(x) .* kkt.u_diag)
     return w
 end
 
