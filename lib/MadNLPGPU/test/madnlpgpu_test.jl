@@ -27,6 +27,16 @@ testset = [
         [],
     ],
     [
+        "CUDSS-HYBRID",
+        ()->MadNLP.Optimizer(
+            linear_solver=MadNLPGPU.CUDSSSolver,
+            print_level=MadNLP.ERROR,
+            hybrid=true,
+            ir=1,
+        ),
+        [],
+    ],
+    [
         "CUSOLVERRF",
         ()->MadNLP.Optimizer(
             linear_solver=MadNLPGPU.RFSolver,
