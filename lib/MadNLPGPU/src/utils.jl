@@ -36,12 +36,22 @@ end
     SparseMatrixCOO to CuSparseMatrixCSC
 =#
 
+@kernel function _transfer_to_map!(dest, to_map, src)
+    k = @index(Global, Linear)
+    @inbounds begin
+        Atomix.@atomic dest[to_map[k]] += src[k]
+    end
+end
+
 function MadNLP.transfer!(
     dest::CUSPARSE.CuSparseMatrixCSC,
     src::MadNLP.SparseMatrixCOO,
     map,
 )
-    return copyto!(view(dest.nzVal, map), src.V)
+    fill!(nonzeros(dest), zero(Tv))
+    _transfer_to_map!(CUDABackend())(nonzeros(dest), map, src.V; ndrange=length(map))
+    synchronize(CUDABackend())
+    return
 end
 
 #=

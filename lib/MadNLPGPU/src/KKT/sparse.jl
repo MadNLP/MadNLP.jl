@@ -367,15 +367,17 @@ end
 
 @kernel function _transfer_hessian_kernel!(y, @Const(ptr), @Const(x))
     index = @index(Global)
-    @inbounds i, j = ptr[index]
-    @inbounds y[i] += x[j]
+    @inbounds begin
+        i, j = ptr[index]
+        Atomix.@atomic y[i] += x[j]
+    end
 end
 
 @kernel function _transfer_jtsj_kernel!(y, @Const(ptr), @Const(ptrptr), @Const(x), @Const(s))
     index = @index(Global)
     @inbounds for index2 in ptrptr[index]:ptrptr[index+1]-1
         i, (j, k, l) = ptr[index2]
-        y[i] += s[j] * x[k] * x[l]
+        Atomix.@atomic y[i] += s[j] * x[k] * x[l]
     end
 end
 
@@ -427,7 +429,7 @@ end
     @inbounds begin
         to = idx_to[i]
         fr = idx_fr[i]
-        y[to] -= alpha * A[fr] * x[to]
+        Atomix.@atomic y[to] -= alpha * A[fr] * x[to]
     end
 end
 
@@ -439,7 +441,7 @@ end
     index = @index(Global)
     @inbounds for index2 in ptrptr[index]:ptrptr[index+1]-1
         i, j = ptr[index2]
-        y[i] += x[j]
+        Atomix.@atomic y[i] += x[j]
     end
 end
 
