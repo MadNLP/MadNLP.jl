@@ -1,8 +1,9 @@
 module MadNLPMumps
 
-import MUMPS_seq_jll
+using MUMPS_seq_jll
+import RelocatableFolders: @path
 import MadNLP:
-    MadNLP, parsefile, dlopen,
+    MadNLP, parsefile,
     @kwdef, MadNLPLogger, @debug, @warn, @error,
     SparseMatrixCSC, SubVector,
     SymbolicException,FactorizationException,SolveException,InertiaException,
@@ -19,7 +20,8 @@ function __init__()
     end
 end
 
-const version = parsefile(joinpath(dirname(pathof(MUMPS_seq_jll)),"..","Project.toml"))["version"]
+const PROJECT_TOML = @path joinpath(dirname(pathof(MUMPS_seq_jll)),"..","Project.toml")
+const version = parsefile(PROJECT_TOML)["version"]
 
 setindex(tup,a,n) = (tup[1:n-1]...,a,tup[n+1:end]...)
 tzeros(n) = tuple((0 for i=1:n)...)
@@ -151,22 +153,22 @@ mutable struct MumpsSolver{T} <: AbstractLinearSolver{T}
     logger::MadNLPLogger
 end
 
-for (lib,fname,typ) in [(MUMPS_seq_jll.libdmumps,:dmumps_c,Float64), (MUMPS_seq_jll.libsmumps, :smumps_c,Float32)]
-    @eval begin
-        dmumps_c(mumps_struc::Struc{$typ})=ccall(
-            ($(string(fname)),$lib),
-            Cvoid,
-            (Ref{Struc},),
-            mumps_struc)
+# this is necessary, when multi-threaded calls are made with Mumps, not to clash with MPI
+mumps_lock = Threads.SpinLock()
+
+function locked_mumps_c(mumps_struc::Struc{Float32})
+    lock(mumps_lock)
+    try
+        @ccall libsmumps.smumps_c(mumps_struc::Ref{Struc{Float32}})::Cvoid
+    finally
+        unlock(mumps_lock)
     end
 end
 
-# this is necessary, when multi-threaded calls are made with Mumps, not to clash with MPI
-mumps_lock = Threads.SpinLock()
-function locked_dmumps_c(mumps_struc::Struc)
+function locked_mumps_c(mumps_struc::Struc{Float64})
     lock(mumps_lock)
     try
-        dmumps_c(mumps_struc)
+        @ccall libdmumps.dmumps_c(mumps_struc::Ref{Struc{Float64}})::Cvoid
     finally
         unlock(mumps_lock)
     end
@@ -188,7 +190,7 @@ function MumpsSolver(csc::SparseMatrixCSC{T,Int32};
     mumps_struc.job = -1
     mumps_struc.comm_fortran = -987654 # MPI.COMM_WORLD.val
 
-    locked_dmumps_c(mumps_struc)
+    locked_mumps_c(mumps_struc)
     mumps_struc.n = csc.n;
     mumps_struc.nz= nnz(csc);
     mumps_struc.a = pointer(csc.nzval)
@@ -215,7 +217,7 @@ function MumpsSolver(csc::SparseMatrixCSC{T,Int32};
     a = copy(csc.nzval) # would there be a better way?
     csc.nzval.=1
 
-    locked_dmumps_c(mumps_struc);
+    locked_mumps_c(mumps_struc);
     mumps_struc.info[1] < 0 && throw(SymbolicException())
 
     csc.nzval.=a
@@ -231,7 +233,7 @@ function factorize!(M::MumpsSolver)
     M.mumps_struc.job = 2;
     cnt = 0
     while true
-        locked_dmumps_c(M.mumps_struc)
+        locked_mumps_c(M.mumps_struc)
         if M.mumps_struc.info[1] in [-8,-9]
             cnt >= 10 && throw(FactorizationException())
             M.mumps_struc.icntl = setindex(M.mumps_struc.icntl,M.mumps_struc.icntl[14]*2.,14)
@@ -252,7 +254,7 @@ function solve!(M::MumpsSolver{T},rhs::Vector{T}) where T
     M.is_singular && return rhs
     M.mumps_struc.rhs = pointer(rhs)
     M.mumps_struc.job = 3
-    locked_dmumps_c(M.mumps_struc)
+    locked_mumps_c(M.mumps_struc)
     M.mumps_struc.info[1] < 0 && throw(SolveException())
     return rhs
 end
@@ -277,7 +279,7 @@ end
 
 function finalize(M::MumpsSolver)
     M.mumps_struc.job = -2
-    locked_dmumps_c(M.mumps_struc);
+    locked_mumps_c(M.mumps_struc);
 end
 
 introduce(::MumpsSolver)="mumps"
