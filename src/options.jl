@@ -45,8 +45,8 @@ end
 
     # NLP options
     kappa_d::Float64 = 1e-5
-    fixed_variable_treatment::Type = kkt_system <: MadNLP.SparseCondensedKKTSystem ? MadNLP.RelaxBound : MadNLP.MakeParameter 
-    equality_treatment::Type = kkt_system <: MadNLP.SparseCondensedKKTSystem ? MadNLP.RelaxEquality : MadNLP.EnforceEquality
+    fixed_variable_treatment::Type = kkt_system <: SparseCondensedKKTSystem ? RelaxBound : MakeParameter
+    equality_treatment::Type = kkt_system <: SparseCondensedKKTSystem ? RelaxEquality : EnforceEquality
     boudn_relax_factor::Float64 = 1e-8
     jacobian_constant::Bool = false
     hessian_constant::Bool = false
@@ -57,7 +57,7 @@ end
 
     # initialization options
     dual_initialized::Bool = false
-    dual_initialization_method::Type = kkt_system <: MadNLP.SparseCondensedKKTSystem ? DualInitializeSetZero : DualInitializeLeastSquares
+    dual_initialization_method::Type = kkt_system <: SparseCondensedKKTSystem ? DualInitializeSetZero : DualInitializeLeastSquares
     constr_mult_init_max::Float64 = 1e3
     bound_push::Float64 = 1e-2
     bound_fac::Float64 = 1e-2
@@ -102,8 +102,8 @@ end
     mu_linear_decrease_factor::Float64 = .2
 end
 
-is_dense_callback(nlp) = hasmethod(MadNLP.jac_dense!, Tuple{typeof(nlp), AbstractVector, AbstractMatrix}) &&
-    hasmethod(MadNLP.hess_dense!, Tuple{typeof(nlp), AbstractVector, AbstractVector, AbstractMatrix})
+is_dense_callback(nlp) = hasmethod(jac_dense!, Tuple{typeof(nlp), AbstractVector, AbstractMatrix}) &&
+    hasmethod(hess_dense!, Tuple{typeof(nlp), AbstractVector, AbstractVector, AbstractMatrix})
 
 # smart option presets
 function MadNLPOptions(
@@ -171,9 +171,9 @@ function _get_primary_options(options)
 end
 
 function load_options(nlp; options...)
-    
+
     primary_opt, options = _get_primary_options(options)
-    
+
     # Initiate interior-point options
     opt_ipm = MadNLPOptions(nlp; primary_opt...)
     linear_solver_options = set_options!(opt_ipm, options)

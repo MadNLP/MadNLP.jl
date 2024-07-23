@@ -2,38 +2,38 @@ abstract type AbstractWrapperModel{T,VT} <: NLPModels.AbstractNLPModel{T,VT} end
 
 struct DenseWrapperModel{T,VT,T2,VT2,MT2, I <: NLPModels.AbstractNLPModel{T2,VT2}} <: AbstractWrapperModel{T,VT}
     inner::I
-    
+
     x::VT2
     y::VT2
-    
+
     con::VT2
     grad::VT2
     jac::MT2
     hess::MT2
-    
+
     meta::NLPModels.NLPModelMeta{T, VT}
-    counters::NLPModels.Counters 
+    counters::NLPModels.Counters
 end
 
 
 struct SparseWrapperModel{T,VT,T2,VI2,VT2,I <: NLPModels.AbstractNLPModel{T2,VT2}} <: AbstractWrapperModel{T,VT}
     inner::I
-    
+
     jrows::VI2
     jcols::VI2
     hrows::VI2
     hcols::VI2
-    
+
     x::VT2
     y::VT2
-    
+
     con::VT2
     grad::VT2
     jac::VT2
     hess::VT2
-    
+
     meta::NLPModels.NLPModelMeta{T, VT}
-    counters::NLPModels.Counters 
+    counters::NLPModels.Counters
 end
 
 
@@ -121,10 +121,10 @@ function NLPModels.cons!(
     g::V
     ) where {M <: AbstractWrapperModel, V <: AbstractVector}
 
-    copyto!(m.x, x) 
+    copyto!(m.x, x)
     NLPModels.cons!(m.inner, m.x, m.con)
     copyto!(g, m.con)
-    return 
+    return
 end
 function NLPModels.grad!(
     m::M,
@@ -143,7 +143,7 @@ function NLPModels.jac_structure!(
     rows::V,
     cols::V
     ) where {M <: SparseWrapperModel, V <: AbstractVector}
-    
+
     NLPModels.jac_structure!(m.inner, m.jrows, m.jcols)
     copyto!(rows, m.jrows)
     copyto!(cols, m.jcols)
@@ -159,13 +159,26 @@ function NLPModels.hess_structure!(
     copyto!(rows, m.hrows)
     copyto!(cols, m.hcols)
 end
+function NLPModels.jtprod!(
+    m::SparseWrapperModel,
+    x::AbstractVector,
+    v::AbstractVector,
+    jtv::AbstractVector,
+)
+    copyto!(m.x, x)
+    copyto!(m.grad, jtv)
+    copyto!(m.con, v)
+    NLPModels.jtprod!(m.inner, m.x, m.con, m.grad)
+    copyto!(jtv, m.grad)
+    return
+end
 function NLPModels.jac_coord!(
-    m::M,
-    x::V,
-    jac::V
-    ) where {M <: SparseWrapperModel, V <: AbstractVector}
+    m::SparseWrapperModel,
+    x::AbstractVector,
+    jac::AbstractVector,
+)
 
-    copyto!(m.x, x)    
+    copyto!(m.x, x)
     NLPModels.jac_coord!(m.inner, m.x, m.jac)
     copyto!(jac, m.jac)
     return
@@ -185,19 +198,18 @@ function NLPModels.hess_coord!(
     return
 end
 
-
-
 function MadNLP.jac_dense!(
     m::Model,
     x::V,
     jac::M
     ) where {Model <: DenseWrapperModel, V <: AbstractVector, M <: AbstractMatrix}
 
-    copyto!(m.x, x)    
+    copyto!(m.x, x)
     MadNLP.jac_dense!(m.inner, m.x, m.jac)
     copyto!(jac, m.jac)
     return
 end
+
 function MadNLP.hess_dense!(
     m::Model,
     x::V,

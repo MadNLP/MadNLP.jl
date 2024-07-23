@@ -47,18 +47,17 @@ end
 function create_kkt_system(
     ::Type{SparseUnreducedKKTSystem},
     cb::SparseCallback{T,VT},
-    ind_cons,
     linear_solver::Type;
     opt_linear_solver=default_options(linear_solver),
     hessian_approximation=ExactHessian,
 ) where {T, VT}
-    ind_ineq = ind_cons.ind_ineq
-    ind_lb = ind_cons.ind_lb
-    ind_ub = ind_cons.ind_ub
+    ind_ineq = cb.ind_ineq
+    ind_lb = cb.ind_lb
+    ind_ub = cb.ind_ub
 
     n_slack = length(ind_ineq)
-    nlb = length(ind_cons.ind_lb)
-    nub = length(ind_cons.ind_ub)
+    nlb = length(cb.ind_lb)
+    nub = length(cb.ind_ub)
     # Deduce KKT size.
     n = cb.nvar
     m = cb.ncon

@@ -152,6 +152,12 @@ function solve!(
         set_options!(solver.opt, kwargs)
     end
 
+    # If the problem has no free variable, do nothing
+    if solver.n == 0
+        update!(stats, solver)
+        return stats
+    end
+
     try
         if solver.status == INITIAL
             @notice(solver.logger,"This is $(introduce()), running with $(introduce(solver.kkt.linear_solver))\n")
@@ -216,7 +222,7 @@ function regular!(solver::AbstractMadNLPSolver{T}) where T
         if (solver.cnt.k!=0 && !solver.opt.jacobian_constant)
             eval_jac_wrapper!(solver, solver.kkt, solver.x)
         end
-        
+
         jtprod!(solver.jacl, solver.kkt, solver.y)
         sd = get_sd(solver.y,solver.zl_r,solver.zu_r,T(solver.opt.s_max))
         sc = get_sc(solver.zl_r,solver.zu_r,T(solver.opt.s_max))
