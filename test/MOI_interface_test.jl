@@ -37,11 +37,6 @@ function test_MOI_Test()
             ]
         );
         exclude = [
-            # TODO: MadNLP does not return the correct multiplier
-            # when a variable is fixed with MOI.EqualTo (Issue #229).
-            r"^test_linear_integration$",
-            "test_quadratic_constraint_GreaterThan",
-            "test_quadratic_constraint_LessThan",
             # MadNLP reaches maximum number of iterations instead
             # of returning infeasibility certificate.
             r"test_linear_DUAL_INFEASIBLE.*",
