@@ -19,7 +19,7 @@ function __init__()
     end
 end
 
-version() = pkgversion(@__MODULE__)
+version = string(pkgversion(@__MODULE__))
 
 setindex(tup,a,n) = (tup[1:n-1]...,a,tup[n+1:end]...)
 tzeros(n) = tuple((0 for i=1:n)...)
