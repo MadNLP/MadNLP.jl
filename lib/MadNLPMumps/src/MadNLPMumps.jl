@@ -1,7 +1,6 @@
 module MadNLPMumps
 
 using MUMPS_seq_jll
-import RelocatableFolders: @path
 import MadNLP:
     MadNLP, parsefile,
     @kwdef, MadNLPLogger, @debug, @warn, @error,
@@ -20,8 +19,7 @@ function __init__()
     end
 end
 
-const PROJECT_TOML = @path joinpath(dirname(pathof(MUMPS_seq_jll)),"..","Project.toml")
-const version = parsefile(PROJECT_TOML)["version"]
+version() = pkgversion(@__MODULE__)
 
 setindex(tup,a,n) = (tup[1:n-1]...,a,tup[n+1:end]...)
 tzeros(n) = tuple((0 for i=1:n)...)
