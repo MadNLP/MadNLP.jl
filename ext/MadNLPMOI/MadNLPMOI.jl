@@ -915,6 +915,8 @@ function MOIModel(model::Optimizer)
             lcon = g_L,
             ucon = g_U,
             nnzj = nnzj,
+            lin_nnzj = 0,
+            nln_nnzj = nnzj,
             nnzh = nnzh,
             minimize = model.sense == MOI.MIN_SENSE
         ),
