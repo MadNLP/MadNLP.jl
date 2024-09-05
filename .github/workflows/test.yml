@@ -28,7 +28,7 @@ jobs:
       - run: julia --color=yes --project=.ci .ci/ci.jl basic
   test-moonshot:
     env:
-      JULIA_DEPOT_PATH: /home/sshin/action-runners/MadNLP/julia-depot/
+      JULIA_DEPOT_PATH: /home/sushin/actions-runner/madnlp-depot/
     runs-on: self-hosted
     strategy:
       matrix:
@@ -49,7 +49,7 @@ jobs:
   test-moonshot-cuda:
     env:
       CUDA_VISIBLE_DEVICES: 1
-      JULIA_DEPOT_PATH: /home/sshin/action-runners/MadNLP/julia-depot/
+      JULIA_DEPOT_PATH: /home/sushin/actions-runner/madnlp-depot/
     runs-on: self-hosted
     strategy:
       matrix:
