@@ -49,16 +49,9 @@ end
 function update!(stats::MadNLPExecutionStats, solver::MadNLPSolver)
     stats.status = solver.status
     unpack_x!(stats.solution, solver.cb, variable(solver.x))
+    unpack_y!(stats.multipliers, solver.cb, solver.y)
     unpack_z!(stats.multipliers_L, solver.cb, variable(solver.zl))
     unpack_z!(stats.multipliers_U, solver.cb, variable(solver.zu))
-    stats.multipliers .= solver.y
-    # stats.solution .= min.(
-    #     max.(
-    #         @view(primal(solver.x)[1:get_nvar(solver.nlp)]),
-    #         get_lvar(solver.nlp)
-    #     ),
-    #     get_uvar(solver.nlp)
-    # )
     stats.objective = unpack_obj(solver.cb, solver.obj_val)
     unpack_cons!(stats.constraints, solver.cb, solver.c)
     stats.constraints .+= solver.rhs

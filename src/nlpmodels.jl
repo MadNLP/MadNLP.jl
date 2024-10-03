@@ -658,7 +658,10 @@ function unpack_x!(x_full, cb::AbstractCallback, x)
     x_full .= x
 end
 function unpack_z!(z_full, cb::AbstractCallback, z)
-    z_full .= z
+    z_full .= z ./ cb.obj_scale[]
+end
+function unpack_y!(y_full, cb::AbstractCallback, y)
+    y_full .= (y .* cb.con_scale) ./ cb.obj_scale[]
 end
 
 # N.B.: Special getters if we use SparseCallback with a MakeParameter fixed_handler,
