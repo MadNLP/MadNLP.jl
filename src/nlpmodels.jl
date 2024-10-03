@@ -296,13 +296,8 @@ function create_sparse_fixed_handler(
 
     nnzh = length(ind_hess_free)
     Hi, Hj = similar(hess_I, nnzh), similar(hess_J, nnzh)
-    # TODO: vectorize
-    for k in 1:nnzh
-        cnt = ind_hess_free[k]
-        i, j = hess_I[cnt], hess_J[cnt]
-        Hi[k] = map_full_to_free[i]
-        Hj[k] = map_full_to_free[j]
-    end
+    Hi .= map_full_to_free[hess_I[ind_hess_free]]
+    Hj .= map_full_to_free[hess_J[ind_hess_free]]
     resize!(hess_I, nnzh)
     resize!(hess_J, nnzh)
     hess_I .= Hi
@@ -310,12 +305,8 @@ function create_sparse_fixed_handler(
 
     nnzj = length(ind_jac_free)
     Ji, Jj = similar(jac_I, nnzj), similar(jac_J, nnzj)
-    for k in 1:nnzj
-        cnt = ind_jac_free[k]
-        i, j = jac_I[cnt], jac_J[cnt]
-        Ji[k] = i
-        Jj[k] = map_full_to_free[j]
-    end
+    Ji .= jac_I[ind_jac_free]
+    Jj .= map_full_to_free[jac_J[ind_jac_free]]
     resize!(jac_I, nnzj)
     resize!(jac_J, nnzj)
     jac_I .= Ji
