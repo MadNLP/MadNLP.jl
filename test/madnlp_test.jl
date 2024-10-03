@@ -160,6 +160,9 @@ end
     @test sol_dense.iter == sol_sparse.iter
     @test sol_dense.objective == sol_sparse.objective
     @test sol_dense.solution == sol_sparse.solution
+    @test sol_dense.multipliers == sol_sparse.multipliers
+    @test sol_dense.multipliers_L == sol_sparse.multipliers_L
+    @test sol_dense.multipliers_U == sol_sparse.multipliers_U
 end
 
 @testset "MadNLP warmstart" begin
