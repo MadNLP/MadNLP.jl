@@ -120,13 +120,6 @@ function MOI.empty!(model::Optimizer)
     model.nlp_dual_start = nothing
     model.qp_data = QPBlockData{Float64}()
     model.nlp_model = nothing
-    # Delete options if they are problem dependent.
-    if haskey(model.options, :jacobian_constant)
-        delete!(model.options, :jacobian_constant)
-    end
-    if haskey(model.options, :hessian_approximation)
-        delete!(model.options, :hessian_approximation)
-    end
     return
 end
 
@@ -897,13 +890,6 @@ function MOIModel(model::Optimizer)
     end
     # TODO: initial bounds' multipliers.
 
-    if !has_nlp_constraints && !has_quadratic_constraints
-        model.options[:jacobian_constant] = true
-    end
-    if !has_hessian
-        model.options[:hessian_approximation] = MadNLP.CompactLBFGS
-    end
-
     return MOIModel(
         NLPModels.NLPModelMeta(
             nvar,
@@ -943,14 +929,28 @@ function MOI.optimize!(model::Optimizer)
     if model.silent
         model.options[:print_level] = MadNLP.ERROR
     end
-    model.solver = MadNLP.MadNLPSolver(model.nlp; model.options...)
+    options = copy(model.options)
+    # Specific options depending on problem's structure.
+    # 1/ Switch to LBFGS if the Hessian is not specified.
+    has_hessian = :Hess in MOI.features_available(model.nlp_data.evaluator)
+    if !has_hessian
+        options[:hessian_approximation] = MadNLP.CompactLBFGS
+    end
+    # 2/ Set Jacobian to constant if all constraints are linear.
+    has_nlp_constraints =
+        any(isequal(_kFunctionTypeScalarQuadratic), model.qp_data.function_type) ||
+        !isempty(model.nlp_data.constraint_bounds)
+    if !has_nlp_constraints
+        options[:jacobian_constant] = true
+    end
+    # Instantiate MadNLP.
+    model.solver = MadNLP.MadNLPSolver(model.nlp; options...)
     model.result = MadNLP.solve!(model.solver)
     model.solve_time = model.solver.cnt.total_time
     model.solve_iterations = model.solver.cnt.k
     return
 end
 
-# From Ipopt/src/Interfaces/IpReturnCodes_inc.h
 const _STATUS_CODES = Dict{MadNLP.Status,MOI.TerminationStatusCode}(
     MadNLP.SOLVE_SUCCEEDED => MOI.LOCALLY_SOLVED,
     MadNLP.SOLVED_TO_ACCEPTABLE_LEVEL => MOI.ALMOST_LOCALLY_SOLVED,
