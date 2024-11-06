@@ -21,6 +21,14 @@ testset = [
         []
     ],
     [
+        "ScaledSparseKKTSystem + LapackCPU",
+        ()->MadNLP.Optimizer(
+            linear_solver=MadNLP.LapackCPUSolver,
+            kkt_system=MadNLP.ScaledSparseKKTSystem,
+            print_level=MadNLP.ERROR),
+        []
+    ],
+    [
         "DenseKKTSystem + LapackCPU-BUNCHKAUFMAN",
         ()->MadNLP.Optimizer(
             kkt_system=MadNLP.DenseKKTSystem,
