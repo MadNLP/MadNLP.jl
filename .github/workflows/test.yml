@@ -23,7 +23,7 @@ jobs:
       - uses: actions/checkout@v2
       - uses: julia-actions/setup-julia@latest
         with:
-          version: ${{ matrix.julia-version }}
+          version: ${{ matrix.julia-version }} 
       - uses: julia-actions/cache@v1
       - run: julia --color=yes --project=.ci .ci/ci.jl basic
   test-moonshot:
