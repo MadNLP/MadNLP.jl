@@ -108,7 +108,6 @@ cb = MadNLP.create_callback(
     MadNLP.SparseCallback,
     nlp,
 )
-ind_cons = MadNLP.get_index_constraints(nlp)
 
 ```
 
@@ -130,7 +129,6 @@ the function [`create_kkt_system`](@ref):
 kkt = MadNLP.create_kkt_system(
     MadNLP.SparseKKTSystem,
     cb,
-    ind_cons,
     linear_solver,
 )
 
