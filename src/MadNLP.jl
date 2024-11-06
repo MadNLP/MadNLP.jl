@@ -15,7 +15,7 @@ export MadNLPSolver, MadNLPOptions, UmfpackSolver, LDLSolver, CHOLMODSolver, Lap
 import LDLFactorizations
 
 # Version info
-version() = parsefile(joinpath(@__DIR__,"..","Project.toml"))["version"]
+version() = string(pkgversion(@__MODULE__))
 introduce() = "MadNLP version v$(version())"
 
 include("enums.jl")
