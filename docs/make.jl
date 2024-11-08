@@ -17,6 +17,9 @@ makedocs(
         "Installation" => "installation.md",
         "Quickstart" => "quickstart.md",
         "Options" => "options.md",
+        "Tutorials" => [
+            "Multi-precision" => "tutorials/multiprecision.md",
+        ],
         "Manual" => [
             "IPM solver" => "man/solver.md",
             "KKT systems" => "man/kkt.md",
