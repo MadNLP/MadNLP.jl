@@ -1,0 +1,22 @@
+steps:
+  - label: "Julia v1.10"
+    plugins:
+      - JuliaCI/julia#v1:
+          version: "1.10"
+      - JuliaCI/julia-test#v1: ~
+    agents:
+      queue: "juliagpu"
+      cuda: "*"
+    if: build.message !~ /\[skip tests\]/
+    timeout_in_minutes: 60
+
+  - label: "Julia v1.11"
+    plugins:
+      - JuliaCI/julia#v1:
+          version: "1.11"
+      - JuliaCI/julia-test#v1: ~
+    agents:
+      queue: "juliagpu"
+      cuda: "*"
+    if: build.message !~ /\[skip tests\]/
+    timeout_in_minutes: 60
