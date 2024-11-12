@@ -19,6 +19,7 @@ makedocs(
         "Options" => "options.md",
         "Tutorials" => [
             "Multi-precision" => "tutorials/multiprecision.md",
+            "Warm-start" => "tutorials/warmstart.md",
         ],
         "Manual" => [
             "IPM solver" => "man/solver.md",
