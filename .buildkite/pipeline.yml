@@ -3,7 +3,7 @@ steps:
     plugins:
       - JuliaCI/julia#v1:
           version: "1.10"
-      - JuliaCI/julia-test#v1: ~
+      - JuliaCI/julia-test#v1: ~/lib/MadNLPGPU
     agents:
       queue: "juliagpu"
       cuda: "*"
