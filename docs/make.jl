@@ -18,6 +18,7 @@ makedocs(
         "Quickstart" => "quickstart.md",
         "Options" => "options.md",
         "Tutorials" => [
+            "Multi-precision" => "tutorials/multiprecision.md",
             "Warm-start" => "tutorials/warmstart.md",
         ],
         "Manual" => [
