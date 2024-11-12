@@ -44,11 +44,5 @@ RelaxEquality
 ```
 
 MadNLP has to keep in memory all the indexes associated to the equality
-and inequality constraints. Similarly, MadNLP has to keep track
-of the indexes of the bounded variables and the fixed variables. MadNLP
-provides a utility [`get_index_constraints`](@ref) to import all the indexes required
-by MadNLP. Each index vector is encoded as a `Vector{Int}`.
-```@docs
-get_index_constraints
-
-```
+and inequality constraints, as well as the indexes of the bounded variables and the fixed variables.
+The indexes are stored explicitly as a `Vector{Int}` in the `AbstractCallback` structure used by MadNLP.
