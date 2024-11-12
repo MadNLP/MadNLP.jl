@@ -3,10 +3,11 @@ steps:
     plugins:
       - JuliaCI/julia#v1:
           version: "1.10"
-      - JuliaCI/julia-test#v1: ~/lib/MadNLPGPU
+      - JuliaCI/julia-test#v1: ~
     agents:
       queue: "juliagpu"
       cuda: "*"
+    working_directory: "~/lib/MadNLPGPU"
     if: build.message !~ /\[skip tests\]/
     timeout_in_minutes: 60
 
