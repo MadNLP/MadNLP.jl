@@ -87,7 +87,7 @@ mutable struct QPBlockData{T}
     end
 end
 
-function _value(variable::MOI.VariableIndex, x::Vector, p::Dict)
+function _value(variable::MOI.VariableIndex, x::AbstractVector, p::Dict)
     if _is_parameter(variable)
         return p[variable.value]
     else
@@ -97,7 +97,7 @@ end
 
 function eval_function(
     f::MOI.ScalarQuadraticFunction{T},
-    x::Vector{T},
+    x::AbstractVector{T},
     p::Dict{Int64,T},
 )::T where {T}
     y = f.constant
@@ -118,7 +118,7 @@ end
 
 function eval_function(
     f::MOI.ScalarAffineFunction{T},
-    x::Vector{T},
+    x::AbstractVector{T},
     p::Dict{Int64,T},
 )::T where {T}
     y = f.constant
@@ -129,9 +129,9 @@ function eval_function(
 end
 
 function eval_dense_gradient(
-    ∇f::Vector{T},
+    ∇f::AbstractVector{T},
     f::MOI.ScalarQuadraticFunction{T},
-    x::Vector{T},
+    x::AbstractVector{T},
     p::Dict{Int64,T},
     adj::T,
 )::Nothing where {T}
@@ -154,9 +154,9 @@ function eval_dense_gradient(
 end
 
 function eval_dense_gradient(
-    ∇f::Vector{T},
+    ∇f::AbstractVector{T},
     f::MOI.ScalarAffineFunction{T},
-    x::Vector{T},
+    x::AbstractVector{T},
     p::Dict{Int64,T},
     adj::T,
 )::Nothing where {T}
@@ -201,7 +201,7 @@ end
 function eval_sparse_gradient(
     ∇f::AbstractVector{T},
     f::MOI.ScalarQuadraticFunction{T},
-    x::Vector{T},
+    x::AbstractVector{T},
     p::Dict{Int64,T},
 )::Int where {T}
     i = 0
@@ -229,7 +229,7 @@ end
 function eval_sparse_gradient(
     ∇f::AbstractVector{T},
     f::MOI.ScalarAffineFunction{T},
-    x::Vector{T},
+    x::AbstractVector{T},
     p::Dict{Int64,T},
 )::Int where {T}
     i = 0
