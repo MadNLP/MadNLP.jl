@@ -42,7 +42,7 @@ jobs:
       - run: julia --color=yes --project=.ci .ci/ci.jl full
       - uses: julia-actions/julia-processcoverage@v1
         with:
-          directories: src,lib/MadNLPHSL/src,lib/MadNLPPardiso/src,lib/MadNLPMumps/src,lib/MadNLPKrylov/src,lib/MadNLPGraph
+          directories: src,lib/MadNLPHSL/src,lib/MadNLPPardiso/src,lib/MadNLPMumps/src,lib/MadNLPKrylov/src
       - uses: codecov/codecov-action@v1
         with:
           file: lcov.info
