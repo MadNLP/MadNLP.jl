@@ -10,8 +10,8 @@ include("utils.jl")
 const _PARAMETER_OFFSET = 0x00f0000000000000
 
 _is_parameter(x::MOI.VariableIndex) = x.value >= _PARAMETER_OFFSET
-
 _is_parameter(term::MOI.ScalarAffineTerm) = _is_parameter(term.variable)
+_is_parameter(term::MOI.ScalarQuadraticTerm) = _is_parameter(term.variable_1) || _is_parameter(term.variable_2)
 
 """
     Optimizer()
@@ -161,7 +161,6 @@ function MOI.add_constrained_variable(
     model::Optimizer,
     set::MOI.Parameter{Float64},
 )
-    model.inner = nothing
     if model.nlp_model === nothing
         model.nlp_model = MOI.Nonlinear.Model()
     end
