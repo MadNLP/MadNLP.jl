@@ -7,7 +7,7 @@ using MathOptInterface
 const MOI = MathOptInterface
 
 function runtests()
-    for name in names(@__MODULE__; all = true)
+    for name in names(@__MODULE__; all=true)
         if startswith("$(name)", "test_")
             @testset "$(name)" begin
                 getfield(@__MODULE__, name)()
@@ -26,17 +26,17 @@ function test_MOI_Test()
     MOI.Test.runtests(
         model,
         MOI.Test.Config(
-            atol = 1e-4,
-            rtol = 1e-4,
-            infeasible_status = MOI.LOCALLY_INFEASIBLE,
-            optimal_status = MOI.LOCALLY_SOLVED,
-            exclude = Any[
+            atol=1e-4,
+            rtol=1e-4,
+            infeasible_status=MOI.LOCALLY_INFEASIBLE,
+            optimal_status=MOI.LOCALLY_SOLVED,
+            exclude=Any[
                 MOI.ConstraintBasisStatus,
                 MOI.DualObjectiveValue,
                 MOI.ObjectiveBound,
             ]
         );
-        exclude = [
+        exclude=[
             # TODO: MadNLP does not return the correct multiplier
             # when a variable is fixed with MOI.EqualTo (Issue #229).
             r"^test_linear_integration$",
@@ -109,6 +109,85 @@ function test_user_defined_function()
     MOI.set(model, MOI.ObjectiveFunction{typeof(obj_f)}(), obj_f)
     MOI.optimize!(model)
     @test MOI.get(model, MOI.TerminationStatus()) == MOI.LOCALLY_SOLVED
+end
+
+# See PR #379 (example 1)
+function test_param_in_quatratic_term1()
+    model = MadNLP.Optimizer()
+    MOI.set(model, MOI.Silent(), true)
+    x, _ = MOI.add_constrained_variable(model, MOI.Interval(0.0, 2.0))
+    y, _ = MOI.add_constrained_variable(model, MOI.Interval(0.0, 2.0))
+    a, _ = MOI.add_constrained_variable(model, MOI.Parameter(3.0))
+    b, _ = MOI.add_constrained_variable(model, MOI.Parameter(3.0))
+
+    # constraint : a*x^2 + b*y^2 <= 1
+    sq_x = MOI.ScalarQuadraticFunction(
+        [MOI.ScalarQuadraticTerm(2.0, x, x)],
+        MOI.ScalarAffineTerm{Float64}[],
+        0.0
+    )
+    sq_y = MOI.ScalarQuadraticFunction(
+        [MOI.ScalarQuadraticTerm(2.0, y, y)],
+        MOI.ScalarAffineTerm{Float64}[],
+        0.0
+    )
+    x_term = MOI.ScalarNonlinearFunction(:*, [a, sq_x])
+    y_term = MOI.ScalarNonlinearFunction(:*, [b, sq_y])
+    x_y_sum = MOI.ScalarNonlinearFunction(:+, [x_term, y_term])
+    lhs = MOI.ScalarNonlinearFunction(:-, [x_y_sum, 1])
+    c = MOI.add_constraint(model, lhs, MOI.LessThan{Float64}(0.0))
+
+    # objective function : x + y
+    MOI.set(model, MOI.ObjectiveSense(), MOI.MAX_SENSE)
+    obj_terms = [MOI.ScalarAffineTerm(1.0, x), MOI.ScalarAffineTerm(1.0, y)]
+    obj_f = MOI.ScalarAffineFunction(obj_terms, 0.0)
+    MOI.set(model, MOI.ObjectiveFunction{typeof(obj_f)}(), obj_f)
+
+    MOI.optimize!(model)
+    @test MOI.get(model, MOI.TerminationStatus()) == MOI.LOCALLY_SOLVED
+    x_val = MOI.get(model, MOI.VariablePrimal(), x)
+    y_val = MOI.get(model, MOI.VariablePrimal(), y)
+    @test abs(3 * x_val^2 + 3 * y_val^2 - 1) <= 1e-6 # constraint has no slack
+end
+
+# See PR #379 (example 2)
+function test_param_in_quadratic_term2()
+    model = MadNLP.Optimizer()
+    MOI.set(model, MOI.Silent(), true)
+    x, _ = MOI.add_constrained_variable(model, MOI.Interval(0.0, 2.0))
+    y, _ = MOI.add_constrained_variable(model, MOI.Interval(0.0, 2.0))
+    a, _ = MOI.add_constrained_variable(model, MOI.Parameter(3.0))
+    b, _ = MOI.add_constrained_variable(model, MOI.Parameter(3.0))
+
+    # constraint:  a*x + b^2*y + a*b^2 <= 42 => 3*x + 9*y <= 42 - 3*9
+    sq_b = MOI.ScalarQuadraticFunction(
+        [MOI.ScalarQuadraticTerm(2.0, b, b)],
+        MOI.ScalarAffineTerm{Float64}[],
+        0.0
+    )
+
+    term1 = MOI.ScalarQuadraticFunction(
+        [MOI.ScalarQuadraticTerm(1.0, a, x)],
+        MOI.ScalarAffineTerm{Float64}[],
+        0.0
+    )
+    term2 = MOI.ScalarNonlinearFunction(:*, [sq_b, y])
+    term3 = MOI.ScalarNonlinearFunction(:*, [a, sq_b])
+
+    lhs = MOI.ScalarNonlinearFunction(:+, [term1, term2, term3])
+    c = MOI.add_constraint(model, lhs, MOI.LessThan{Float64}(42.0))
+
+    # objective function : x + y
+    MOI.set(model, MOI.ObjectiveSense(), MOI.MAX_SENSE)
+    obj_terms = [MOI.ScalarAffineTerm(1.0, x), MOI.ScalarAffineTerm(1.0, y)]
+    obj_f = MOI.ScalarAffineFunction(obj_terms, 0.0)
+    MOI.set(model, MOI.ObjectiveFunction{typeof(obj_f)}(), obj_f)
+
+    MOI.optimize!(model)
+    @assert MOI.get(model, MOI.TerminationStatus()) == MOI.LOCALLY_SOLVED
+    x_val = MOI.get(model, MOI.VariablePrimal(), x)
+    y_val = MOI.get(model, MOI.VariablePrimal(), y)
+    @assert abs(3 * x_val + 9 * y_val - 15) <= 1e-6 # constraint has no slack
 end
 
 end
