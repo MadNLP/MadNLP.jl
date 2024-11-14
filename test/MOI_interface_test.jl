@@ -112,7 +112,8 @@ function test_user_defined_function()
 end
 
 # See PR #379 (example 1)
-function test_param_in_quatratic_term1()
+function test_param_in_quadratic_term1()
+    println("test 1")
     model = MadNLP.Optimizer()
     MOI.set(model, MOI.Silent(), true)
     x, _ = MOI.add_constrained_variable(model, MOI.Interval(0.0, 2.0))
@@ -152,6 +153,7 @@ end
 
 # See PR #379 (example 2)
 function test_param_in_quadratic_term2()
+    println("test 2")
     model = MadNLP.Optimizer()
     MOI.set(model, MOI.Silent(), true)
     x, _ = MOI.add_constrained_variable(model, MOI.Interval(0.0, 2.0))
