@@ -11,6 +11,7 @@ import HSL
 import HSL: mc68_control, mc68_info, ma77_control, ma77_info, ma86_control, ma86_info, ma97_control, ma97_info
 
 import LinearAlgebra
+using Quadmath
 
 include("common.jl")
 include("ma27.jl")
