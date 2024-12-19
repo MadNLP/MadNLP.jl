@@ -6,11 +6,13 @@ version = "0.5.2"
 HSL = "34c5aeac-e683-54a6-a0e9-6e0fdc586c50"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 MadNLP = "2621e9c9-9eb4-46b1-8089-e8c72242dfb6"
+Quadmath = "be4d8f0f-7fa4-5f49-b795-2f01399ab2dd"
 
 [compat]
 HSL = "0.4.2"
 MadNLP = "0.5,0.6,0.7,0.8"
 MadNLPTests = "0.5"
+Quadmath = "0.5.10"
 julia = "1.6"
 
 [extras]

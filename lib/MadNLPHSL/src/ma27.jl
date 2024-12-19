@@ -38,6 +38,7 @@ end
 
 
 for (fa, fb, fc, typ) in [
+    (:ma27aq, :ma27bq, :ma27cq, Float128),
     (:ma27ad, :ma27bd, :ma27cd, Float64),
     (:ma27a , :ma27b , :ma27c , Float32)
     ]
@@ -155,3 +156,4 @@ input_type(::Type{Ma27Solver}) = :csc
 default_options(::Type{Ma27Solver}) = Ma27Options()
 is_supported(::Type{Ma27Solver},::Type{Float32}) = true
 is_supported(::Type{Ma27Solver},::Type{Float64}) = true
+is_supported(::Type{Ma27Solver},::Type{Float128}) = true
