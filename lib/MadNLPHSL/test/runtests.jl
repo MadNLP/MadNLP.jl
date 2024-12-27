@@ -1,4 +1,4 @@
-using Test, MadNLP, MadNLPHSL, MadNLPTests, HSL
+using Test, MadNLP, MadNLPHSL, MadNLPTests, HSL, Quadmath
 
 testset = [
     [
@@ -40,9 +40,22 @@ testset = [
 
 @testset "MadNLPHSL test" begin
     if LIBHSL_isfunctional()
-        for hsl_solver in [Ma27Solver, Ma57Solver, Ma77Solver, Ma86Solver, Ma97Solver]
-            # MadNLPTests.test_linear_solver(hsl_solver,Float32)
-            MadNLPTests.test_linear_solver(hsl_solver,Float64)
+        for (hsl_solver, package) in [(Ma27Solver, "ma27"),
+                                      (Ma57Solver, "ma57"),
+                                      (Ma77Solver, "ma77"),
+                                      (Ma86Solver, "ma86"),
+                                      (Ma97Solver, "ma97")]
+            @testset "$package" begin
+                # MadNLPTests.test_linear_solver(hsl_solver,Float32)
+                @testset "Float64" begin
+                    MadNLPTests.test_linear_solver(hsl_solver,Float64)
+                end
+                if MadNLPHSL.is_supported(hsl_solver, Float128)
+                    @testset "Float128" begin
+                        MadNLPTests.test_linear_solver(hsl_solver,Float128)
+                    end
+                end
+            end
         end
         for (name,optimizer_constructor,exclude) in testset
             test_madnlp(name,optimizer_constructor,exclude)
