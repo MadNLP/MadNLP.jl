@@ -8,7 +8,7 @@ LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 MadNLP = "2621e9c9-9eb4-46b1-8089-e8c72242dfb6"
 
 [compat]
-HSL = "0.4.2"
+HSL = "0.4.2, 0.5"
 MadNLP = "0.5,0.6,0.7,0.8"
 MadNLPTests = "0.5"
 julia = "1.6"
