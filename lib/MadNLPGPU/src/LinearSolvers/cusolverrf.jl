@@ -23,8 +23,8 @@
 const CuSubVector{T} = SubArray{
     T,
     1,
-    CUDA.CuArray{T,1,CUDA.Mem.DeviceBuffer},
-    Tuple{CUDA.CuArray{Int64,1,CUDA.Mem.DeviceBuffer}},
+    CUDA.CuArray{T,1,CUDA.DeviceMemory},
+    Tuple{CUDA.CuArray{Int64,1,CUDA.DeviceMemory}},
     false,
 }
 
