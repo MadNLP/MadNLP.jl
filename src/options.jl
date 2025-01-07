@@ -182,7 +182,7 @@ function load_options(nlp; options...)
     opt_linear_solver = default_options(opt_ipm.linear_solver)
     iterator_options = set_options!(opt_linear_solver, linear_solver_options)
     # Initiate iterator options
-    opt_iterator = default_options(opt_ipm.iterator)
+    opt_iterator = default_options(opt_ipm.iterator, opt_ipm.tol)
     remaining_options = set_options!(opt_iterator, iterator_options)
 
     # Initiate logger
