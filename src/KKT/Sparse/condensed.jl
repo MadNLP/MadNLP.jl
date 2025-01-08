@@ -221,15 +221,18 @@ nzval(H) = H.nzval
 
     n = size(H,2)
 
+    # N.B.: we should ensure that zind is allocated on the proper device.
+    zind = similar(nzval(H), Int, size(H, 2))
+    zind .= 1:size(H, 2)
     map!(
         i->(-1,i,0),
         @view(sym[1:n]),
-        1:size(H,2)
+        zind,
     )
     map!(
         i->(i,i),
         @view(sym2[1:n]),
-        1:size(H,2)
+        zind,
     )
 
     _build_condensed_aug_symbolic_hess(
