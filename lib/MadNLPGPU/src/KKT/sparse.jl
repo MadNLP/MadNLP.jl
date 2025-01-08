@@ -112,12 +112,14 @@ function MadNLP.get_sparse_condensed_ext(
     jt_map,
     hess_map,
 ) where {T,VT<:CuVector{T}}
-    hess_com_ptr = map((i, j) -> (i, j), hess_map, 1:length(hess_map))
+    zvals = CuVector{Int}(1:length(hess_map))
+    hess_com_ptr = map((i, j) -> (i, j), hess_map, zvals)
     if length(hess_com_ptr) > 0 # otherwise error is thrown
         sort!(hess_com_ptr)
     end
 
-    jt_csc_ptr = map((i, j) -> (i, j), jt_map, 1:length(jt_map))
+    jvals = CuVector{Int}(1:length(jt_map))
+    jt_csc_ptr = map((i, j) -> (i, j), jt_map, jvals)
     if length(jt_csc_ptr) > 0 # otherwise error is thrown
         sort!(jt_csc_ptr)
     end
@@ -320,7 +322,8 @@ end
 function MadNLP.coo_to_csc(
     coo::MadNLP.SparseMatrixCOO{T,I,VT,VI},
 ) where {T,I,VT<:CuArray,VI<:CuArray}
-    coord = map((i, j, k) -> ((i, j), k), coo.I, coo.J, 1:length(coo.I))
+    zvals = CuVector{Int}(1:length(coo.I))
+    coord = map((i, j, k) -> ((i, j), k), coo.I, coo.J, zvals)
     if length(coord) > 0
         sort!(coord, lt = (((i, j), k), ((n, m), l)) -> (j, i) < (m, n))
     end
@@ -505,7 +508,8 @@ function MadNLP._set_con_scale_sparse!(
     jac_I,
     jac_buffer,
 ) where {T,VT<:CuVector{T}}
-    inds = map((i, j) -> (i, j), jac_I, 1:length(jac_I))
+    ind_jac = CuVector{Int}(1:length(jac_I))
+    inds = map((i, j) -> (i, j), jac_I, ind_jac)
     if !isempty(inds)
         sort!(inds)
     end
