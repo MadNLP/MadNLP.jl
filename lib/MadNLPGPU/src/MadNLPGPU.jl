@@ -42,13 +42,14 @@ function MadNLP.MadNLPOptions(
     kkt_system = dense_callback ? MadNLP.DenseCondensedKKTSystem : MadNLP.SparseCondensedKKTSystem,
     linear_solver = dense_callback ? LapackGPUSolver : CUDSSSolver,
     tol = MadNLP.get_tolerance(T,kkt_system),
-    ) where {T, VT <: CuVector{T}}
-
+    bound_relax_factor = (kkt_system == MadNLP.SparseCondensedKKTSystem) ? tol : 1e-8,
+) where {T, VT <: CuVector{T}}
     return MadNLP.MadNLPOptions(
         tol = tol,
         callback = callback,
         kkt_system = kkt_system,
         linear_solver = linear_solver,
+        bound_relax_factor = bound_relax_factor,
     )
 end
 

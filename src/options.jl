@@ -113,8 +113,7 @@ function MadNLPOptions(
     kkt_system = dense_callback ? DenseCondensedKKTSystem : SparseKKTSystem,
     linear_solver = dense_callback ? LapackCPUSolver : default_sparse_solver(nlp),
     tol = get_tolerance(T,kkt_system)
-    ) where T
-
+) where T
     return MadNLPOptions(
         tol = tol,
         callback = callback,
