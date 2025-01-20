@@ -88,6 +88,8 @@ for (
     potrf,
     potrf_buffer,
     potrs,
+    sytrs_buffer,
+    sytrs,
     typ,
     cutyp,
 ) in (
@@ -105,6 +107,8 @@ for (
         :cusolverDnDpotrf,
         :cusolverDnDpotrf_bufferSize,
         :cusolverDnDpotrs,
+        :cusolverDnXsytrs_bufferSize,
+        :cusolverDnXsytrs,
         Float64,
         CUDA.R_64F,
     ),
@@ -122,6 +126,8 @@ for (
         :cusolverDnSpotrf,
         :cusolverDnSpotrf_bufferSize,
         :cusolverDnSpotrs,
+        :cusolverDnXsytrs_bufferSize,
+        :cusolverDnXsytrs,
         Float32,
         CUDA.R_32F,
     ),
@@ -158,24 +164,7 @@ for (
         function solve_bunchkaufman!(M::LapackGPUSolver{$typ}, x)
             copyto!(M.etc[:ipiv64], M.etc[:ipiv])
             copyto!(M.rhs, x)
-            ccall(
-                (:cusolverDnXsytrs_bufferSize, libcusolver),
-                cusolverStatus_t,
-                (
-                    cusolverDnHandle_t,
-                    cublasFillMode_t,
-                    Int64,
-                    Int64,
-                    cudaDataType,
-                    CuPtr{Cdouble},
-                    Int64,
-                    CuPtr{Int64},
-                    cudaDataType,
-                    CuPtr{Cdouble},
-                    Int64,
-                    Ptr{Int64},
-                    Ptr{Int64},
-                ),
+            CUSOLVER.$sytrs_buffer(
                 dense_handle(),
                 CUBLAS_FILL_MODE_LOWER,
                 size(M.fact, 1),
@@ -192,27 +181,7 @@ for (
             )
             length(M.work) < M.lwork[] && resize!(M.work, Int(M.lwork[]))
             length(M.work_host) < M.lwork_host[] && resize!(work_host, Int(M.lwork_host[]))
-            ccall(
-                (:cusolverDnXsytrs, libcusolver),
-                cusolverStatus_t,
-                (
-                    cusolverDnHandle_t,
-                    cublasFillMode_t,
-                    Int64,
-                    Int64,
-                    cudaDataType,
-                    CuPtr{Cdouble},
-                    Int64,
-                    CuPtr{Int64},
-                    cudaDataType,
-                    CuPtr{Cdouble},
-                    Int64,
-                    CuPtr{Cdouble},
-                    Int64,
-                    Ptr{Cdouble},
-                    Int64,
-                    CuPtr{Int64},
-                ),
+            CUSOLVER.$sytrs(
                 dense_handle(),
                 CUBLAS_FILL_MODE_LOWER,
                 size(M.fact, 1),
