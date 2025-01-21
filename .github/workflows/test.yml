@@ -61,3 +61,40 @@ jobs:
           version: ${{ matrix.julia-version }}
       - uses: julia-actions/cache@v1
       - run: julia --color=yes --project=.ci .ci/ci.jl cuda
+  test-moonshot-hsl:
+    env:
+      CUDA_VISIBLE_DEVICES: 1
+      JULIA_DEPOT_PATH: /scratch/github-actions/julia_depot_madnlphsl/
+    runs-on: self-hosted
+    strategy:
+      matrix:
+        os: [ubuntu-24.04]
+        julia-version: ['1.10']
+        julia-arch: [x64]
+        hsl-version: ['2024.11.28'] # '2025.1.19'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: julia-actions/setup-julia@latest
+        with:
+          version: ${{ matrix.julia-version }}
+          arch: ${{ matrix.julia-arch }}
+      - uses: julia-actions/julia-buildpkg@latest
+      - name: Set HSL_VERSION as environment variable
+        run: echo "HSL_VERSION=${{ matrix.hsl-version }}" >> $GITHUB_ENV
+      - name: Install HSL_jll.jl
+        shell: julia --color=yes {0}
+        run: |
+          using Pkg
+          Pkg.activate("/scratch/github-actions/actions_runner_madnlphsl/_work/MadNLP.jl/MadNLP.jl/lib/MadNLPHSL")
+          path_HSL_jll = "/scratch/github-actions/actions_runner_madnlphsl/HSL_jll.jl.v" * ENV["HSL_VERSION"]
+          Pkg.develop(path=path_HSL_jll)
+      - name: Test HSL.jl
+        shell: julia --color=yes {0}
+        run: |
+          using Pkg
+          Pkg.develop(path=".")
+          Pkg.test("MadNLPHSL")
+      - uses: julia-actions/julia-processcoverage@v1
+      - uses: codecov/codecov-action@v5
+        with:
+          file: lcov.info
