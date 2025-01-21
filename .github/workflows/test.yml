@@ -86,7 +86,7 @@ jobs:
         run: |
           using Pkg
           Pkg.activate("/scratch/github-actions/actions_runner_madnlphsl/_work/MadNLP.jl/MadNLP.jl/lib/MadNLPHSL")
-          path_HSL_jll = "/scratch/github-actions/actions_runner_madnlphsl/HSL_jll.jl.v" * ENV["HSL_VERSION"]
+          path_HSL_jll = "/scratch/github-actions/actions_runner_hsl/HSL_jll.jl.v" * ENV["HSL_VERSION"]
           Pkg.develop(path=path_HSL_jll)
       - name: Test HSL.jl
         shell: julia --color=yes {0}
