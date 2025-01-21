@@ -92,7 +92,7 @@ jobs:
         shell: julia --color=yes {0}
         run: |
           using Pkg
-          Pkg.develop(path=".")
+          Pkg.develop(path="/scratch/github-actions/actions_runner_madnlphsl/_work/MadNLP.jl/MadNLP.jl/lib/MadNLPHSL")
           Pkg.test("MadNLPHSL")
       - uses: julia-actions/julia-processcoverage@v1
       - uses: codecov/codecov-action@v5
