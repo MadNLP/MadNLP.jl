@@ -26,7 +26,7 @@ jobs:
           version: ${{ matrix.julia-version }} 
       - uses: julia-actions/cache@v1
       - run: julia --color=yes --project=.ci .ci/ci.jl basic
-  test-moonshot:
+  test-mit:
     env:
       JULIA_DEPOT_PATH: /home/sushin/actions-runner/madnlp-depot/
     runs-on: self-hosted
@@ -43,10 +43,10 @@ jobs:
       - uses: julia-actions/julia-processcoverage@v1
         with:
           directories: src,lib/MadNLPHSL/src,lib/MadNLPPardiso/src,lib/MadNLPMumps/src,lib/MadNLPKrylov/src
-      - uses: codecov/codecov-action@v1
+      - uses: codecov/codecov-action@v5
         with:
           file: lcov.info
-  test-moonshot-cuda:
+  test-cuda:
     env:
       CUDA_VISIBLE_DEVICES: 1
       JULIA_DEPOT_PATH: /home/sushin/actions-runner/madnlp-depot/
@@ -61,3 +61,33 @@ jobs:
           version: ${{ matrix.julia-version }}
       - uses: julia-actions/cache@v1
       - run: julia --color=yes --project=.ci .ci/ci.jl cuda
+  test-madnlphsl:
+    env:
+      CUDA_VISIBLE_DEVICES: 1
+      JULIA_DEPOT_PATH: /scratch/github-actions/julia_depot_madnlphsl/
+    runs-on: self-hosted
+    strategy:
+      matrix:
+        julia-version: ['1.10']
+        hsl-version: ['2024.11.28'] # '2025.1.19'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: julia-actions/setup-julia@latest
+        with:
+          version: ${{ matrix.julia-version }}
+      - uses: julia-actions/julia-buildpkg@latest
+      - name: Set HSL_VERSION as environment variable
+        run: echo "HSL_VERSION=${{ matrix.hsl-version }}" >> $GITHUB_ENV
+      - name: Install HSL_jll.jl
+        shell: julia --color=yes {0}
+        run: |
+          using Pkg
+          Pkg.activate("./lib/MadNLPHSL")
+          path_HSL_jll = "/scratch/github-actions/actions_runner_madnlphsl/HSL_jll.jl.v" * ENV["HSL_VERSION"]
+          Pkg.develop(path=path_HSL_jll)
+      - name: Test MadNLPHSL.jl
+        shell: julia --color=yes {0}
+        run: |
+          using Pkg
+          Pkg.develop(path="./lib/MadNLPHSL")
+          Pkg.test("MadNLPHSL")
