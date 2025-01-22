@@ -26,7 +26,7 @@ jobs:
           version: ${{ matrix.julia-version }} 
       - uses: julia-actions/cache@v1
       - run: julia --color=yes --project=.ci .ci/ci.jl basic
-  test-moonshot:
+  test-mit:
     env:
       JULIA_DEPOT_PATH: /home/sushin/actions-runner/madnlp-depot/
     runs-on: self-hosted
@@ -46,7 +46,7 @@ jobs:
       - uses: codecov/codecov-action@v1
         with:
           file: lcov.info
-  test-moonshot-cuda:
+  test-cuda:
     env:
       CUDA_VISIBLE_DEVICES: 1
       JULIA_DEPOT_PATH: /home/sushin/actions-runner/madnlp-depot/
@@ -61,7 +61,7 @@ jobs:
           version: ${{ matrix.julia-version }}
       - uses: julia-actions/cache@v1
       - run: julia --color=yes --project=.ci .ci/ci.jl cuda
-  test-moonshot-hsl:
+  test-madnlphsl:
     env:
       CUDA_VISIBLE_DEVICES: 1
       JULIA_DEPOT_PATH: /scratch/github-actions/julia_depot_madnlphsl/
@@ -86,7 +86,7 @@ jobs:
         run: |
           using Pkg
           Pkg.activate("/scratch/github-actions/actions_runner_madnlphsl/_work/MadNLP.jl/MadNLP.jl/lib/MadNLPHSL")
-          path_HSL_jll = "/scratch/github-actions/actions_runner_hsl/HSL_jll.jl.v" * ENV["HSL_VERSION"]
+          path_HSL_jll = "/scratch/github-actions/actions_runner_madnlphsl/HSL_jll.jl.v" * ENV["HSL_VERSION"]
           Pkg.develop(path=path_HSL_jll)
       - name: Test MadNLPHSL.jl
         shell: julia --color=yes {0}
