@@ -75,7 +75,6 @@ jobs:
       - uses: julia-actions/setup-julia@latest
         with:
           version: ${{ matrix.julia-version }}
-          arch: ${{ matrix.julia-arch }}
       - uses: julia-actions/julia-buildpkg@latest
       - name: Set HSL_VERSION as environment variable
         run: echo "HSL_VERSION=${{ matrix.hsl-version }}" >> $GITHUB_ENV
