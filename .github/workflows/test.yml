@@ -68,9 +68,7 @@ jobs:
     runs-on: self-hosted
     strategy:
       matrix:
-        os: [ubuntu-24.04]
         julia-version: ['1.10']
-        julia-arch: [x64]
         hsl-version: ['2024.11.28'] # '2025.1.19'
     steps:
       - uses: actions/checkout@v4
@@ -85,14 +83,14 @@ jobs:
         shell: julia --color=yes {0}
         run: |
           using Pkg
-          Pkg.activate("/scratch/github-actions/actions_runner_madnlphsl/_work/MadNLP.jl/MadNLP.jl/lib/MadNLPHSL")
+          Pkg.activate("./lib/MadNLPHSL")
           path_HSL_jll = "/scratch/github-actions/actions_runner_madnlphsl/HSL_jll.jl.v" * ENV["HSL_VERSION"]
           Pkg.develop(path=path_HSL_jll)
       - name: Test MadNLPHSL.jl
         shell: julia --color=yes {0}
         run: |
           using Pkg
-          Pkg.develop(path="/scratch/github-actions/actions_runner_madnlphsl/_work/MadNLP.jl/MadNLP.jl/lib/MadNLPHSL")
+          Pkg.develop(path="./lib/MadNLPHSL")
           Pkg.test("MadNLPHSL")
       - uses: julia-actions/julia-processcoverage@v1
       - uses: codecov/codecov-action@v5
