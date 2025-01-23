@@ -7,98 +7,59 @@
     ma77_order::Ordering = METIS
     ma77_print_level::Int = -1
     ma77_small::Float64 = 1e-20
-    ma77_static::Float64 = 0.
+    ma77_static::Float64 = 0.0
     ma77_u::Float64 = 1e-8
     ma77_umax::Float64 = 1e-4
 end
 
-mutable struct Ma77Solver{T} <: AbstractLinearSolver{T}
-    tril::SparseMatrixCSC{T,Int32}
-    full::SparseMatrixCSC{T,Int32}
+mutable struct Ma77Solver{T,INT} <: AbstractLinearSolver{T}
+    tril::SparseMatrixCSC{T,INT}
+    full::SparseMatrixCSC{T,INT}
     tril_to_full_view::SubVector{T}
 
-    control::ma77_control{T}
-    info::ma77_info{T}
+    control::Ma77Control{T,INT}
+    info::Ma77Info{T,INT}
 
-    mc68_control::mc68_control
-    mc68_info::mc68_info
+    mc68_control::Mc68Control{INT}
+    mc68_info::Mc68Info{INT}
 
-    order::Vector{Int32}
-    keep::Vector{Ptr{Nothing}}
+    order::Vector{INT}
+    keep::Vector{Ptr{Cvoid}}
 
     opt::Ma77Options
     logger::MadNLPLogger
 end
 
-for (fdefault, fanalyse, ffactor, fsolve, ffinalise, fopen, finputv, finputr, typ) in [
-    (:ma77_default_control_d, :ma77_analyse_d,
-     :ma77_factor_d, :ma77_solve_d, :ma77_finalise_d,
-     :ma77_open_d, :ma77_input_vars_d, :ma77_input_reals_d, Float64),
-    (:ma77_default_control_s, :ma77_analyse_s,
-     :ma77_factor_s, :ma77_solve_s, :ma77_finalise_s,
-     :ma77_open_s, :ma77_input_vars_s, :ma77_input_reals_s, Float32),
-    ]
-    @eval begin
-        ma77_default_control(control::ma77_control{$typ}
-        ) = HSL.$fdefault(control)
-
-        ma77_open(
-            n::Cint,fname1::String,fname2::String,fname3::String,fname4::String,
-            keep::Vector{Ptr{Cvoid}},control::ma77_control{$typ},info::ma77_info{$typ}
-        ) = HSL.$fopen(n,fname1,fname2,fname3,fname4,keep,control,info)
-
-        ma77_input_vars(
-            idx::Cint,nvar::Cint,list::Vector{Cint},
-            keep::Vector{Ptr{Cvoid}},control::ma77_control{$typ},info::ma77_info{$typ}
-        ) = HSL.$finputv(idx,nvar,list,keep,control,info)
-
-        ma77_input_reals(
-            idx::Cint,length::Cint,reals::Vector{$typ},
-            keep::Vector{Ptr{Cvoid}},control::ma77_control{$typ},info::ma77_info{$typ}
-        ) = HSL.$finputr(idx,length,reals,keep,control,info)
-
-        ma77_analyse(
-            order::Vector{Cint},
-            keep::Vector{Ptr{Cvoid}},control::ma77_control{$typ},info::ma77_info{$typ}
-        ) = HSL.$fanalyse(order,keep,control,info)
-
-        ma77_factor(
-            posdef::Cint,keep::Vector{Ptr{Cvoid}},control::ma77_control{$typ},info::ma77_info{$typ},
-            scale::Ptr{Nothing}
-        ) = HSL.$ffactor(posdef,keep,control,info,scale)
-
-        ma77_solve(
-            job::Cint,nrhs::Cint,lx::Cint,x::Vector{$typ},
-            keep::Vector{Ptr{Cvoid}},control::ma77_control{$typ},info::ma77_info{$typ},
-            scale::Ptr{Nothing}
-        ) = HSL.$fsolve(job,nrhs,lx,x,keep,control,info,scale)
-
-        ma77_finalize(
-            keep::Vector{Ptr{Cvoid}},control::ma77_control{$typ},info::ma77_info{$typ}
-        ) = HSL.$ffinalise(keep,control,info)
-    end
-end
-
 function Ma77Solver(
-    csc::SparseMatrixCSC{T,Int32};
-    opt=Ma77Options(),logger=MadNLPLogger(),
-) where T
-    full,tril_to_full_view = get_tril_to_full(csc)
-    order = Vector{Int32}(undef,csc.n)
+    csc::SparseMatrixCSC{T,INT};
+    opt = Ma77Options(),
+    logger = MadNLPLogger(),
+) where {T,INT}
+    full, tril_to_full_view = get_tril_to_full(csc)
+    order = Vector{INT}(undef, csc.n)
 
-    mc68info = mc68_info()
-    mc68control = mc68_control()
-    HSL.mc68_default_control_i(mc68control)
+    mc68info = Mc68Info{INT}()
+    mc68control = Mc68Control{INT}()
+    HSL.mc68_default_control(INT, mc68control)
 
     keep = [C_NULL]
 
-    mc68control.f_array_in=1
-    mc68control.f_array_out=1
-    HSL.mc68_order_i(Int32(opt.ma77_order),Int32(csc.n),csc.colptr,csc.rowval,order,mc68control,mc68info)
+    mc68control.f_array_in = 1
+    mc68control.f_array_out = 1
+    HSL.mc68_order(
+        INT,
+        INT(opt.ma77_order),
+        INT(csc.n),
+        csc.colptr,
+        csc.rowval,
+        order,
+        mc68control,
+        mc68info,
+    )
 
-    info=ma77_info{T}()
-    control=ma77_control{T}()
-    ma77_default_control(control)
+    info = Ma77Info{T,INT}()
+    control = Ma77Control{T,INT}()
+    HSL.ma77_default_control(T, INT, control)
     control.f_arrays = 1
     control.bits = 32
     control.file_size = opt.ma77_file_size
@@ -113,81 +74,123 @@ function Ma77Solver(
     control.static_ = opt.ma77_static
     control.u = opt.ma77_u
 
-    ma77_open(
-        Int32(full.n),
-        tempname(cleanup=false), tempname(cleanup=false), tempname(cleanup=false), tempname(cleanup=false),
-        keep,control,info
+    HSL.ma77_open(
+        T,
+        INT,
+        INT(full.n),
+        tempname(cleanup = false),
+        tempname(cleanup = false),
+        tempname(cleanup = false),
+        tempname(cleanup = false),
+        keep,
+        control,
+        info,
     )
 
     info.flag < 0 && throw(SymbolicException())
 
-    for i=1:full.n
-        ma77_input_vars(
-            Int32(i),full.colptr[i+1]-full.colptr[i],
+    for i = 1:full.n
+        HSL.ma77_input_vars(
+            T,
+            INT,
+            INT(i),
+            full.colptr[i+1] - full.colptr[i],
             _madnlp_unsafe_wrap(
                 full.rowval,
-                full.colptr[i+1]-full.colptr[i],
-                full.colptr[i]
+                full.colptr[i+1] - full.colptr[i],
+                full.colptr[i],
             ),
-            keep,control,info);
+            keep,
+            control,
+            info,
+        )
         info.flag < 0 && throw(LinearSymbolicException())
     end
 
-    ma77_analyse(order,keep,control,info)
-    info.flag<0 && throw(SymbolicException())
+    HSL.ma77_analyse(T, INT, order, keep, control, info)
+    info.flag < 0 && throw(SymbolicException())
 
-    M = Ma77Solver{T}(csc,full,tril_to_full_view,
-                   control,info,mc68control,mc68info,order,keep,opt,logger)
-    finalizer(finalize,M)
+    M = Ma77Solver{T,INT}(
+        csc,
+        full,
+        tril_to_full_view,
+        control,
+        info,
+        mc68control,
+        mc68info,
+        order,
+        keep,
+        opt,
+        logger,
+    )
+    finalizer(finalize, M)
     return M
 end
 
-function factorize!(M::Ma77Solver)
-    M.full.nzval.=M.tril_to_full_view
-    for i=1:M.full.n
-        ma77_input_reals(
-            Int32(i),M.full.colptr[i+1]-M.full.colptr[i],
+function factorize!(M::Ma77Solver{T,INT}) where {T,INT}
+    M.full.nzval .= M.tril_to_full_view
+    for i = 1:M.full.n
+        HSL.ma77_input_reals(
+            T,
+            INT,
+            INT(i),
+            M.full.colptr[i+1] - M.full.colptr[i],
             _madnlp_unsafe_wrap(
                 M.full.nzval,
-                M.full.colptr[i+1]-M.full.colptr[i],
-                M.full.colptr[i]
+                M.full.colptr[i+1] - M.full.colptr[i],
+                M.full.colptr[i],
             ),
-            M.keep,M.control,M.info
+            M.keep,
+            M.control,
+            M.info,
         )
         M.info.flag < 0 && throw(FactorizationException())
     end
-    ma77_factor(Int32(0),M.keep,M.control,M.info,C_NULL)
+    HSL.ma77_factor(T, INT, INT(0), M.keep, M.control, M.info, C_NULL)
     M.info.flag < 0 && throw(FactorizationException())
     return M
 end
-function solve!(M::Ma77Solver{T},rhs::Vector{T}) where T
-    ma77_solve(Int32(0),Int32(1),Int32(M.full.n),rhs,M.keep,M.control,M.info,C_NULL);
+function solve!(M::Ma77Solver{T,INT}, rhs::Vector{T}) where {T,INT}
+    HSL.ma77_solve(
+        T,
+        INT,
+        INT(0),
+        INT(1),
+        INT(M.full.n),
+        rhs,
+        M.keep,
+        M.control,
+        M.info,
+        C_NULL,
+    )
     M.info.flag < 0 && throw(SolveException())
     return rhs
 end
 
 is_inertia(::Ma77Solver) = true
 function inertia(M::Ma77Solver)
-    return (M.info.matrix_rank-M.info.num_neg,M.full.n-M.info.matrix_rank,M.info.num_neg)
+    return (
+        M.info.matrix_rank - M.info.num_neg,
+        M.full.n - M.info.matrix_rank,
+        M.info.num_neg,
+    )
 end
 
-function finalize(M::Ma77Solver{T}) where T
-    
-    ma77_finalize(M.keep,M.control,M.info)
+function finalize(M::Ma77Solver{T,INT}) where {T,INT}
+    HSL.ma77_finalise(T, INT, M.keep, M.control, M.info)
 end
 
 function improve!(M::Ma77Solver)
     if M.control.u == M.opt.ma77_umax
-        @debug(M.logger,"improve quality failed.")
+        @debug(M.logger, "improve quality failed.")
         return false
     end
-    M.control.u = min(M.opt.ma77_umax,M.control.u^.75)
-    @debug(M.logger,"improved quality: pivtol = $(M.control.u)")
+    M.control.u = min(M.opt.ma77_umax, M.control.u^0.75)
+    @debug(M.logger, "improved quality: pivtol = $(M.control.u)")
     return true
 end
 
-introduce(::Ma77Solver)="ma77 v$(HSL.HSL_MA77_version())"
+introduce(::Ma77Solver) = "ma77 v$(HSL.HSL_MA77_version())"
 input_type(::Type{Ma77Solver}) = :csc
 default_options(::Type{Ma77Solver}) = Ma77Options()
-is_supported(::Type{Ma77Solver},::Type{Float32}) = true
-is_supported(::Type{Ma77Solver},::Type{Float64}) = true
+is_supported(::Type{Ma77Solver}, ::Type{T}) where T <: AbstractFloat = HSL.is_supported(Val(:hsl_ma77), T)
