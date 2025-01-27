@@ -73,6 +73,7 @@ function create_kkt_system(
     linear_solver::Type;
     opt_linear_solver=default_options(linear_solver),
     hessian_approximation=ExactHessian,
+    qn_options=QuasiNewtonOptions(),
 ) where {T,VT}
 
     n_slack = length(ind_cons.ind_ineq)
@@ -85,7 +86,7 @@ function create_kkt_system(
     jac_sparsity_J = create_array(cb, Int32, cb.nnzj)
     _jac_sparsity_wrapper!(cb,jac_sparsity_I, jac_sparsity_J)
 
-    quasi_newton = create_quasi_newton(hessian_approximation, cb, n)
+    quasi_newton = create_quasi_newton(hessian_approximation, cb, n; options=qn_options)
     hess_sparsity_I, hess_sparsity_J = build_hessian_structure(cb, hessian_approximation)
 
     nlb = length(ind_cons.ind_lb)
