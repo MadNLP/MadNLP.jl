@@ -20,6 +20,7 @@ makedocs(
         "Tutorials" => [
             "Multi-precision" => "tutorials/multiprecision.md",
             "Warm-start" => "tutorials/warmstart.md",
+            "LBFGS" => "tutorials/lbfgs.md",
         ],
         "Manual" => [
             "IPM solver" => "man/solver.md",

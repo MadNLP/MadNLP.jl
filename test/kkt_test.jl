@@ -34,7 +34,6 @@ end
     (MadNLP.DenseCondensedKKTSystem, MadNLP.DenseCallback),
 ]
     linear_solver = MadNLP.LapackCPUSolver
-    cnt = MadNLP.MadNLPCounters(; start_time=time())
 
     nlp = MadNLPTests.HS15Model()
     ind_cons = MadNLP.get_index_constraints(nlp)
@@ -50,5 +49,32 @@ end
         linear_solver;
     )
     MadNLPTests.test_kkt_system(kkt, cb)
+end
+
+@testset "[KKT system] $(KKTSystem)+LBFGS" for (KKTSystem, Callback) in [
+    (MadNLP.SparseKKTSystem, MadNLP.SparseCallback),
+    (MadNLP.SparseUnreducedKKTSystem, MadNLP.SparseCallback),
+    (MadNLP.SparseCondensedKKTSystem, MadNLP.SparseCallback),
+    (MadNLP.ScaledSparseKKTSystem, MadNLP.SparseCallback),
+]
+    linear_solver = MadNLP.LapackCPUSolver
+    nlp = MadNLPTests.HS15Model()
+    ind_cons = MadNLP.get_index_constraints(nlp)
+    cb = MadNLP.create_callback(Callback, nlp)
+    # Define options for LBFGS
+    p = 20
+    qn_options = MadNLP.QuasiNewtonOptions(; max_history=p)
+
+    kkt = MadNLP.create_kkt_system(
+        KKTSystem,
+        cb,
+        ind_cons,
+        linear_solver;
+        hessian_approximation=MadNLP.CompactLBFGS,
+        qn_options=qn_options,
+    )
+    @test isa(kkt.quasi_newton, MadNLP.CompactLBFGS)
+    # Test options are correctly passed to MadNLP
+    @test kkt.quasi_newton.max_mem == p
 end
 
