@@ -34,7 +34,7 @@ function initialize!(solver::AbstractMadNLPSolver{T}) where T
         solver.y,
         solver.rhs,
         solver.ind_ineq;
-        tol=opt.tol,
+        tol=opt.bound_relax_factor,
         bound_push=opt.bound_push,
         bound_fac=opt.bound_fac,
     )
@@ -216,7 +216,7 @@ function regular!(solver::AbstractMadNLPSolver{T}) where T
         if (solver.cnt.k!=0 && !solver.opt.jacobian_constant)
             eval_jac_wrapper!(solver, solver.kkt, solver.x)
         end
-        
+
         jtprod!(solver.jacl, solver.kkt, solver.y)
         sd = get_sd(solver.y,solver.zl_r,solver.zu_r,T(solver.opt.s_max))
         sc = get_sc(solver.zl_r,solver.zu_r,T(solver.opt.s_max))
