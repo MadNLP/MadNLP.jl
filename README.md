@@ -127,17 +127,26 @@ model = Model(()->MadNLP.Optimizer(linear_solver=RFSolver))         # for sparse
 If you use MadNLP.jl in your research, we would greatly appreciate your citing it.
 
 ```bibtex
-@article{shin2023accelerating,
+@article{shin2024accelerating,
   title={Accelerating optimal power flow with {GPU}s: {SIMD} abstraction of nonlinear programs and condensed-space interior-point methods},
-  author={Shin, Sungho and Pacaud, Fran{\c{c}}ois and Anitescu, Mihai},
-  journal={arXiv preprint arXiv:2307.16830},
-  year={2023}
+  author={Shin, Sungho and Anitescu, Mihai and Pacaud, Fran{\c{c}}ois},
+  journal={Electric Power Systems Research},
+  volume={236},
+  pages={110651},
+  year={2024},
+  publisher={Elsevier}
 }
-@article{shin2020graph,
-  title={Graph-Based Modeling and Decomposition of Energy Infrastructures},
+@article{shin2021graph,
+  title={Graph-based modeling and decomposition of energy infrastructures},
   author={Shin, Sungho and Coffrin, Carleton and Sundar, Kaarthik and Zavala, Victor M},
-  journal={arXiv preprint arXiv:2010.02404},
-  year={2020}
+  journal={IFAC-PapersOnLine},
+  volume={54},
+  number={3},
+  pages={693--698},
+  year={2021},
+  publisher={Elsevier}
+}
+
 }
 ```
 
