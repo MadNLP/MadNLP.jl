@@ -146,8 +146,6 @@ If you use MadNLP.jl in your research, we would greatly appreciate your citing i
   year={2021},
   publisher={Elsevier}
 }
-
-}
 ```
 
 ## Supporting MadNLP.jl
