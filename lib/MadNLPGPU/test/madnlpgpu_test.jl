@@ -37,6 +37,15 @@ testset = [
         [],
     ],
     [
+        "CUDSS-NOPIVOTING",
+        ()->MadNLP.Optimizer(
+            linear_solver=MadNLPGPU.CUDSSSolver,
+            print_level=MadNLP.ERROR,
+            pivoting=false,
+        ),
+        [],
+    ],
+    [
         "CUSOLVERRF",
         ()->MadNLP.Optimizer(
             linear_solver=MadNLPGPU.RFSolver,
