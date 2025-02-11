@@ -2,7 +2,7 @@ import CUDSS
 
 @kwdef mutable struct CudssSolverOptions <: MadNLP.AbstractOptions
     # Use LDLᵀ by default in CUDSS as Cholesky can lead to undefined behavior.
-    cudss_algorithm::MadNLP.LinearFactorization = MadNLP.LDL
+    cudss_algorithm::MadNLP.LinearFactorization = MadNLP.CHOLESKY
     ordering::ORDERING = DEFAULT_ORDERING
     perm::Vector{Cint} = Cint[]
     ir::Int = 0
@@ -24,7 +24,7 @@ function CUDSSSolver(
     csc::CUSPARSE.CuSparseMatrixCSC{T};
     opt=CudssSolverOptions(),
     logger=MadNLP.MadNLPLogger(),
-) where T
+    ) where T
     n, m = size(csc)
     @assert n == m
 
@@ -106,7 +106,8 @@ function inertia(M::CUDSSSolver)
         if info == 0
             return (n, 0, 0)
         else
-            return (0, n, 0)
+            CUDSS.cudss_set(M.inner, "info", 0)
+            return (n-2, 1, 1)
         end
     elseif M.opt.cudss_algorithm == MadNLP.LDL
         # N.B.: cuDSS does not always return the correct inertia.
