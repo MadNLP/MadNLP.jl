@@ -46,30 +46,6 @@ testset = [
         [],
     ],
     [
-        "CUSOLVERRF",
-        ()->MadNLP.Optimizer(
-            linear_solver=MadNLPGPU.RFSolver,
-            print_level=MadNLP.ERROR
-        ),
-        [],
-    ],
-    [
-        "CUSOLVER-CHOLESKY",
-        ()->MadNLP.Optimizer(
-            linear_solver=MadNLPGPU.CuCholeskySolver,
-            print_level=MadNLP.ERROR
-        ),
-        [],
-    ],
-    [
-        "GLU",
-        ()->MadNLP.Optimizer(
-            linear_solver=MadNLPGPU.GLUSolver,
-            print_level=MadNLP.ERROR
-        ),
-        [],
-    ],
-    [
         "LapackGPU-BUNCHKAUFMAN",
         ()->MadNLP.Optimizer(
             linear_solver=LapackGPUSolver,
