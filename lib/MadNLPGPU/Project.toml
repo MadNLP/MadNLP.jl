@@ -15,7 +15,7 @@ SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 [compat]
 AMD = "0.5"
 CUDA = "5.4.0"
-CUDSS = "0.3.1, 0.4"
+CUDSS = "0.4.3"
 KernelAbstractions = "0.9"
 MadNLP = "0.7, 0.8"
 MadNLPTests = "0.5"
