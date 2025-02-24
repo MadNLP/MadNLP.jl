@@ -1,3 +1,10 @@
+@enum ORDERING begin
+    DEFAULT_ORDERING = 0
+    METIS_ORDERING = 1
+    AMD_ORDERING = 2
+    USER_ORDERING = 3
+end
+
 function MadNLP._madnlp_unsafe_wrap(vec::VT, n, shift=1) where {T, VT <: CuVector{T}}
     return view(vec,shift:shift+n-1)
 end

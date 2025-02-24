@@ -7,6 +7,7 @@ import CUDSS
     perm::Vector{Cint} = Cint[]
     ir::Int = 0
     hybrid::Bool = false
+    pivoting::Bool = true
 end
 
 mutable struct CUDSSSolver{T} <: MadNLP.AbstractLinearSolver{T}
@@ -65,6 +66,7 @@ function CUDSSSolver(
     end
     (opt.ir > 0) && CUDSS.cudss_set(solver, "ir_n_steps", opt.ir)
     opt.hybrid && CUDSS.cudss_set(solver, "hybrid_mode", 1)
+    !opt.pivoting && CUDSS.cudss_set(solver, "pivot_type", 'N')
 
     x_gpu = CUDA.zeros(T, n)
     b_gpu = CUDA.zeros(T, n)

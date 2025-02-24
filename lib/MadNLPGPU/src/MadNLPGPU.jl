@@ -10,7 +10,6 @@ import .CUSOLVER:
     cusolverStatus_t, CuPtr, cudaDataType, cublasFillMode_t, cusolverDnHandle_t, dense_handle
 import .CUBLAS: handle, CUBLAS_DIAG_NON_UNIT,
     CUBLAS_FILL_MODE_LOWER, CUBLAS_FILL_MODE_UPPER, CUBLAS_SIDE_LEFT, CUBLAS_OP_N, CUBLAS_OP_T
-import CUSOLVERRF
 
 # Kernels
 import KernelAbstractions: @kernel, @index, synchronize, @Const
@@ -31,7 +30,6 @@ include("utils.jl")
 include("KKT/dense.jl")
 include("KKT/sparse.jl")
 include("LinearSolvers/lapackgpu.jl")
-include("LinearSolvers/cusolverrf.jl")
 include("LinearSolvers/cudss.jl")
 
 # option preset
@@ -52,7 +50,7 @@ function MadNLP.MadNLPOptions(
     )
 end
 
-export LapackGPUSolver, CuCholeskySolver, RFSolver
+export LapackGPUSolver
 
 # re-export MadNLP, including deprecated names
 for name in names(MadNLP, all=true)
