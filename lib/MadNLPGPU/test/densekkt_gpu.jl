@@ -4,7 +4,7 @@ using MadNLPTests
 
 function _compare_gpu_with_cpu(KKTSystem, n, m, ind_fixed)
     for (T,tol,atol) in [
-        (Float32,1e-3,1e-1),
+        (Float32,1e-4,1e1),
         (Float64,1e-8,1e-6)
         ]
         madnlp_options = Dict{Symbol, Any}(

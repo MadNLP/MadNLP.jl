@@ -45,9 +45,9 @@ end
 
     # NLP options
     kappa_d::Float64 = 1e-5
-    fixed_variable_treatment::Type = kkt_system <: MadNLP.SparseCondensedKKTSystem ? MadNLP.RelaxBound : MadNLP.MakeParameter 
+    fixed_variable_treatment::Type = kkt_system <: MadNLP.SparseCondensedKKTSystem ? MadNLP.RelaxBound : MadNLP.MakeParameter
     equality_treatment::Type = kkt_system <: MadNLP.SparseCondensedKKTSystem ? MadNLP.RelaxEquality : MadNLP.EnforceEquality
-    boudn_relax_factor::Float64 = 1e-8
+    bound_relax_factor::Float64 = 1e-8
     jacobian_constant::Bool = false
     hessian_constant::Bool = false
     hessian_approximation::Type = ExactHessian
@@ -113,8 +113,7 @@ function MadNLPOptions(
     kkt_system = dense_callback ? DenseCondensedKKTSystem : SparseKKTSystem,
     linear_solver = dense_callback ? LapackCPUSolver : default_sparse_solver(nlp),
     tol = get_tolerance(T,kkt_system)
-    ) where T
-
+) where T
     return MadNLPOptions(
         tol = tol,
         callback = callback,
@@ -171,9 +170,9 @@ function _get_primary_options(options)
 end
 
 function load_options(nlp; options...)
-    
+
     primary_opt, options = _get_primary_options(options)
-    
+
     # Initiate interior-point options
     opt_ipm = MadNLPOptions(nlp; primary_opt...)
     linear_solver_options = set_options!(opt_ipm, options)

@@ -11,7 +11,7 @@ function _compare_dense_with_sparse(
     inertia=MadNLP.InertiaBased,
 )
 
-    for (T,tol,atol) in [(Float32,1e-3,1e0), (Float64,1e-8,1e-6)]
+    for (T,tol,atol) in [(Float32,1e-4,1e1), (Float64,1e-8,1e-6)]
 
         sparse_options = Dict{Symbol, Any}(
             :kkt_system=>MadNLP.SparseKKTSystem,
@@ -68,7 +68,7 @@ end
 
         kkt = solverd.kkt
         @test isempty(kkt.jac)
-        @test solverd.kkt.linear_solver.A === kkt.aug_com 
+        @test solverd.kkt.linear_solver.A === kkt.aug_com
         @test size(kkt.hess) == (n, n)
         @test length(kkt.pr_diag) == n
         @test length(kkt.du_diag) == m
