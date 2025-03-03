@@ -57,7 +57,7 @@ all the variables in the problem are coupled, resulting in a dense Hessian matri
 Hence, the problem is good candidate for a quasi-Newton algorithm.
 
 We start by solving the problem with the default options in MadNLP,
-using the dense linear solver Lapack:
+using a dense linear solver from LAPACK:
 
 ```@example lbfgs
 nh = 10
