@@ -137,7 +137,7 @@ the KKT system solved in MadNLP rewrites as
 A & -I & 0
 \end{bmatrix}
 \begin{bmatrix}
-\Delta x \\ \Delta s \\ Delta y
+\Delta x \\ \Delta s \\ \Delta y
 \end{bmatrix}
 =
 \begin{bmatrix}
@@ -150,7 +150,12 @@ The method is detailed e.g. in Section 3.8 of [that paper](https://link.springer
 
 
 !!! info
-    As MadNLP is designed to solve constrained optimization problems,
+    As MadNLP is designed to solve generic constrained optimization problems,
     it does not approximate the inverse of the Hessian matrix, as done
-    in most implementations of the LBFGS algorithm.
+    in other implementations of the LBFGS algorithm specialized
+    on solving nonlinear problems with bound constraints.
+    If your problem has no generic nonlinear constraints, we recommend for optimal performance
+    using [LBFGSB](https://dl.acm.org/doi/pdf/10.1145/279232.279236)
+    or the LBFGS implemented in [JSOSolvers.jl](https://github.com/JuliaSmoothOptimizers/JSOSolvers.jl/blob/main/src/lbfgs.jl).
+
 
