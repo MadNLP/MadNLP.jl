@@ -126,7 +126,7 @@ B_k = \xi_k I + U_k V_k^\top
 ```
 with ``\xi > 0`` a scaling factor, ``U_k`` and ``V_k`` two ``n \times 2p`` matrices.
 The number ``p`` denotes the number of vectors used when computing the limited memory updates
-(the parameter ``max_history`` in MadNLP): the larger, the more accurate is the low-rank approximation.
+(the parameter `max_history` in MadNLP): the larger, the more accurate is the low-rank approximation.
 
 Replacing the Hessian of the Lagrangian ``W_k`` by the low-rank matrix ``B_k``,
 the KKT system solved in MadNLP rewrites as
