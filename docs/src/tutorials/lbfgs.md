@@ -151,6 +151,6 @@ The method is detailed e.g. in Section 3.8 of [that paper](https://link.springer
 
 !!! info
     As MadNLP is designed to solve constrained optimization problems,
-    it does not approximate the inverse of the Hessian matrix, as it is done
+    it does not approximate the inverse of the Hessian matrix, as done
     in most implementations of the LBFGS algorithm.
 
