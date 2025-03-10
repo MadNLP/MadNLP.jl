@@ -42,7 +42,13 @@ function eval_cons_wrapper!(solver::AbstractMadNLPSolver, c::AbstractVector{T}, 
         variable(x),
         c,
     )
-    view(c,solver.ind_ineq) .-= slack(x)
+    if solver.opt.slack_reset
+        slack(x) .= view(c, solver.ind_ineq)
+        view(c,solver.ind_ineq) .= 0.0
+    else
+        view(c,solver.ind_ineq) .-= slack(x)
+    end
+
     c .-= solver.rhs
     cnt.con_cnt+=1
     if cnt.con_cnt == 1 && !is_valid(c)

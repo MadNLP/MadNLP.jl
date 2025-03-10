@@ -93,6 +93,7 @@ end
     kappa_sigma::T = 1e10
     barrier_tol_factor::T = 10.
     rho::T = 1000.
+    slack_reset::Bool = false
 
     # Barrier
     # mu_min by courtesy of Ipopt
