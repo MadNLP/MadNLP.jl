@@ -93,6 +93,7 @@ end
     kappa_sigma::Float64 = 1e10
     barrier_tol_factor::Float64 = 10.
     rho::Float64 = 1000.
+    slack_reset::Bool = false
 
     # Barrier
     mu_init::Float64 = 1e-1
