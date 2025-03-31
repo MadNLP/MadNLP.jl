@@ -81,16 +81,27 @@ end
     colsca_from_mumps::Cint = 0
     rowsca_from_mumps::Cint = 0
 
+    colsca_loc::Ptr{T} = C_NULL
+    rowsca_loc::Ptr{T} = C_NULL
+
+    rowind::Ptr{Cint} = C_NULL
+    colind::Ptr{Cint} = C_NULL
+    pivots::Ptr{T} = C_NULL
+
     rhs::Ptr{T} = C_NULL
     redrhs::Ptr{T} = C_NULL
     rhs_sparse::Ptr{T} = C_NULL
     sol_loc::Ptr{T} = C_NULL
     rhs_loc::Ptr{T} = C_NULL
+    rhsintr::Ptr{T} = C_NULL
 
     irhs_sparse::Ptr{Cint} = C_NULL
     irhs_ptr::Ptr{Cint} = C_NULL
     isol_loc::Ptr{Cint} = C_NULL
     irhs_loc::Ptr{Cint} = C_NULL
+
+    glob2loc_rhs::Ptr{Cint} = C_NULL
+    glob2loc_sol::Ptr{Cint} = C_NULL
 
     nrhs::Cint = 0
     lrhs::Cint = 0
@@ -99,6 +110,7 @@ end
     lsol_loc::Cint = 0
     nloc_rhs::Cint = 0
     lrhs_loc::Cint = 0
+    nsol_loc::Cint = 0
 
     schur_mloc::Cint = 0
     schur_nloc::Cint = 0
@@ -108,6 +120,8 @@ end
     nblock::Cint = 0
     nprow::Cint = 0
     npcol::Cint = 0
+
+    ld_rhsintr::Cint = 0
 
     info::NTuple{80,Cint} = tzeros(80)
     infog::NTuple{80,Cint} = tzeros(80)
@@ -122,21 +136,21 @@ end
     listvar_schur::Ptr{Cint} = C_NULL
     schur::Ptr{T} = C_NULL ##
 
-    instance_number::Cint = 0
     wk_user::Ptr{T} = C_NULL
 
     version_number::NTuple{32,Cchar} = tzeros(32)
 
-    ooc_tmpdir::NTuple{256,Cchar} = tzeros(256)
-    ooc_prefix::NTuple{64,Cchar} = tzeros(64)
+    ooc_tmpdir::NTuple{1024,Cchar} = tzeros(1024)
+    ooc_prefix::NTuple{256,Cchar} = tzeros(256)
 
-    write_problem::NTuple{256,Cchar} = tzeros(256)
+    write_problem::NTuple{1024,Cchar} = tzeros(1024)
     lwk_user::Cint = 0
 
-    save_dir::NTuple{256,Cchar} = tzeros(256)
+    save_dir::NTuple{1024,Cchar} = tzeros(1024)
     save_prefix::NTuple{256,Cchar} = tzeros(256)
 
     metis_options::NTuple{40,Cint} = tzeros(40)
+    instance_number::Cint = 0
 end
 
 mutable struct MumpsSolver{T} <: AbstractLinearSolver{T}
