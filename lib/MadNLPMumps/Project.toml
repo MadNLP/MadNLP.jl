@@ -1,6 +1,6 @@
 name = "MadNLPMumps"
 uuid = "3b83494e-c0a4-4895-918b-9157a7a085a1"
-version = "0.4.1"
+version = "0.5.0"
 
 [deps]
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
