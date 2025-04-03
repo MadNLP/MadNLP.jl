@@ -21,6 +21,7 @@ makedocs(
             "Multi-precision" => "tutorials/multiprecision.md",
             "Warm-start" => "tutorials/warmstart.md",
             "LBFGS" => "tutorials/lbfgs.md",
+            "Custom KKT system" => "tutorials/kktsystem.md",
         ],
         "Manual" => [
             "IPM solver" => "man/solver.md",
