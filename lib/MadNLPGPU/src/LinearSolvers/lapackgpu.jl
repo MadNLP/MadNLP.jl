@@ -250,7 +250,6 @@ for (
 
         function factorize_qr!(M::LapackGPUSolver{$typ})
             haskey(M.etc, :tau) || (M.etc[:tau] = CuVector{$typ}(undef, size(M.A, 1)))
-            haskey(M.etc, :one) || (M.etc[:one] = ones($typ, 1))
             transfer!(M.fact, M.A)
             tril_to_full!(M.fact)
             CUSOLVER.$geqrf_buffer(
@@ -317,7 +316,7 @@ for (
                 CUBLAS_DIAG_NON_UNIT,
                 Int32(size(M.fact, 1)),
                 Int32(1),
-                M.etc[:one],
+                $typ(1),
                 M.fact,
                 Int32(size(M.fact, 2)),
                 M.rhs,
