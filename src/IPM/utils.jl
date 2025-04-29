@@ -6,7 +6,7 @@ algorithm has terminated.
 
 """
 mutable struct MadNLPExecutionStats{T, VT} <: AbstractExecutionStats
-    options::MadNLPOptions
+    options::AbstractOptions
     status::Status
     solution::VT
     objective::T
@@ -20,7 +20,7 @@ mutable struct MadNLPExecutionStats{T, VT} <: AbstractExecutionStats
     counters::MadNLPCounters
 end
 
-MadNLPExecutionStats(solver::MadNLPSolver) =MadNLPExecutionStats(
+MadNLPExecutionStats(solver::AbstractMadNLPSolver) =MadNLPExecutionStats(
     solver.opt,
     solver.status,
     primal(solver.x)[1:get_nvar(solver.nlp)],
@@ -35,7 +35,7 @@ MadNLPExecutionStats(solver::MadNLPSolver) =MadNLPExecutionStats(
     solver.cnt,
 )
 
-function update!(stats::MadNLPExecutionStats, solver::MadNLPSolver)
+function update!(stats::MadNLPExecutionStats, solver::AbstractMadNLPSolver)
     stats.status = solver.status
     stats.solution .= @view(primal(solver.x)[1:get_nvar(solver.nlp)])
     stats.multipliers .= solver.y

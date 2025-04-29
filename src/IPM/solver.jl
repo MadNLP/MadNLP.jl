@@ -88,10 +88,10 @@ abstract type DualInitializeOptions end
 struct DualInitializeSetZero <: DualInitializeOptions end
 struct DualInitializeLeastSquares <: DualInitializeOptions end
 
-function initialize_dual(solver::MadNLPSolver{T}, ::Type{DualInitializeSetZero}) where T
+function initialize_dual(solver::AbstractMadNLPSolver{T}, ::Type{DualInitializeSetZero}) where T
     fill!(solver.y, zero(T))
 end
-function initialize_dual(solver::MadNLPSolver{T}, ::Type{DualInitializeLeastSquares}) where T
+function initialize_dual(solver::AbstractMadNLPSolver{T}, ::Type{DualInitializeLeastSquares}) where T
     set_initial_rhs!(solver, solver.kkt)
     factorize_wrapper!(solver)
     is_solved = solve_refine_wrapper!(
@@ -527,7 +527,7 @@ function restore!(solver::AbstractMadNLPSolver{T}) where T
     end
 end
 
-function robust!(solver::MadNLPSolver{T}) where T
+function robust!(solver::AbstractMadNLPSolver{T}) where T
     initialize_robust_restorer!(solver)
     RR = solver.RR
     while true
@@ -827,7 +827,7 @@ end
 
 function inertia_correction!(
     inertia_corrector::InertiaBased,
-    solver::MadNLPSolver{T}
+    solver::AbstractMadNLPSolver{T}
     ) where {T}
 
     n_trial = 0
@@ -880,7 +880,7 @@ end
 
 function inertia_correction!(
     inertia_corrector::InertiaFree,
-    solver::MadNLPSolver{T}
+    solver::AbstractMadNLPSolver{T}
     ) where T
 
     n_trial = 0
@@ -943,7 +943,7 @@ end
 
 function inertia_correction!(
     inertia_corrector::InertiaIgnore,
-    solver::MadNLPSolver{T}
+    solver::AbstractMadNLPSolver{T}
     ) where T
 
     n_trial = 0
