@@ -16,7 +16,7 @@ function solve_refine_wrapper!(d, solver, p, w)
     return result
 end
 
-function factorize_wrapper!(solver::MadNLPSolver)
+function factorize_wrapper!(solver::AbstractMadNLPSolver)
     @trace(solver.logger,"Factorization started.")
     build_kkt!(solver.kkt)
     solver.cnt.linear_solver_time += @elapsed factorize!(solver.kkt.linear_solver)
