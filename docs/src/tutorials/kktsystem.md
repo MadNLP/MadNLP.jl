@@ -69,12 +69,12 @@ nothing
 
 The `AbstractKKTSystem` object is an abstraction to solve the generic
 system ``K x = b``. Depending on the implementation, the structure of the linear system
-is exploited in different manners. Solving a KKT system amounts to the four
+is exploited in different fashions. Solving a KKT system amounts to the four
 following operations:
 1. Querying the current sensitivities to assemble the different blocks constituting the matrix ``K``.
-2. Assembling a reduced sparse matrix condensing the sparse matrix ``K`` to an equivalent smaller system (and symmetric).
+2. Assembling a reduced sparse matrix condensing the sparse matrix ``K`` to an equivalent smaller symmetric system.
 3. Calling a linear solver to solve the condensed system.
-4. Calling a routine to unpack the condensed solution to get the original descent direction ``(\Delta x, \Delta y, \Delta z_\ell, \Delta_u)``.
+4. Calling a routine to unpack the condensed solution to get the original descent direction ``(\Delta x, \Delta y, \Delta z_\ell, \Delta z_u)``.
 
 Exploiting the problem's structure usually happens in steps (2) and (4).
 We skim through the four successive steps in more details.
@@ -87,11 +87,11 @@ The KKT system requires the following information:
 - the constraints' Jacobian ``J`` ;
 - the diagonal matrices ``Z_\ell``, ``Z_u`` and ``X_\ell``, ``X_u``.
 
-The Hessian and Jacobian are assumed sparse by default.
+The Hessian and the Jacobian are assumed sparse by default.
 
 At every IPM iteration, MadNLP updates automatically the values in
 ``W``, ``J`` and in the diagonal matrices ``Z_\ell, Z_u, X_\ell, X_u``.
-By default, the following attributes are expected in every instance `kkt` of an `AbstractKKTSystem`:
+By default, we expect the following attributes available in every instance `kkt` of an `AbstractKKTSystem`:
 
 - `kkt.hess`: stores the nonzeroes of the Hessian ``W``;
 - `kkt.jac`: stores the nonzeroes of the Jacobian ``J``;
@@ -108,7 +108,7 @@ nonzeroes values in `kkt.hess` and `kkt.jac`. Rightafter, MadNLP calls respectiv
 the functions [`compress_hessian!`](@ref) and [`compress_jacobian!`](@ref) to update all the internal values
 in the KKT system `kkt`.
 
-To recap, every time we re-evaluate the Jacobian and the Hessian, MadNLP
+To recap, every time we evaluate the Hessian and the Jacobian, MadNLP
 calls automatically the functions:
 ```julia
 hess = MadNLP.get_hessian(kkt)
@@ -124,8 +124,8 @@ MadNLP.compress_jacobian!(kkt)
 ### Assembling the KKT system
 
 Once the sensitivities have been updated, we can assemble the KKT matrix ``K``
-and condense it to an equivalent system ``K_{c}`` before sending it to a linear solver
-for factorization. The assembling of the KKT system is done in the function [`build_kkt!`](@ref).
+and condense it to an equivalent system ``K_{c}`` before factorizing it with a linear solver.
+The assembling of the KKT system is done in the function [`build_kkt!`](@ref).
 
 The system is usually stored in the attribute `kkt.aug_com`. Its dimension depends on the condensation used.
 The matrix `kkt.aug_com` can be dense or sparse, depending on the condensation used.
@@ -420,8 +420,8 @@ end
 ```
 
 !!! note
-    The function `solve!` takes as second argument a vector `w` being a
-    [`AbstractKKTVector`](@ref). A `AbstractKKTVector` is a convenient data
+    The function `solve!` takes as second argument a vector `w` being an
+    [`AbstractKKTVector`](@ref). An `AbstractKKTVector` is a convenient data
     structure used in MadNLP to store and access the elements in the primal-dual vector
     ``(\Delta x, \Delta y, \Delta z_\ell, \Delta z_u)``.
 
@@ -459,7 +459,7 @@ end
 
 ### Demonstration
 
-We now have all the elements we need to solve the problem with the new KKT linear
+We now have all the elements needed to solve the problem with the new KKT linear
 system `DiagonalHessianKKTSystem`. We just have to pass the KKT system to MadNLP
 using the option `kkt_system`:
 
