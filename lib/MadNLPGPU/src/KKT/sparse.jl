@@ -465,7 +465,7 @@ end
 
 function MadNLP.compress_jacobian!(
     kkt::MadNLP.SparseCondensedKKTSystem{T,VT,MT},
-) where {T,VT,MT<:CUDA.CUSOLVER.CuSparseMatrixCSC{T,Int32}}
+) where {T,VT,MT<:CUDA.CUSPARSE.CuSparseMatrixCSC{T,Int32}}
     fill!(kkt.jt_csc.nzVal, zero(T))
     if length(kkt.ext.jt_csc_ptrptr) > 1 # otherwise error is thrown
         _transfer_to_csc_kernel!(CUDABackend())(
