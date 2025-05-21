@@ -187,6 +187,12 @@ end
     xp_ur .-= wu ./ u_diag
     return
 end
+function reduce_rhs!(kkt::AbstractKKTSystem, d::AbstractKKTVector)
+    reduce_rhs!(
+        d.xp_lr, dual_lb(d), kkt.l_diag,
+        d.xp_ur, dual_ub(d), kkt.u_diag,
+    )
+end
 
 # Finish
 function finish_aug_solve!(kkt::AbstractKKTSystem, d::AbstractKKTVector)

@@ -35,7 +35,7 @@ function solve!(kkt::SparseUnreducedKKTSystem, w::AbstractKKTVector)
 end
 
 function solve!(kkt::AbstractReducedKKTSystem, w::AbstractKKTVector)
-    reduce_rhs!(w.xp_lr, dual_lb(w), kkt.l_diag, w.xp_ur, dual_ub(w), kkt.u_diag)
+    reduce_rhs!(kkt, w)
     solve!(kkt.linear_solver, primal_dual(w))
     finish_aug_solve!(kkt, w)
     return w
@@ -83,7 +83,7 @@ function solve!(
     nn = length(w_)
 
     fill!(Tk, zero(T))
-    reduce_rhs!(w.xp_lr, dual_lb(w), kkt.l_diag, w.xp_ur, dual_ub(w), kkt.u_diag)
+    reduce_rhs!(kkt, w)
 
     # Resize arrays with correct dimension
     if size(qn.V1) != (nn, 2*p)
@@ -130,7 +130,7 @@ function solve!(kkt::SparseCondensedKKTSystem{T}, w::AbstractKKTVector)  where T
     wz = view(full(w), n+m+1:n+2*m)
     Σs = view(kkt.pr_diag, n+1:n+m)
 
-    reduce_rhs!(w.xp_lr, dual_lb(w), kkt.l_diag, w.xp_ur, dual_ub(w), kkt.u_diag)
+    reduce_rhs!(kkt, w)
 
     kkt.buffer .= kkt.diag_buffer .* (wz .+ ws ./ Σs)
 
@@ -167,7 +167,7 @@ function solve!(
 
     Σs = get_slack_regularization(kkt)
 
-    reduce_rhs!(w.xp_lr, dual_lb(w), kkt.l_diag, w.xp_ur, dual_ub(w), kkt.u_diag)
+    reduce_rhs!(kkt, w)
 
     fill!(kkt.buffer, zero(T))
     kkt.buffer[kkt.ind_ineq] .= kkt.diag_buffer .* (wz .+ ws ./ Σs)
