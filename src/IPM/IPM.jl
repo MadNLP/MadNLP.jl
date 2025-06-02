@@ -5,6 +5,8 @@ abstract type AbstractMadNLPSolver{T} end
 
 include("restoration.jl")
 include("inertiacorrector.jl")
+include("barrier.jl")
+include("options.jl")
 
 mutable struct MadNLPSolver{
     T,
@@ -241,5 +243,4 @@ include("callbacks.jl")
 include("factorization.jl")
 include("line_search.jl")
 include("solver.jl")
-
 

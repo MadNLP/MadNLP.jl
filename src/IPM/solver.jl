@@ -77,8 +77,10 @@ function initialize!(solver::AbstractMadNLPSolver{T}) where T
     theta = get_theta(solver.c)
     solver.theta_max = 1e4*max(1,theta)
     solver.theta_min = 1e-4*max(1,theta)
-    solver.mu = solver.opt.mu_init
-    solver.tau = max(solver.opt.tau_min,1-solver.opt.mu_init)
+
+    mu_init = solver.opt.barrier.mu_init
+    solver.mu = mu_init
+    solver.tau = max(solver.opt.tau_min,1-mu_init)
     push!(solver.filter, (solver.theta_max,-Inf))
 
     return REGULAR
@@ -229,7 +231,6 @@ function regular!(solver::AbstractMadNLPSolver{T}) where T
             sd,
         )
         solver.inf_compl = get_inf_compl(solver.x_lr,solver.xl_r,solver.zl_r,solver.xu_r,solver.x_ur,solver.zu_r,zero(T),sc)
-        inf_compl_mu = get_inf_compl(solver.x_lr,solver.xl_r,solver.zl_r,solver.xu_r,solver.x_ur,solver.zu_r,solver.mu,sc)
 
         print_iter(solver)
 
@@ -245,16 +246,7 @@ function regular!(solver::AbstractMadNLPSolver{T}) where T
 
         # update the barrier parameter
         @trace(solver.logger,"Updating the barrier parameter.")
-        while solver.mu != max(solver.opt.mu_min,solver.opt.tol/10) &&
-            max(solver.inf_pr,solver.inf_du,inf_compl_mu) <= solver.opt.barrier_tol_factor*solver.mu
-            mu_new = get_mu(solver.mu,solver.opt.mu_min,
-                            solver.opt.mu_linear_decrease_factor,solver.opt.mu_superlinear_decrease_power,solver.opt.tol)
-            inf_compl_mu = get_inf_compl(solver.x_lr,solver.xl_r,solver.zl_r,solver.xu_r,solver.x_ur,solver.zu_r,solver.mu,sc)
-            solver.tau= get_tau(solver.mu,solver.opt.tau_min)
-            solver.mu = mu_new
-            empty!(solver.filter)
-            push!(solver.filter,(solver.theta_max,-Inf))
-        end
+        update_barrier!(solver.opt.barrier, solver, sc)
 
         # compute the newton step
         @trace(solver.logger,"Computing the newton step.")
@@ -263,7 +255,7 @@ function regular!(solver::AbstractMadNLPSolver{T}) where T
         end
 
         set_aug_diagonal!(solver.kkt,solver)
-        set_aug_rhs!(solver, solver.kkt, solver.c)
+        set_aug_rhs!(solver, solver.kkt, solver.c, solver.mu)
         dual_inf_perturbation!(primal(solver.p),solver.ind_llb,solver.ind_uub,solver.mu,solver.opt.kappa_d)
 
         inertia_correction!(solver.inertia_corrector, solver) || return ROBUST
@@ -405,7 +397,7 @@ function restore!(solver::AbstractMadNLPSolver{T}) where T
 
         !solver.opt.hessian_constant && eval_lag_hess_wrapper!(solver,solver.kkt,solver.x,solver.y)
         set_aug_diagonal!(solver.kkt,solver)
-        set_aug_rhs!(solver, solver.kkt, solver.c)
+        set_aug_rhs!(solver, solver.kkt, solver.c, solver.mu)
 
         dual_inf_perturbation!(primal(solver.p),solver.ind_llb,solver.ind_uub,solver.mu,solver.opt.kappa_d)
         factorize_wrapper!(solver)
@@ -578,7 +570,7 @@ function second_order_correction(solver::AbstractMadNLPSolver,alpha_max,theta,va
     theta_soc_old = theta_trial
     for p=1:solver.opt.max_soc
         # compute second order correction
-        set_aug_rhs!(solver, solver.kkt, wy)
+        set_aug_rhs!(solver, solver.kkt, wy, solver.mu)
         dual_inf_perturbation!(
             primal(solver.p),
             solver.ind_llb,solver.ind_uub,solver.mu,solver.opt.kappa_d,
