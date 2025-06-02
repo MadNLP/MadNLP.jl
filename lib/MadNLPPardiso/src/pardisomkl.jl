@@ -1,4 +1,3 @@
-@enum(MatchingStrategy::Int,COMPLETE=1,COMPLETE2x2=2,CONSTRAINTS=3)
 
 @kwdef mutable struct PardisoMKLOptions <: AbstractOptions
     pardisomkl_num_threads::Int = 1
@@ -20,7 +19,7 @@ mutable struct PardisoMKLSolver{T} <: AbstractLinearSolver{T}
     logger::MadNLPLogger
 end
 
-pardisomkl_pardisoinit(pt,mtype::Ref{Cint},iparm::Vector{Cint}) where T =
+pardisomkl_pardisoinit(pt,mtype::Ref{Cint},iparm::Vector{Cint}) =
     ccall(
         (:pardisoinit,libmkl_rt),
         Cvoid,

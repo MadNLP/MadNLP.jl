@@ -1,6 +1,7 @@
 module MadNLPPardiso
 
 include(joinpath("..","deps","deps.jl"))
+const libpardiso = PARDISO_PATH
 
 
 import Libdl: dlopen, RTLD_DEEPBIND
@@ -17,7 +18,7 @@ import MKL_jll: libmkl_rt
 include("pardisomkl.jl")
 
 function __init__()
-    check_deps()
+    # check_deps()
     @isdefined(libpardiso) && dlopen(libpardiso,RTLD_DEEPBIND)
 end
 

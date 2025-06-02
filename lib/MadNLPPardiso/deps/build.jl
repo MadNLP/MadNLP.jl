@@ -1,41 +1,92 @@
-# MadNLP.jl
-# Created by Sungho Shin (sungho.shin@wisc.edu)
+# remove deps.jl if it exists, in case build.jl fails
+isfile("deps.jl") && rm("deps.jl")
 
-using Pkg.Artifacts, BinaryProvider
+using Libdl
 
-const verbose = "--verbose" in ARGS
-const prefix = Prefix(@__DIR__)
-const so = BinaryProvider.platform_dlext()
-const rpath = `-Wl,-rpath,`
-const whole_archive= Sys.isapple() ? `-Wl,-all_load` : `-Wl,--whole-archive`
-const no_whole_archive = Sys.isapple() ? `-Wl,-noall_load` : `-Wl,--no-whole-archive`
-const libdir     = mkpath(joinpath(@__DIR__, "lib"))
-const pardiso_library_path = haskey(ENV,"MADNLP_PARDISO_LIBRARY_PATH") ? ENV["MADNLP_PARDISO_LIBRARY_PATH"] : ""
-const CC = haskey(ENV,"MADNLP_CC") ? ENV["MADNLP_CC"] : `gcc`
-const libopenblas_dir = joinpath(artifact"OpenBLAS32","lib")
-const with_openblas = `-L$libopenblas_dir $rpath$libopenblas_dir -lopenblas`
 
-rm(libdir;recursive=true,force=true)
-mkpath(libdir)
-isvalid(cmd::Cmd)=(try run(cmd) catch e return false end; return true)
+println("Pardiso library")
+println("===============")
 
-# Pardiso
-if pardiso_library_path != ""
-    if isvalid(`$CC --version`)
-        ff = splitext(basename(pardiso_library_path)[4:end])[1]
-        dd = dirname(pardiso_library_path)
-        product = FileProduct(prefix,joinpath(libdir,"libpardiso.$so"),:libpardiso)
-        wait(OutputCollector(`$CC -shared -olib/libpardiso.$so .pardiso_dummy.c $whole_archive -L$dd $rpath$dd -l$ff $no_whole_archive $with_openblas -lgfortran -fopenmp -lpthread -lm`,verbose=verbose))
-        Sys.isapple() && satisfied(product) && wait(OutputCollector(`install_name_tool -change lib$name.$so @rpath/lib$name.$so lib/libpardiso.$so`,verbose=verbose))
-    end
-end
-
-if @isdefined(product) && satisfied(product)
-    @info "Building Pardiso succeded."
-    write_deps_file(joinpath(@__DIR__, "deps.jl"),Product[product], verbose=verbose)
+const LIBPARDISONAMES =
+if Sys.iswindows()
+[
+    "libpardiso.dll",
+    "libpardiso600-WIN-X86-64.dll",
+]
+elseif Sys.isapple()
+[
+    "libpardiso.dylib",
+    "libpardiso600-MACOS-X86-64.dylib",
+]
+elseif Sys.islinux()
+[
+    "libpardiso.so",
+    "libpardiso600-GNU800-X86-64.so",
+]
 else
-    @error "Building Pardiso failed."
-    write_deps_file(joinpath(@__DIR__, "deps.jl"),Product[], verbose=verbose)
+    error("unhandled OS")
 end
 
-# write deps.jl
+println("Looking for libraries with name: ", join(LIBPARDISONAMES, ", "), ".")
+
+
+PATH_PREFIXES = [@__DIR__; get(ENV, "JULIA_PARDISO", [])]
+
+if !haskey(ENV, "JULIA_PARDISO")
+    println("INFO: use the `JULIA_PARDISO` environment variable to set a path to " *
+            "the folder where the Pardiso library is located")
+end
+
+function find_paradisolib()
+    found_lib = false
+    for prefix in PATH_PREFIXES
+        println("Looking in \"$(abspath(prefix))\" for libraries")
+        for libname in LIBPARDISONAMES
+            local path
+            try
+                path = joinpath(prefix, libname)
+                if isfile(path)
+                    println("    found \"$(abspath(path))\", attempting to load it...")
+                    Libdl.dlopen(path, Libdl.RTLD_GLOBAL)
+                    println("    loaded successfully!")
+                    global PARDISO_LIB_FOUND = true
+                    return path, true
+                end
+            catch e
+                println("    failed to load due to:")
+                Base.showerror(stderr, e)
+            end
+        end
+    end
+    println("did not find libpardiso, assuming PARDISO 5/6 is not installed")
+    return "", false
+end
+
+pardisopath, found_pardisolib = find_paradisolib()
+
+#################################################
+
+println("\nMKL Pardiso")
+println("=============")
+function find_mklparadiso()
+    if haskey(ENV, "MKLROOT")
+        println("found MKLROOT environment variable, enabling local MKL")
+        return true
+    end
+    println("did not find MKLROOT environment variable, using MKL_jll")
+    return false
+end
+
+found_mklpardiso = find_mklparadiso()
+
+open("deps.jl", "w") do f
+    print(f,
+"""
+const LOCAL_MKL_FOUND = $found_mklpardiso
+const PARDISO_LIB_FOUND = $found_pardisolib
+const PARDISO_PATH = raw"$pardisopath"
+"""
+)
+
+end
+
