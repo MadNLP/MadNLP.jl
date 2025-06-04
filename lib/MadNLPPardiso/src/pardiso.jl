@@ -134,7 +134,7 @@ function PardisoSolver(
     elseif opt.pardiso_algorithm == MadNLP.CHOLESKY
         Ref{Int32}(2)  # real and symmetric positive definite
     else
-        error("Only the factorizations CHOLESKY, LDL or BUNCHKAUFMAN are supported in MadNLPPardiso."
+        error("Only the factorizations CHOLESKY, LDL or BUNCHKAUFMAN are supported in MadNLPPardiso." *
               "Please change the option `pardiso_algorithm` accordingly.")
     end
 
