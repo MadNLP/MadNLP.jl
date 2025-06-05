@@ -50,6 +50,7 @@ end
 @kwdef mutable struct AdaptiveUpdate{T} <: AbstractBarrierUpdate{T}
     mu_init::T = 1e-1
     mu_min::T = 1e-11
+    mu_max::T = 1e5
     sigma_min::T = 1e-6
     sigma_max::T = 1e2
     sigma_tol::T = 1e-2
@@ -105,9 +106,9 @@ function _evaluate_quality_function(solver, sigma, step_aff, step_cen, res_dual,
     )
 
     # Primal infeasibility
-    inf_pr = (1.0 - alpha_pr)^2 * res_primal / n
+    inf_pr = (1.0 - alpha_pr)^2 * res_primal^2 / n
     # Dual infeasibility
-    inf_du = (1.0 - alpha_du)^2 * res_dual / m
+    inf_du = (1.0 - alpha_du)^2 * res_dual^2 / m
     # Complementarity infeasibility
     inf_compl = (inf_compl_lb + inf_compl_ub ) / (nlb + nub)
 
@@ -115,35 +116,44 @@ function _evaluate_quality_function(solver, sigma, step_aff, step_cen, res_dual,
     return inf_du + inf_pr + inf_compl
 end
 
-function _run_bissection!(solver, barrier, s1, s2, step_aff, step_cen, res_primal, res_dual)
+function _run_golden_search!(solver, barrier, sigma_lb, sigma_ub, step_aff, step_cen, res_primal, res_dual)
     gfac = 0.5 * (3.0 - sqrt(5.0))
 
-    # TODO
+    sigma_1, sigma_2 = sigma_lb, sigma_ub
+    phi_1 = _evaluate_quality_function(solver, sigma_1, step_aff, step_cen, res_primal, res_dual)
+    phi_2 = _evaluate_quality_function(solver, sigma_2, step_aff, step_cen, res_primal, res_dual)
 
+    sigma_mid1 = sigma_lb + gfac * (sigma_ub - sigma_lb)
+    sigma_mid2 = sigma_lb + (1.0 - gfac) * (sigma_ub - sigma_lb)
+    phi_mid1 = _evaluate_quality_function(solver, sigma_mid1, step_aff, step_cen, res_primal, res_dual)
+    phi_mid2 = _evaluate_quality_function(solver, sigma_mid2, step_aff, step_cen, res_primal, res_dual)
+
+    # Golden search
     for i in 1:barrier.max_gs_iter
-
-        s3 = s1 + gfac * (s2 - s1)
-        s4 = s1 + (1.0 - gfac) * (s2 - s1)
-
-        phi1 = _evaluate_quality_function(solver, s3, step_aff, step_cen, res_primal, res_dual)
-        phi2 = _evaluate_quality_function(solver, s4, step_aff, step_cen, res_primal, res_dual)
-
-        if phi1 < phi2
-            s2 = s4
+        if phi_mid1 > phi_mid2
+            sigma_1 = sigma_mid1
+            phi_1 = phi_mid1
+            sigma_mid1 = sigma_mid2
+            sigma_mid2 = sigma_1 + (1.0 - gfac) * (sigma_2 - sigma_1)
+            phi_mid2 = _evaluate_quality_function(solver, sigma_mid2, step_aff, step_cen, res_primal, res_dual)
         else
-            s1 = s3
+            sigma_2 = sigma_mid2
+            phi_2 = phi_mid2
+            sigma_mid2 = sigma_mid1
+            sigma_mid1 = sigma_1 + gfac * (sigma_2 - sigma_1)
+            phi_mid1 = _evaluate_quality_function(solver, sigma_mid1, step_aff, step_cen, res_primal, res_dual)
         end
 
-        if s2 - s1 < barrier.sigma_tol * s2
+        if sigma_2 - sigma_1 < barrier.sigma_tol * sigma_2
             break
         end
     end
-
-    return (s1 + s2) / 2.0
+    # Compute final sigma
+    sigma, phi = phi_mid1 < phi_mid2 ? (sigma_mid1, phi_mid1) : (sigma_mid2, phi_mid2)
+    return sigma
 end
 
 function get_adaptive_mu(solver::AbstractMadNLPSolver, barrier::AdaptiveUpdate)
-    mu_max = 1e5
     linear_solver = solver.kkt.linear_solver
     step_aff = solver._w1 # buffer 1
     step_cen = solver._w2 # buffer 2
@@ -151,8 +161,8 @@ function get_adaptive_mu(solver::AbstractMadNLPSolver, barrier::AdaptiveUpdate)
     # Affine step
     set_aug_rhs!(solver, solver.kkt, solver.c, 0.0)
     # Get primal and dual infeasibility directly from the values in RHS p
-    res_primal = norm(dual(solver.p))^2
-    res_dual = norm(primal(solver.p))^2
+    res_primal = norm(dual(solver.p))
+    res_dual = norm(primal(solver.p))
 
     # Get approximate solution without iterative refinement
     copyto!(full(step_aff), full(solver.p))
@@ -165,23 +175,22 @@ function get_adaptive_mu(solver::AbstractMadNLPSolver, barrier::AdaptiveUpdate)
     copyto!(full(step_cen), full(solver.p))
     solve!(linear_solver, full(step_cen))
 
-    # Determine if sigma is greater or less than 1
+    # Refine the search interval using Ipopt's heuristics
+    # First, check if sigma is greater than 1.
     phi1 = _evaluate_quality_function(solver, 1.0, step_aff, step_cen, res_primal, res_dual)
     sigma_1m = 1.0 - 1e-4
     phi1m = _evaluate_quality_function(solver, sigma_1m, step_aff, step_cen, res_primal, res_dual)
-
     # Restrict search interval
     if phi1m > phi1
         sigma_min = 1.0
-        sigma_max = min(barrier.sigma_max, mu_max / mu)
+        sigma_max = min(barrier.sigma_max, barrier.mu_max / mu)
     else
         sigma_min = max(barrier.sigma_min, barrier.mu_min / mu)
-        sigma_max = min(max(sigma_min, sigma_1m), mu_max / mu)
+        sigma_max = min(max(sigma_min, sigma_1m), barrier.mu_max / mu)
     end
 
-    # Run Golden-section search
-    # N.B.: Assume the quality function is unimodal
-    sigma_opt = _run_bissection!(solver, barrier, sigma_min, sigma_max, step_aff, step_cen, res_primal, res_dual)
+    # Run Golden-section search (assume the quality function is unimodal)
+    sigma_opt = _run_golden_search!(solver, barrier, sigma_min, sigma_max, step_aff, step_cen, res_primal, res_dual)
 
     return sigma_opt * mu
 end
@@ -219,7 +228,7 @@ function update_barrier!(barrier::AdaptiveUpdate{T}, solver::AbstractMadNLPSolve
     # Update tau
     solver.mu = max(mu, barrier.mu_min)
     solver.tau = get_tau(solver.mu, solver.opt.tau_min)
-    # TODO: should we reset line-search?
+    # Reset filter line-search
     empty!(solver.filter)
     push!(solver.filter, (solver.theta_max, -Inf))
 end
