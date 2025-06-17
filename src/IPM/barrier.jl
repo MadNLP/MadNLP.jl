@@ -57,6 +57,10 @@ end
     gamma::T = 1.0
     free_mode::Bool = true
     max_gs_iter::Int = 8
+
+    # For non-free mode (also temporarily for robust solve :P )
+    mu_superlinear_decrease_power::T = 1.5
+    mu_linear_decrease_factor::T = .2
 end
 
 function get_fixed_mu(solver::AbstractMadNLPSolver{T}, barrier::AdaptiveUpdate{T}) where T
