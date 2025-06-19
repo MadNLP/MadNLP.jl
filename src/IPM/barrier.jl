@@ -116,8 +116,6 @@ function _evaluate_quality_function(solver, sigma, step_aff, step_cen, res_dual,
     # Complementarity infeasibility
     inf_compl = (inf_compl_lb + inf_compl_ub ) / (nlb + nub)
 
-    @trace(solver.logger, "sigma=$(sigma) inf_du=$(inf_du) inf_pr=$(inf_pr) inf_compl=$(inf_compl)")
-    @trace(solver.logger, "qL=$(inf_du + inf_pr + inf_compl)")
     # Quality function qL defined in Eq. (4.2)
     return inf_du + inf_pr + inf_compl
 end
