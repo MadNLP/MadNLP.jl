@@ -254,7 +254,7 @@ function update_barrier!(barrier::LOQOUpdate{T}, solver::AbstractMadNLPSolver{T}
     xi = min_cc/mu
     sigma = barrier.gamma*min((1-barrier.r)*((1-xi)/xi),2)^3
 
-    solver.mu = sigma*mu
+    solver.mu = max(barrier.mu_min,sigma*mu)
     # TODO(@anton): Hmmmm does this make sense, we essentially throw out filter always
     empty!(solver.filter)
     push!(solver.filter, (solver.theta_max, -Inf))
