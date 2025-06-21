@@ -314,6 +314,20 @@ function get_average_complementarity(solver::AbstractMadNLPSolver)
     )
 end
 
+function get_min_complementarity(x_lr::AbstractVector{T}, xl_r::AbstractVector{T}, zl_r::AbstractVector{T},
+                                 x_ur::AbstractVector{T}, xu_r::AbstractVector{T}, zu_r::AbstractVector{T}) where T
+    cc_lb = mapreduce((x_l, xl, zl) -> (x_l-xl)*zl, min, x_lr, xl_r, zl_r, init=T(Inf))
+    cc_ub = mapreduce((x_u, xu, zu) -> (xu-x_u)*zu, min, x_ur, xu_r, zu_r, init=T(Inf))
+    return min(cc_lb,cc_ub)
+end
+
+function get_min_complementarity(solver::AbstractMadNLPSolver)
+    return get_min_complementarity(
+        solver.x_lr, solver.xl_r, solver.zl_r,
+        solver.x_ur, solver.xu_r, solver.zu_r,
+    )
+end
+
 function get_varphi_d(
     f::AbstractVector{T},
     x::AbstractVector{T},

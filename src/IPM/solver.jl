@@ -451,10 +451,10 @@ function robust!(solver::AbstractMadNLPSolver{T}) where T
 
         # update the barrier parameter
         @trace(_logger(solver),"Updating restoration phase barrier parameter.")
-        while RR.mu_R >= _opt(solver).mu_min &&
+        while RR.mu_R >= _opt(solver).barrier.mu_min &&
             max(RR.inf_pr_R,RR.inf_du_R,inf_compl_mu_R) <= _opt(solver).barrier_tol_factor*RR.mu_R
-            RR.mu_R = get_mu(RR.mu_R,_opt(solver).mu_min,
-                             _opt(solver).mu_linear_decrease_factor,_opt(solver).mu_superlinear_decrease_power,_opt(solver).tol)
+            RR.mu_R = get_mu(RR.mu_R,_opt(solver).barrier.mu_min,
+                             _opt(solver).barrier.mu_linear_decrease_factor,_opt(solver).barrier.mu_superlinear_decrease_power,_opt(solver).tol)
             inf_compl_mu_R = get_inf_compl_R(
                 _x_lr(solver),_xl_r(solver),_zl_r(solver),_xu_r(solver),_x_ur(solver),_zu_r(solver),RR.pp,RR.zp,RR.nn,RR.zn,RR.mu_R,sc)
             RR.tau_R= max(_opt(solver).tau_min,1-RR.mu_R)

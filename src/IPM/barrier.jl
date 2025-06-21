@@ -57,6 +57,10 @@ end
     gamma::T = 1.0
     free_mode::Bool = true
     max_gs_iter::Int = 8
+
+    # For non-free mode (also temporarily for robust solve :P )
+    mu_superlinear_decrease_power::T = 1.5
+    mu_linear_decrease_factor::T = .2
 end
 
 function get_fixed_mu(solver::AbstractMadNLPSolver{T}, barrier::AdaptiveUpdate{T}) where T
@@ -229,6 +233,29 @@ function update_barrier!(barrier::AdaptiveUpdate{T}, solver::AbstractMadNLPSolve
     solver.mu = max(mu, barrier.mu_min)
     solver.tau = get_tau(solver.mu, solver.opt.tau_min)
     # Reset filter line-search
+    empty!(solver.filter)
+    push!(solver.filter, (solver.theta_max, -Inf))
+end
+
+@kwdef mutable struct LOQOUpdate{T} <: AbstractBarrierUpdate{T}
+    mu_init::T = 1e-1
+    mu_min::T = 1e-11
+    gamma::T = 0.1 # scale factor
+    r::T = .95 # Steplength param
+    # Temporarily for robust solve
+    mu_superlinear_decrease_power::T = 1.5
+    mu_linear_decrease_factor::T = .2
+end
+
+function update_barrier!(barrier::LOQOUpdate{T}, solver::AbstractMadNLPSolver{T}, sc::T) where T
+    mu = get_average_complementarity(solver) # get average complementarity.
+    ncc = solver.nlb + solver.nub
+    min_cc = get_min_complementarity(solver)
+    xi = min_cc/mu
+    sigma = barrier.gamma*min((1-barrier.r)*((1-xi)/xi),2)^3
+
+    solver.mu = max(barrier.mu_min,sigma*mu)
+    # TODO(@anton): Hmmmm does this make sense, we essentially throw out filter always
     empty!(solver.filter)
     push!(solver.filter, (solver.theta_max, -Inf))
 end
