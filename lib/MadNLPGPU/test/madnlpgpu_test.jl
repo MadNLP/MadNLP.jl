@@ -46,6 +46,15 @@ testset = [
         [],
     ],
     [
+        "Formulation K2.5",
+        ()->MadNLP.Optimizer(
+            linear_solver=MadNLPGPU.CUDSSSolver,
+            print_level=MadNLP.ERROR,
+            kkt_system=MadNLP.ScaledSparseKKTSystem,
+        ),
+        [],
+    ],
+    [
         "LapackGPU-BUNCHKAUFMAN",
         ()->MadNLP.Optimizer(
             linear_solver=LapackGPUSolver,
