@@ -1,7 +1,7 @@
 module MadNLPGPU
 
 import LinearAlgebra
-import SparseArrays: SparseMatrixCSC, nonzeros
+import SparseArrays: SparseMatrixCSC, nonzeros, nnz
 import LinearAlgebra: Symmetric
 # CUDA
 import CUDA: CUDA, CUSPARSE, CUBLAS, CUSOLVER, CuVector, CuMatrix, CuArray, R_64F,
