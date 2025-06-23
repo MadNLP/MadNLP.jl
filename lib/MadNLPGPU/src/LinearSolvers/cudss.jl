@@ -2,7 +2,7 @@ import CUDSS
 
 @kwdef mutable struct CudssSolverOptions <: MadNLP.AbstractOptions
     # Use LDLᵀ by default in CUDSS as Cholesky can lead to undefined behavior.
-    cudss_algorithm::MadNLP.LinearFactorization = MadNLP.CHOLESKY
+    cudss_algorithm::MadNLP.LinearFactorization = MadNLP.LDL
     ordering::ORDERING = DEFAULT_ORDERING
     perm::Vector{Cint} = Cint[]
     ir::Int = 0
