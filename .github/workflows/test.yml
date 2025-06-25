@@ -28,7 +28,7 @@ jobs:
       - run: julia --color=yes --project=.ci .ci/ci.jl basic
   test-mit:
     env:
-      JULIA_DEPOT_PATH: /home/sushin/actions-runner/madnlp-depot/
+      JULIA_DEPOT_PATH: /scratch/github-actions/julia_depot_madnlp/
     runs-on: self-hosted
     strategy:
       matrix:
@@ -49,7 +49,7 @@ jobs:
   test-cuda:
     env:
       CUDA_VISIBLE_DEVICES: 1
-      JULIA_DEPOT_PATH: /home/sushin/actions-runner/madnlp-depot/
+      JULIA_DEPOT_PATH: /scratch/github-actions/julia_depot_madnlp/
     runs-on: self-hosted
     strategy:
       matrix:
