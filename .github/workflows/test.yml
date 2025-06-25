@@ -28,7 +28,8 @@ jobs:
       - run: julia --color=yes --project=.ci .ci/ci.jl basic
   test-mit:
     env:
-      JULIA_DEPOT_PATH: /scratch/github-actions/julia_depot_madnlp/
+      CUDA_VISIBLE_DEVICES: 1
+      JULIA_DEPOT_PATH: ${{ workspace }}/julia_depot_madnlp/
     runs-on: self-hosted
     strategy:
       matrix:
@@ -46,10 +47,16 @@ jobs:
       - uses: codecov/codecov-action@v5
         with:
           file: lcov.info
+      - name: Cleanup build folder
+        run: |
+          ls -la ./
+          rm -rf ./* || true
+          rm -rf ./.??* || true
+          ls -la ./
   test-cuda:
     env:
       CUDA_VISIBLE_DEVICES: 1
-      JULIA_DEPOT_PATH: /scratch/github-actions/julia_depot_madnlp/
+      JULIA_DEPOT_PATH: ${{ workspace }}/julia_depot_madnlp/
     runs-on: self-hosted
     strategy:
       matrix:
@@ -61,10 +68,16 @@ jobs:
           version: ${{ matrix.julia-version }}
       - uses: julia-actions/cache@v1
       - run: julia --color=yes --project=.ci .ci/ci.jl cuda
+      - name: Cleanup build folder
+        run: |
+          ls -la ./
+          rm -rf ./* || true
+          rm -rf ./.??* || true
+          ls -la ./
   test-madnlphsl:
     env:
       CUDA_VISIBLE_DEVICES: 1
-      JULIA_DEPOT_PATH: /scratch/github-actions/julia_depot_madnlphsl/
+      JULIA_DEPOT_PATH: ${{ workspace }}/julia_depot_madnlp/
     runs-on: self-hosted
     strategy:
       matrix:
@@ -91,3 +104,9 @@ jobs:
           using Pkg
           Pkg.develop(path="./lib/MadNLPHSL")
           Pkg.test("MadNLPHSL")
+      - name: Cleanup build folder
+        run: |
+          ls -la ./
+          rm -rf ./* || true
+          rm -rf ./.??* || true
+          ls -la ./
