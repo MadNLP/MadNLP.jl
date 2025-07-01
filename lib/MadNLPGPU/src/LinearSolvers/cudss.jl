@@ -12,7 +12,8 @@ end
 
 mutable struct CUDSSSolver{T} <: MadNLP.AbstractLinearSolver{T}
     inner::Union{Nothing, CUDSS.CudssSolver}
-    tril::CUSPARSE.CuSparseMatrixCSC{T}
+    tril
+    tril_buffer
     x_gpu::CUDA.CuVector{T}
     b_gpu::CUDA.CuVector{T}
 
@@ -21,10 +22,11 @@ mutable struct CUDSSSolver{T} <: MadNLP.AbstractLinearSolver{T}
 end
 
 function CUDSSSolver(
-    csc::CUSPARSE.CuSparseMatrixCSC{T};
+    csc;
     opt=CudssSolverOptions(),
     logger=MadNLP.MadNLPLogger(),
-    ) where T
+    )
+    T = eltype(csc.nzval)
     n, m = size(csc)
     @assert n == m
 
@@ -38,7 +40,7 @@ function CUDSSSolver(
     end
 
     matrix = CUDSS.CudssMatrix(
-        CUSPARSE.CuSparseMatrixCSR(csc.colPtr, csc.rowVal, csc.nzVal, csc.dims),
+        CUSPARSE.CuSparseMatrixCSR(CUDA.CuArray(csc.colptr), CUDA.CuArray(csc.rowval), CUDA.CuArray(csc.nzval), (csc.n, csc.n)),
         structure,
         view
     )
@@ -74,7 +76,7 @@ function CUDSSSolver(
     CUDSS.cudss("analysis", solver, x_gpu, b_gpu)
 
     return CUDSSSolver(
-        solver, csc,
+        solver, csc, CuArray(nonzeros(csc)),
         # full, tril_to_full_view,
         x_gpu, b_gpu,
         opt, logger
@@ -83,14 +85,16 @@ end
 
 function MadNLP.factorize!(M::CUDSSSolver)
     # copyto!(M.full.nzVal, M.tril_to_full_view)
-    CUDSS.cudss_set(M.inner.matrix, nonzeros(M.tril))
+    copyto!(M.tril_buffer, nonzeros(M.tril))
+    CUDSS.cudss_set(M.inner.matrix, M.tril_buffer)
     CUDSS.cudss("factorization", M.inner, M.x_gpu, M.b_gpu)
     synchronize(CUDABackend())
     return M
 end
 
 function MadNLP.solve!(M::CUDSSSolver{T}, x) where T
-    CUDSS.cudss("solve", M.inner, M.x_gpu, x)
+    copyto!(M.b_gpu, x)
+    CUDSS.cudss("solve", M.inner, M.x_gpu, M.b_gpu)
     synchronize(CUDABackend())
     copyto!(x, M.x_gpu)
     return x
