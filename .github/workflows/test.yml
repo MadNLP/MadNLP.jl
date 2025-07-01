@@ -21,9 +21,9 @@ jobs:
         os: [ubuntu-latest,macos-latest,windows-latest]
     steps:
       - uses: actions/checkout@v2
-      - uses: julia-actions/setup-julia@latest
+      - uses: julia-actions/install-juliaup@v2
         with:
-          version: ${{ matrix.julia-version }}
+          channel: ${{ matrix.julia-version }}
       - uses: julia-actions/cache@v1
       - run: julia --color=yes --project=.ci .ci/ci.jl basic
   test-mit:
@@ -35,9 +35,9 @@ jobs:
         julia-version: ['1.10']
     steps:
       - uses: actions/checkout@v2
-      - uses: julia-actions/setup-julia@latest
+      - uses: julia-actions/install-juliaup@v2
         with:
-          version: ${{ matrix.julia-version }}
+          channel: ${{ matrix.julia-version }}
       - uses: julia-actions/cache@v1
       - run: julia --color=yes --project=.ci .ci/ci.jl full
       - uses: julia-actions/julia-processcoverage@v1
@@ -56,9 +56,9 @@ jobs:
         julia-version: ['1.10', '1.11']
     steps:
       - uses: actions/checkout@v2
-      - uses: julia-actions/setup-julia@latest
+      - uses: julia-actions/install-juliaup@v2
         with:
-          version: ${{ matrix.julia-version }}
+          channel: ${{ matrix.julia-version }}
       - uses: julia-actions/cache@v1
       - run: julia --color=yes --project=.ci .ci/ci.jl cuda
   test-madnlphsl:
@@ -72,9 +72,9 @@ jobs:
         hsl-version: ['2024.11.28', '2024.12.31']
     steps:
       - uses: actions/checkout@v4
-      - uses: julia-actions/setup-julia@latest
+      - uses: julia-actions/install-juliaup@v2
         with:
-          version: ${{ matrix.julia-version }}
+          channel: ${{ matrix.julia-version }}
       - uses: julia-actions/julia-buildpkg@latest
       - name: Set HSL_VERSION as environment variable
         run: echo "HSL_VERSION=${{ matrix.hsl-version }}" >> $GITHUB_ENV
