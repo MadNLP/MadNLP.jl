@@ -31,10 +31,7 @@ function _pardisoinit(
     dparm::Vector{Cdouble},
     err::Ref{Cint},
 )
-    return ccall(
-        (:pardisoinit, libpardiso),
-        Cvoid,
-        (Ptr{Int}, Ptr{Cint}, Ptr{Cint}, Ptr{Cint}, Ptr{Cdouble}, Ptr{Cint}),
+    return pardisoinit(
         pt,
         mtype,
         solver,
@@ -63,28 +60,7 @@ function _pardiso(
     err::Ref{Cint},
     dparm::Vector{Cdouble},
 )
-    return ccall(
-        (:pardiso, libpardiso),
-        Cvoid,
-        (
-            Ptr{Int},
-            Ptr{Cint},
-            Ptr{Cint},
-            Ptr{Cint},
-            Ptr{Cint},
-            Ptr{Cint},
-            Ptr{Cdouble},
-            Ptr{Cint},
-            Ptr{Cint},
-            Ptr{Cint},
-            Ptr{Cint},
-            Ptr{Cint},
-            Ptr{Cint},
-            Ptr{Cdouble},
-            Ptr{Cdouble},
-            Ptr{Cint},
-            Ptr{Cdouble},
-        ),
+    return pardiso(
         pt,
         maxfct,
         mnum,

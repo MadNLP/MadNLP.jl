@@ -32,7 +32,10 @@ import MadNLP:
     default_options
 import MKL_jll: libmkl_rt
 
-@isdefined(libpardiso) && include("pardiso.jl")
+if @isdefined(libpardiso)
+    include("libpardiso.jl")
+    include("pardiso.jl")
+end
 include("pardisomkl.jl")
 
 function __init__()
