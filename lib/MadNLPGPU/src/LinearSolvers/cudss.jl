@@ -13,8 +13,10 @@ import CUDSS
     cudss_reordering_alg::String = "default"
     cudss_factorization_alg::String = "default"
     cudss_solve_alg::String = "default"
-    cudss_hybrid::Bool = false
+    cudss_matching::Bool = false
     cudss_pivoting::Bool = true
+    cudss_hybrid::Bool = false
+    cudss_hybrid_memory::Int = 0
 end
 
 function set_cudss_options!(solver, opt::CudssSolverOptions)
@@ -24,6 +26,9 @@ function set_cudss_options!(solver, opt::CudssSolverOptions)
     end
     if opt.cudss_hybrid
         CUDSS.cudss_set(solver, "hybrid_mode", 1)
+        if cudss_hybrid_memory > 0
+            CUDSS.cudss_set(solver, "hybrid_device_memory_limit", cudss_hybrid_memory)
+        end
     end
     if !opt.cudss_pivoting
         CUDSS.cudss_set(solver, "pivot_type", 'N')
@@ -34,8 +39,11 @@ function set_cudss_options!(solver, opt::CudssSolverOptions)
     if opt.cudss_pivot_threshold > 0.0
         CUDSS.cudss_set(solver, "pivot_threshold", opt.cudss_pivot_threshold)
     end
-    if opt.cudss_matching_alg != "default"
-        CUDSS.cudss_set(solver, "matching_alg", opt.cudss_matching_alg)
+    if cudss_matching
+        CUDSS.cudss_set(solver, "use_matching", 1)
+        if opt.cudss_matching_alg != "default"
+            CUDSS.cudss_set(solver, "matching_alg", opt.cudss_matching_alg)
+        end
     end
     if opt.cudss_reordering_alg != "default"
         CUDSS.cudss_set(solver, "reordering_alg", opt.cudss_reordering_alg)
