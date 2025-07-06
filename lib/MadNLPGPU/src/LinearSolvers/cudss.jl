@@ -15,8 +15,9 @@ import CUDSS
     cudss_solve_alg::String = "default"
     cudss_matching::Bool = false
     cudss_pivoting::Bool = true
-    cudss_hybrid::Bool = false
-    cudss_hybrid_memory::Int = 0
+    cudss_hybrid_execute::Bool = false
+    cudss_hybrid_memory::Bool = false
+    cudss_hybrid_memory_limit::Int = 0
 end
 
 function set_cudss_options!(solver, opt::CudssSolverOptions)
@@ -24,11 +25,14 @@ function set_cudss_options!(solver, opt::CudssSolverOptions)
         CUDSS.cudss_set(solver, "ir_n_steps", opt.cudss_ir)
         CUDSS.cudss_set(solver, "ir_tol", opt.cudss_ir_tol)
     end
-    if opt.cudss_hybrid
+    if opt.cudss_hybrid_memory
         CUDSS.cudss_set(solver, "hybrid_mode", 1)
-        if opt.cudss_hybrid_memory > 0
-            CUDSS.cudss_set(solver, "hybrid_device_memory_limit", opt.cudss_hybrid_memory)
+        if opt.cudss_hybrid_memory_limit > 0
+            CUDSS.cudss_set(solver, "hybrid_device_memory_limit", opt.cudss_hybrid_memory_limit)
         end
+    end
+    if opt.cudss_hybrid_execute
+        CUDSS.cudss_set(solver, "hybrid_execute_mode", 1)
     end
     if !opt.cudss_pivoting
         CUDSS.cudss_set(solver, "pivot_type", 'N')
