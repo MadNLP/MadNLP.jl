@@ -26,8 +26,8 @@ function set_cudss_options!(solver, opt::CudssSolverOptions)
     end
     if opt.cudss_hybrid
         CUDSS.cudss_set(solver, "hybrid_mode", 1)
-        if cudss_hybrid_memory > 0
-            CUDSS.cudss_set(solver, "hybrid_device_memory_limit", cudss_hybrid_memory)
+        if opt.cudss_hybrid_memory > 0
+            CUDSS.cudss_set(solver, "hybrid_device_memory_limit", opt.cudss_hybrid_memory)
         end
     end
     if !opt.cudss_pivoting
@@ -39,7 +39,7 @@ function set_cudss_options!(solver, opt::CudssSolverOptions)
     if opt.cudss_pivot_threshold > 0.0
         CUDSS.cudss_set(solver, "pivot_threshold", opt.cudss_pivot_threshold)
     end
-    if cudss_matching
+    if opt.cudss_matching
         CUDSS.cudss_set(solver, "use_matching", 1)
         if opt.cudss_matching_alg != "default"
             CUDSS.cudss_set(solver, "matching_alg", opt.cudss_matching_alg)
