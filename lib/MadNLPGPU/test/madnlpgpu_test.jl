@@ -18,6 +18,24 @@ testset = [
         [],
     ],
     [
+        "CUDSS-SYMAMD",
+        ()->MadNLP.Optimizer(
+            linear_solver=MadNLPGPU.CUDSSSolver,
+            print_level=MadNLP.ERROR,
+            ordering=MadNLPGPU.SYMAMD_ORDERING,
+        ),
+        [],
+    ],
+    [
+        "CUDSS-COLAMD",
+        ()->MadNLP.Optimizer(
+            linear_solver=MadNLPGPU.CUDSSSolver,
+            print_level=MadNLP.ERROR,
+            ordering=MadNLPGPU.COLAMD_ORDERING,
+        ),
+        [],
+    ],
+    [
         "CUDSS-METIS",
         ()->MadNLP.Optimizer(
             linear_solver=MadNLPGPU.CUDSSSolver,
