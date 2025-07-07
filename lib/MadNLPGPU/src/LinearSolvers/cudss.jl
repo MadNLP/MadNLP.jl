@@ -108,6 +108,12 @@ function CUDSSSolver(
         elseif opt.cudss_ordering == AMD_ORDERING
             A = SparseMatrixCSC(csc)
             opt.cudss_perm = AMD.amd(A)
+        elseif opt.cudss_ordering == SYMAMD_ORDERING
+            A = SparseMatrixCSC(csc)
+            opt.cudss_perm = AMD.symamd(A)
+        elseif opt.cudss_ordering == COLAMD_ORDERING
+            A = SparseMatrixCSC(csc)
+            opt.cudss_perm = AMD.colamd(A)
         elseif opt.cudss_ordering == USER_ORDERING
             (!isempty(opt.cudss_perm) && isperm(opt.cudss_perm)) || error("The vector opt.cudss_perm is not a valid permutation.")
         else
@@ -116,9 +122,9 @@ function CUDSSSolver(
         CUDSS.cudss_set(solver, "user_perm", opt.cudss_perm)
     end
 
+    # The phase "analysis" is "reordering" combined with "symbolic_factorization"
     x_gpu = CUDA.zeros(T, n)
     b_gpu = CUDA.zeros(T, n)
-
     CUDSS.cudss("analysis", solver, x_gpu, b_gpu)
 
     return CUDSSSolver(
