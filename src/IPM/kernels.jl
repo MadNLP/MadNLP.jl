@@ -204,14 +204,17 @@ function finish_aug_solve!(kkt::AbstractKKTSystem, d::AbstractKKTVector)
 end
 
 function set_initial_bounds!(xl::AbstractVector{T}, xu::AbstractVector{T}, tol) where T
-    map!(
-        x->x - max(one(T), abs(x)) .* tol,
-        xl, xl
-    )
-    map!(
-        x->x + max(one(T), abs(x)) .* tol,
-        xu, xu
-    )
+    # If `tol` is set to zero, keep the bounds unchanged.
+    if tol > zero(T)
+        map!(
+            x->x - max(one(T), abs(x)) .* tol,
+            xl, xl
+        )
+        map!(
+            x->x + max(one(T), abs(x)) .* tol,
+            xu, xu
+        )
+    end
 end
 
 function set_initial_rhs!(solver::AbstractMadNLPSolver{T}, kkt::AbstractKKTSystem) where T
