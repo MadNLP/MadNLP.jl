@@ -216,3 +216,12 @@ end
     )
     @test result.status == MadNLP.SOLVE_SUCCEEDED
 end
+
+@testset "Issue #430" begin
+    # Test MadNLP is working with bound_relax_factor=0
+    nlp = MadNLPTests.HS15Model()
+    solver = MadNLPSolver(nlp; bound_relax_factor=0.0)
+    stats = MadNLP.solve!(solver)
+    @test stats.status == MadNLP.SOLVE_SUCCEEDED
+end
+
