@@ -13,6 +13,7 @@ import NLPModels: finalize, AbstractNLPModel, obj, grad!, cons!, jac_coord!, hes
 import SolverCore: solve!, getStatus, AbstractOptimizationSolver, AbstractExecutionStats
 export MadNLPSolver, MadNLPOptions, UmfpackSolver, LDLSolver, CHOLMODSolver, LapackCPUSolver, madnlp, solve!
 import LDLFactorizations
+import AmplNLReader
 
 # Version info
 version() = string(pkgversion(@__MODULE__))
@@ -28,5 +29,11 @@ include(joinpath("LinearSolvers","linearsolvers.jl"))
 include("options.jl")
 include(joinpath("IPM", "IPM.jl"))
 include("extension_templates.jl")
+
+function (@main)(ARGS)
+    nlp = AmplNLReader.AmplModel(ARGS[1])
+    madnlp(nlp)    
+    return 0
+end
 
 end # end module
