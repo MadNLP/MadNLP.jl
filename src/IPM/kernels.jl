@@ -739,7 +739,7 @@ function get_rel_search_norm(x::AbstractVector{T}, dx::AbstractVector{T}) where 
 end
 
 # Utility functions
-if VERSION > v"1.12" # See https://github.com/JuliaGPU/CUDA.jl/issues/2811. norm of view() of CuArray is not supported
+if VERSION > v"1.11" # See https://github.com/JuliaGPU/CUDA.jl/issues/2811. norm of view() of CuArray is not supported
     function get_sd(l, zl_r, zu_r, s_max)
         return max(
             s_max,
