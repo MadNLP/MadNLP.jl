@@ -739,33 +739,17 @@ function get_rel_search_norm(x::AbstractVector{T}, dx::AbstractVector{T}) where 
 end
 
 # Utility functions
-if VERSION > v"1.11" # See https://github.com/JuliaGPU/CUDA.jl/issues/2811. norm of view() of CuArray is not supported
-    function get_sd(l, zl_r, zu_r, s_max)
-        return max(
-            s_max,
-            (mynorm(l, 1)+mynorm(zl_r, 1)+mynorm(zu_r, 1)) / max(1, (length(l)+length(zl_r)+length(zu_r))),
-        ) / s_max
-    end
-    function get_sc(zl_r, zu_r, s_max)
-        return max(
-            s_max,
-            (mynorm(zl_r,1)+mynorm(zu_r,1)) / max(1,length(zl_r)+length(zu_r)),
-        ) / s_max
-    end
-    mynorm(x::AbstractVector{T}, p::Int) where T = mapreduce(abs2, +, x)^(1/p)
-else
-    function get_sd(l, zl_r, zu_r, s_max)
-        return max(
-            s_max,
-            (norm(l, 1)+norm(zl_r, 1)+norm(zu_r, 1)) / max(1, (length(l)+length(zl_r)+length(zu_r))),
-        ) / s_max
-    end
-    function get_sc(zl_r, zu_r, s_max)
-        return max(
-            s_max,
-            (norm(zl_r,1)+norm(zu_r,1)) / max(1,length(zl_r)+length(zu_r)),
-        ) / s_max
-    end
+function get_sd(l, zl_r, zu_r, s_max)
+    return max(
+        s_max,
+        (norm(l, 1)+norm(zl_r, 1)+norm(zu_r, 1)) / max(1, (length(l)+length(zl_r)+length(zu_r))),
+    ) / s_max
+end
+function get_sc(zl_r, zu_r, s_max)
+    return max(
+        s_max,
+        (norm(zl_r,1)+norm(zu_r,1)) / max(1,length(zl_r)+length(zu_r)),
+    ) / s_max
 end
 
 function get_mu(
