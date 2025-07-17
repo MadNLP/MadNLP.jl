@@ -63,7 +63,6 @@ function initialize!(solver::AbstractMadNLPSolver{T}) where T
     eval_jac_wrapper!(solver, _kkt(solver), _x(solver))
     eval_grad_f_wrapper!(solver, _f(solver),_x(solver))
 
-
     @trace(_logger(solver),"Initializing constraint duals.")
     if !_opt(solver).dual_initialized
         initialize_dual(solver, opt.dual_initialization_method)
@@ -247,21 +246,25 @@ function regular!(solver::AbstractMadNLPSolver{T}) where T
         _cnt(solver).k>=_opt(solver).max_iter && return MAXIMUM_ITERATIONS_EXCEEDED
         time()-_cnt(solver).start_time>=_opt(solver).max_wall_time && return MAXIMUM_WALLTIME_EXCEEDED
 
+        # evaluate Hessian
+        if (solver.cnt.k!=0 && !solver.opt.hessian_constant)
+            eval_lag_hess_wrapper!(solver, solver.kkt, solver.x, solver.y)
+        end
+
+        # factorize the KKT system
+        @trace(solver.logger,"Factorizing the KKT system.")
+        set_aug_diagonal!(solver.kkt,solver)
+        inertia_correction!(solver.inertia_corrector, solver) || return ROBUST
+
         # update the barrier parameter
         @trace(solver.logger,"Updating the barrier parameter.")
         update_barrier!(solver.opt.barrier, solver, sc)
 
         # compute the newton step
         @trace(_logger(solver),"Computing the newton step.")
-        if (_cnt(solver).k!=0 && !_opt(solver).hessian_constant)
-            eval_lag_hess_wrapper!(solver, _kkt(solver), _x(solver), _y(solver))
-        end
-
-        set_aug_diagonal!(_kkt(solver),solver)
         set_aug_rhs!(solver, _kkt(solver), _c(solver), _mu(solver))
         dual_inf_perturbation!(primal(_p(solver)),_ind_llb(solver),_ind_uub(solver),_mu(solver),_opt(solver).kappa_d)
-
-        inertia_correction!(_inertia_corrector(solver), solver) || return ROBUST
+        solve_refine_wrapper!(_d(solver), solver, _p(solver), __w4(solver))
 
         @trace(_logger(solver),"Backtracking line search initiated.")
         status = filter_line_search!(solver)
@@ -295,7 +298,7 @@ function regular!(solver::AbstractMadNLPSolver{T}) where T
         eval_grad_f_wrapper!(solver, _f(solver),_x(solver))
 
         _cnt(solver).k+=1
-            @trace(_logger(solver),"Proceeding to the next interior point iteration.")
+        @trace(_logger(solver),"Proceeding to the next interior point iteration.")
     end
 end
 
@@ -641,7 +644,6 @@ function inertia_correction!(
     factorize_wrapper!(solver)
 
     num_pos,num_zero,num_neg = inertia(_kkt(solver).linear_solver)
-
 
     solve_status = !is_inertia_correct(_kkt(solver), num_pos, num_zero, num_neg) ?
         false : solve_refine_wrapper!(
