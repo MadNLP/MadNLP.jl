@@ -164,8 +164,8 @@ function set_cen_aug_rhs!(solver::AbstractMadNLPSolver, kkt::AbstractKKTSystem, 
 
     px .= 0
     py .= 0
-    pzl .= (solver.xl_r .- solver.x_lr) .* solver.zl_r .+ mu
-    pzu .= (solver.xu_r .- solver.x_ur) .* solver.zu_r .- mu
+    pzl .= mu
+    pzu .= -mu
     return
 end
 
