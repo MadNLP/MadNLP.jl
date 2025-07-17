@@ -117,8 +117,8 @@ function reinitialize!(solver::AbstractMadNLPSolver)
     theta = get_theta(solver.c)
     solver.theta_max=1e4*max(1,theta)
     solver.theta_min=1e-4*max(1,theta)
-    solver.mu=solver.opt.mu_init
-    solver.tau=max(solver.opt.tau_min,1-solver.opt.mu_init)
+    solver.mu=solver.opt.barrier.mu_init
+    solver.tau=max(solver.opt.tau_min,1-solver.opt.barrier.mu_init)
     empty!(solver.filter)
     push!(solver.filter, (solver.theta_max,-Inf))
 
