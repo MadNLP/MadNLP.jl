@@ -76,7 +76,6 @@ function _evaluate_quality_function(solver, sigma, step_aff, step_cen, res_dual,
 
     # Δ(σ) = Δ(0) + σ (Δ(1) - Δ(0))
     full(d) .= full(step_aff) .+ sigma .* (full(step_cen) .- full(step_aff))
-
     # Primal step
     alpha_pr = get_alpha_max(
         primal(solver.x),
@@ -157,6 +156,19 @@ function _run_golden_search!(solver, barrier, sigma_lb, sigma_ub, step_aff, step
     return sigma
 end
 
+function set_cen_aug_rhs!(solver::AbstractMadNLPSolver, kkt::AbstractKKTSystem, mu)
+    px = primal(solver.p)
+    py = dual(solver.p)
+    pzl = dual_lb(solver.p)
+    pzu = dual_ub(solver.p)
+
+    px .= 0
+    py .= 0
+    pzl .= mu
+    pzu .= -mu
+    return
+end
+
 function get_adaptive_mu(solver::AbstractMadNLPSolver, barrier::AdaptiveUpdate)
     linear_solver = solver.kkt.linear_solver
     step_aff = solver._w1 # buffer 1
@@ -164,17 +176,20 @@ function get_adaptive_mu(solver::AbstractMadNLPSolver, barrier::AdaptiveUpdate)
 
     # Affine step
     set_aug_rhs!(solver, solver.kkt, solver.c, 0.0)
-    # Get primal and dual infeasibility directly from the values in RHS p
-    res_primal = norm(dual(solver.p))
-    res_dual = norm(primal(solver.p))
+    # Get primal and dual infeasibility directly 1from the values in RHS p
+    res_primal = norm(primal(solver.p))
+    res_dual = norm(dual(solver.p))
 
     # Get approximate solution without iterative refinement
     copyto!(full(step_aff), full(solver.p))
     solve!(linear_solver, full(step_aff))
 
+    # Get average complementarity
     mu = get_average_complementarity(solver)
     # Centering step
-    set_aug_rhs!(solver, solver.kkt, solver.c, mu)
+    set_cen_aug_rhs!(solver, solver.kkt, mu)
+    # NOTE(@anton) Ipopt also applies the dual infeasibility perturbation for some reason???
+    dual_inf_perturbation!(primal(solver.p),solver.ind_llb,solver.ind_uub,mu,solver.opt.kappa_d)
     # Get (again) approximate solution without iterative refinement
     copyto!(full(step_cen), full(solver.p))
     solve!(linear_solver, full(step_cen))
@@ -195,7 +210,6 @@ function get_adaptive_mu(solver::AbstractMadNLPSolver, barrier::AdaptiveUpdate)
 
     # Run Golden-section search (assume the quality function is unimodal)
     sigma_opt = _run_golden_search!(solver, barrier, sigma_min, sigma_max, step_aff, step_cen, res_primal, res_dual)
-
     return sigma_opt * mu
 end
 
