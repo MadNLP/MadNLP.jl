@@ -315,6 +315,11 @@ function MOI.is_valid(model::Optimizer, x::MOI.VariableIndex)
     return MOI.is_valid(model.variables, x)
 end
 
+function MOI.is_valid(model::Optimizer, ci::MOI.ConstraintIndex{MOI.VariableIndex, MOI.Parameter{Float64}})
+    p = MOI.VariableIndex(ci.value)
+    return haskey(model.parameters, p)
+end
+
 function MOI.get(model::Optimizer, ::MOI.ListOfVariableIndices)
     return model.list_of_variable_indices
 end
@@ -856,6 +861,7 @@ function MOIModel(model::Optimizer)
             clamp(0.0, model.variables.lower[i], model.variables.upper[i])
         end
     end
+
     # Constraints bounds
     g_L, g_U = copy(model.qp_data.g_L), copy(model.qp_data.g_U)
     for bound in model.nlp_data.constraint_bounds
