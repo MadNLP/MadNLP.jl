@@ -190,6 +190,16 @@ function test_param_in_quadratic_term2()
     @assert abs(3 * x_val + 9 * y_val - 15) <= 1e-6 # constraint has no slack
 end
 
+function test_parameter_is_valid()
+    model = MadNLP.Optimizer()
+    p, ci = MOI.add_constrained_variable(model, MOI.Parameter(2.0))
+    @test MOI.is_valid(model, p)
+    @test MOI.is_valid(model, ci)
+    @test !MOI.is_valid(model, typeof(p)(p.value + 1))
+    @test !MOI.is_valid(model, typeof(ci)(ci.value + 1))
+    return
+end
+
 end
 
 TestMOIWrapper.runtests()
