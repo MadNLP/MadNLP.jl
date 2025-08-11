@@ -13,7 +13,7 @@ testset = [
         ()->MadNLP.Optimizer(
             linear_solver=MadNLPGPU.CUDSSSolver,
             print_level=MadNLP.ERROR,
-            ordering=MadNLPGPU.AMD_ORDERING,
+            cudss_ordering=MadNLPGPU.AMD_ORDERING,
         ),
         [],
     ],
@@ -22,7 +22,7 @@ testset = [
         ()->MadNLP.Optimizer(
             linear_solver=MadNLPGPU.CUDSSSolver,
             print_level=MadNLP.ERROR,
-            ordering=MadNLPGPU.SYMAMD_ORDERING,
+            cudss_ordering=MadNLPGPU.SYMAMD_ORDERING,
         ),
         [],
     ],
@@ -31,7 +31,7 @@ testset = [
         ()->MadNLP.Optimizer(
             linear_solver=MadNLPGPU.CUDSSSolver,
             print_level=MadNLP.ERROR,
-            ordering=MadNLPGPU.COLAMD_ORDERING,
+            cudss_ordering=MadNLPGPU.COLAMD_ORDERING,
         ),
         [],
     ],
@@ -40,7 +40,7 @@ testset = [
         ()->MadNLP.Optimizer(
             linear_solver=MadNLPGPU.CUDSSSolver,
             print_level=MadNLP.ERROR,
-            ordering=MadNLPGPU.METIS_ORDERING,
+            cudss_ordering=MadNLPGPU.METIS_ORDERING,
         ),
         [],
     ],
@@ -49,8 +49,8 @@ testset = [
         ()->MadNLP.Optimizer(
             linear_solver=MadNLPGPU.CUDSSSolver,
             print_level=MadNLP.ERROR,
-            hybrid=true,
-            ir=1,
+            cudss_hybrid_memory=true,
+            cudss_ir=1,
         ),
         [],
     ],
@@ -59,7 +59,7 @@ testset = [
         ()->MadNLP.Optimizer(
             linear_solver=MadNLPGPU.CUDSSSolver,
             print_level=MadNLP.ERROR,
-            pivoting=false,
+            cudss_pivoting=false,
         ),
         [],
     ],
