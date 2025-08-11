@@ -61,10 +61,10 @@ function set_cudss_options!(solver, opt::CudssSolverOptions)
 end
 
 mutable struct CUDSSSolver{T} <: MadNLP.AbstractLinearSolver{T}
-    inner::Union{Nothing, CUDSS.CudssSolver}
+    inner::CUDSS.CudssSolver{T}
     tril::CUSPARSE.CuSparseMatrixCSC{T}
-    x_gpu::CUDA.CuVector{T}
-    b_gpu::CUDA.CuVector{T}
+    x_gpu::CUDSS.CudssMatrix{T}
+    b_gpu::CUDSS.CudssMatrix{T}
 
     opt::CudssSolverOptions
     logger::MadNLP.MadNLPLogger
@@ -79,24 +79,14 @@ function CUDSSSolver(
     @assert n == m
 
     view = 'U'
-    structure = if opt.cudss_algorithm == MadNLP.LU
-        "G"
-    elseif opt.cudss_algorithm == MadNLP.CHOLESKY
-        "SPD"
-    elseif opt.cudss_algorithm == MadNLP.LDL
-        "S"
-    end
+    structure = 'G'
+    # We need view = 'F' for the sparse LU decomposition
+    (opt.cudss_algorithm == MadNLP.LU) && error("The sparse LU of cuDSS is not supported.")
+    (opt.cudss_algorithm == MadNLP.CHOLESKY) && (structure = "SPD")
+    (opt.cudss_algorithm == MadNLP.LDL) && (structure = "S")
 
-    matrix = CUDSS.CudssMatrix(
-        CUSPARSE.CuSparseMatrixCSR(csc.colPtr, csc.rowVal, csc.nzVal, csc.dims),
-        structure,
-        view
-    )
-
-    config = CUDSS.CudssConfig()
-    data = CUDSS.CudssData()
-    solver = CUDSS.CudssSolver(matrix, config, data)
-
+    matrix = CUSPARSE.CuSparseMatrixCSR(csc.colPtr, csc.rowVal, csc.nzVal, csc.dims)
+    solver = CUDSS.CudssSolver(matrix, structure, view)
     set_cudss_options!(solver, opt)
 
     if opt.cudss_ordering != DEFAULT_ORDERING
@@ -123,8 +113,8 @@ function CUDSSSolver(
     end
 
     # The phase "analysis" is "reordering" combined with "symbolic_factorization"
-    x_gpu = CUDA.zeros(T, n)
-    b_gpu = CUDA.zeros(T, n)
+    x_gpu = CudssMatrix(T, n)
+    b_gpu = CudssMatrix(T, n)
     CUDSS.cudss("analysis", solver, x_gpu, b_gpu)
 
     return CUDSSSolver(
@@ -137,20 +127,19 @@ end
 function MadNLP.factorize!(M::CUDSSSolver)
     CUDSS.cudss_set(M.inner.matrix, nonzeros(M.tril))
     CUDSS.cudss("factorization", M.inner, M.x_gpu, M.b_gpu)
-    synchronize(CUDABackend())
     return M
 end
 
-function MadNLP.solve!(M::CUDSSSolver{T}, x) where T
-    CUDSS.cudss("solve", M.inner, M.x_gpu, x)
-    synchronize(CUDABackend())
-    copyto!(x, M.x_gpu)
-    return x
+function MadNLP.solve!(M::CUDSSSolver{T}, xb::CuVector{T}) where T
+    CUDSS.cudss_set(M.b_gpu, xb)
+    CUDSS.cudss_set(M.x_gpu, xb)
+    CUDSS.cudss("solve", M.inner, M.x_gpu, M.b_gpu)
+    return xb
 end
 
 MadNLP.input_type(::Type{CUDSSSolver}) = :csc
 MadNLP.default_options(::Type{CUDSSSolver}) = CudssSolverOptions()
-MadNLP.is_inertia(M::CUDSSSolver) = (M.opt.cudss_algorithm ∈ (MadNLP.CHOLESKY, MadNLP.LDL))
+MadNLP.is_inertia(M::CUDSSSolver) = true  # Uncomment if MadNLP.LU is supported -- (M.opt.cudss_algorithm ∈ (MadNLP.CHOLESKY, MadNLP.LDL))
 function inertia(M::CUDSSSolver)
     n = size(M.tril, 1)
     if M.opt.cudss_algorithm == MadNLP.CHOLESKY
