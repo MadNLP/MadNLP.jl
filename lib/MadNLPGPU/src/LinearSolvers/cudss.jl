@@ -6,7 +6,7 @@ import CUDSS
     cudss_ordering::ORDERING = DEFAULT_ORDERING
     cudss_perm::Vector{Cint} = Cint[]
     cudss_ir::Int = 0
-    cudss_ir_tol::Float64 = 1e-8
+    cudss_ir_tol::Float64 = 1e-8  # currently ignored in cuDSS 0.6
     cudss_pivot_threshold::Float64 = 0.0
     cudss_pivot_epsilon::Float64 = 0.0
     cudss_matching_alg::String = "default"
@@ -133,7 +133,9 @@ function MadNLP.factorize!(M::CUDSSSolver)
     else
         CUDSS.cudss("refactorization", M.inner, M.x_gpu, M.b_gpu)
     end
-    CUDA.synchronize()
+    if !M.opt.cudss_hybrid_memory && !M.opt.cudss_hybrid_execute
+        CUDA.synchronize()
+    end
     return M
 end
 
@@ -141,7 +143,9 @@ function MadNLP.solve!(M::CUDSSSolver{T}, xb::CuVector{T}) where T
     CUDSS.cudss_set(M.b_gpu, xb)
     CUDSS.cudss_set(M.x_gpu, xb)
     CUDSS.cudss("solve", M.inner, M.x_gpu, M.b_gpu)
-    CUDA.synchronize()
+    if !M.opt.cudss_hybrid_memory && !M.opt.cudss_hybrid_execute
+        CUDA.synchronize()
+    end
     return xb
 end
 
