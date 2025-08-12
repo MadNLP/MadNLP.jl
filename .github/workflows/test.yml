@@ -91,30 +91,32 @@ jobs:
       - uses: codecov/codecov-action@v5
         with:
           file: lcov.info
-  test-pardiso:
-    runs-on: 
-      labels: pardiso
-    strategy:
-      matrix:
-        julia-version: ['1']
-    steps:
-      - uses: actions/checkout@v2
-      - uses: julia-actions/install-juliaup@v2
-        with:
-          channel: ${{ matrix.julia-version }}
-      - uses: julia-actions/cache@v1
-      - name: test MadNLPPardiso
-        shell: julia --project=./lib/MadNLPPardiso --color=yes {0}
-        run: |
-          using Pkg
-          Pkg.Registry.update()
-          Pkg.test("MadNLPPardiso", coverage=true)
-      - uses: julia-actions/julia-processcoverage@v1
-        with:
-          directories: lib/MadNLPPardiso/src
-      - uses: codecov/codecov-action@v5
-        with:
-          file: lcov.info
+  # Pardiso license currently not available
+  # 
+  # test-pardiso:
+  #   runs-on: 
+  #     labels: pardiso
+  #   strategy:
+  #     matrix:
+  #       julia-version: ['1']
+  #   steps:
+  #     - uses: actions/checkout@v2
+  #     - uses: julia-actions/install-juliaup@v2
+  #       with:
+  #         channel: ${{ matrix.julia-version }}
+  #     - uses: julia-actions/cache@v1
+  #     - name: test MadNLPPardiso
+  #       shell: julia --project=./lib/MadNLPPardiso --color=yes {0}
+  #       run: |
+  #         using Pkg
+  #         Pkg.Registry.update()
+  #         Pkg.test("MadNLPPardiso", coverage=true)
+  #     - uses: julia-actions/julia-processcoverage@v1
+  #       with:
+  #         directories: lib/MadNLPPardiso/src
+  #     - uses: codecov/codecov-action@v5
+  #       with:
+  #         file: lcov.info
   test-gpu:
     runs-on: 
       labels: cuda
