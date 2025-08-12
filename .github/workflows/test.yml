@@ -43,8 +43,38 @@ jobs:
       - uses: codecov/codecov-action@v5
         with:
           file: lcov.info
-  test-hsl-pardiso:
-    runs-on: self-hosted
+  test-hsl:
+    runs-on: 
+      labels: hsl
+    strategy:
+      matrix:
+        julia-version: ['1']
+        hsl-version: ['2024.11.28', '2024.12.31']
+    steps:
+      - uses: actions/checkout@v2
+      - uses: julia-actions/install-juliaup@v2
+        with:
+          channel: ${{ matrix.julia-version }}
+      - uses: julia-actions/cache@v1
+      - name: Set HSL_VERSION as environment variable
+        run: echo "HSL_VERSION=${{ matrix.hsl-version }}" >> $GITHUB_ENV
+      - name: test MadNLPHSL
+        shell: julia --project=./lib/MadNLPHSL --color=yes {0}
+        run: |
+          using Pkg
+          Pkg.Registry.update()
+          path_HSL_jll = "~/HSL_jll.jl.v" * ENV["HSL_VERSION"]
+          Pkg.develop(path=path_HSL_jll)
+          Pkg.test("MadNLPHSL")
+      - uses: julia-actions/julia-processcoverage@v1
+        with:
+          directories: src,lib/MadNLPHSL/src
+      - uses: codecov/codecov-action@v5
+        with:
+          file: lcov.info
+  test-pardiso:
+    runs-on: 
+      labels: pardiso
     strategy:
       matrix:
         julia-version: ['1']
@@ -54,28 +84,20 @@ jobs:
         with:
           channel: ${{ matrix.julia-version }}
       - uses: julia-actions/cache@v1
-      - name: test MadNLPHSL
-        shell: julia --project=./lib/MadNLPHSL --color=yes {0}
-        run: |
-          using Pkg
-          Pkg.Registry.update()
-          path_HSL_jll = "/scratch/github-actions/actions_runner_madnlphsl/HSL_jll.jl.v" * ENV["HSL_VERSION"]
-          Pkg.develop(path=path_HSL_jll)
-          Pkg.test("MadNLPHSL")
       - name: test MadNLPPardiso
         shell: julia --project=./lib/MadNLPPardiso --color=yes {0}
         run: |
           using Pkg
           Pkg.Registry.update()
-          Pkg.test("MadNLPPardiso)
+          Pkg.test("MadNLPPardiso")
       - uses: julia-actions/julia-processcoverage@v1
         with:
-          directories: src,lib/MadNLPHSL/src,lib/MadNLPPardiso/src
+          directories: lib/MadNLPPardiso/src
       - uses: codecov/codecov-action@v5
         with:
           file: lcov.info
   test-gpu:
-    runs-on: self-hosted
+    runs-on: 
       labels: cuda
     strategy:
       matrix:
