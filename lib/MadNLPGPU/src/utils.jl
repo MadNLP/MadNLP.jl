@@ -78,3 +78,19 @@ symul!(y, A, x::CuVector{T}, α = 1., β = 0.) where T = CUBLAS.symv!('L', T(α)
 
 MadNLP._ger!(alpha::Number, x::CuVector{T}, y::CuVector{T}, A::CuMatrix{T}) where T = CUBLAS.ger!(alpha, x, y, A)
 
+
+if VERSION > v"1.11" # See https://github.com/JuliaGPU/CUDA.jl/issues/2811. norm of view() of CuArray is not supported
+    function MadNLP.get_sd(l::CuVector{T}, zl_r, zu_r, s_max) where T
+        return max(
+            s_max,
+            (my1norm(l)+my1norm(zl_r)+my1norm(zu_r)) / max(1, (length(l)+length(zl_r)+length(zu_r))),
+        ) / s_max
+    end
+    function MadNLP.get_sc(zl_r::SubArray{T,1,VT}, zu_r, s_max) where {T, VT <: CuVector{T}}
+        return max(
+            s_max,
+            (my1norm(zl_r)+my1norm(zu_r)) / max(1,length(zl_r)+length(zu_r)),
+        ) / s_max
+    end
+    my1norm(x) = mapreduce(abs, +, x)
+end
