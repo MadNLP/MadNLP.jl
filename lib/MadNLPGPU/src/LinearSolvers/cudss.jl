@@ -113,8 +113,8 @@ function CUDSSSolver(
     end
 
     # The phase "analysis" is "reordering" combined with "symbolic_factorization"
-    x_gpu = CudssMatrix(T, n)
-    b_gpu = CudssMatrix(T, n)
+    x_gpu = CUDSS.CudssMatrix(T, n)
+    b_gpu = CUDSS.CudssMatrix(T, n)
     CUDSS.cudss("analysis", solver, x_gpu, b_gpu)
 
     return CUDSSSolver(
