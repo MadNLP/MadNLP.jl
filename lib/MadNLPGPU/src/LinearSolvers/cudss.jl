@@ -128,7 +128,7 @@ function CUDSSSolver(
 
     return CUDSSSolver(
         solver, csc,
-        x_gpu, b_gpu,
+        x_gpu, b_gpu, buffer,
         fresh_factorization, opt, logger,
     )
 end
