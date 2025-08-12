@@ -133,7 +133,7 @@ function MadNLP.factorize!(M::CUDSSSolver)
     else
         CUDSS.cudss("refactorization", M.inner, M.x_gpu, M.b_gpu)
     end
-    synchronize(CUDABackend())
+    CUDA.synchronize()
     return M
 end
 
@@ -141,7 +141,7 @@ function MadNLP.solve!(M::CUDSSSolver{T}, xb::CuVector{T}) where T
     CUDSS.cudss_set(M.b_gpu, xb)
     CUDSS.cudss_set(M.x_gpu, xb)
     CUDSS.cudss("solve", M.inner, M.x_gpu, M.b_gpu)
-    synchronize(CUDABackend())
+    CUDA.synchronize()
     return xb
 end
 
