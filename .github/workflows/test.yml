@@ -68,7 +68,7 @@ jobs:
     strategy:
       matrix:
         julia-version: ['1']
-        hsl-version: ['2024.11.28', '2024.12.31']
+        hsl-version: ['2024.11.28', '2024.12.31', '2025.7.21']
     steps:
       - uses: actions/checkout@v2
       - uses: julia-actions/install-juliaup@v2
