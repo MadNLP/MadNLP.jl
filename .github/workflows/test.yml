@@ -37,6 +37,7 @@ jobs:
       - uses: codecov/codecov-action@v5
         with:
           file: lcov.info
+          token: ${{ secrets.CODECOV_TOKEN }}
   test-mumps:
     runs-on: ${{ matrix.os }}
     strategy:
@@ -62,6 +63,7 @@ jobs:
       - uses: codecov/codecov-action@v5
         with:
           file: lcov.info
+          token: ${{ secrets.CODECOV_TOKEN }}
   test-hsl:
     runs-on: 
       labels: hsl
@@ -91,6 +93,7 @@ jobs:
       - uses: codecov/codecov-action@v5
         with:
           file: lcov.info
+          token: ${{ secrets.CODECOV_TOKEN }}
   # Pardiso license currently not available
   # 
   # test-pardiso:
@@ -141,3 +144,5 @@ jobs:
       - uses: codecov/codecov-action@v5
         with:
           file: lcov.info
+          token: ${{ secrets.CODECOV_TOKEN }}
+          
