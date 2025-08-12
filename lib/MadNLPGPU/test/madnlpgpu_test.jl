@@ -45,12 +45,20 @@ testset = [
         [],
     ],
     [
+        "CUDSS-IR",
+        ()->MadNLP.Optimizer(
+            linear_solver=MadNLPGPU.CUDSSSolver,
+            print_level=MadNLP.ERROR,
+            cudss_ir=1,
+        ),
+        [],
+    ],
+    [
         "CUDSS-HYBRID",
         ()->MadNLP.Optimizer(
             linear_solver=MadNLPGPU.CUDSSSolver,
             print_level=MadNLP.ERROR,
             cudss_hybrid_memory=true,
-            cudss_ir=1,
         ),
         [],
     ],
