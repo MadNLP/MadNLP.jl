@@ -20,7 +20,7 @@ import CUDSS
     cudss_hybrid_memory_limit::Int = 0
 end
 
-function set_cudss_options!(solver, opt::CudssSolverOptions)
+function set_cudss_options!(solver::CUDSS.CudssSolver, opt::CudssSolverOptions)
     if opt.cudss_ir > 0
         CUDSS.cudss_set(solver, "ir_n_steps", opt.cudss_ir)
         CUDSS.cudss_set(solver, "ir_tol", opt.cudss_ir_tol)
@@ -60,11 +60,12 @@ function set_cudss_options!(solver, opt::CudssSolverOptions)
     end
 end
 
-mutable struct CUDSSSolver{T} <: MadNLP.AbstractLinearSolver{T}
+mutable struct CUDSSSolver{T,V} <: MadNLP.AbstractLinearSolver{T}
     inner::CUDSS.CudssSolver{T}
-    tril::CUSPARSE.CuSparseMatrixCSC{T}
+    tril::CUSPARSE.CuSparseMatrixCSC{T,Cint}
     x_gpu::CUDSS.CudssMatrix{T}
     b_gpu::CUDSS.CudssMatrix{T}
+    buffer::V
     fresh_factorization::Bool
 
     opt::CudssSolverOptions
@@ -118,10 +119,17 @@ function CUDSSSolver(
     b_gpu = CUDSS.CudssMatrix(T, n)
     CUDSS.cudss("analysis", solver, x_gpu, b_gpu)
 
+    # Allocate additional buffer for iterative refinement
+    # Always allocate it to support dynamic updates to opt.cudss_ir
+    buffer = CuVector{T}(undef, n)
+
+    # Indicates whether this is the first factorization or a refactorization
+    fresh_factorization = true
+
     return CUDSSSolver(
         solver, csc,
         x_gpu, b_gpu,
-        true, opt, logger,
+        fresh_factorization, opt, logger,
     )
 end
 
@@ -139,8 +147,13 @@ function MadNLP.factorize!(M::CUDSSSolver)
     return M
 end
 
-function MadNLP.solve!(M::CUDSSSolver{T}, xb::CuVector{T}) where T
-    CUDSS.cudss_set(M.b_gpu, xb)
+function MadNLP.solve!(M::CUDSSSolver{T,V}, xb::V) where {T,V}
+    if M.opt.cudss_ir > 0
+        copyto!(M.buffer, xb)
+        CUDSS.cudss_set(M.b_gpu, M.buffer)
+    else
+        CUDSS.cudss_set(M.x_gpu, xb)
+    end
     CUDSS.cudss_set(M.x_gpu, xb)
     CUDSS.cudss("solve", M.inner, M.x_gpu, M.b_gpu)
     if !M.opt.cudss_hybrid_memory && !M.opt.cudss_hybrid_execute
@@ -159,7 +172,6 @@ function inertia(M::CUDSSSolver)
         if info == 0
             return (n, 0, 0)
         else
-            CUDSS.cudss_set(M.inner, "info", 0)
             return (n-2, 1, 1)
         end
     elseif M.opt.cudss_algorithm == MadNLP.LDL
