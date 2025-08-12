@@ -65,6 +65,7 @@ mutable struct CUDSSSolver{T} <: MadNLP.AbstractLinearSolver{T}
     tril::CUSPARSE.CuSparseMatrixCSC{T}
     x_gpu::CUDSS.CudssMatrix{T}
     b_gpu::CUDSS.CudssMatrix{T}
+    fresh_factorization::Bool
 
     opt::CudssSolverOptions
     logger::MadNLP.MadNLPLogger
@@ -120,14 +121,19 @@ function CUDSSSolver(
     return CUDSSSolver(
         solver, csc,
         x_gpu, b_gpu,
-        opt, logger
+        true, opt, logger,
     )
 end
 
 function MadNLP.factorize!(M::CUDSSSolver)
     CUDSS.cudss_set(M.inner.matrix, nonzeros(M.tril))
-    CUDSS.cudss("factorization", M.inner, M.x_gpu, M.b_gpu)
-    CUDA.synchronize()
+    if M.fresh_factorization
+        CUDSS.cudss("factorization", M.inner, M.x_gpu, M.b_gpu)
+        M.fresh_factorization = false
+    else
+        CUDSS.cudss("refactorization", M.inner, M.x_gpu, M.b_gpu)
+    end
+    synchronize(CUDABackend())
     return M
 end
 
@@ -135,7 +141,7 @@ function MadNLP.solve!(M::CUDSSSolver{T}, xb::CuVector{T}) where T
     CUDSS.cudss_set(M.b_gpu, xb)
     CUDSS.cudss_set(M.x_gpu, xb)
     CUDSS.cudss("solve", M.inner, M.x_gpu, M.b_gpu)
-    CUDA.synchronize()
+    synchronize(CUDABackend())
     return xb
 end
 
