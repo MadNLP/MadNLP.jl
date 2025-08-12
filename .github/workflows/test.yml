@@ -12,7 +12,7 @@ permissions:
   contents: read
 
 jobs:
-  test-github:
+  test-madnlp-mumps:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -37,7 +37,13 @@ jobs:
           using Pkg
           Pkg.Registry.update()
           Pkg.test("MadNLPMumps")
-  test-mit:
+      - uses: julia-actions/julia-processcoverage@v1
+        with:
+          directories: src,lib/MadNLPMumps/src
+      - uses: codecov/codecov-action@v5
+        with:
+          file: lcov.info
+  test-hsl-pardiso:
     runs-on: self-hosted
     strategy:
       matrix:
@@ -48,12 +54,6 @@ jobs:
         with:
           channel: ${{ matrix.julia-version }}
       - uses: julia-actions/cache@v1
-      - name: test MadNLP
-        shell: julia --project=./lib/MadNLPHSL --color=yes {0}
-        run: |
-          using Pkg
-          Pkg.Registry.update()
-          Pkg.test("MadNLP)
       - name: test MadNLPHSL
         shell: julia --project=./lib/MadNLPHSL --color=yes {0}
         run: |
@@ -62,18 +62,30 @@ jobs:
           path_HSL_jll = "/scratch/github-actions/actions_runner_madnlphsl/HSL_jll.jl.v" * ENV["HSL_VERSION"]
           Pkg.develop(path=path_HSL_jll)
           Pkg.test("MadNLPHSL")
-      - name: test MadNLPMumps
-        shell: julia --project=./lib/MadNLPMumps --color=yes {0}
-        run: |
-          using Pkg
-          Pkg.Registry.update()
-          Pkg.test("MadNLPHSL")
       - name: test MadNLPPardiso
         shell: julia --project=./lib/MadNLPPardiso --color=yes {0}
         run: |
           using Pkg
           Pkg.Registry.update()
-          Pkg.test("MadNLPHSL")
+          Pkg.test("MadNLPPardiso)
+      - uses: julia-actions/julia-processcoverage@v1
+        with:
+          directories: src,lib/MadNLPHSL/src,lib/MadNLPPardiso/src
+      - uses: codecov/codecov-action@v5
+        with:
+          file: lcov.info
+  test-gpu:
+    runs-on: self-hosted
+      labels: cuda
+    strategy:
+      matrix:
+        julia-version: ['1']
+    steps:
+      - uses: actions/checkout@v2
+      - uses: julia-actions/install-juliaup@v2
+        with:
+          channel: ${{ matrix.julia-version }}
+      - uses: julia-actions/cache@v1
       - name: test MadNLPGPU
         shell: julia --project=./lib/MadNLPGPU --color=yes {0}
         run: |
@@ -82,7 +94,7 @@ jobs:
           Pkg.test("MadNLPGPU")
       - uses: julia-actions/julia-processcoverage@v1
         with:
-          directories: src,lib/MadNLPHSL/src,lib/MadNLPPardiso/src,lib/MadNLPMumps/src,lib/MadNLPGPU/src
+          directories: lib/MadNLPGPU/src
       - uses: codecov/codecov-action@v5
         with:
           file: lcov.info
