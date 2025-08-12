@@ -16,7 +16,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        julia-version: ['latest']
+        julia-version: ['1']
         julia-arch: [x64]
         os: [ubuntu-latest,macos-latest,windows-latest]
     steps:
@@ -41,7 +41,7 @@ jobs:
     runs-on: self-hosted
     strategy:
       matrix:
-        julia-version: ['latest']
+        julia-version: ['1']
     steps:
       - uses: actions/checkout@v2
       - uses: julia-actions/install-juliaup@v2
