@@ -12,7 +12,7 @@ permissions:
   contents: read
 
 jobs:
-  test-madnlp-mumps:
+  test-madnlp:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -30,13 +30,32 @@ jobs:
         run: |
           using Pkg
           Pkg.Registry.update()
-          Pkg.test("MadNLP")
+          Pkg.test("MadNLP", coverage=true)
+      - uses: julia-actions/julia-processcoverage@v1
+        with:
+          directories: src,lib/MadNLPMumps/src
+      - uses: codecov/codecov-action@v5
+        with:
+          file: lcov.info
+  test-mumps:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        julia-version: ['1']
+        julia-arch: [x64]
+        os: [ubuntu-latest,macos-latest,windows-latest]
+    steps:
+      - uses: actions/checkout@v2
+      - uses: julia-actions/install-juliaup@v2
+        with:
+          channel: ${{ matrix.julia-version }}
+      - uses: julia-actions/cache@v1
       - name: test MadNLPMumps
         shell: julia --project=./lib/MadNLPMumps --color=yes {0}
         run: |
           using Pkg
           Pkg.Registry.update()
-          Pkg.test("MadNLPMumps")
+          Pkg.test("MadNLPMumps", coverage=true)
       - uses: julia-actions/julia-processcoverage@v1
         with:
           directories: src,lib/MadNLPMumps/src
@@ -65,7 +84,7 @@ jobs:
           Pkg.Registry.update()
           path_HSL_jll = "/home/action-runner/HSL_jll.jl.v" * ENV["HSL_VERSION"]
           Pkg.develop(path=path_HSL_jll)
-          Pkg.test("MadNLPHSL")
+          Pkg.test("MadNLPHSL", coverage=true)
       - uses: julia-actions/julia-processcoverage@v1
         with:
           directories: src,lib/MadNLPHSL/src
@@ -89,7 +108,7 @@ jobs:
         run: |
           using Pkg
           Pkg.Registry.update()
-          Pkg.test("MadNLPPardiso")
+          Pkg.test("MadNLPPardiso", coverage=true)
       - uses: julia-actions/julia-processcoverage@v1
         with:
           directories: lib/MadNLPPardiso/src
@@ -113,7 +132,7 @@ jobs:
         run: |
           using Pkg
           Pkg.Registry.update()
-          Pkg.test("MadNLPGPU")
+          Pkg.test("MadNLPGPU", coverage=true)
       - uses: julia-actions/julia-processcoverage@v1
         with:
           directories: lib/MadNLPGPU/src
