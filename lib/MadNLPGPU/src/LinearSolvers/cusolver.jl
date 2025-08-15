@@ -249,9 +249,9 @@ for (getrf, getrf_buffer, getrs, T) in
                     M.n,
                     M.ipiv64,
                     $T,
-                    M.work_cpu,
-                    Csize_t(M.lwork_gpu * sizeof($T)),
                     M.work_gpu,
+                    Csize_t(M.lwork_gpu * sizeof($T)),
+                    M.work_cpu,
                     Csize_t(M.lwork_cpu),
                     M.info,
                 )
