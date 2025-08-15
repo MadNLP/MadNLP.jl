@@ -13,12 +13,15 @@ mutable struct LapackGPUSolver{T,MT} <: AbstractLinearSolver{T}
     ipiv64::CuVector{Int64}
     opt::LapackOptions
     logger::MadNLPLogger
+    legacy::Bool
+    params::CuSolverParameters
 
     function LapackGPUSolver(
         A::MT;
         option_dict::Dict{Symbol,Any} = Dict{Symbol,Any}(),
         opt = LapackOptions(),
         logger = MadNLPLogger(),
+        legacy::Bool = true,
         kwargs...,
     ) where {MT<:AbstractMatrix}
         set_options!(opt, option_dict, kwargs...)
@@ -35,8 +38,9 @@ mutable struct LapackGPUSolver{T,MT} <: AbstractLinearSolver{T}
         info = CuVector{Cint}(undef, 1)
         ipiv = CuVector{Cint}(undef, 0)
         ipiv64 = CuVector{Int64}(undef, 0)
+        params = CuSolverParameters()
         solver = new{T,MT}(A, fact, n, sol, tau, work_gpu, lwork_gpu, work_cpu, lwork_cpu,
-                           info, ipiv, ipiv64, opt, logger)
+                           info, ipiv, ipiv64, opt, logger, legacy, params)
         setup!(solver)
         return solver
     end
@@ -73,17 +77,23 @@ function factorize!(M::LapackGPUSolver)
     end
 end
 
-function solve!(M::LapackGPUSolver{T}, x::CuVector{T}) where {T}
-    if M.opt.lapack_algorithm == MadNLP.BUNCHKAUFMAN
-        solve_bunchkaufman!(M, x)
-    elseif M.opt.lapack_algorithm == MadNLP.LU
-        solve_lu!(M, x)
-    elseif M.opt.lapack_algorithm == MadNLP.QR
-        solve_qr!(M, x)
-    elseif M.opt.lapack_algorithm == MadNLP.CHOLESKY
-        solve_cholesky!(M, x)
-    else
-        error(M.logger, "Invalid lapack_algorithm")
+for T in (:Float32, :Float64)
+    @eval begin
+        function solve!(M::LapackGPUSolver{$T}, x::CuVector{$T})
+            if M.opt.lapack_algorithm == MadNLP.BUNCHKAUFMAN
+                solve_bunchkaufman!(M, x)
+            elseif M.opt.lapack_algorithm == MadNLP.LU
+                solve_lu!(M, x)
+            elseif M.opt.lapack_algorithm == MadNLP.QR
+                solve_qr!(M, x)
+            elseif M.opt.lapack_algorithm == MadNLP.CHOLESKY
+                solve_cholesky!(M, x)
+            else
+                error(M.logger, "Invalid lapack_algorithm")
+            end
+        end
+
+        is_supported(::Type{LapackGPUSolver}, ::Type{$T}) = true
     end
 end
 
@@ -107,5 +117,4 @@ end
 
 input_type(::Type{LapackGPUSolver}) = :dense
 MadNLP.default_options(::Type{LapackGPUSolver}) = LapackOptions()
-is_supported(::Type{LapackGPUSolver}, ::Type{Float32}) = true
-is_supported(::Type{LapackGPUSolver}, ::Type{Float64}) = true
+introduce(M::LapackGPUSolver) = "cuSOLVER v$(CUSOLVER.version()) -- ($(M.opt.lapack_algorithm))"

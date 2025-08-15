@@ -85,7 +85,17 @@ testset = [
         ()->MadNLP.Optimizer(
             linear_solver=LapackGPUSolver,
             lapack_algorithm=MadNLP.BUNCHKAUFMAN,
-            print_level=MadNLP.ERROR
+            print_level=MadNLP.ERROR,
+        ),
+        [],
+    ],
+    [
+        "LapackGPU-LU (legacy)",
+        ()->MadNLP.Optimizer(
+            linear_solver=LapackGPUSolver,
+            lapack_algorithm=MadNLP.LU,
+            print_level=MadNLP.ERROR,
+            legacy=true,
         ),
         [],
     ],
@@ -94,7 +104,18 @@ testset = [
         ()->MadNLP.Optimizer(
             linear_solver=LapackGPUSolver,
             lapack_algorithm=MadNLP.LU,
-            print_level=MadNLP.ERROR
+            print_level=MadNLP.ERROR,
+            legacy=false,
+        ),
+        [],
+    ],
+    [
+        "LapackGPU-QR (legacy)",
+        ()->MadNLP.Optimizer(
+            linear_solver=LapackGPUSolver,
+            lapack_algorithm=MadNLP.QR,
+            print_level=MadNLP.ERROR,
+            legacy=true,
         ),
         [],
     ],
@@ -103,16 +124,28 @@ testset = [
         ()->MadNLP.Optimizer(
             linear_solver=LapackGPUSolver,
             lapack_algorithm=MadNLP.QR,
-            print_level=MadNLP.ERROR
+            print_level=MadNLP.ERROR,
+            legacy=false,
         ),
         [],
+    ],
+    [
+        "LapackGPU-CHOLESKY (legacy)",
+        ()->MadNLP.Optimizer(
+            linear_solver=LapackGPUSolver,
+            lapack_algorithm=MadNLP.CHOLESKY,
+            print_level=MadNLP.ERROR,
+            legacy=true,
+        ),
+        ["infeasible", "lootsma", "eigmina", "lp_examodels_issue75"], # KKT system not PD
     ],
     [
         "LapackGPU-CHOLESKY",
         ()->MadNLP.Optimizer(
             linear_solver=LapackGPUSolver,
             lapack_algorithm=MadNLP.CHOLESKY,
-            print_level=MadNLP.ERROR
+            print_level=MadNLP.ERROR,
+            legacy=false,
         ),
         ["infeasible", "lootsma", "eigmina", "lp_examodels_issue75"], # KKT system not PD
     ],
