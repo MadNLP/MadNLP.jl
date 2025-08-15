@@ -14,7 +14,7 @@ for (potrf, potrf_buffer, potrs, nbytes, T) in
                     potrf_lwork_gpu,
                 )
                 M.lwork_gpu = potrf_lwork_gpu[] * $nbytes
-                resize!(M.work_gpu, M.lwork_gpu)
+                resize!(M.work_gpu, M.lwork_gpu |> Int64)
             else
                 potrf_lwork_gpu = Ref{Csize_t}(0)
                 potrf_lwork_cpu = Ref{Csize_t}(0)
@@ -32,8 +32,8 @@ for (potrf, potrf_buffer, potrs, nbytes, T) in
                 )
                 M.lwork_cpu = potrf_lwork_cpu[]
                 M.lwork_gpu = potrf_lwork_gpu[]
-                resize!(M.work_cpu, M.lwork_cpu)
-                resize!(M.work_gpu, M.lwork_gpu)
+                resize!(M.work_cpu, M.lwork_cpu |> Int64)
+                resize!(M.work_gpu, M.lwork_gpu |> Int64)
             end
             return M
         end
@@ -138,8 +138,8 @@ for (sytrf_buffer, sytrf, nbytes, T) in
             )
             M.lwork_cpu = sytrs_lwork_cpu[]
             M.lwork_gpu = max(sytrs_lwork_gpu[], sytrf_lwork_gpu[] * $nbytes)
-            resize!(M.work_cpu, M.lwork_cpu)
-            resize!(M.work_gpu, M.lwork_gpu)
+            resize!(M.work_cpu, M.lwork_cpu |> Int64)
+            resize!(M.work_gpu, M.lwork_gpu |> Int64)
             return M
         end
 
@@ -201,7 +201,7 @@ for (getrf, getrf_buffer, getrs, nbytes, T) in
                     getrf_lwork_gpu,
                 )
                 M.lwork_gpu = getrf_lwork_gpu[] * $nbytes
-                resize!(M.work_gpu, M.lwork_gpu)
+                resize!(M.work_gpu, M.lwork_gpu |> Int64)
             else
                 resize!(M.ipiv64, M.n)
                 getrf_lwork_cpu = Ref{Csize_t}(0)
@@ -220,8 +220,8 @@ for (getrf, getrf_buffer, getrs, nbytes, T) in
                 )
                 M.lwork_cpu = getrf_lwork_cpu[]
                 M.lwork_gpu = getrf_lwork_gpu[]
-                resize!(M.work_cpu, M.lwork_cpu)
-                resize!(M.work_gpu, M.lwork_gpu)
+                resize!(M.work_cpu, M.lwork_cpu |> Int64)
+                resize!(M.work_gpu, M.lwork_gpu |> Int64)
             end
             return M
         end
@@ -327,7 +327,7 @@ for (geqrf, geqrf_buffer, ormqr, ormqr_buffer, trsm, nbytes, T) in
                     geqrf_lwork_gpu,
                 )
                 M.lwork_gpu = max(geqrf_lwork_gpu[], ormqr_lwork_gpu[]) * $nbytes
-                resize!(M.work_gpu, M.lwork_gpu)
+                resize!(M.work_gpu, M.lwork_gpu |> Int64)
             else
                 geqrf_lwork_cpu = Ref{Csize_t}(0)
                 geqrf_lwork_gpu = Ref{Csize_t}(0)
@@ -347,8 +347,8 @@ for (geqrf, geqrf_buffer, ormqr, ormqr_buffer, trsm, nbytes, T) in
                 )
                 M.lwork_cpu = geqrf_lwork_cpu[]
                 M.lwork_gpu = max(ormqr_lwork_gpu[] * $nbytes, geqrf_lwork_gpu[])
-                resize!(M.work_cpu, M.lwork_cpu)
-                resize!(M.work_gpu, M.lwork_gpu)
+                resize!(M.work_cpu, M.lwork_cpu |> Int64)
+                resize!(M.work_gpu, M.lwork_gpu |> Int64)
             end
             return M
         end
