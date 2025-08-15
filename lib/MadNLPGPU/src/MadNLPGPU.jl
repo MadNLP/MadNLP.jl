@@ -4,7 +4,7 @@ import LinearAlgebra
 import SparseArrays: SparseMatrixCSC, nonzeros, nnz
 import LinearAlgebra: Symmetric
 # CUDA
-import CUDA: CUDA, CUSPARSE, CUBLAS, CUSOLVER, CuVector, CuMatrix, CuArray, R_64F,
+import CUDA: CUDA, CUSPARSE, CUBLAS, CUSOLVER, CuVector, CuMatrix, CuArray,
     has_cuda, @allowscalar, runtime_version, CUDABackend
 import .CUSOLVER:
     cusolverStatus_t, CuPtr, cudaDataType, cublasFillMode_t, cusolverDnHandle_t, dense_handle
@@ -30,6 +30,7 @@ include("utils.jl")
 include("KKT/dense.jl")
 include("KKT/sparse.jl")
 include("LinearSolvers/lapackgpu.jl")
+include("LinearSolvers/cusolver.jl")
 include("LinearSolvers/cudss.jl")
 
 # option preset
@@ -51,7 +52,7 @@ function MadNLP.MadNLPOptions{T}(
     )
 end
 
-export LapackGPUSolver
+export LapackGPUSolver, CUDSSSolver
 
 # re-export MadNLP, including deprecated names
 for name in names(MadNLP, all=true)
