@@ -4,10 +4,10 @@ mutable struct LapackGPUSolver{T,MT} <: AbstractLinearSolver{T}
     n::Int64
     sol::CuVector{T}
     tau::CuVector{T}
-    work_gpu::CuVector{T}
-    lwork_gpu::Int64
+    work_gpu::CuVector{UInt8}
+    lwork_gpu::Csize_t
     work_cpu::Vector{UInt8}
-    lwork_cpu::Int64
+    lwork_cpu::Csize_t
     info::CuVector{Cint}
     ipiv::CuVector{Cint}
     ipiv64::CuVector{Int64}

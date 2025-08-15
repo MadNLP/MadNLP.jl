@@ -1,6 +1,6 @@
-for (potrf, potrf_buffer, potrs, T) in
-    ((:cusolverDnDpotrf, :cusolverDnDpotrf_bufferSize, :cusolverDnDpotrs, :Float64),
-     (:cusolverDnSpotrf, :cusolverDnSpotrf_bufferSize, :cusolverDnSpotrs, :Float32))
+for (potrf, potrf_buffer, potrs, nbytes, T) in
+    ((:cusolverDnDpotrf, :cusolverDnDpotrf_bufferSize, :cusolverDnDpotrs, :8, :Float64),
+     (:cusolverDnSpotrf, :cusolverDnSpotrf_bufferSize, :cusolverDnSpotrs, :4, :Float32))
     @eval begin
         function setup_cholesky!(M::LapackGPUSolver{$T})
             if M.legacy
@@ -13,7 +13,7 @@ for (potrf, potrf_buffer, potrs, T) in
                     Cint(M.n),
                     potrf_lwork_gpu,
                 )
-                M.lwork_gpu = potrf_lwork_gpu[] |> Int64
+                M.lwork_gpu = potrf_lwork_gpu[] * $nbytes
                 resize!(M.work_gpu, M.lwork_gpu)
             else
                 potrf_lwork_gpu = Ref{Csize_t}(0)
@@ -30,8 +30,8 @@ for (potrf, potrf_buffer, potrs, T) in
                     potrf_lwork_gpu,
                     potrf_lwork_cpu,
                 )
-                M.lwork_cpu = potrf_lwork_cpu[] |> Int64
-                M.lwork_gpu = (potrf_lwork_gpu[] ÷ sizeof($T)) |> Int64
+                M.lwork_cpu = potrf_lwork_cpu[]
+                M.lwork_gpu = potrf_lwork_gpu[]
                 resize!(M.work_cpu, M.lwork_cpu)
                 resize!(M.work_gpu, M.lwork_gpu)
             end
@@ -47,7 +47,7 @@ for (potrf, potrf_buffer, potrs, T) in
                     M.fact,
                     Cint(M.n),
                     M.work_gpu,
-                    Cint(M.lwork_gpu),
+                    Cint(M.lwork_gpu ÷ $nbytes),
                     M.info,
                 )
             else
@@ -61,9 +61,9 @@ for (potrf, potrf_buffer, potrs, T) in
                     M.n,
                     $T,
                     M.work_gpu,
-                    Csize_t(M.lwork_gpu * sizeof($T)),
+                    M.lwork_gpu,
                     M.work_cpu,
-                    Csize_t(M.lwork_cpu),
+                    M.lwork_cpu,
                     M.info,
                 )
             end
@@ -104,9 +104,9 @@ for (potrf, potrf_buffer, potrs, T) in
     end
 end
 
-for (sytrf_buffer, sytrf, T) in
-    ((:cusolverDnDsytrf_bufferSize, :cusolverDnDsytrf, :Float64),
-     (:cusolverDnSsytrf_bufferSize, :cusolverDnSsytrf, :Float32))
+for (sytrf_buffer, sytrf, nbytes, T) in
+    ((:cusolverDnDsytrf_bufferSize, :cusolverDnDsytrf, :8, :Float64),
+     (:cusolverDnSsytrf_bufferSize, :cusolverDnSsytrf, :4, :Float32))
     @eval begin
         function setup_bunchkaufman!(M::LapackGPUSolver{$T})
             resize!(M.ipiv, M.n)
@@ -136,8 +136,8 @@ for (sytrf_buffer, sytrf, T) in
                 sytrs_lwork_gpu,
                 sytrs_lwork_cpu,
             )
-            M.lwork_cpu = sytrs_lwork_cpu[] |> Int64
-            M.lwork_gpu = max(sytrf_lwork_gpu[] |> Int64, (sytrs_lwork_gpu[] ÷ sizeof($T)) |> Int64)
+            M.lwork_cpu = sytrs_lwork_cpu[]
+            M.lwork_gpu = max(sytrs_lwork_gpu[], sytrf_lwork_gpu[] * $nbytes)
             resize!(M.work_cpu, M.lwork_cpu)
             resize!(M.work_gpu, M.lwork_gpu)
             return M
@@ -153,7 +153,7 @@ for (sytrf_buffer, sytrf, T) in
                 Cint(M.n),
                 M.ipiv,
                 M.work_gpu,
-                Cint(M.lwork_gpu),
+                Cint(M.lwork_gpu ÷ $nbytes),
                 M.info,
             )
             return M
@@ -174,9 +174,9 @@ for (sytrf_buffer, sytrf, T) in
                 x,
                 M.n,
                 M.work_gpu,
-                Csize_t(M.lwork_gpu * sizeof($T)),
+                M.lwork_gpu,
                 M.work_cpu,
-                Csize_t(M.lwork_cpu),
+                M.lwork_cpu,
                 M.info,
             )
             return x
@@ -184,9 +184,9 @@ for (sytrf_buffer, sytrf, T) in
     end
 end
 
-for (getrf, getrf_buffer, getrs, T) in
-    ((:cusolverDnDgetrf, :cusolverDnDgetrf_bufferSize, :cusolverDnDgetrs, :Float64),
-     (:cusolverDnSgetrf, :cusolverDnSgetrf_bufferSize, :cusolverDnSgetrs, :Float32))
+for (getrf, getrf_buffer, getrs, nbytes, T) in
+    ((:cusolverDnDgetrf, :cusolverDnDgetrf_bufferSize, :cusolverDnDgetrs, :8, :Float64),
+     (:cusolverDnSgetrf, :cusolverDnSgetrf_bufferSize, :cusolverDnSgetrs, :4, :Float32))
     @eval begin
         function setup_lu!(M::LapackGPUSolver{$T})
             if M.legacy
@@ -200,7 +200,7 @@ for (getrf, getrf_buffer, getrs, T) in
                     Cint(M.n),
                     getrf_lwork_gpu,
                 )
-                M.lwork_gpu = getrf_lwork_gpu[] |> Int64
+                M.lwork_gpu = getrf_lwork_gpu[] * $nbytes
                 resize!(M.work_gpu, M.lwork_gpu)
             else
                 resize!(M.ipiv64, M.n)
@@ -218,8 +218,8 @@ for (getrf, getrf_buffer, getrs, T) in
                     getrf_lwork_cpu,
                     getrf_lwork_gpu,
                 )
-                M.lwork_cpu = getrf_lwork_cpu[] |> Int64
-                M.lwork_gpu = (getrf_lwork_gpu[] ÷ sizeof($T)) |> Int64
+                M.lwork_cpu = getrf_lwork_cpu[]
+                M.lwork_gpu = getrf_lwork_gpu[]
                 resize!(M.work_cpu, M.lwork_cpu)
                 resize!(M.work_gpu, M.lwork_gpu)
             end
@@ -250,9 +250,9 @@ for (getrf, getrf_buffer, getrs, T) in
                     M.ipiv64,
                     $T,
                     M.work_gpu,
-                    Csize_t(M.lwork_gpu * sizeof($T)),
+                    M.lwork_gpu,
                     M.work_cpu,
-                    Csize_t(M.lwork_cpu),
+                    M.lwork_cpu,
                     M.info,
                 )
             end
@@ -295,9 +295,9 @@ for (getrf, getrf_buffer, getrs, T) in
     end
 end
 
-for (geqrf, geqrf_buffer, ormqr, ormqr_buffer, trsm, T) in
-    ((:cusolverDnDgeqrf, :cusolverDnDgeqrf_bufferSize, :cusolverDnDormqr, :cusolverDnDormqr_bufferSize, :cublasDtrsm_v2_64, :Float64),
-     (:cusolverDnSgeqrf, :cusolverDnSgeqrf_bufferSize, :cusolverDnSormqr, :cusolverDnSormqr_bufferSize, :cublasStrsm_v2_64, :Float32))
+for (geqrf, geqrf_buffer, ormqr, ormqr_buffer, trsm, nbytes, T) in
+    ((:cusolverDnDgeqrf, :cusolverDnDgeqrf_bufferSize, :cusolverDnDormqr, :cusolverDnDormqr_bufferSize, :cublasDtrsm_v2_64, :8, :Float64),
+     (:cusolverDnSgeqrf, :cusolverDnSgeqrf_bufferSize, :cusolverDnSormqr, :cusolverDnSormqr_bufferSize, :cublasStrsm_v2_64, :4, :Float32))
     @eval begin
         function setup_qr!(M::LapackGPUSolver{$T})
             resize!(M.tau, M.n)
@@ -326,7 +326,7 @@ for (geqrf, geqrf_buffer, ormqr, ormqr_buffer, trsm, T) in
                     Cint(M.n),
                     geqrf_lwork_gpu,
                 )
-                M.lwork_gpu = max(geqrf_lwork_gpu[], ormqr_lwork_gpu[]) |> Int64
+                M.lwork_gpu = max(geqrf_lwork_gpu[], ormqr_lwork_gpu[]) * $nbytes
                 resize!(M.work_gpu, M.lwork_gpu)
             else
                 geqrf_lwork_cpu = Ref{Csize_t}(0)
@@ -345,8 +345,8 @@ for (geqrf, geqrf_buffer, ormqr, ormqr_buffer, trsm, T) in
                     geqrf_lwork_cpu,
                     geqrf_lwork_gpu,
                 )
-                M.lwork_cpu = geqrf_lwork_cpu[] |> Int64
-                M.lwork_gpu = max(ormqr_lwork_gpu[] |> Int64, (geqrf_lwork_gpu[] ÷ sizeof($T)) |> Int64)
+                M.lwork_cpu = geqrf_lwork_cpu[]
+                M.lwork_gpu = max(ormqr_lwork_gpu[] * $nbytes, geqrf_lwork_gpu[])
                 resize!(M.work_cpu, M.lwork_cpu)
                 resize!(M.work_gpu, M.lwork_gpu)
             end
@@ -363,7 +363,7 @@ for (geqrf, geqrf_buffer, ormqr, ormqr_buffer, trsm, T) in
                     Cint(M.n),
                     M.tau,
                     M.work_gpu,
-                    Cint(M.lwork_gpu),
+                    Cint(M.lwork_gpu ÷ $nbytes),
                     M.info,
                 )
             else
@@ -379,9 +379,9 @@ for (geqrf, geqrf_buffer, ormqr, ormqr_buffer, trsm, T) in
                     M.tau,
                     $T,
                     M.work_gpu,
-                    Csize_t(M.lwork_gpu * sizeof($T)),
+                    M.lwork_gpu,
                     M.work_cpu,
-                    Csize_t(M.lwork_cpu),
+                    M.lwork_cpu,
                     M.info,
                 )
             end
@@ -403,7 +403,7 @@ for (geqrf, geqrf_buffer, ormqr, ormqr_buffer, trsm, T) in
                 x,
                 Cint(M.n),
                 M.work_gpu,
-                Cint(M.lwork_gpu),
+                Cint(M.lwork_gpu ÷ $nbytes),
                 M.info,
             )
             CUBLAS.$trsm(
