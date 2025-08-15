@@ -388,7 +388,7 @@ for (geqrf, geqrf_buffer, ormqr, ormqr_buffer, trsm, T) in
             return M
         end
 
-        function solve_qr!(M::LapackGPUSolver{$T})
+        function solve_qr!(M::LapackGPUSolver{$T}, x::CuVector{$T})
             # We only have the legacy API for ormqr
             CUSOLVER.$ormqr(
                 dense_handle(),
