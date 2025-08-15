@@ -21,7 +21,7 @@ mutable struct LapackGPUSolver{T,MT} <: AbstractLinearSolver{T}
         option_dict::Dict{Symbol,Any} = Dict{Symbol,Any}(),
         opt = LapackOptions(),
         logger = MadNLPLogger(),
-        legacy::Bool = true,
+        legacy::Bool = false,
         kwargs...,
     ) where {MT<:AbstractMatrix}
         set_options!(opt, option_dict, kwargs...)
