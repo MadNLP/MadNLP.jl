@@ -215,8 +215,8 @@ for (getrf, getrf_buffer, getrs, nbytes, T) in
                     M.fact,
                     M.n,
                     $T,
-                    getrf_lwork_cpu,
                     getrf_lwork_gpu,
+                    getrf_lwork_cpu,
                 )
                 M.lwork_cpu = getrf_lwork_cpu[]
                 M.lwork_gpu = getrf_lwork_gpu[]
@@ -342,8 +342,8 @@ for (geqrf, geqrf_buffer, ormqr, ormqr_buffer, trsm, nbytes, T) in
                     $T,
                     M.tau,
                     $T,
-                    geqrf_lwork_cpu,
                     geqrf_lwork_gpu,
+                    geqrf_lwork_cpu,
                 )
                 M.lwork_cpu = geqrf_lwork_cpu[]
                 M.lwork_gpu = max(ormqr_lwork_gpu[] * $nbytes, geqrf_lwork_gpu[])
