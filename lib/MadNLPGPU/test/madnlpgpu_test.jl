@@ -3,7 +3,7 @@ testset = [
     [
         "CUDSS",
         ()->MadNLP.Optimizer(
-            linear_solver=MadNLPGPU.CUDSSSolver,
+            linear_solver=CUDSSSolver,
             print_level=MadNLP.ERROR
         ),
         [],
@@ -11,7 +11,7 @@ testset = [
     [
         "CUDSS-AMD",
         ()->MadNLP.Optimizer(
-            linear_solver=MadNLPGPU.CUDSSSolver,
+            linear_solver=CUDSSSolver,
             print_level=MadNLP.ERROR,
             cudss_ordering=MadNLPGPU.AMD_ORDERING,
         ),
@@ -20,7 +20,7 @@ testset = [
     [
         "CUDSS-SYMAMD",
         ()->MadNLP.Optimizer(
-            linear_solver=MadNLPGPU.CUDSSSolver,
+            linear_solver=CUDSSSolver,
             print_level=MadNLP.ERROR,
             cudss_ordering=MadNLPGPU.SYMAMD_ORDERING,
         ),
@@ -29,7 +29,7 @@ testset = [
     [
         "CUDSS-COLAMD",
         ()->MadNLP.Optimizer(
-            linear_solver=MadNLPGPU.CUDSSSolver,
+            linear_solver=CUDSSSolver,
             print_level=MadNLP.ERROR,
             cudss_ordering=MadNLPGPU.COLAMD_ORDERING,
         ),
@@ -38,7 +38,7 @@ testset = [
     [
         "CUDSS-METIS",
         ()->MadNLP.Optimizer(
-            linear_solver=MadNLPGPU.CUDSSSolver,
+            linear_solver=CUDSSSolver,
             print_level=MadNLP.ERROR,
             cudss_ordering=MadNLPGPU.METIS_ORDERING,
         ),
@@ -47,7 +47,7 @@ testset = [
     [
         "CUDSS-IR",
         ()->MadNLP.Optimizer(
-            linear_solver=MadNLPGPU.CUDSSSolver,
+            linear_solver=CUDSSSolver,
             print_level=MadNLP.ERROR,
             cudss_ir=1,
         ),
@@ -56,7 +56,7 @@ testset = [
     [
         "CUDSS-HYBRID",
         ()->MadNLP.Optimizer(
-            linear_solver=MadNLPGPU.CUDSSSolver,
+            linear_solver=CUDSSSolver,
             print_level=MadNLP.ERROR,
             cudss_hybrid_memory=true,
         ),
@@ -65,7 +65,7 @@ testset = [
     [
         "CUDSS-NOPIVOTING",
         ()->MadNLP.Optimizer(
-            linear_solver=MadNLPGPU.CUDSSSolver,
+            linear_solver=CUDSSSolver,
             print_level=MadNLP.ERROR,
             cudss_pivoting=false,
         ),
@@ -74,7 +74,7 @@ testset = [
     # [
     #     "Formulation K2.5",
     #     ()->MadNLP.Optimizer(
-    #         linear_solver=MadNLPGPU.CUDSSSolver,
+    #         linear_solver=CUDSSSolver,
     #         print_level=MadNLP.ERROR,
     #         kkt_system=MadNLP.ScaledSparseKKTSystem,
     #     ),
@@ -85,7 +85,7 @@ testset = [
         ()->MadNLP.Optimizer(
             linear_solver=LapackGPUSolver,
             lapack_algorithm=MadNLP.BUNCHKAUFMAN,
-            print_level=MadNLP.ERROR
+            print_level=MadNLP.ERROR,
         ),
         [],
     ],
@@ -94,7 +94,7 @@ testset = [
         ()->MadNLP.Optimizer(
             linear_solver=LapackGPUSolver,
             lapack_algorithm=MadNLP.LU,
-            print_level=MadNLP.ERROR
+            print_level=MadNLP.ERROR,
         ),
         [],
     ],
@@ -103,7 +103,7 @@ testset = [
         ()->MadNLP.Optimizer(
             linear_solver=LapackGPUSolver,
             lapack_algorithm=MadNLP.QR,
-            print_level=MadNLP.ERROR
+            print_level=MadNLP.ERROR,
         ),
         [],
     ],
@@ -112,7 +112,7 @@ testset = [
         ()->MadNLP.Optimizer(
             linear_solver=LapackGPUSolver,
             lapack_algorithm=MadNLP.CHOLESKY,
-            print_level=MadNLP.ERROR
+            print_level=MadNLP.ERROR,
         ),
         ["infeasible", "lootsma", "eigmina", "lp_examodels_issue75"], # KKT system not PD
     ],

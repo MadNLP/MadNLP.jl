@@ -69,7 +69,7 @@ mutable struct CUDSSSolver{T,V} <: MadNLP.AbstractLinearSolver{T}
     fresh_factorization::Bool
 
     opt::CudssSolverOptions
-    logger::MadNLP.MadNLPLogger
+    logger::MadNLPLogger
 end
 
 function CUDSSSolver(
@@ -83,7 +83,7 @@ function CUDSSSolver(
     view = 'U'
     structure = 'G'
     # We need view = 'F' for the sparse LU decomposition
-    (opt.cudss_algorithm == MadNLP.LU) && error("The sparse LU of cuDSS is not supported.")
+    (opt.cudss_algorithm == MadNLP.LU) && error(logger, "The sparse LU of cuDSS is not supported.")
     (opt.cudss_algorithm == MadNLP.CHOLESKY) && (structure = "SPD")
     (opt.cudss_algorithm == MadNLP.LDL) && (structure = "S")
 
@@ -107,9 +107,9 @@ function CUDSSSolver(
             A = SparseMatrixCSC(csc)
             opt.cudss_perm = AMD.colamd(A)
         elseif opt.cudss_ordering == USER_ORDERING
-            (!isempty(opt.cudss_perm) && isperm(opt.cudss_perm)) || error("The vector opt.cudss_perm is not a valid permutation.")
+            (!isempty(opt.cudss_perm) && isperm(opt.cudss_perm)) || error(logger, "The vector opt.cudss_perm is not a valid permutation.")
         else
-            error("The ordering $(opt.cudss_ordering) is not supported.")
+            error(logger, "The ordering $(opt.cudss_ordering) is not supported.")
         end
         CUDSS.cudss_set(solver, "user_perm", opt.cudss_perm)
     end
@@ -177,8 +177,10 @@ function inertia(M::CUDSSSolver)
     elseif M.opt.cudss_algorithm == MadNLP.LDL
         # N.B.: cuDSS does not always return the correct inertia.
         (k, l) = CUDSS.cudss_get(M.inner, "inertia")
-        k = min(n, k) # TODO: add safeguard for inertia
+        @assert 0 ≤ k + l ≤ n
         return (k, n - k - l, l)
+    else
+        error(M.logger, "Unsupported cudss_algorithm")
     end
 end
 MadNLP.improve!(M::CUDSSSolver) = false
