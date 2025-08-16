@@ -27,8 +27,10 @@ import MadNLP:
 import AMD, Metis
 
 include("utils.jl")
-include("KKT/dense.jl")
-include("KKT/sparse.jl")
+include("KKT/kernels_dense.jl")
+include("KKT/kernels_sparse.jl")
+include("KKT/cuda_dense.jl")
+include("KKT/cuda_sparse.jl")
 include("LinearSolvers/lapackgpu.jl")
 include("LinearSolvers/cusolver.jl")
 include("LinearSolvers/cudss.jl")
@@ -52,7 +54,8 @@ function MadNLP.MadNLPOptions{T}(
     )
 end
 
-export LapackGPUSolver, CUDSSSolver
+global LapackROCSolver
+export LapackGPUSolver, CUDSSSolver, LapackROCSolver
 
 # re-export MadNLP, including deprecated names
 for name in names(MadNLP, all=true)
