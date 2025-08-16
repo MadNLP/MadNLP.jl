@@ -2,7 +2,7 @@ function MadNLP.MadNLPOptions{T}(
     nlp::MadNLP.AbstractNLPModel{T,VT};
     callback = MadNLP.DenseCallback,
     kkt_system = MadNLP.DenseCondensedKKTSystem,
-    linear_solver = LapackGPUSolver,
+    linear_solver = LapackROCSolver,
     tol = MadNLP.get_tolerance(T,kkt_system),
     bound_relax_factor = tol
 ) where {T, VT <: ROCVector{T}}

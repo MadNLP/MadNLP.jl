@@ -6,12 +6,17 @@ import LinearAlgebra: Symmetric
 
 import MadNLP
 import MadNLPGPU
-import MadNLPGPU: LapackGPUSolver
+import MadNLPGPU: LapackROCSolver
 
 import KernelAbstractions: synchronize
 
 using AMDGPU
 using AMDGPU.rocBLAS, AMDGPU.rocSOLVER, AMDGPU.rocSPARSE
+
+function __init__()
+    setglobal!(MadNLPGPU, :LapackROCSolver, LapackROCSolver)
+    return
+end
 
 include("utils.jl")
 include("KKT/rocm_dense.jl")

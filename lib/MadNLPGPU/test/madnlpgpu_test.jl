@@ -118,6 +118,36 @@ cuda_testset = [
     ],
 ]
 
+rocm_testset = [
+    [
+        "LapackGPU-LU",
+        ()->MadNLP.Optimizer(
+            linear_solver=LapackROCSolver,
+            lapack_algorithm=MadNLP.LU,
+            print_level=MadNLP.ERROR,
+        ),
+        [],
+    ],
+    [
+        "LapackGPU-QR",
+        ()->MadNLP.Optimizer(
+            linear_solver=LapackROCSolver,
+            lapack_algorithm=MadNLP.QR,
+            print_level=MadNLP.ERROR,
+        ),
+        [],
+    ],
+    [
+        "LapackGPU-CHOLESKY",
+        ()->MadNLP.Optimizer(
+            linear_solver=LapackROCSolver,
+            lapack_algorithm=MadNLP.CHOLESKY,
+            print_level=MadNLP.ERROR,
+        ),
+        ["infeasible", "lootsma", "eigmina", "lp_examodels_issue75"], # KKT system not PD
+    ],
+]
+
 @testset "MadNLPGPU test" begin
     if CUDA.functional()
         MadNLPTests.test_linear_solver(LapackGPUSolver,Float32)

@@ -54,7 +54,8 @@ function MadNLP.MadNLPOptions{T}(
     )
 end
 
-export LapackGPUSolver, CUDSSSolver
+global LapackROCSolver
+export LapackGPUSolver, CUDSSSolver, LapackROCSolver
 
 # re-export MadNLP, including deprecated names
 for name in names(MadNLP, all=true)
