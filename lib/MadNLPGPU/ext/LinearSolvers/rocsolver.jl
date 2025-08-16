@@ -1,4 +1,4 @@
-mutable struct LapackROCSolver{T,MT} <: AbstractLinearSolver{T}
+mutable struct LapackROCSolver{T,MT} <: MadNLP.AbstractLinearSolver{T}
     A::MT
     fact::ROCMatrix{T}
     n::Int64
@@ -6,17 +6,17 @@ mutable struct LapackROCSolver{T,MT} <: AbstractLinearSolver{T}
     tau::ROCVector{T}
     info::ROCVector{Cint}
     ipiv::ROCVector{Int64}
-    opt::LapackOptions
-    logger::MadNLPLogger
+    opt::MadNLP.LapackOptions
+    logger::MadNLP.MadNLPLogger
 
     function LapackROCSolver(
         A::MT;
         option_dict::Dict{Symbol,Any} = Dict{Symbol,Any}(),
-        opt = LapackOptions(),
-        logger = MadNLPLogger(),
+        opt = MadNLP.LapackOptions(),
+        logger = MadNLP.MadNLPLogger(),
         kwargs...,
     ) where {MT<:AbstractMatrix}
-        set_options!(opt, option_dict, kwargs...)
+        MadNLP.set_options!(opt, option_dict, kwargs...)
         T = eltype(A)
         m,n = size(A)
         @assert m == n
@@ -31,9 +31,9 @@ mutable struct LapackROCSolver{T,MT} <: AbstractLinearSolver{T}
     end
 end
 
-improve!(M::LapackROCSolver) = false
-is_inertia(M::LapackROCSolver) = M.opt.lapack_algorithm == MadNLP.CHOLESKY
-function inertia(M::LapackROCSolver)
+MadNLP.improve!(M::LapackROCSolver) = false
+MadNLP.is_inertia(M::LapackROCSolver) = M.opt.lapack_algorithm == MadNLP.CHOLESKY
+function MadNLP.inertia(M::LapackROCSolver)
     if M.opt.lapack_algorithm == MadNLP.CHOLESKY
         sum(M.info) == 0 ? (M.n, 0, 0) : (0, M.n, 0)
     else
@@ -41,11 +41,11 @@ function inertia(M::LapackROCSolver)
     end
 end
 
-input_type(::Type{LapackROCSolver}) = :dense
+MadNLP.input_type(::Type{LapackROCSolver}) = :dense
 MadNLP.default_options(::Type{LapackROCSolver}) = LapackOptions()
-introduce(M::LapackROCSolver) = "cuSOLVER v$(CUSOLVER.version()) -- ($(M.opt.lapack_algorithm))"
+MadNLP.introduce(M::LapackROCSolver) = "cuSOLVER v$(CUSOLVER.version()) -- ($(M.opt.lapack_algorithm))"
 
-function setup!(M::LapackROCSolver)
+function MadNLPGPU.setup!(M::LapackROCSolver)
     if M.opt.lapack_algorithm == MadNLP.LU
         setup_lu!(M)
     elseif M.opt.lapack_algorithm == MadNLP.QR
@@ -57,7 +57,7 @@ function setup!(M::LapackROCSolver)
     end
 end
 
-function factorize!(M::LapackROCSolver)
+function MadNLP.factorize!(M::LapackROCSolver)
     transfer!(M.fact, M.A)
     if M.opt.lapack_algorithm == MadNLP.LU
         tril_to_full!(M.fact)
@@ -74,7 +74,7 @@ end
 
 for T in (:Float32, :Float64)
     @eval begin
-        function solve!(M::LapackROCSolver{$T}, x::CuVector{$T})
+        function MadNLP.solve!(M::LapackROCSolver{$T}, x::ROCVector{$T})
             if M.opt.lapack_algorithm == MadNLP.LU
                 solve_lu!(M, x)
             elseif M.opt.lapack_algorithm == MadNLP.QR
@@ -90,7 +90,7 @@ for T in (:Float32, :Float64)
     end
 end
 
-function solve!(M::LapackROCSolver, x::AbstractVector)
+function MadNLP.solve!(M::LapackROCSolver, x::AbstractVector)
     isempty(M.sol) && resize!(M.sol, M.n)
     copyto!(M.sol, x)
     solve!(M, M.sol)

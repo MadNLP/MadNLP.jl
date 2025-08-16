@@ -6,7 +6,6 @@ import LinearAlgebra: Symmetric
 
 import MadNLP
 import MadNLPGPU
-import MadNLPGPU: LapackROCSolver
 
 import KernelAbstractions: synchronize
 
