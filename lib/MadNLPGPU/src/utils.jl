@@ -12,7 +12,7 @@ function MadNLP._madnlp_unsafe_wrap(vec::VT, n, shift=1) where {T, VT <: CuVecto
 end
 
 # Local transfer! function to move data on the device.
-MadNLP.transfer!(x::AbstractArray, y::AbstractArray) = copyto!(x, y)
+transfer!(x::AbstractArray, y::AbstractArray) = copyto!(x, y)
 
 #=
     SparseMatrixCSC to CuSparseMatrixCSC
@@ -31,7 +31,7 @@ end
     SparseMatrixCOO to CuSparseMatrixCSC
 =#
 
-function MadNLP.transfer!(
+function transfer!(
     dest::CUSPARSE.CuSparseMatrixCSC,
     src::MadNLP.SparseMatrixCOO,
     map,
@@ -43,7 +43,7 @@ end
     CuSparseMatrixCSC to CuMatrix
 =#
 
-function MadNLP.transfer!(y::CuMatrix{T}, x::CUSPARSE.CuSparseMatrixCSC{T}) where {T}
+function transfer!(y::CuMatrix{T}, x::CUSPARSE.CuSparseMatrixCSC{T}) where {T}
     n = size(y, 2)
     fill!(y, zero(T))
     backend = CUDABackend()

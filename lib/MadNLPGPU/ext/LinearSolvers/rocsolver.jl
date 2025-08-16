@@ -42,10 +42,10 @@ function MadNLP.inertia(M::LapackROCSolver)
 end
 
 MadNLP.input_type(::Type{LapackROCSolver}) = :dense
-MadNLP.default_options(::Type{LapackROCSolver}) = LapackOptions()
+MadNLP.default_options(::Type{LapackROCSolver}) = MadNLP.LapackOptions()
 MadNLP.introduce(M::LapackROCSolver) = "cuSOLVER v$(CUSOLVER.version()) -- ($(M.opt.lapack_algorithm))"
 
-function MadNLPGPU.setup!(M::LapackROCSolver)
+function setup!(M::LapackROCSolver)
     if M.opt.lapack_algorithm == MadNLP.LU
         setup_lu!(M)
     elseif M.opt.lapack_algorithm == MadNLP.QR
@@ -86,7 +86,7 @@ for T in (:Float32, :Float64)
             end
         end
 
-        is_supported(::Type{LapackROCSolver}, ::Type{$T}) = true
+        MadNLP.is_supported(::Type{LapackROCSolver}, ::Type{$T}) = true
     end
 end
 
@@ -102,9 +102,9 @@ for (potrf, potrs, T) in
     ((:rocsolver_dpotrf_64, :rocsolver_dpotrs_64, :Float64),
      (:rocsolver_spotrf_64, :rocsolver_spotrs_64, :Float32))
     @eval begin
-        MadNLPGPU.setup_cholesky!(M::LapackROCSolver{$T}) = M
+        setup_cholesky!(M::LapackROCSolver{$T}) = M
 
-        function MadNLPGPU.factorize_cholesky!(M::LapackROCSolver{$T})
+        function factorize_cholesky!(M::LapackROCSolver{$T})
             rocSOLVER.$potrf(
                 rocBLAS.handle(),
                 rocBLAS.rocblas_fill_lower,
@@ -116,7 +116,7 @@ for (potrf, potrs, T) in
             return M
         end
 
-        function MadNLPGPU.solve_cholesky!(M::LapackROCSolver{$T}, x::ROCVector{$T})
+        function solve_cholesky!(M::LapackROCSolver{$T}, x::ROCVector{$T})
             rocSOLVER.$potrs(
                 rocBLAS.handle(),
                 rocBLAS.rocblas_fill_lower,
@@ -137,12 +137,12 @@ for (getrf, getrs, T) in
     ((:rocsolver_dgetrf_64, :rocsolver_dgetrs_64, :Float64),
      (:rocsolver_sgetrf_64, :rocsolver_sgetrs_64, :Float32))
     @eval begin
-        function MadNLPGPU.setup_lu!(M::LapackROCSolver{$T})
+        function setup_lu!(M::LapackROCSolver{$T})
             resize!(M.ipiv, M.n)
             return M
         end
 
-        function MadNLPGPU.factorize_lu!(M::LapackROCSolver{$T})
+        function factorize_lu!(M::LapackROCSolver{$T})
             rocSOLVER.$getrf(
                 rocBLAS.handle(),
                 M.n,
@@ -155,7 +155,7 @@ for (getrf, getrs, T) in
             return M
         end
 
-        function MadNLPGPU.solve_lu!(M::LapackROCSolver{$T}, x::ROCVector{$T})
+        function solve_lu!(M::LapackROCSolver{$T}, x::ROCVector{$T})
             rocSOLVER.$getrs(
                 rocBLAS.handle(),
                 rocBLAS.rocblas_operation_none,
@@ -176,12 +176,12 @@ for (geqrf, ormqr, trsm, T) in
     ((:rocsolver_dgeqrf_64, :rocsolver_dormqr, :cublasDtrsm_v2_64, :Float64),
      (:rocsolver_sgeqrf_64, :rocsolver_sormqr, :cublasStrsm_v2_64, :Float32))
     @eval begin
-        function MadNLPGPU.setup_qr!(M::LapackROCSolver{$T})
+        function setup_qr!(M::LapackROCSolver{$T})
             resize!(M.tau, M.n)
             return M
         end
 
-        function MadNLPGPU.factorize_qr!(M::LapackROCSolver{$T})
+        function factorize_qr!(M::LapackROCSolver{$T})
             rocSOLVER.$geqrf(
                 rocBLAS.handle(),
                 M.n,
@@ -193,7 +193,7 @@ for (geqrf, ormqr, trsm, T) in
             return M
         end
 
-        function MadNLPGPU.solve_qr!(M::LapackROCSolver{$T}, x::ROCVector{$T})
+        function solve_qr!(M::LapackROCSolver{$T}, x::ROCVector{$T})
             rocSOLVER.$ormqr(
                 rocBLAS.handle(),
                 rocBLAS.rocblas_side_left,

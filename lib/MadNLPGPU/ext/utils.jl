@@ -2,7 +2,7 @@ function MadNLP.MadNLPOptions{T}(
     nlp::MadNLP.AbstractNLPModel{T,VT};
     callback = MadNLP.DenseCallback,
     kkt_system = MadNLP.DenseCondensedKKTSystem,
-    linear_solver = LapackROCSolver,
+    linear_solver = MadNLP.LapackROCSolver,
     tol = MadNLP.get_tolerance(T,kkt_system),
     bound_relax_factor = tol
 ) where {T, VT <: ROCVector{T}}
@@ -36,7 +36,7 @@ end
     SparseMatrixCOO to ROCSparseMatrixCSC
 =#
 
-function MadNLP.transfer!(
+function transfer!(
     dest::rocSPARSE.ROCSparseMatrixCSC,
     src::MadNLP.SparseMatrixCOO,
     map,
@@ -48,7 +48,7 @@ end
     ROCSparseMatrixCSC to ROCMatrix
 =#
 
-function MadNLP.transfer!(y::ROCMatrix{T}, x::rocSPARSE.ROCSparseMatrixCSC{T}) where {T}
+function transfer!(y::ROCMatrix{T}, x::rocSPARSE.ROCSparseMatrixCSC{T}) where {T}
     n = size(y, 2)
     fill!(y, zero(T))
     backend = ROCBackend()
