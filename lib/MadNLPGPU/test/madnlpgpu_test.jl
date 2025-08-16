@@ -1,4 +1,4 @@
-testset = [
+cuda_testset = [
     # Temporarily commented out since LapackGPUSolver does not currently support sparse callbacks
     [
         "CUDSS",
@@ -119,10 +119,17 @@ testset = [
 ]
 
 @testset "MadNLPGPU test" begin
-    MadNLPTests.test_linear_solver(LapackGPUSolver,Float32)
-    MadNLPTests.test_linear_solver(LapackGPUSolver,Float64)
-    # Test LapackGPU wrapper
-    for (name,optimizer_constructor,exclude) in testset
-        test_madnlp(name,optimizer_constructor,exclude; Arr=CuArray)
+    if CUDA.functional()
+        MadNLPTests.test_linear_solver(LapackGPUSolver,Float32)
+        MadNLPTests.test_linear_solver(LapackGPUSolver,Float64)
+        # Test LapackGPU wrapper
+        for (name,optimizer_constructor,exclude) in cuda_testset
+            test_madnlp(name,optimizer_constructor,exclude; Arr=CuArray)
+        end
+    end
+    if AMDGPU.functional()
+        for (name,optimizer_constructor,exclude) in rocm_testset
+            test_madnlp(name,optimizer_constructor,exclude; Arr=ROCArray)
+        end
     end
 end

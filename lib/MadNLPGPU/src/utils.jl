@@ -12,21 +12,7 @@ function MadNLP._madnlp_unsafe_wrap(vec::VT, n, shift=1) where {T, VT <: CuVecto
 end
 
 # Local transfer! function to move data on the device.
-transfer!(x::AbstractArray, y::AbstractArray) = copyto!(x, y)
-
-#=
-    copyto!
-=#
-
-@kernel function _copy_to_map_kernel!(y, p, x)
-    i = @index(Global)
-    @inbounds y[p[i]] = x[i]
-end
-
-@kernel function _copy_from_map_kernel!(y, x, p)
-    i = @index(Global)
-    @inbounds y[i] = x[p[i]]
-end
+MadNLP.transfer!(x::AbstractArray, y::AbstractArray) = copyto!(x, y)
 
 #=
     SparseMatrixCSC to CuSparseMatrixCSC
@@ -34,9 +20,9 @@ end
 
 function CUSPARSE.CuSparseMatrixCSC{Tv,Ti}(A::SparseMatrixCSC{Tv,Ti}) where {Tv,Ti}
     return CUSPARSE.CuSparseMatrixCSC{Tv,Ti}(
-        CuArray(A.colptr),
-        CuArray(A.rowval),
-        CuArray(A.nzval),
+        CuVector(A.colptr),
+        CuVector(A.rowval),
+        CuVector(A.nzval),
         size(A),
     )
 end
@@ -57,24 +43,15 @@ end
     CuSparseMatrixCSC to CuMatrix
 =#
 
-@kernel function _csc_to_dense_kernel!(y, @Const(colptr), @Const(rowval), @Const(nzval))
-    col = @index(Global)
-    @inbounds for ptr in colptr[col]:colptr[col+1]-1
-        row = rowval[ptr]
-        y[row, col] = nzval[ptr]
-    end
-end
-
-function transfer!(y::CuMatrix{T}, x::CUSPARSE.CuSparseMatrixCSC{T}) where {T}
+function MadNLP.transfer!(y::CuMatrix{T}, x::CUSPARSE.CuSparseMatrixCSC{T}) where {T}
     n = size(y, 2)
     fill!(y, zero(T))
-    _csc_to_dense_kernel!(CUDABackend())(y, x.colPtr, x.rowVal, x.nzVal, ndrange = n)
-    synchronize(CUDABackend())
+    backend = CUDABackend()
+    _csc_to_dense_kernel!(backend)(y, x.colPtr, x.rowVal, x.nzVal, ndrange = n)
+    synchronize(backend)
     return
 end
 
-# BLAS operations
-symul!(y, A, x::CuVector{T}, α = 1., β = 0.) where T = CUBLAS.symv!('L', T(α), A, x, T(β), y)
-
+# CUBLAS operations
+MadNLP.symul!(y, A, x::CuVector{T}, α = one(T), β = zero(T)) where T = CUBLAS.symv!('L', T(α), A, x, T(β), y)
 MadNLP._ger!(alpha::Number, x::CuVector{T}, y::CuVector{T}, A::CuMatrix{T}) where T = CUBLAS.ger!(alpha, x, y, A)
-
