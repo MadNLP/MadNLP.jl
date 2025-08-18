@@ -177,8 +177,8 @@ function get_adaptive_mu(solver::AbstractMadNLPSolver, barrier::AdaptiveUpdate)
     # Affine step
     set_aug_rhs!(solver, solver.kkt, solver.c, 0.0)
     # Get primal and dual infeasibility directly 1from the values in RHS p
-    res_primal = norm(primal(solver.p))
-    res_dual = norm(dual(solver.p))
+    res_primal = norm(dual(solver.p))
+    res_dual = norm(primal(solver.p))
 
     # Get approximate solution without iterative refinement
     copyto!(full(step_aff), full(solver.p))
