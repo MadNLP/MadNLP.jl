@@ -125,7 +125,7 @@ jobs:
     strategy:
       matrix:
         julia-version: ['1']
-        gpu: [cuda, amdgpu]
+        gpu: [cuda]
     runs-on:
       - self-hosted
       - ${{ matrix.gpu }}
