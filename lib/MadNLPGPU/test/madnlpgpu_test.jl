@@ -71,15 +71,24 @@ cuda_testset = [
         ),
         [],
     ],
-    # [
-    #     "Formulation K2.5",
-    #     ()->MadNLP.Optimizer(
-    #         linear_solver=CUDSSSolver,
-    #         print_level=MadNLP.ERROR,
-    #         kkt_system=MadNLP.ScaledSparseKKTSystem,
-    #     ),
-    #     [],
-    # ],
+    [
+        "Formulation K1",
+        ()->MadNLP.Optimizer(
+            linear_solver=CUDSSSolver,
+            print_level=MadNLP.ERROR,
+            kkt_system=MadNLP.SparseCondensedKKTSystem,
+        ),
+        [],
+    ],
+    [
+        "Formulation K2.5",
+        ()->MadNLP.Optimizer(
+            linear_solver=CUDSSSolver,
+            print_level=MadNLP.ERROR,
+            kkt_system=MadNLP.ScaledSparseKKTSystem,
+        ),
+        [],
+    ],
     [
         "LapackGPU-BUNCHKAUFMAN",
         ()->MadNLP.Optimizer(
