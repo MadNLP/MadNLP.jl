@@ -61,7 +61,7 @@ function setup!(M::LapackGPUSolver)
 end
 
 function factorize!(M::LapackGPUSolver)
-    transfer!(M.fact, M.A)
+    gpu_transfer!(M.fact, M.A)
     if M.opt.lapack_algorithm == MadNLP.BUNCHKAUFMAN
         factorize_bunchkaufman!(M)
     elseif M.opt.lapack_algorithm == MadNLP.LU
