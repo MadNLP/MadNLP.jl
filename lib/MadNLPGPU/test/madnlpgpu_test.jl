@@ -76,7 +76,7 @@ cuda_testset = [
         ()->MadNLP.Optimizer(
             linear_solver=CUDSSSolver,
             print_level=MadNLP.ERROR,
-            kkt_system=MadNLP.SparseCondensedKKTSystem,
+            kkt_system=MadNLP.SparseKKTSystem,
         ),
         [],
     ],
