@@ -120,12 +120,15 @@ jobs:
   #     - uses: codecov/codecov-action@v5
   #       with:
   #         file: lcov.info
+  # need to run one on cuda and one on amdgpu
   test-gpu:
-    runs-on: 
-      labels: cuda
     strategy:
       matrix:
         julia-version: ['1']
+        gpu: [cuda]
+    runs-on:
+      - self-hosted
+      - ${{ matrix.gpu }}
     steps:
       - uses: actions/checkout@v2
       - uses: julia-actions/install-juliaup@v2

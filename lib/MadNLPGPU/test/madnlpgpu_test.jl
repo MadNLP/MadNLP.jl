@@ -1,4 +1,4 @@
-testset = [
+cuda_testset = [
     # Temporarily commented out since LapackGPUSolver does not currently support sparse callbacks
     [
         "CUDSS",
@@ -72,6 +72,15 @@ testset = [
         [],
     ],
     # [
+    #     "Formulation K2",
+    #     ()->MadNLP.Optimizer(
+    #         linear_solver=CUDSSSolver,
+    #         print_level=MadNLP.ERROR,
+    #         kkt_system=MadNLP.SparseKKTSystem,
+    #     ),
+    #     [],
+    # ],
+    # [
     #     "Formulation K2.5",
     #     ()->MadNLP.Optimizer(
     #         linear_solver=CUDSSSolver,
@@ -122,7 +131,7 @@ testset = [
     MadNLPTests.test_linear_solver(LapackGPUSolver,Float32)
     MadNLPTests.test_linear_solver(LapackGPUSolver,Float64)
     # Test LapackGPU wrapper
-    for (name,optimizer_constructor,exclude) in testset
+    for (name,optimizer_constructor,exclude) in cuda_testset
         test_madnlp(name,optimizer_constructor,exclude; Arr=CuArray)
     end
 end
