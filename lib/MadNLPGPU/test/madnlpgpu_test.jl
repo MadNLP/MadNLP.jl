@@ -72,7 +72,7 @@ cuda_testset = [
         [],
     ],
     [
-        "Formulation K1",
+        "Formulation K2",
         ()->MadNLP.Optimizer(
             linear_solver=CUDSSSolver,
             print_level=MadNLP.ERROR,
