@@ -1,7 +1,7 @@
 using AMDGPU
 using MadNLPTests
 
-function _compare_gpu_with_cpu(KKTSystem, n, m, ind_fixed)
+function _compare_amdgpu_with_cpu(KKTSystem, n, m, ind_fixed)
     for (T,tol,atol) in [
         (Float32,1e-4,1e1),
         (Float64,1e-8,1e-6)
@@ -10,6 +10,7 @@ function _compare_gpu_with_cpu(KKTSystem, n, m, ind_fixed)
             :callback=>MadNLP.DenseCallback,
             :kkt_system=>KKTSystem,
             :linear_solver=>LapackROCSolver,
+            :lapack_algorithm=>MadNLP.QR,
             :print_level=>MadNLP.ERROR,
             :tol=>tol
         )
@@ -36,19 +37,19 @@ function _compare_gpu_with_cpu(KKTSystem, n, m, ind_fixed)
     end
 end
 
-@testset "MadNLPGPU ($(kkt_system))" for kkt_system in [
+@testset "MadNLPGPU -- LapackROCSolver -- ($(kkt_system))" for kkt_system in [
         MadNLP.DenseKKTSystem,
         MadNLP.DenseCondensedKKTSystem,
     ]
     @testset "Size: ($n, $m)" for (n, m) in [(10, 0), (10, 5), (50, 10)]
-        _compare_gpu_with_cpu(kkt_system, n, m, Int[])
+        _compare_amdgpu_with_cpu(kkt_system, n, m, Int[])
     end
     @testset "Fixed variables" for (n,m) in [(10, 0), (10, 5), (50, 10)]
-        _compare_gpu_with_cpu(kkt_system, n, m, Int[1, 2])
+        _compare_amdgpu_with_cpu(kkt_system, n, m, Int[1, 2])
     end
 end
 
-@testset "MadNLP: $QN + $KKT" for QN in [
+@testset "MadNLP -- LapackROCSolver: $QN + $KKT" for QN in [
     MadNLP.BFGS,
     MadNLP.DampedBFGS,
 ], KKT in [
