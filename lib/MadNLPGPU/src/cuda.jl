@@ -1,4 +1,7 @@
-# option preset
+#=
+    MadNLP.MadNLPOptions
+=#
+
 function MadNLP.MadNLPOptions{T}(
     nlp::AbstractNLPModel{T,VT};
     dense_callback = MadNLP.is_dense_callback(nlp),

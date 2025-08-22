@@ -14,6 +14,10 @@ function MadNLP.transfer!(
     return copyto!(view(dest.nzVal, map), src.V)
 end
 
+#=
+    MadNLP.mul! with SparseCondensedKKTSystem + CUDA
+=#
+
 function MadNLP.mul!(
     w::MadNLP.AbstractKKTVector{T,VT},
     kkt::MadNLP.SparseCondensedKKTSystem,
