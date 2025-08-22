@@ -9,7 +9,7 @@ function MadNLP.MadNLPOptions{T}(
     kkt_system = dense_callback ? MadNLP.DenseCondensedKKTSystem : MadNLP.SparseCondensedKKTSystem,
     linear_solver = MadNLPGPU.LapackROCSolver,
     tol = MadNLP.get_tolerance(T,kkt_system),
-    bound_relax_factor = tol
+    bound_relax_factor = tol,
 ) where {T, VT <: ROCVector{T}}
     return MadNLP.MadNLPOptions{T}(
         tol = tol,
@@ -37,7 +37,7 @@ end
     ROCSparseMatrixCSC to ROCMatrix
 =#
 
-function gpu_transfer!(y::ROCMatrix{T}, x::rocSPARSE.ROCSparseMatrixCSC{T}) where {T}
+function MadNLPGPU.gpu_transfer!(y::ROCMatrix{T}, x::rocSPARSE.ROCSparseMatrixCSC{T}) where {T}
     n = size(y, 2)
     fill!(y, zero(T))
     backend = ROCBackend()

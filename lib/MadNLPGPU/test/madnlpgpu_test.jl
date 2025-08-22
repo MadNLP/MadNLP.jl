@@ -167,6 +167,8 @@ rocm_testset = [
         end
     end
     if AMDGPU.functional()
+        MadNLPTests.test_linear_solver(LapackROCSolver,Float32)
+        MadNLPTests.test_linear_solver(LapackROCSolver,Float64)
         for (name,optimizer_constructor,exclude) in rocm_testset
             test_madnlp(name,optimizer_constructor,exclude; Arr=ROCArray)
         end

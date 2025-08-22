@@ -44,8 +44,8 @@ function MadNLP.inertia(M::LapackROCSolver)
 end
 
 MadNLP.input_type(::Type{LapackROCSolver}) = :dense
-MadNLP.default_options(::Type{LapackROCSolver}) = MadNLP.LapackOptions()
-MadNLP.introduce(M::LapackROCSolver) = "cuSOLVER v$(CUSOLVER.version()) -- ($(M.opt.lapack_algorithm))"
+MadNLP.default_options(::Type{LapackROCSolver}) = MadNLP.LapackOptions(MadNLP.LU)
+MadNLP.introduce(M::LapackROCSolver) = "rocSOLVER v$(rocSOLVER.version()) -- ($(M.opt.lapack_algorithm))"
 
 function setup!(M::LapackROCSolver)
     if M.opt.lapack_algorithm == MadNLP.LU
@@ -60,7 +60,7 @@ function setup!(M::LapackROCSolver)
 end
 
 function MadNLP.factorize!(M::LapackROCSolver)
-    gpu_transfer!(M.fact, M.A)
+    MadNLPGPU.gpu_transfer!(M.fact, M.A)
     if M.opt.lapack_algorithm == MadNLP.LU
         MadNLP.tril_to_full!(M.fact)
         factorize_lu!(M)
@@ -95,7 +95,7 @@ end
 function MadNLP.solve!(M::LapackROCSolver, x::AbstractVector)
     isempty(M.sol) && resize!(M.sol, M.n)
     copyto!(M.sol, x)
-    solve!(M, M.sol)
+    MadNLP.solve!(M, M.sol)
     copyto!(x, M.sol)
     return x
 end
