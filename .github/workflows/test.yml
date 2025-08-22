@@ -65,7 +65,7 @@ jobs:
           file: lcov.info
           token: ${{ secrets.CODECOV_TOKEN }}
   test-hsl:
-    runs-on: 
+    runs-on:
       labels: hsl
     strategy:
       matrix:
@@ -125,7 +125,7 @@ jobs:
     strategy:
       matrix:
         julia-version: ['1']
-        gpu: [cuda]
+        gpu: [cuda, amdgpu]
     runs-on:
       - self-hosted
       - ${{ matrix.gpu }}
@@ -148,4 +148,4 @@ jobs:
         with:
           file: lcov.info
           token: ${{ secrets.CODECOV_TOKEN }}
-          
+
