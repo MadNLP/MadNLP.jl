@@ -28,7 +28,7 @@ function _compare_gpu_with_cpu(KKTSystem, n, m, ind_fixed)
         results_gpu = MadNLP.solve!(d_solver)
 
         @test isa(d_solver.kkt, KKTSystem{T})
-        # # Check that both results match exactly
+        # Check that both results match exactly
         @test h_solver.cnt.k == d_solver.cnt.k
         @test results_cpu.objective ≈ results_gpu.objective
         @test results_cpu.solution ≈ Array(results_gpu.solution) atol=atol
