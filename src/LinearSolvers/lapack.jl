@@ -223,7 +223,7 @@ for (potrf, potrs, getrf, getrs, sytrf, sytrs, geqrf, ormqr, trsm, T) in
             resize!(M.tau, M.n)
             $geqrf(M.n, M.n, M.fact, M.n, M.tau, M.work, M.lwork, M.info)
             buffer_size_geqrf = M.work[1] |> BlasInt
-            $ormqr('L', 'T', M.n, one(BlasInt), M.n, M.fact, M.n, M.n, M.tau, M.n, M.work, M.lwork, M.info)
+            $ormqr('L', 'T', M.n, one(BlasInt), M.n, M.fact, M.n, M.tau, M.tau, M.n, M.work, M.lwork, M.info)
             buffer_size_ormqr = M.work[1] |> BlasInt
             M.lwork = max(buffer_size_geqrf, buffer_size_ormqr)
             resize!(M.work, M.lwork)
@@ -236,7 +236,7 @@ for (potrf, potrs, getrf, getrs, sytrf, sytrs, geqrf, ormqr, trsm, T) in
         end
 
         function solve_qr!(M::LapackCPUSolver{$T}, x::Vector{$T})
-            $ormqr('L', 'T', M.n, one(BlasInt), M.n, M.fact, M.n, M.n, x, M.n, M.work, M.lwork, M.info)
+            $ormqr('L', 'T', M.n, one(BlasInt), M.n, M.fact, M.n, M.tau, x, M.n, M.work, M.lwork, M.info)
             $trsm('L', 'U', 'N', 'N' , M.n, one(BlasInt), one($T), M.fact, M.n, x, M.n)
             return x
         end
