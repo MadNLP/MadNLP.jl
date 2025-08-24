@@ -223,7 +223,7 @@ for (potrf, potrs, getrf, getrs, sytrf, sytrs, geqrf, ormqr, trsm, T) in
             resize!(M.tau, M.n)
             $geqrf(M.n, M.n, M.fact, M.n, M.tau, M.work, M.lwork, M.info)
             buffer_size_geqrf = M.work[1] |> BlasInt
-            $ormqr('L', 'T', M.n, one(BlasInt), M.n, M.fact, M.n, M.tau, tau, M.n, M.work, M.lwork, M.info)
+            $ormqr('L', 'T', M.n, one(BlasInt), M.n, M.fact, M.n, M.n, M.tau, M.n, M.work, M.lwork, M.info)
             buffer_size_ormqr = M.work[1] |> BlasInt
             M.lwork = max(buffer_size_geqrf, buffer_size_ormqr)
             resize!(M.work, M.lwork)
