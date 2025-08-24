@@ -26,8 +26,8 @@ mutable struct LapackCPUSolver{T, MT} <: AbstractLinearSolver{T}
         fact = Matrix{T}(undef, m, n)
         sol = Vector{T}(undef, 0)
         tau = Vector{T}(undef, 0)
-        work = Vector{T}(undef, 0)
-        lwork = BlasInt(0)
+        work = Vector{T}(undef, 1)
+        lwork = BlasInt(-1)
         info = Ref{BlasInt}(0)
         ipiv = Vector{BlasInt}(undef, 0)
         solver = new{T,MT}(A, fact, n, sol, tau, work, lwork, info, ipiv, opt, logger)
@@ -187,10 +187,10 @@ for (potrf, potrs, getrf, getrs, sytrf, sytrs, geqrf, ormqr, trsm, T) in
 
         function setup_bunchkaufman!(M::LapackCPUSolver{$T})
             resize!(M.ipiv, M.n)
-            buffer_size_sytrf = Ref{BlasInt}(-1)
-            $sytrf('L', M.n, M.fact, M.n, M.ipiv, M.work, buffer_size_sytrf, M.info)
-            M.lwork = buffer_size_sytrf[] |> BlasInt
-            (M.lwork > 0) && resize!(M.work, M.lwork)
+            $sytrf('L', M.n, M.fact, M.n, M.ipiv, M.work, M.lwork, M.info)
+            buffer_size_sytrf = M.work[1] |> BlasInt
+            M.lwork = buffer_size_sytrf
+            resize!(M.work, M.lwork)
             return M
         end
 
@@ -221,12 +221,12 @@ for (potrf, potrs, getrf, getrs, sytrf, sytrs, geqrf, ormqr, trsm, T) in
 
         function setup_qr!(M::LapackCPUSolver{$T})
             resize!(M.tau, M.n)
-            buffer_size_geqrf = Ref{BlasInt}(-1)
-            $geqrf(M.n, M.n, M.fact, M.n, M.tau, M.work, buffer_size_geqrf, M.info)
-            buffer_size_ormqr = Ref{BlasInt}(-1)
-            $ormqr('L', 'T', M.n, one(BlasInt), M.n, M.fact, M.n, M.tau, tau, M.n, M.work, buffer_size_ormqr, M.info)
-            M.lwork = max(buffer_size_geqrf[], buffer_size_ormqr[]) |> BlasInt
-            (M.lwork > 0) && resize!(M.work, M.lwork)
+            $geqrf(M.n, M.n, M.fact, M.n, M.tau, M.work, M.lwork, M.info)
+            buffer_size_geqrf = M.work[1] |> BlasInt
+            $ormqr('L', 'T', M.n, one(BlasInt), M.n, M.fact, M.n, M.tau, tau, M.n, M.work, M.lwork, M.info)
+            buffer_size_ormqr = M.work[1] |> BlasInt
+            M.lwork = max(buffer_size_geqrf, buffer_size_ormqr)
+            resize!(M.work, M.lwork)
             return M
         end
 
@@ -244,7 +244,7 @@ for (potrf, potrs, getrf, getrs, sytrf, sytrs, geqrf, ormqr, trsm, T) in
 end
 
 improve!(M::LapackCPUSolver) = false
-is_inertia(M::LapackCPUSolver) = M.opt.lapack_algorithm == BUNCHKAUFMAN || M.opt.lapack_algorithm == CHOLESKY
+is_inertia(M::LapackCPUSolver) = (M.opt.lapack_algorithm == BUNCHKAUFMAN) || (M.opt.lapack_algorithm == CHOLESKY)
 function inertia(M::LapackCPUSolver)
     if M.opt.lapack_algorithm == BUNCHKAUFMAN
         inertia(M.fact, M.ipiv, M.info[])
@@ -259,7 +259,7 @@ input_type(::Type{LapackCPUSolver}) = :dense
 default_options(::Type{LapackCPUSolver}) = LapackOptions()
 introduce(M::LapackCPUSolver) = "Lapack-CPU ($(M.opt.lapack_algorithm))"
 
-function inertia(fact,ipiv,info)
+function inertia(fact, ipiv, info)
     numneg = num_neg_ev(size(fact,1), fact, ipiv)
     numzero = info > 0 ? 1 : 0
     numpos = size(fact,1) - numneg - numzero
