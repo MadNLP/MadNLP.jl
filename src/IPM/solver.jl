@@ -70,6 +70,7 @@ function initialize!(solver::AbstractMadNLPSolver{T}) where T
     end
 
     # Initializing
+    @trace(solver.logger,"Eval f")
     solver.obj_val = eval_f_wrapper(solver, solver.x)
     eval_cons_wrapper!(solver, solver.c, solver.x)
     eval_lag_hess_wrapper!(solver, solver.kkt, solver.x, solver.y)

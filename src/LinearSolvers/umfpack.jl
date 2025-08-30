@@ -37,9 +37,12 @@ function UmfpackSolver(
 end
 
 function factorize!(M::UmfpackSolver)
+    #@warn(M.logger, "Trying to factorize 1")
     M.full.nzval .= M.tril_to_full_view
+    #@warn(M.logger, "Trying to factorize 2")
     # We check the factorization succeeded later in the backsolve
     UMFPACK.lu!(M.inner, M.full; check=false)
+    #@warn(M.logger, "Trying to factorize 3")
     return M
 end
 
