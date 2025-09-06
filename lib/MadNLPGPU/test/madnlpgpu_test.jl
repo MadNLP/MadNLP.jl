@@ -117,6 +117,15 @@ cuda_testset = [
         [],
     ],
     [
+        "LapackGPU-EVD",
+        ()->MadNLP.Optimizer(
+            linear_solver=LapackGPUSolver,
+            lapack_algorithm=MadNLP.EVD,
+            print_level=MadNLP.ERROR,
+        ),
+        [],
+    ],
+    [
         "LapackGPU-CHOLESKY",
         ()->MadNLP.Optimizer(
             linear_solver=LapackGPUSolver,
@@ -142,6 +151,15 @@ rocm_testset = [
         ()->MadNLP.Optimizer(
             linear_solver=LapackROCSolver,
             lapack_algorithm=MadNLP.QR,
+            print_level=MadNLP.ERROR,
+        ),
+        [],
+    ],
+    [
+        "LapackROCSolver-EVD",
+        ()->MadNLP.Optimizer(
+            linear_solver=LapackROCSolver,
+            lapack_algorithm=MadNLP.EVD,
             print_level=MadNLP.ERROR,
         ),
         [],

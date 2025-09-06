@@ -7,7 +7,7 @@ import LinearAlgebra: Symmetric
 import CUDA: CUDA, CUSPARSE, CUBLAS, CUSOLVER, CuVector, CuMatrix, CuArray,
     has_cuda, @allowscalar, runtime_version, CUDABackend
 import .CUSOLVER: cusolverStatus_t, CuPtr, cudaDataType, cublasFillMode_t, cusolverDnHandle_t,
-    dense_handle, CuSolverParameters
+    dense_handle, CuSolverParameters, CUSOLVER_EIG_MODE_VECTOR
 import .CUBLAS: handle, CUBLAS_DIAG_NON_UNIT,
     CUBLAS_FILL_MODE_LOWER, CUBLAS_FILL_MODE_UPPER, CUBLAS_SIDE_LEFT, CUBLAS_OP_N, CUBLAS_OP_T
 
