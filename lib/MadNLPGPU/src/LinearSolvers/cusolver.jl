@@ -496,7 +496,7 @@ for (syevd, syevd_buffer, gemm, nbytes, T) in
                     $T,
                     M.fact,
                     M.n,
-                    $T
+                    $T,
                     M.Λ,
                     $T,
                     M.work_gpu,
