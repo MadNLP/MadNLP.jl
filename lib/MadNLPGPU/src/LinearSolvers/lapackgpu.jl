@@ -118,7 +118,7 @@ is_inertia(M::LapackGPUSolver) = (M.opt.lapack_algorithm == MadNLP.CHOLESKY) || 
 function inertia(M::LapackGPUSolver)
     if M.opt.lapack_algorithm == MadNLP.CHOLESKY
         sum(M.info) == 0 ? (M.n, 0, 0) : (0, M.n, 0)
-    elseif M.opt.lapack_algorithm == MadNLP.CHOLESKY
+    elseif M.opt.lapack_algorithm == MadNLP.EVD
         numpos = count(λ -> λ > 0, M.Λ)
         numneg = count(λ -> λ < 0, M.Λ)
         numzero = M.n - numpos - numneg
