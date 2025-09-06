@@ -4,6 +4,7 @@ mutable struct LapackGPUSolver{T,MT} <: AbstractLinearSolver{T}
     n::Int64
     sol::CuVector{T}
     tau::CuVector{T}
+    Λ::CuVector{T}
     work_gpu::CuVector{UInt8}
     lwork_gpu::Csize_t
     work_cpu::Vector{UInt8}
@@ -31,7 +32,8 @@ mutable struct LapackGPUSolver{T,MT} <: AbstractLinearSolver{T}
         fact = CuMatrix{T}(undef, m, n)
         sol = CuVector{T}(undef, 0)
         tau = CuVector{T}(undef, 0)
-        work_gpu = CuVector{T}(undef, 0)
+        Λ = CuVector{T}(undef, 0)
+        work_gpu = CuVector{UInt8}(undef, 0)
         lwork_gpu = zero(Int64)
         work_cpu = Vector{UInt8}(undef, 0)
         lwork_cpu = zero(Int64)
@@ -39,7 +41,7 @@ mutable struct LapackGPUSolver{T,MT} <: AbstractLinearSolver{T}
         ipiv = CuVector{Cint}(undef, 0)
         ipiv64 = CuVector{Int64}(undef, 0)
         params = CuSolverParameters()
-        solver = new{T,MT}(A, fact, n, sol, tau, work_gpu, lwork_gpu, work_cpu, lwork_cpu,
+        solver = new{T,MT}(A, fact, n, sol, tau, Λ, work_gpu, lwork_gpu, work_cpu, lwork_cpu,
                            info, ipiv, ipiv64, opt, logger, legacy, params)
         setup!(solver)
         return solver
