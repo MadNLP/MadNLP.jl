@@ -421,3 +421,122 @@ for (geqrf, geqrf_buffer, ormqr, ormqr_buffer, trsv, nbytes, T) in
         end
     end
 end
+
+for (syevd, syevd_buffer, gemv, nbytes, T) in
+    ((:cusolverDnDsyevd, :cusolverDnDsyevd_bufferSize, :cublasDgemv_v2_64, :8, :Float64),
+     (:cusolverDnSsyevd, :cusolverDnSsyevd_bufferSize, :cublasSgemv_v2_64, :4, :Float32))
+    @eval begin
+        function setup_evd!(M::LapackGPUSolver{$T})
+            resize!(M.tau, M.n)
+            resize!(M.Λ, M.n)
+            if M.legacy
+                syevd_lwork_gpu = Ref{Cint}(0)
+                CUSOLVER.$syevd_buffer(
+                    dense_handle(),
+                    CUSOLVER_EIG_MODE_VECTOR,
+                    CUBLAS_FILL_MODE_LOWER,
+                    Cint(M.n),
+                    M.fact,
+                    Cint(M.n),
+                    M.Λ,
+                    syevd_lwork_gpu,
+                )
+                M.lwork_gpu = syevd_lwork_gpu[] * $nbytes
+                resize!(M.work_gpu, M.lwork_gpu |> Int64)
+            else
+                syevd_lwork_cpu = Ref{Csize_t}(0)
+                syevd_lwork_gpu = Ref{Csize_t}(0)
+                CUSOLVER.cusolverDnXsyevd_bufferSize(
+                    dense_handle(),
+                    M.params,
+                    CUSOLVER_EIG_MODE_VECTOR,
+                    CUBLAS_FILL_MODE_LOWER,
+                    M.n,
+                    $T,
+                    M.fact,
+                    M.n,
+                    $T,
+                    M.Λ,
+                    $T,
+                    syevd_lwork_gpu,
+                    syevd_lwork_cpu,
+                )
+                M.lwork_cpu = syevd_lwork_cpu[]
+                M.lwork_gpu = syevd_lwork_gpu[]
+                resize!(M.work_cpu, M.lwork_cpu |> Int64)
+                resize!(M.work_gpu, M.lwork_gpu |> Int64)
+            end
+            return M
+        end
+
+        function factorize_evd!(M::LapackGPUSolver{$T})
+            if M.legacy
+                CUSOLVER.$syevd(
+                    dense_handle(),
+                    CUSOLVER_EIG_MODE_VECTOR,
+                    CUBLAS_FILL_MODE_LOWER,
+                    Cint(M.n),
+                    M.fact,
+                    Cint(M.n),
+                    M.Λ,
+                    M.work_gpu,
+                    Cint(M.lwork_gpu ÷ $nbytes),
+                    M.info,
+                )
+            else
+                CUSOLVER.cusolverDnXsyevd(
+                    dense_handle(),
+                    M.params,
+                    CUSOLVER_EIG_MODE_VECTOR,
+                    CUBLAS_FILL_MODE_LOWER,
+                    M.n,
+                    $T,
+                    M.fact,
+                    M.n,
+                    $T,
+                    M.Λ,
+                    $T,
+                    M.work_gpu,
+                    M.lwork_gpu,
+                    M.work_cpu,
+                    M.lwork_cpu,
+                    M.info,
+                )
+            end
+            return M
+        end
+
+        function solve_evd!(M::LapackGPUSolver{$T}, x::CuVector{$T})
+            CUBLAS.$gemv(
+                handle(),
+                CUBLAS_OP_T,
+                M.n,
+                M.n,
+                one($T),
+                M.fact,
+                M.n,
+                x,
+                one(Int64),
+                zero($T),
+                M.tau,
+                one(Int64),
+            )
+            M.tau ./= M.Λ
+            CUBLAS.$gemv(
+                handle(),
+                CUBLAS_OP_N,
+                M.n,
+                M.n,
+                one($T),
+                M.fact,
+                M.n,
+                M.tau,
+                one(Int64),
+                zero($T),
+                x,
+                one(Int64),
+            )
+            return x
+        end
+    end
+end

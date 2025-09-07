@@ -4,6 +4,7 @@ mutable struct LapackGPUSolver{T,MT} <: AbstractLinearSolver{T}
     n::Int64
     sol::CuVector{T}
     tau::CuVector{T}
+    Λ::CuVector{T}
     work_gpu::CuVector{UInt8}
     lwork_gpu::Csize_t
     work_cpu::Vector{UInt8}
@@ -31,7 +32,8 @@ mutable struct LapackGPUSolver{T,MT} <: AbstractLinearSolver{T}
         fact = CuMatrix{T}(undef, m, n)
         sol = CuVector{T}(undef, 0)
         tau = CuVector{T}(undef, 0)
-        work_gpu = CuVector{T}(undef, 0)
+        Λ = CuVector{T}(undef, 0)
+        work_gpu = CuVector{UInt8}(undef, 0)
         lwork_gpu = zero(Int64)
         work_cpu = Vector{UInt8}(undef, 0)
         lwork_cpu = zero(Int64)
@@ -39,7 +41,7 @@ mutable struct LapackGPUSolver{T,MT} <: AbstractLinearSolver{T}
         ipiv = CuVector{Cint}(undef, 0)
         ipiv64 = CuVector{Int64}(undef, 0)
         params = CuSolverParameters()
-        solver = new{T,MT}(A, fact, n, sol, tau, work_gpu, lwork_gpu, work_cpu, lwork_cpu,
+        solver = new{T,MT}(A, fact, n, sol, tau, Λ, work_gpu, lwork_gpu, work_cpu, lwork_cpu,
                            info, ipiv, ipiv64, opt, logger, legacy, params)
         setup!(solver)
         return solver
@@ -55,6 +57,8 @@ function setup!(M::LapackGPUSolver)
         setup_qr!(M)
     elseif M.opt.lapack_algorithm == MadNLP.CHOLESKY
         setup_cholesky!(M)
+    elseif M.opt.lapack_algorithm == MadNLP.EVD
+        setup_evd!(M)
     else
         error(M.logger, "Invalid lapack_algorithm")
     end
@@ -72,6 +76,8 @@ function factorize!(M::LapackGPUSolver)
         factorize_qr!(M)
     elseif M.opt.lapack_algorithm == MadNLP.CHOLESKY
         factorize_cholesky!(M)
+    elseif M.opt.lapack_algorithm == MadNLP.EVD
+        factorize_evd!(M)
     else
         error(M.logger, "Invalid lapack_algorithm")
     end
@@ -88,6 +94,8 @@ for T in (:Float32, :Float64)
                 solve_qr!(M, x)
             elseif M.opt.lapack_algorithm == MadNLP.CHOLESKY
                 solve_cholesky!(M, x)
+            elseif M.opt.lapack_algorithm == MadNLP.EVD
+                solve_evd!(M, x)
             else
                 error(M.logger, "Invalid lapack_algorithm")
             end
@@ -106,10 +114,15 @@ function solve!(M::LapackGPUSolver, x::AbstractVector)
 end
 
 improve!(M::LapackGPUSolver) = false
-is_inertia(M::LapackGPUSolver) = M.opt.lapack_algorithm == MadNLP.CHOLESKY
+is_inertia(M::LapackGPUSolver) = (M.opt.lapack_algorithm == MadNLP.CHOLESKY) || (M.opt.lapack_algorithm == MadNLP.EVD)
 function inertia(M::LapackGPUSolver)
     if M.opt.lapack_algorithm == MadNLP.CHOLESKY
         sum(M.info) == 0 ? (M.n, 0, 0) : (0, M.n, 0)
+    elseif M.opt.lapack_algorithm == MadNLP.EVD
+        numpos = count(λ -> λ > 0, M.Λ)
+        numneg = count(λ -> λ < 0, M.Λ)
+        numzero = M.n - numpos - numneg
+        (numpos, numzero, numneg)
     else
         error(M.logger, "Invalid lapack_algorithm")
     end
