@@ -8,8 +8,11 @@ mutable struct LapackCPUSolver{T, MT} <: AbstractLinearSolver{T}
     n::Int64
     sol::Vector{T}
     tau::Vector{T}
+    Λ::Vector{T}
     work::Vector{T}
     lwork::BlasInt
+    iwork::Vector{BlasInt}
+    liwork::BlasInt
     info::Base.RefValue{BlasInt}
     ipiv::Vector{BlasInt}
     opt::LapackOptions
@@ -26,11 +29,14 @@ mutable struct LapackCPUSolver{T, MT} <: AbstractLinearSolver{T}
         fact = Matrix{T}(undef, m, n)
         sol = Vector{T}(undef, 0)
         tau = Vector{T}(undef, 0)
+        Λ = Vector{T}(undef, 0)
         work = Vector{T}(undef, 1)
         lwork = BlasInt(-1)
+        iwork = Vector{BlasInt}(undef, 1)
+        liwork = BlasInt(-1)
         info = Ref{BlasInt}(0)
         ipiv = Vector{BlasInt}(undef, 0)
-        solver = new{T,MT}(A, fact, n, sol, tau, work, lwork, info, ipiv, opt, logger)
+        solver = new{T,MT}(A, fact, n, sol, tau, Λ, work, lwork, iwork, liwork, info, ipiv, opt, logger)
         setup!(solver)
         return solver
     end
@@ -45,6 +51,8 @@ function setup!(M::LapackCPUSolver)
         setup_qr!(M)
     elseif M.opt.lapack_algorithm == MadNLP.CHOLESKY
         setup_cholesky!(M)
+    elseif M.opt.lapack_algorithm == MadNLP.EVD
+        setup_evd!(M)
     else
         error(M.logger, "Invalid lapack_algorithm")
     end
@@ -62,6 +70,8 @@ function factorize!(M::LapackCPUSolver)
         factorize_qr!(M)
     elseif M.opt.lapack_algorithm == CHOLESKY
         factorize_cholesky!(M)
+    elseif M.opt.lapack_algorithm == EVD
+        factorize_evd!(M)
     else
         error(M.logger, "Invalid lapack_algorithm")
     end
@@ -78,6 +88,8 @@ for T in (:Float32, :Float64)
                 solve_qr!(M, x)
             elseif M.opt.lapack_algorithm == CHOLESKY
                 solve_cholesky!(M, x)
+            elseif M.opt.lapack_algorithm == EVD
+                solve_evd!(M, x)
             else
                 error(M.logger, "Invalid lapack_algorithm")
             end
@@ -95,9 +107,9 @@ function solve!(M::LapackCPUSolver, x::AbstractVector)
     return x
 end
 
-for (potrf, potrs, getrf, getrs, sytrf, sytrs, geqrf, ormqr, trsm, T) in
-    ((:spotrf_, :spotrs_, :sgetrf_, :sgetrs_, :ssytrf_, :ssytrs_, :sgeqrf_, :sormqr_, :strsm_, :Float32),
-     (:dpotrf_, :dpotrs_, :dgetrf_, :dgetrs_, :dsytrf_, :dsytrs_, :dgeqrf_, :dormqr_, :dtrsm_, :Float64))
+for (potrf, potrs, getrf, getrs, sytrf, sytrs, geqrf, ormqr, trsm, syevd, gemv, T) in
+    ((:spotrf_, :spotrs_, :sgetrf_, :sgetrs_, :ssytrf_, :ssytrs_, :sgeqrf_, :sormqr_, :strsm_, :ssyevd_, :sgemv_, :Float32),
+     (:dpotrf_, :dpotrs_, :dgetrf_, :dgetrs_, :dsytrf_, :dsytrs_, :dgeqrf_, :dormqr_, :dtrsm_, :dsyevd_, :dgemv_, :Float64))
     @eval begin
         # potrf
         function $potrf(uplo, n, a, lda, info)
@@ -171,6 +183,22 @@ for (potrf, potrs, getrf, getrs, sytrf, sytrs, geqrf, ormqr, trsm, T) in
                           side, uplo, transa, diag, m, n, alpha, a, lda, b, ldb, 1, 1, 1, 1)
         end
 
+        # syevd
+        function $syevd(jobz, uplo, n, a, lda, w, work, lwork, iwork, liwork, info)
+            return ccall((@blasfunc($syevd), libblastrampoline), Cvoid,
+                         (Ref{UInt8}, Ref{UInt8}, Ref{BlasInt}, Ptr{$T}, Ref{BlasInt}, Ptr{$T},
+                          Ptr{$T}, Ref{BlasInt}, Ptr{BlasInt}, Ref{BlasInt}, Ref{BlasInt}, Clong, Clong),
+                          jobz, uplo, n, a, lda, w, work, lwork, iwork, liwork, info, 1, 1)
+        end
+
+        # gemv
+        function $gemv(trans, m, n, alpha, a, lda, x, incx, beta, y, incy)
+            return ccall((@blasfunc($gemv), libblastrampoline), Cvoid,
+                         (Ref{UInt8}, Ref{BlasInt}, Ref{BlasInt}, Ref{$T}, Ptr{$T}, Ref{BlasInt},
+                          Ptr{$T}, Ref{BlasInt}, Ref{$T}, Ptr{$T}, Ref{BlasInt}, Clong),
+                          trans, m, n, alpha, a, lda, x, incx, beta, y, incy, 1)
+        end
+
         function setup_cholesky!(M::LapackCPUSolver{$T})
             return M
         end
@@ -240,16 +268,46 @@ for (potrf, potrs, getrf, getrs, sytrf, sytrs, geqrf, ormqr, trsm, T) in
             $trsm('L', 'U', 'N', 'N' , M.n, one(BlasInt), one($T), M.fact, M.n, x, M.n)
             return x
         end
+
+        function setup_evd!(M::LapackCPUSolver{$T})
+            resize!(M.tau, M.n)
+            resize!(M.Λ, M.n)
+            $syevd('V', 'L', M.n, M.fact, M.n, M.Λ, M.work, M.lwork, M.iwork, M.liwork, M.info)
+            buffer_size_syevd = M.work[1] |> BlasInt
+            buffer2_size_syevd = M.iwork[1] |> BlasInt
+            M.lwork = buffer_size_syevd
+            M.liwork = buffer2_size_syevd
+            resize!(M.work, M.lwork)
+            resize!(M.iwork, M.liwork)
+            return M
+        end
+
+        function factorize_evd!(M::LapackCPUSolver{$T})
+            $syevd('V', 'L', M.n, M.fact, M.n, M.Λ, M.work, M.lwork, M.iwork, M.liwork, M.info)
+            return M
+        end
+
+        function solve_evd!(M::LapackCPUSolver{$T}, x::Vector{$T})
+            $gemv('T', M.n, M.n, one($T), M.fact, M.n, x, one(BlasInt), zero($T), M.tau, one(BlasInt))
+            M.tau ./= M.Λ
+            $gemv('N', M.n, M.n, one($T), M.fact, M.n, M.tau, one(BlasInt), zero($T), x, one(BlasInt))
+            return x
+        end
     end
 end
 
 improve!(M::LapackCPUSolver) = false
-is_inertia(M::LapackCPUSolver) = (M.opt.lapack_algorithm == BUNCHKAUFMAN) || (M.opt.lapack_algorithm == CHOLESKY)
+is_inertia(M::LapackCPUSolver) = (M.opt.lapack_algorithm == BUNCHKAUFMAN) || (M.opt.lapack_algorithm == CHOLESKY) || (M.opt.lapack_algorithm == MadNLP.EVD)
 function inertia(M::LapackCPUSolver)
     if M.opt.lapack_algorithm == BUNCHKAUFMAN
         inertia(M.fact, M.ipiv, M.info[])
     elseif M.opt.lapack_algorithm == CHOLESKY
         M.info[] == 0 ? (M.n, 0, 0) : (0, M.n, 0) # later we need to change inertia() to is_inertia_correct() and is_full_rank()
+    elseif M.opt.lapack_algorithm == EVD
+        numpos = count(λ -> λ > 0, M.Λ)
+        numneg = count(λ -> λ < 0, M.Λ)
+        numzero = M.n - numpos - numneg
+        (numpos, numzero, numneg)
     else
         error(M.logger, "Invalid lapack_algorithm")
     end
