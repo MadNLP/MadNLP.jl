@@ -56,6 +56,15 @@ testset = [
         []
     ],
     [
+        "DenseKKTSystem + LapackCPU-EVD",
+        ()->MadNLP.Optimizer(
+            kkt_system=MadNLP.DenseKKTSystem,
+            linear_solver=MadNLP.LapackCPUSolver,
+            lapack_algorithm=MadNLP.EVD,
+            print_level=MadNLP.ERROR),
+        []
+    ],
+    [
         "DenseKKTSystem + LapackCPU-CHOLESKY",
         ()->MadNLP.Optimizer(
             kkt_system=MadNLP.DenseKKTSystem,
