@@ -173,7 +173,7 @@ for (getrf, getrs, T) in
     end
 end
 
-for (geqrf, ormqr, trsm, T) in
+for (geqrf, ormqr, trsv, T) in
     ((:rocsolver_dgeqrf_64, :rocsolver_dormqr, :rocblas_dtrsv_64, :Float64),
      (:rocsolver_sgeqrf_64, :rocsolver_sormqr, :rocblas_strsv_64, :Float32))
     @eval begin
