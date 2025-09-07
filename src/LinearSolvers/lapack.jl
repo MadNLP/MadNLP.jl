@@ -176,7 +176,7 @@ for (potrf, potrs, getrf, getrs, sytrf, sytrs, geqrf, ormqr, trsv, syevd, gemv, 
 
         # trsv
         function $trsv(uplo, trans, diag, n, a, lda, x, incx)
-            return ccall((@blasfunc($dtrsv), libblastrampoline), Cvoid,
+            return ccall((@blasfunc($trsv), libblastrampoline), Cvoid,
                          (Ref{UInt8}, Ref{UInt8}, Ref{UInt8}, Ref{BlasInt}, Ptr{$T}, Ref{BlasInt},
                           Ptr{$T}, Ref{BlasInt}, Clong, Clong, Clong),
                           uplo, trans, diag, n, a, lda, x, incx, 1, 1, 1)
