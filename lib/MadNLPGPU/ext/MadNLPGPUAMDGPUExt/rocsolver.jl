@@ -4,9 +4,11 @@ mutable struct LapackROCSolver{T,MT} <: MadNLP.AbstractLinearSolver{T}
     n::Int64
     sol::ROCVector{T}
     tau::ROCVector{T}
+    Λ::ROCVector{T}
     info::ROCVector{Cint}
     ipiv::ROCVector{Int64}
     alpha::Base.RefValue{T}
+    beta::Base.RefValue{T}
     opt::MadNLP.LapackOptions
     logger::MadNLP.MadNLPLogger
 
@@ -24,27 +26,34 @@ mutable struct LapackROCSolver{T,MT} <: MadNLP.AbstractLinearSolver{T}
         fact = ROCMatrix{T}(undef, m, n)
         sol = ROCVector{T}(undef, 0)
         tau = ROCVector{T}(undef, 0)
+        Λ = ROCVector{T}(undef, 0)
         info = ROCVector{Cint}(undef, 1)
         ipiv = ROCVector{Int64}(undef, 0)
         alpha = Ref{T}(1)
-        solver = new{T,MT}(A, fact, n, sol, tau, info, ipiv, alpha, opt, logger)
+        beta = Ref{T}(0)
+        solver = new{T,MT}(A, fact, n, sol, tau, Λ, info, ipiv, alpha, beta, opt, logger)
         setup!(solver)
         return solver
     end
 end
 
 MadNLP.improve!(M::LapackROCSolver) = false
-MadNLP.is_inertia(M::LapackROCSolver) = M.opt.lapack_algorithm == MadNLP.CHOLESKY
+MadNLP.is_inertia(M::LapackROCSolver) = (M.opt.lapack_algorithm == MadNLP.CHOLESKY) || (M.opt.lapack_algorithm == MadNLP.EVD)
 function MadNLP.inertia(M::LapackROCSolver)
     if M.opt.lapack_algorithm == MadNLP.CHOLESKY
         sum(M.info) == 0 ? (M.n, 0, 0) : (0, M.n, 0)
+    elseif M.opt.lapack_algorithm == MadNLP.EVD
+        numpos = count(λ -> λ > 0, M.Λ)
+        numneg = count(λ -> λ < 0, M.Λ)
+        numzero = M.n - numpos - numneg
+        (numpos, numzero, numneg)
     else
         error(M.logger, "Invalid lapack_algorithm")
     end
 end
 
 MadNLP.input_type(::Type{LapackROCSolver}) = :dense
-MadNLP.default_options(::Type{LapackROCSolver}) = MadNLP.LapackOptions(MadNLP.LU)
+MadNLP.default_options(::Type{LapackROCSolver}) = MadNLP.LapackOptions(MadNLP.EVD)
 MadNLP.introduce(M::LapackROCSolver) = "rocSOLVER v$(rocSOLVER.version()) -- ($(M.opt.lapack_algorithm))"
 
 function setup!(M::LapackROCSolver)
@@ -54,6 +63,8 @@ function setup!(M::LapackROCSolver)
         setup_qr!(M)
     elseif M.opt.lapack_algorithm == MadNLP.CHOLESKY
         setup_cholesky!(M)
+    elseif M.opt.lapack_algorithm == MadNLP.EVD
+        setup_evd!(M)
     else
         error(M.logger, "Invalid lapack_algorithm")
     end
@@ -69,6 +80,8 @@ function MadNLP.factorize!(M::LapackROCSolver)
         factorize_qr!(M)
     elseif M.opt.lapack_algorithm == MadNLP.CHOLESKY
         factorize_cholesky!(M)
+    elseif M.opt.lapack_algorithm == MadNLP.EVD
+        factorize_evd!(M)
     else
         error(M.logger, "Invalid lapack_algorithm")
     end
@@ -83,6 +96,8 @@ for T in (:Float32, :Float64)
                 solve_qr!(M, x)
             elseif M.opt.lapack_algorithm == MadNLP.CHOLESKY
                 solve_cholesky!(M, x)
+            elseif M.opt.lapack_algorithm == MadNLP.EVD
+                solve_evd!(M, x)
             else
                 error(M.logger, "Invalid lapack_algorithm")
             end
@@ -216,6 +231,66 @@ for (geqrf, ormqr, trsv, T) in
                 M.n,
                 M.fact,
                 M.n,
+                x,
+                one(Int64),
+            )
+            return x
+        end
+    end
+end
+
+for (syevd, gemv, T) in
+    ((:rocsolver_dsyevd, :rocblas_dgemv_64, :Float64),
+     (:rocsolver_ssyevd, :rocblas_sgemv_64, :Float32))
+    @eval begin
+        function setup_evd!(M::LapackROCSolver{$T})
+            resize!(M.tau, M.n)
+            resize!(M.Λ, M.n)
+            return M
+        end
+
+        function factorize_evd!(M::LapackROCSolver{$T})
+            rocSOLVER.$syevd(
+                rocBLAS.handle(),
+                rocSOLVER.rocblas_evect_original,
+                rocBLAS.rocblas_fill_lower,
+                Cint(M.n),
+                M.fact,
+                Cint(M.n),
+                M.Λ,
+                M.tau,
+                M.info,
+            )
+            return M
+        end
+
+        function solve_evd!(M::LapackROCSolver{$T}, x::ROCVector{$T})
+            rocBLAS.$gemv(
+                rocBLAS.handle(),
+                rocBLAS.rocblas_operation_transpose,
+                M.n,
+                M.n,
+                M.alpha,
+                M.fact,
+                M.n,
+                x,
+                one(Int64),
+                M.beta,
+                M.tau,
+                one(Int64),
+            )
+            M.tau ./= M.Λ
+            rocBLAS.$gemv(
+                rocBLAS.handle(),
+                rocBLAS.rocblas_operation_none,
+                M.n,
+                M.n,
+                M.alpha,
+                M.fact,
+                M.n,
+                M.tau,
+                one(Int64),
+                M.beta,
                 x,
                 one(Int64),
             )
