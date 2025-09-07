@@ -295,9 +295,9 @@ for (getrf, getrf_buffer, getrs, nbytes, T) in
     end
 end
 
-for (geqrf, geqrf_buffer, ormqr, ormqr_buffer, trsm, nbytes, T) in
-    ((:cusolverDnDgeqrf, :cusolverDnDgeqrf_bufferSize, :cusolverDnDormqr, :cusolverDnDormqr_bufferSize, :cublasDtrsm_v2_64, :8, :Float64),
-     (:cusolverDnSgeqrf, :cusolverDnSgeqrf_bufferSize, :cusolverDnSormqr, :cusolverDnSormqr_bufferSize, :cublasStrsm_v2_64, :4, :Float32))
+for (geqrf, geqrf_buffer, ormqr, ormqr_buffer, trsv, nbytes, T) in
+    ((:cusolverDnDgeqrf, :cusolverDnDgeqrf_bufferSize, :cusolverDnDormqr, :cusolverDnDormqr_bufferSize, :cublasDtrsv_v2_64, :8, :Float64),
+     (:cusolverDnSgeqrf, :cusolverDnSgeqrf_bufferSize, :cusolverDnSormqr, :cusolverDnSormqr_bufferSize, :cublasStrsv_v2_64, :4, :Float32))
     @eval begin
         function setup_qr!(M::LapackGPUSolver{$T})
             resize!(M.tau, M.n)
@@ -406,19 +406,16 @@ for (geqrf, geqrf_buffer, ormqr, ormqr_buffer, trsm, nbytes, T) in
                 Cint(M.lwork_gpu ÷ $nbytes),
                 M.info,
             )
-            CUBLAS.$trsm(
+            CUBLAS.$trsv(
                 handle(),
-                CUBLAS_SIDE_LEFT,
                 CUBLAS_FILL_MODE_UPPER,
                 CUBLAS_OP_N,
                 CUBLAS_DIAG_NON_UNIT,
                 M.n,
-                one(Int64),
-                one($T),
                 M.fact,
                 M.n,
                 x,
-                M.n,
+                one(Int64),
             )
             return x
         end
