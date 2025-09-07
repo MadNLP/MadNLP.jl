@@ -173,9 +173,9 @@ for (getrf, getrs, T) in
     end
 end
 
-for (geqrf, ormqr, trsm, T) in
-    ((:rocsolver_dgeqrf_64, :rocsolver_dormqr, :rocblas_dtrsm_64, :Float64),
-     (:rocsolver_sgeqrf_64, :rocsolver_sormqr, :rocblas_strsm_64, :Float32))
+for (geqrf, ormqr, trsv, T) in
+    ((:rocsolver_dgeqrf_64, :rocsolver_dormqr, :rocblas_dtrsv_64, :Float64),
+     (:rocsolver_sgeqrf_64, :rocsolver_sormqr, :rocblas_strsv_64, :Float32))
     @eval begin
         function setup_qr!(M::LapackROCSolver{$T})
             resize!(M.tau, M.n)
@@ -208,19 +208,16 @@ for (geqrf, ormqr, trsm, T) in
                 x,
                 Cint(M.n),
             )
-            rocBLAS.$trsm(
+            rocBLAS.$trsv(
                 rocBLAS.handle(),
-                rocBLAS.rocblas_side_left,
                 rocBLAS.rocblas_fill_upper,
                 rocBLAS.rocblas_operation_none,
                 rocBLAS.rocblas_diagonal_non_unit,
                 M.n,
-                one(Int64),
-                M.alpha,
                 M.fact,
                 M.n,
                 x,
-                M.n,
+                one(Int64),
             )
             return x
         end

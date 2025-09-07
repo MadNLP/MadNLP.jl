@@ -107,9 +107,9 @@ function solve!(M::LapackCPUSolver, x::AbstractVector)
     return x
 end
 
-for (potrf, potrs, getrf, getrs, sytrf, sytrs, geqrf, ormqr, trsm, syevd, gemv, T) in
-    ((:spotrf_, :spotrs_, :sgetrf_, :sgetrs_, :ssytrf_, :ssytrs_, :sgeqrf_, :sormqr_, :strsm_, :ssyevd_, :sgemv_, :Float32),
-     (:dpotrf_, :dpotrs_, :dgetrf_, :dgetrs_, :dsytrf_, :dsytrs_, :dgeqrf_, :dormqr_, :dtrsm_, :dsyevd_, :dgemv_, :Float64))
+for (potrf, potrs, getrf, getrs, sytrf, sytrs, geqrf, ormqr, trsv, syevd, gemv, T) in
+    ((:spotrf_, :spotrs_, :sgetrf_, :sgetrs_, :ssytrf_, :ssytrs_, :sgeqrf_, :sormqr_, :strsv_, :ssyevd_, :sgemv_, :Float32),
+     (:dpotrf_, :dpotrs_, :dgetrf_, :dgetrs_, :dsytrf_, :dsytrs_, :dgeqrf_, :dormqr_, :dtrsv_, :dsyevd_, :dgemv_, :Float64))
     @eval begin
         # potrf
         function $potrf(uplo, n, a, lda, info)
@@ -174,13 +174,12 @@ for (potrf, potrs, getrf, getrs, sytrf, sytrs, geqrf, ormqr, trsm, syevd, gemv, 
                           side, trans, m, n, k, a, lda, tau, c, ldc, work, lwork, info, 1, 1)
         end
 
-        # trsm
-        function $trsm(side, uplo, transa, diag, m, n, alpha, a, lda, b, ldb)
-            return ccall((@blasfunc($trsm), libblastrampoline), Cvoid,
-                         (Ref{UInt8}, Ref{UInt8}, Ref{UInt8}, Ref{UInt8}, Ref{BlasInt}, Ref{BlasInt},
-                          Ref{$T}, Ptr{$T}, Ref{BlasInt}, Ptr{$T}, Ref{BlasInt}, Clong,
-                          Clong, Clong, Clong),
-                          side, uplo, transa, diag, m, n, alpha, a, lda, b, ldb, 1, 1, 1, 1)
+        # trsv
+        function $trsv(uplo, trans, diag, n, a, lda, x, incx)
+            return ccall((@blasfunc($trsv), libblastrampoline), Cvoid,
+                         (Ref{UInt8}, Ref{UInt8}, Ref{UInt8}, Ref{BlasInt}, Ptr{$T}, Ref{BlasInt},
+                          Ptr{$T}, Ref{BlasInt}, Clong, Clong, Clong),
+                          uplo, trans, diag, n, a, lda, x, incx, 1, 1, 1)
         end
 
         # syevd
@@ -265,7 +264,7 @@ for (potrf, potrs, getrf, getrs, sytrf, sytrs, geqrf, ormqr, trsm, syevd, gemv, 
 
         function solve_qr!(M::LapackCPUSolver{$T}, x::Vector{$T})
             $ormqr('L', 'T', M.n, one(BlasInt), M.n, M.fact, M.n, M.tau, x, M.n, M.work, M.lwork, M.info)
-            $trsm('L', 'U', 'N', 'N' , M.n, one(BlasInt), one($T), M.fact, M.n, x, M.n)
+            $trsv('U', 'N', 'N' , M.n, M.fact, M.n, x, one(BlasInt))
             return x
         end
 
