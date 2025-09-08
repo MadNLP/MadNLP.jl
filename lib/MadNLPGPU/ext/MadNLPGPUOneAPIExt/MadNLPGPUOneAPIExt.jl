@@ -1,4 +1,4 @@
-module MadNLPGPUAMDGPUExt
+module MadNLPGPUOneAPIExt
 
 import LinearAlgebra
 import SparseArrays: SparseMatrixCSC, nonzeros, nnz
@@ -10,7 +10,7 @@ import MadNLPGPU
 import KernelAbstractions: synchronize
 
 using oneAPI
-using oneAPI.oneMKL, onAPI.Support
+using oneAPI.oneMKL, oneAPI.Support
 
 function __init__()
     setglobal!(MadNLPGPU, :LapackOneMKLSolver, LapackOneMKLSolver)
