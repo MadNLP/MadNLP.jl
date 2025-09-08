@@ -3,11 +3,11 @@
 ########################################################
 
 #=
-    SparseMatrixCOO to oneMKLMatrixCSC
+    SparseMatrixCOO to oneSparseMatrixCSC
 =#
 
 function MadNLP.transfer!(
-    dest::oneMKL.oneMKLMatrixCSC,
+    dest::oneMKL.oneSparseMatrixCSC,
     src::MadNLP.SparseMatrixCOO,
     map,
 )
@@ -102,7 +102,7 @@ function MadNLP.mul_hess_blk!(
     return
 end
 
-function MadNLP.get_tril_to_full(csc::oneMKL.oneMKLMatrixCSC{Tv,Ti}) where {Tv,Ti}
+function MadNLP.get_tril_to_full(csc::oneMKL.oneSparseMatrixCSC{Tv,Ti}) where {Tv,Ti}
     cscind = MadNLP.SparseMatrixCSC{Int,Ti}(
         Symmetric(
             MadNLP.SparseMatrixCSC{Int,Ti}(
@@ -114,7 +114,7 @@ function MadNLP.get_tril_to_full(csc::oneMKL.oneMKLMatrixCSC{Tv,Ti}) where {Tv,T
             :L,
         ),
     )
-    return oneMKL.oneMKLMatrixCSC{Tv,Ti}(
+    return oneMKL.oneSparseMatrixCSC{Tv,Ti}(
         oneArray(cscind.colptr),
         oneArray(cscind.rowval),
         oneVector{Tv}(undef, MadNLP.nnz(cscind)),
@@ -185,7 +185,7 @@ function get_diagonal_mapping(colptr, rowval)
     return rows[inds2], ptrs[inds2]
 end
 
-function MadNLP._sym_length(Jt::oneMKL.oneMKLMatrixCSC)
+function MadNLP._sym_length(Jt::oneMKL.oneSparseMatrixCSC)
     return mapreduce(
         (x, y) -> begin
             z = x - y
@@ -205,10 +205,10 @@ function MadNLP._first_and_last_col(sym2::oneVector, ptr2)
     return (first, last)
 end
 
-MadNLP.nzval(H::oneMKL.oneMKLMatrixCSC) = H.nzVal
+MadNLP.nzval(H::oneMKL.oneSparseMatrixCSC) = H.nzVal
 
 function MadNLP._get_sparse_csc(dims, colptr::oneVector, rowval, nzval)
-    return oneMKL.oneMKLMatrixCSC(colptr, rowval, nzval, dims)
+    return oneMKL.oneSparseMatrixCSC(colptr, rowval, nzval, dims)
 end
 
 function getij(idx, n)
@@ -296,7 +296,7 @@ function MadNLP.coo_to_csc(
     rowval = map(x -> x[1][1], coord_csc)
     nzval = similar(rowval, T)
 
-    csc = oneMKL.oneMKLMatrixCSC(colptr, rowval, nzval, size(coo))
+    csc = oneMKL.oneSparseMatrixCSC(colptr, rowval, nzval, size(coo))
 
     cscmap = similar(coo.I, Int)
     if length(mapptr) > 1
@@ -318,7 +318,7 @@ end
 
 function MadNLP.build_condensed_aug_coord!(
     kkt::MadNLP.AbstractCondensedKKTSystem{T,VT,MT},
-) where {T,VT,MT<:oneMKL.oneMKLMatrixCSC{T}}
+) where {T,VT,MT<:oneMKL.oneSparseMatrixCSC{T}}
     fill!(kkt.aug_com.nzVal, zero(T))
     backend = OneAPIBackend()
     if length(kkt.hptr) > 0
@@ -359,7 +359,7 @@ end
 
 function MadNLP.compress_hessian!(
     kkt::MadNLP.AbstractSparseKKTSystem{T,VT,MT},
-) where {T,VT,MT<:oneMKL.oneMKLMatrixCSC{T,Int32}}
+) where {T,VT,MT<:oneMKL.oneSparseMatrixCSC{T,Int32}}
     fill!(kkt.hess_com.nzVal, zero(T))
     backend = OneAPIBackend()
     if length(kkt.ext.hess_com_ptrptr) > 1
@@ -377,7 +377,7 @@ end
 
 function MadNLP.compress_jacobian!(
     kkt::MadNLP.SparseCondensedKKTSystem{T,VT,MT},
-) where {T,VT,MT<:oneMKL.oneMKLMatrixCSC{T,Int32}}
+) where {T,VT,MT<:oneMKL.oneSparseMatrixCSC{T,Int32}}
     fill!(kkt.jt_csc.nzVal, zero(T))
     backend = OneAPIBackend()
     if length(kkt.ext.jt_csc_ptrptr) > 1 # otherwise error is thrown
@@ -426,7 +426,7 @@ end
 =#
 
 function MadNLP._build_condensed_aug_symbolic_hess(
-    H::oneMKL.oneMKLMatrixCSC{Tv,Ti},
+    H::oneMKL.oneSparseMatrixCSC{Tv,Ti},
     sym,
     sym2,
 ) where {Tv,Ti}
@@ -449,7 +449,7 @@ end
 =#
 
 function MadNLP._build_condensed_aug_symbolic_jt(
-    Jt::oneMKL.oneMKLMatrixCSC{Tv,Ti},
+    Jt::oneMKL.oneSparseMatrixCSC{Tv,Ti},
     sym,
     sym2,
 ) where {Tv,Ti}
