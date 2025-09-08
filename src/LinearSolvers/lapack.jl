@@ -198,22 +198,6 @@ for (potrf, potrs, getrf, getrs, sytrf, sytrs, geqrf, ormqr, trsv, syevd, gemv, 
                           trans, m, n, alpha, a, lda, x, incx, beta, y, incy, 1)
         end
 
-        # syevd
-        function $syevd(jobz, uplo, n, a, lda, w, work, lwork, iwork, liwork, info)
-            return ccall((@blasfunc($syevd), libblastrampoline), Cvoid,
-                         (Ref{UInt8}, Ref{UInt8}, Ref{BlasInt}, Ptr{$T}, Ref{BlasInt}, Ptr{$T},
-                          Ptr{$T}, Ref{BlasInt}, Ptr{BlasInt}, Ref{BlasInt}, Ref{BlasInt}, Clong, Clong),
-                          jobz, uplo, n, a, lda, w, work, lwork, iwork, liwork, info, 1, 1)
-        end
-
-        # gemv
-        function $gemv(trans, m, n, alpha, a, lda, x, incx, beta, y, incy)
-            return ccall((@blasfunc($gemv), libblastrampoline), Cvoid,
-                         (Ref{UInt8}, Ref{BlasInt}, Ref{BlasInt}, Ref{$T}, Ptr{$T}, Ref{BlasInt},
-                          Ptr{$T}, Ref{BlasInt}, Ref{$T}, Ptr{$T}, Ref{BlasInt}, Clong),
-                          trans, m, n, alpha, a, lda, x, incx, beta, y, incy, 1)
-        end
-
         function setup_cholesky!(M::LapackCPUSolver{$T})
             return M
         end
@@ -281,31 +265,6 @@ for (potrf, potrs, getrf, getrs, sytrf, sytrs, geqrf, ormqr, trsv, syevd, gemv, 
         function solve_qr!(M::LapackCPUSolver{$T}, x::Vector{$T})
             $ormqr('L', 'T', M.n, one(BlasInt), M.n, M.fact, M.n, M.tau, x, M.n, M.work, M.lwork, M.info)
             $trsv('U', 'N', 'N' , M.n, M.fact, M.n, x, one(BlasInt))
-            return x
-        end
-
-        function setup_evd!(M::LapackCPUSolver{$T})
-            resize!(M.tau, M.n)
-            resize!(M.Λ, M.n)
-            $syevd('V', 'L', M.n, M.fact, M.n, M.Λ, M.work, M.lwork, M.iwork, M.liwork, M.info)
-            buffer_size_syevd = M.work[1] |> BlasInt
-            buffer2_size_syevd = M.iwork[1] |> BlasInt
-            M.lwork = buffer_size_syevd
-            M.liwork = buffer2_size_syevd
-            resize!(M.work, M.lwork)
-            resize!(M.iwork, M.liwork)
-            return M
-        end
-
-        function factorize_evd!(M::LapackCPUSolver{$T})
-            $syevd('V', 'L', M.n, M.fact, M.n, M.Λ, M.work, M.lwork, M.iwork, M.liwork, M.info)
-            return M
-        end
-
-        function solve_evd!(M::LapackCPUSolver{$T}, x::Vector{$T})
-            $gemv('T', M.n, M.n, one($T), M.fact, M.n, x, one(BlasInt), zero($T), M.tau, one(BlasInt))
-            M.tau ./= M.Λ
-            $gemv('N', M.n, M.n, one($T), M.fact, M.n, M.tau, one(BlasInt), zero($T), x, one(BlasInt))
             return x
         end
 
