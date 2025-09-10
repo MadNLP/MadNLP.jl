@@ -95,11 +95,9 @@ end
     rho::T = 1000.
 
     # Barrier
-    mu_init::T = 1e-1
-    mu_min::T = min(1e-4, tol ) / (barrier_tol_factor + 1) # by courtesy of Ipopt
-    mu_superlinear_decrease_power::T = 1.5
+    # mu_min by courtesy of Ipopt
+    barrier::AbstractBarrierUpdate{T} = MonotoneUpdate{T}(; mu_min=min(1e-4, tol ) / (barrier_tol_factor + 1))
     tau_min::T = 0.99
-    mu_linear_decrease_factor::T = .2
 end
 
 is_dense_callback(nlp) = hasmethod(MadNLP.jac_dense!, Tuple{typeof(nlp), AbstractVector, AbstractMatrix}) &&
