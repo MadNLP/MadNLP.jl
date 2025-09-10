@@ -443,8 +443,6 @@ function robust!(solver::AbstractMadNLPSolver{T}) where T
         RR.inf_du_R = get_inf_du_R(RR.f_R,_y(solver),primal(_zl(solver)),primal(_zu(solver)),_jacl(solver),RR.zp,RR.zn,_opt(solver).rho,sd)
         RR.inf_compl_R = get_inf_compl_R(
             _x_lr(solver),_xl_r(solver),_zl_r(solver),_xu_r(solver),_x_ur(solver),_zu_r(solver),RR.pp,RR.zp,RR.nn,RR.zn,zero(T),sc)
-        inf_compl_mu_R = get_inf_compl_R(
-            _x_lr(solver),_xl_r(solver),_zl_r(solver),_xu_r(solver),_x_ur(solver),_zu_r(solver),RR.pp,RR.zp,RR.nn,RR.zn,RR.mu_R,sc)
 
         print_iter(solver;is_resto=true)
 
@@ -454,18 +452,7 @@ function robust!(solver::AbstractMadNLPSolver{T}) where T
 
         # update the barrier parameter
         @trace(_logger(solver),"Updating restoration phase barrier parameter.")
-        while RR.mu_R >= _opt(solver).barrier.mu_min &&
-            max(RR.inf_pr_R,RR.inf_du_R,inf_compl_mu_R) <= _opt(solver).barrier_tol_factor*RR.mu_R
-            RR.mu_R = get_mu(RR.mu_R,_opt(solver).barrier.mu_min,
-                             _opt(solver).barrier.mu_linear_decrease_factor,_opt(solver).barrier.mu_superlinear_decrease_power,_opt(solver).tol)
-            inf_compl_mu_R = get_inf_compl_R(
-                _x_lr(solver),_xl_r(solver),_zl_r(solver),_xu_r(solver),_x_ur(solver),_zu_r(solver),RR.pp,RR.zp,RR.nn,RR.zn,RR.mu_R,sc)
-            RR.tau_R= max(_opt(solver).tau_min,1-RR.mu_R)
-            RR.zeta = sqrt(RR.mu_R)
-
-            empty!(RR.filter)
-            push!(RR.filter,(_theta_max(solver),-Inf))
-        end
+        _update_monotone_RR!(_opt(solver).barrier, solver, sc)
 
         # compute the newton step
         if !_opt(solver).hessian_constant
