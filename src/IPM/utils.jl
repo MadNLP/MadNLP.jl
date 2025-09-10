@@ -38,9 +38,9 @@ MadNLPExecutionStats(solver::AbstractMadNLPSolver) =MadNLPExecutionStats(
 function update!(stats::MadNLPExecutionStats, solver::AbstractMadNLPSolver)
     stats.status = solver.status
     stats.solution .= @view(primal(solver.x)[1:get_nvar(solver.nlp)])
-    stats.multipliers .= solver.y
-    stats.multipliers_L .= @view(primal(solver.zl)[1:get_nvar(solver.nlp)])
-    stats.multipliers_U .= @view(primal(solver.zu)[1:get_nvar(solver.nlp)])
+    stats.multipliers .= (solver.y .* solver.cb.con_scale) ./ solver.cb.obj_scale[]
+    stats.multipliers_L .= @view(primal(solver.zl)[1:get_nvar(solver.nlp)]) ./ solver.cb.obj_scale[]
+    stats.multipliers_U .= @view(primal(solver.zu)[1:get_nvar(solver.nlp)]) ./ solver.cb.obj_scale[]
     # stats.solution .= min.(
     #     max.(
     #         @view(primal(solver.x)[1:get_nvar(solver.nlp)]),
@@ -137,24 +137,26 @@ function print_init(solver::AbstractMadNLPSolver)
     return
 end
 
-function print_iter(solver::AbstractMadNLPSolver;is_resto=false)
+function print_iter(solver::AbstractMadNLPSolver; is_resto=false)
     obj_scale = solver.cb.obj_scale[]
     mod(solver.cnt.k,10)==0&& @info(solver.logger,@sprintf(
-        "iter    objective    inf_pr   inf_du lg(mu)  ||d||  lg(rg) alpha_du alpha_pr  ls"))
+        "iter    objective    inf_pr   inf_du inf_compl lg(mu)  ||d||  lg(rg) alpha_du alpha_pr  ls"))
     if is_resto
         RR = solver.RR::RobustRestorer
         inf_du = RR.inf_du_R
         inf_pr = RR.inf_pr_R
+        inf_compl = RR.inf_compl_R
         mu = log10(RR.mu_R)
     else
         inf_du = solver.inf_du
         inf_pr = solver.inf_pr
+        inf_compl = solver.inf_compl
         mu = log10(solver.mu)
     end
     @info(solver.logger,@sprintf(
-        "%4i%s% 10.7e %6.2e %6.2e %5.1f %6.2e %s %6.2e %6.2e%s  %i",
+        "%4i%s% 10.7e %6.2e %6.2e %7.2e %5.1f %6.2e %s %6.2e %6.2e%s  %i",
         solver.cnt.k,is_resto ? "r" : " ",solver.obj_val/obj_scale,
-        inf_pr, inf_du, mu,
+        inf_pr, inf_du, inf_compl, mu,
         solver.cnt.k == 0 ? 0. : norm(primal(solver.d),Inf),
         solver.del_w == 0 ? "   - " : @sprintf("%5.1f",log(10,solver.del_w)),
         solver.alpha_z,solver.alpha,solver.ftype,solver.cnt.l))

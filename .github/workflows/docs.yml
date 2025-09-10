@@ -12,9 +12,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
-      - uses: julia-actions/setup-julia@latest
+      - uses: julia-actions/install-juliaup@v2
         with:
-          version: '1.9'
+          channel: '1.10'
       - name: Install dependencies
         run: julia --project=docs/ docs/install.jl
       - name: Build and deploy
