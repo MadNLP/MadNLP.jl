@@ -10,7 +10,7 @@ testset = [
         "SparseKKTSystem + Umfpack",
         ()->MadNLP.Optimizer(
             linear_solver=MadNLP.UmfpackSolver,
-            print_level=MadNLP.INFO),
+            print_level=MadNLP.ERROR),
         []
     ],
     [
@@ -86,6 +86,7 @@ testset = [
         "SparseUnreducedKKTSystem",
         ()->MadNLP.Optimizer(
             kkt_system=MadNLP.SparseUnreducedKKTSystem,
+            linear_solver=UmfpackSolver,
             print_level=MadNLP.ERROR),
         []
     ],
@@ -93,6 +94,7 @@ testset = [
         "SparseUnreducedKKTSystem + InertiaFree",
         ()->MadNLP.Optimizer(
             inertia_correction_method=MadNLP.InertiaFree,
+            linear_solver=UmfpackSolver,
             kkt_system=MadNLP.SparseUnreducedKKTSystem,
             print_level=MadNLP.ERROR),
         []
