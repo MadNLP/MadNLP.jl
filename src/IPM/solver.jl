@@ -456,14 +456,12 @@ function robust!(solver::AbstractMadNLPSolver{T}) where T
             eval_lag_hess_wrapper!(solver, solver.kkt, solver.x, solver.y; is_resto=true)
         end
         set_aug_RR!(solver.kkt, solver, RR)
+        inertia_correction!(solver.inertia_corrector, solver) || return RESTORATION_FAILED
 
         # without inertia correction,
         @trace(solver.logger,"Solving restoration phase primal-dual system.")
         set_aug_rhs_RR!(solver, solver.kkt, RR, solver.opt.rho)
-
-        inertia_correction!(solver.inertia_corrector, solver) || return RESTORATION_FAILED
-
-
+        solve_refine_wrapper!(solver.d, solver, solver.p, solver._w4)
         finish_aug_solve_RR!(
             RR.dpp,RR.dnn,RR.dzp,RR.dzn,solver.y,dual(solver.d),
             RR.pp,RR.nn,RR.zp,RR.zn,RR.mu_R,solver.opt.rho
@@ -615,7 +613,7 @@ end
 function inertia_correction!(
     inertia_corrector::InertiaBased,
     solver::AbstractMadNLPSolver{T}
-    ) where {T}
+) where {T}
 
     n_trial = 0
     solver.del_w = del_w_prev = zero(T)
@@ -626,11 +624,7 @@ function inertia_correction!(
 
     num_pos,num_zero,num_neg = inertia(solver.kkt.linear_solver)
 
-    solve_status = !is_inertia_correct(solver.kkt, num_pos, num_zero, num_neg) ?
-        false : solve_refine_wrapper!(
-            solver.d, solver, solver.p, solver._w4,
-        )
-
+    solve_status = is_inertia_correct(solver.kkt, num_pos, num_zero, num_neg)
 
     while !solve_status
         @debug(solver.logger,"Primal-dual perturbed.")
@@ -653,10 +647,7 @@ function inertia_correction!(
         factorize_wrapper!(solver)
         num_pos,num_zero,num_neg = inertia(solver.kkt.linear_solver)
 
-        solve_status = !is_inertia_correct(solver.kkt, num_pos, num_zero, num_neg) ?
-            false : solve_refine_wrapper!(
-                solver.d, solver, solver.p, solver._w4
-            )
+        solve_status = is_inertia_correct(solver.kkt, num_pos, num_zero, num_neg)
         n_trial += 1
     end
 
@@ -668,7 +659,6 @@ function inertia_correction!(
     inertia_corrector::InertiaFree,
     solver::AbstractMadNLPSolver{T}
     ) where T
-
     n_trial = 0
     solver.del_w = del_w_prev = zero(T)
 
@@ -682,6 +672,10 @@ function inertia_correction!(
     g = inertia_corrector.g
 
     set_g_ifr!(solver,g)
+    # Inertia-free correction compares to right-hand-side p and p0.
+    # Initialize p
+    set_aug_rhs!(solver, solver.kkt, solver.c, solver.mu)
+    # Initialize p0
     set_aug_rhs_ifr!(solver, solver.kkt, p0)
 
     factorize_wrapper!(solver)
