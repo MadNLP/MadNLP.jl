@@ -1,4 +1,4 @@
-using Test, CUDA, AMDGPU, MadNLP, MadNLPGPU, MadNLPTests
+using Test, CUDA, AMDGPU, oneAPI, MadNLP, MadNLPGPU, MadNLPTests
 
 @testset "MadNLPGPU test" begin
     include("madnlpgpu_test.jl")

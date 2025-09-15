@@ -108,7 +108,7 @@ jobs:
       fail-fast: false
       matrix:
         julia-version: ['1']
-        gpu: [cuda, amdgpu]
+        gpu: [cuda, amdgpu, oneapi]
     runs-on:
       - self-hosted
       - ${{ matrix.gpu }}
