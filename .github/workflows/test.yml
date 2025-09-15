@@ -95,9 +95,9 @@ jobs:
           file: lcov.info
           token: ${{ secrets.CODECOV_TOKEN }}
   # Pardiso license currently not available
-  # 
+  #
   # test-pardiso:
-  #   runs-on: 
+  #   runs-on:
   #     labels: pardiso
   #   strategy:
   #     matrix:
@@ -125,7 +125,7 @@ jobs:
     strategy:
       matrix:
         julia-version: ['1']
-        gpu: [cuda, amdgpu]
+        gpu: [cuda, amdgpu, oneapi]
     runs-on:
       - self-hosted
       - ${{ matrix.gpu }}
