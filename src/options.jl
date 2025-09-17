@@ -128,10 +128,8 @@ get_tolerance(::Type{T},::Type{SparseCondensedKKTSystem}) where T = 10^(round(lo
 function default_sparse_solver(nlp::AbstractNLPModel)
     if isdefined(Main, :MadNLPHSL)
         Main.MadNLPHSL.Ma27Solver
-    elseif isdefined(Main, :MadNLPMumps)
-        Main.MadNLPMumps.MumpsSolver
     else
-        UmfpackSolver
+        MumpsSolver
     end
 end
 
