@@ -1,4 +1,3 @@
-
 setindex(tup,a,n) = (tup[1:n-1]...,a,tup[n+1:end]...)
 tzeros(n) = tuple((0 for i=1:n)...)
 
@@ -200,7 +199,7 @@ function MumpsSolver(csc::SparseMatrixCSC{T,Int32};
     mumps_struc.icntl = setindex(mumps_struc.icntl,0,10)
     mumps_struc.icntl = setindex(mumps_struc.icntl,0,13)
     mumps_struc.icntl = setindex(mumps_struc.icntl,opt.mumps_mem_percent,14)
-    mumps_struc.icntl = setindex(mumps_struc.icntl,1,28)
+
     mumps_struc.cntl = setindex(mumps_struc.cntl,opt.mumps_pivtol,1)
 
     locked_mumps_c(mumps_struc);
