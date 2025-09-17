@@ -3,7 +3,6 @@ setindex(tup,a,n) = (tup[1:n-1]...,a,tup[n+1:end]...)
 tzeros(n) = tuple((0 for i=1:n)...)
 
 @kwdef mutable struct MumpsOptions <: AbstractOptions
-    mumps_dep_tol::Float64 = 0.1
     mumps_mem_percent::Int = 35
     mumps_permuting_scaling::Int = 0
     mumps_pivot_order::Int = 0
