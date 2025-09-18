@@ -51,7 +51,7 @@ end
     jacobian_constant::Bool = false
     hessian_constant::Bool = false
     hessian_approximation::Type = ExactHessian
-    quasi_newton_options::QuasiNewtonOptions{T} = QuasiNewtonOptions()
+    quasi_newton_options::QuasiNewtonOptions{T} = QuasiNewtonOptions{T}()
     inertia_correction_method::Type = InertiaAuto
     inertia_free_tol::T = 0.
 
