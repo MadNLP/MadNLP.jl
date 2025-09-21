@@ -198,7 +198,7 @@ function solve!(
         if !(solver.status < SOLVE_SUCCEEDED)
             print_summary(solver)
         end
-        @notice(solver.logger,"EXIT: $(get_status_output(solver.status, solver.opt))")
+        @notice(solver.logger,"$(Base.text_colors[color_status(solver.status)])EXIT: $(get_status_output(solver.status, solver.opt))$(Base.text_colors[:normal])")
         solver.opt.disable_garbage_collector &&
             (GC.enable(true); @warn(solver.logger,"Julia garbage collector is turned back on"))
         finalize(solver.logger)
@@ -209,6 +209,10 @@ function solve!(
 
     return stats
 end
+
+color_status(status::Status) =
+    status <= SOLVE_SUCCEEDED ? :green :
+    status <= SOLVED_TO_ACCEPTABLE_LEVEL ? :blue : :red
 
 
 function regular!(solver::AbstractMadNLPSolver{T}) where T
