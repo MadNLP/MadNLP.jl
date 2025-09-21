@@ -140,7 +140,7 @@ end
 function print_iter(solver::AbstractMadNLPSolver; is_resto=false)
     obj_scale = solver.cb.obj_scale[]
     mod(solver.cnt.k,10)==0&& @info(solver.logger,@sprintf(
-        "iter    objective    inf_pr   inf_du inf_compl lg(mu) lg(rg) ir ls"))
+        "iter    objective    inf_pr   inf_du inf_compl lg(mu) lg(rg) alpha_pr ir ls"))
     if is_resto
         RR = solver.RR::RobustRestorer
         inf_du = RR.inf_du_R
@@ -154,11 +154,12 @@ function print_iter(solver::AbstractMadNLPSolver; is_resto=false)
         mu = log10(solver.mu)
     end
     @info(solver.logger,@sprintf(
-        "%4i%s% 10.7e %6.2e %6.2e %7.2e %5.1f  %s  %2i %2i%s",
+        "%4i%s% 10.7e %6.2e %6.2e %7.2e %5.1f  %s  %6.2e %2i %2i%s",
         solver.cnt.k,is_resto ? "r" : " ",solver.obj_val/obj_scale,
         inf_pr, inf_du, inf_compl, mu,
         # solver.cnt.k == 0 ? 0. : norm(primal(solver.d),Inf),
         solver.del_w == 0 ? "   - " : @sprintf("%5.1f",log(10,solver.del_w)),
+        solver.alpha,
         solver.cnt.ir,
         solver.cnt.l,
         solver.ftype,))
@@ -172,13 +173,13 @@ function print_summary(solver::AbstractMadNLPSolver)
 
     @notice(solver.logger,"")
     @notice(solver.logger,"Number of Iterations....: $(solver.cnt.k)\n")
-    @notice(solver.logger,"                               (scaled)             (unscaled)")
-    @notice(solver.logger,@sprintf("Objective...............:  % 1.11e   % 1.11e",solver.obj_val,solver.obj_val/obj_scale))
-    @notice(solver.logger,@sprintf("Dual infeasibility......:   %1.11e    %1.11e",solver.inf_du,solver.inf_du/obj_scale))
-    @notice(solver.logger,@sprintf("Constraint violation....:   %1.11e    %1.11e",norm(solver.c,Inf),solver.inf_pr))
-    @notice(solver.logger,@sprintf("Complementarity.........:   %1.11e    %1.11e",
+    @notice(solver.logger,"                                   (scaled)                 (unscaled)")
+    @notice(solver.logger,@sprintf("Objective...............:  % 1.16e   % 1.16e",solver.obj_val,solver.obj_val/obj_scale))
+    @notice(solver.logger,@sprintf("Dual infeasibility......:   %1.16e    %1.16e",solver.inf_du,solver.inf_du/obj_scale))
+    @notice(solver.logger,@sprintf("Constraint violation....:   %1.16e    %1.16e",norm(solver.c,Inf),solver.inf_pr))
+    @notice(solver.logger,@sprintf("Complementarity.........:   %1.16e    %1.16e",
                                 solver.inf_compl*obj_scale,solver.inf_compl))
-    @notice(solver.logger,@sprintf("Overall NLP error.......:   %1.11e    %1.11e\n",
+    @notice(solver.logger,@sprintf("Overall NLP error.......:   %1.16e    %1.16e\n",
                                 max(solver.inf_du*obj_scale,norm(solver.c,Inf),solver.inf_compl),
                                 max(solver.inf_du,solver.inf_pr,solver.inf_compl)))
 
