@@ -637,6 +637,7 @@ function inertia_correction!(
 
     n_trial = 0
     solver.del_w = del_w_prev = zero(T)
+    solver.del_c = del_c_prev = zero(T)
 
     @trace(solver.logger,"Inertia-based regularization started.")
 
@@ -666,8 +667,9 @@ function inertia_correction!(
             end
         end
         solver.del_c = num_neg == 0 ? zero(T) : solver.opt.jacobian_regularization_value * solver.mu^(solver.opt.jacobian_regularization_exponent)
-        regularize_diagonal!(solver.kkt, solver.del_w - del_w_prev, solver.del_c)
+        regularize_diagonal!(solver.kkt, solver.del_w - del_w_prev, solver.del_c - del_c_prev)
         del_w_prev = solver.del_w
+        del_c_prev = solver.del_c
 
         factorize_wrapper!(solver)
         num_pos,num_zero,num_neg = inertia(solver.kkt.linear_solver)
@@ -690,6 +692,7 @@ function inertia_correction!(
 
     n_trial = 0
     solver.del_w = del_w_prev = zero(T)
+    solver.del_c = del_c_prev = zero(T)
 
     @trace(solver.logger,"Inertia-free regularization started.")
     dx = primal(solver.d)
@@ -727,8 +730,9 @@ function inertia_correction!(
             end
         end
         solver.del_c = solver.opt.jacobian_regularization_value * solver.mu^(solver.opt.jacobian_regularization_exponent)
-        regularize_diagonal!(solver.kkt, solver.del_w - del_w_prev, solver.del_c)
+        regularize_diagonal!(solver.kkt, solver.del_w - del_w_prev, solver.del_c - del_c_prev)
         del_w_prev = solver.del_w
+        del_c_prev = solver.del_c
 
         factorize_wrapper!(solver)
         solve_status = solve_refine_wrapper!(
@@ -753,6 +757,7 @@ function inertia_correction!(
 
     n_trial = 0
     solver.del_w = del_w_prev = zero(T)
+    solver.del_c = del_c_prev = zero(T)
 
     @trace(solver.logger,"Inertia-based regularization started.")
 
@@ -775,8 +780,9 @@ function inertia_correction!(
             end
         end
         solver.del_c = solver.opt.jacobian_regularization_value * solver.mu^(solver.opt.jacobian_regularization_exponent)
-        regularize_diagonal!(solver.kkt, solver.del_w - del_w_prev, solver.del_c)
+        regularize_diagonal!(solver.kkt, solver.del_w - del_w_prev, solver.del_c - del_c_prev)
         del_w_prev = solver.del_w
+        del_c_prev = solver.del_c
 
         factorize_wrapper!(solver)
         solve_status = solve_refine_wrapper!(
