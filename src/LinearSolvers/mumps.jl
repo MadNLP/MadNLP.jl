@@ -4,7 +4,7 @@ tzeros(n) = tuple((0 for i=1:n)...)
 @kwdef mutable struct MumpsOptions <: AbstractOptions
     mumps_mem_percent::Int = 35
     mumps_permuting_scaling::Int = 0
-    mumps_pivot_order::Int = 7
+    mumps_pivot_order::Int = 0
     mumps_pivtol::Float64 = 1e-8
     mumps_pivtolmax::Float64 = 1e-4
     mumps_scaling::Int = 1
@@ -199,6 +199,7 @@ function MumpsSolver(csc::SparseMatrixCSC{T,Int32};
     mumps_struc.icntl = setindex(mumps_struc.icntl,0,10)
     mumps_struc.icntl = setindex(mumps_struc.icntl,1,13)
     mumps_struc.icntl = setindex(mumps_struc.icntl,opt.mumps_mem_percent,14)
+
 
     mumps_struc.cntl = setindex(mumps_struc.cntl,opt.mumps_pivtol,1)
 
