@@ -86,6 +86,7 @@ const SubVector{Tv,VT, VI} = SubArray{Tv, 1, VT, Tuple{VI}, false}
     k::Int = 0 # total iteration counter
     l::Int = 0 # backtracking line search counter
     t::Int = 0 # restoration phase counter
+    ir::Int = 0 # iterative refinement counter
 
     start_time::Float64
 

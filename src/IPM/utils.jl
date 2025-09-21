@@ -140,7 +140,7 @@ end
 function print_iter(solver::AbstractMadNLPSolver; is_resto=false)
     obj_scale = solver.cb.obj_scale[]
     mod(solver.cnt.k,10)==0&& @info(solver.logger,@sprintf(
-        "iter    objective    inf_pr   inf_du inf_compl lg(mu)  ||d||  lg(rg) alpha_du alpha_pr  ls"))
+        "iter    objective    inf_pr   inf_du inf_compl lg(mu) lg(rg) ls"))
     if is_resto
         RR = solver.RR::RobustRestorer
         inf_du = RR.inf_du_R
@@ -154,12 +154,13 @@ function print_iter(solver::AbstractMadNLPSolver; is_resto=false)
         mu = log10(solver.mu)
     end
     @info(solver.logger,@sprintf(
-        "%4i%s% 10.7e %6.2e %6.2e %7.2e %5.1f %6.2e %s %6.2e %6.2e%s  %i",
+        "%4i%s% 10.7e %6.2e %6.2e %7.2e %5.1f  %s  %i",
         solver.cnt.k,is_resto ? "r" : " ",solver.obj_val/obj_scale,
         inf_pr, inf_du, inf_compl, mu,
-        solver.cnt.k == 0 ? 0. : norm(primal(solver.d),Inf),
+        # solver.cnt.k == 0 ? 0. : norm(primal(solver.d),Inf),
         solver.del_w == 0 ? "   - " : @sprintf("%5.1f",log(10,solver.del_w)),
-        solver.alpha_z,solver.alpha,solver.ftype,solver.cnt.l))
+        # solver.alpha_z,solver.alpha,solver.ftype,
+        solver.cnt.l))
     return
 end
 
@@ -185,12 +186,14 @@ function print_summary(solver::AbstractMadNLPSolver)
     @notice(solver.logger,"Number of constraint evaluations                     = $(solver.cnt.con_cnt)")
     @notice(solver.logger,"Number of constraint Jacobian evaluations            = $(solver.cnt.con_jac_cnt)")
     @notice(solver.logger,"Number of Lagrangian Hessian evaluations             = $(solver.cnt.lag_hess_cnt)")
-    @notice(solver.logger,@sprintf("Total wall-clock secs in solver (w/o fun. eval./lin. alg.)  = %6.3f",
-                                solver.cnt.solver_time))
+    @notice(solver.logger,@sprintf("Total wall-clock secs in initializtion                      = %6.3f",
+                                solver.cnt.init_time))
     @notice(solver.logger,@sprintf("Total wall-clock secs in linear solver                      = %6.3f",
                                 solver.cnt.linear_solver_time))
     @notice(solver.logger,@sprintf("Total wall-clock secs in NLP function evaluations           = %6.3f",
                                 solver.cnt.eval_function_time))
+    @notice(solver.logger,@sprintf("Total wall-clock secs in solver (w/o init./fun./lin. alg.)  = %6.3f",
+                                solver.cnt.total_time - solver.cnt.init_time - solver.cnt.linear_solver_time - solver.cnt.eval_function_time))
     @notice(solver.logger,@sprintf("Total wall-clock secs                                       = %6.3f\n",
                                 solver.cnt.total_time))
 end
