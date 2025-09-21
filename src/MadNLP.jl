@@ -16,7 +16,7 @@ import LDLFactorizations
 
 # Version info
 version() = string(pkgversion(@__MODULE__))
-introduce() = "MadNLP version v$(version())"
+introduce() = "\033[34mMad\033[31mN\033[32mL\033[35mP\033[0m version v$(version())"
 
 include("enums.jl")
 include("utils.jl")
