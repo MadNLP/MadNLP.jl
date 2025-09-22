@@ -45,3 +45,20 @@ function gpu_transfer!(y::CuMatrix{T}, x::CUSPARSE.CuSparseMatrixCSC{T}) where {
     synchronize(backend)
     return
 end
+
+
+if VERSION > v"1.11" # See https://github.com/JuliaGPU/CUDA.jl/issues/2811. norm of view() of CuArray is not supported
+    function MadNLP.get_sd(l::CuVector{T}, zl_r, zu_r, s_max) where T
+        return max(
+            s_max,
+            (my1norm(l)+my1norm(zl_r)+my1norm(zu_r)) / max(1, (length(l)+length(zl_r)+length(zu_r))),
+        ) / s_max
+    end
+    function MadNLP.get_sc(zl_r::SubArray{T,1,VT}, zu_r, s_max) where {T, VT <: CuVector{T}}
+        return max(
+            s_max,
+            (my1norm(zl_r)+my1norm(zu_r)) / max(1,length(zl_r)+length(zu_r)),
+        ) / s_max
+    end
+    my1norm(x) = mapreduce(abs, +, x)
+end
