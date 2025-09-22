@@ -56,6 +56,17 @@ testset = [
         []
     ],
     [
+        "DenseKKTSystem + LapackCPU-EVD",
+        ()->MadNLP.Optimizer(
+            kkt_system=MadNLP.DenseKKTSystem,
+            linear_solver=MadNLP.LapackCPUSolver,
+            lapack_algorithm=MadNLP.EVD,
+            print_level=MadNLP.ERROR),
+        [
+            "eigmina" # fails; regularization does not correct the inertia; inertia calculation based on EVD does not seem reliable
+         ]
+    ],
+    [
         "DenseKKTSystem + LapackCPU-CHOLESKY",
         ()->MadNLP.Optimizer(
             kkt_system=MadNLP.DenseKKTSystem,
@@ -216,3 +227,12 @@ end
     )
     @test result.status == MadNLP.SOLVE_SUCCEEDED
 end
+
+@testset "Issue #430" begin
+    # Test MadNLP is working with bound_relax_factor=0
+    nlp = MadNLPTests.HS15Model()
+    solver = MadNLPSolver(nlp; bound_relax_factor=0.0)
+    stats = MadNLP.solve!(solver)
+    @test stats.status == MadNLP.SOLVE_SUCCEEDED
+end
+
