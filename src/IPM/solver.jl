@@ -670,7 +670,7 @@ function inertia_correction!(
                 return false
             end
         end
-        solver.del_c = num_neg == 0 ? zero(T) : solver.opt.jacobian_regularization_value * solver.mu^(solver.opt.jacobian_regularization_exponent)
+        solver.del_c = num_zero == 0 ? zero(T) : solver.opt.jacobian_regularization_value * solver.mu^(solver.opt.jacobian_regularization_exponent)
         regularize_diagonal!(solver.kkt, solver.del_w - del_w_prev, solver.del_c - del_c_prev)
         del_w_prev = solver.del_w
         del_c_prev = solver.del_c
