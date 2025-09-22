@@ -301,8 +301,10 @@ function get_inf_compl(x_lr, xl_r, zl_r, xu_r, x_ur, zu_r, mu, sc)
 end
 
 function get_average_complementarity(x_lr, xl_r, zl_r, x_ur, xu_r, zu_r)
-    n_lb = length(x_lr)
-    n_ub = length(x_ur)
+    n_lb, n_ub = length(x_lr), length(x_ur)
+    if n_lb + n_ub == 0
+        return 0.0
+    end
     cc_lb = dot(x_lr, zl_r) - dot(xl_r, zl_r)
     cc_ub = dot(xu_r, zu_r) - dot(x_ur, zu_r)
     return (cc_lb + cc_ub) / (n_lb + n_ub)

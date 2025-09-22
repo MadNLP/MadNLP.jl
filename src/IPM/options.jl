@@ -96,7 +96,7 @@ end
 
     # Barrier
     # mu_min by courtesy of Ipopt
-    barrier::AbstractBarrierUpdate{T} = MonotoneUpdate{T}(; mu_min=min(1e-4, tol ) / (barrier_tol_factor + 1))
+    barrier::AbstractBarrierUpdate{T} = MonotoneUpdate(tol, barrier_tol_factor)
     tau_min::T = 0.99
 end
 

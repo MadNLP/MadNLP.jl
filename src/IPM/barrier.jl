@@ -126,6 +126,9 @@ Update the barrier parameter using the classical Fiacco-McCormick monotone rule.
     mu_superlinear_decrease_power::T = 1.5
     mu_linear_decrease_factor::T = .2
 end
+function MonotoneUpdate(tol::T, barrier_tol_factor::T) where T
+    return MonotoneUpdate{T}(; mu_min=min(1e-4, tol ) / (barrier_tol_factor + 1))
+end
 
 function update_barrier!(barrier::MonotoneUpdate{T}, solver::AbstractMadNLPSolver{T}, sc::T) where T
     _update_monotone!(barrier, solver, sc)
@@ -169,7 +172,7 @@ function _check_progress(barrier::AbstractAdaptiveUpdate{T}, solver::AbstractMad
 end
 
 function update_barrier!(barrier::AbstractAdaptiveUpdate{T}, solver::AbstractMadNLPSolver{T}, sc::T) where T
-    is_barrier_updated = false
+    old_mu = solver.mu
     progress = _check_progress(barrier, solver)
     # Update state of barrier algorithm
     if !barrier.free_mode
@@ -185,17 +188,15 @@ function update_barrier!(barrier::AbstractAdaptiveUpdate{T}, solver::AbstractMad
             barrier.free_mode = false
             # Reset barrier parameter using current average complementarity
             solver.mu = get_fixed_mu(solver, barrier)
-            is_barrier_updated = true
         else
             @trace(solver.logger, "Keeping adaptive barrier in free mode.")
         end
     end
     if barrier.free_mode
         solver.mu = get_adaptive_mu(solver, barrier)
-        is_barrier_updated = true
     end
     # Update tau and reset filter is barrier has been updated
-    if is_barrier_updated
+    if solver.mu != old_mu
         solver.tau = get_tau(solver.mu, solver.opt.tau_min)
         empty!(solver.filter)
         push!(solver.filter, (solver.theta_max, -Inf))
@@ -229,6 +230,9 @@ The algorithm is described in [Nocedal2009, Section 4].
     mu_linear_decrease_factor::T = .2
     free_mode::Bool = true
     globalization::Bool = true
+end
+function QualityFunctionUpdate(tol::T, barrier_tol_factor::T) where T
+    return QualityFunctionUpdate{T}(; mu_min=min(1e-4, tol ) / (barrier_tol_factor + 1))
 end
 
 # Evaluate the linear quality function described in [Nocedal2009, Eq. (4.2)]
@@ -388,6 +392,9 @@ The algorithm is described in [Nocedal2009, Section 3].
     mu_linear_decrease_factor::T = .2
     free_mode::Bool = true
     globalization::Bool = true
+end
+function LOQOUpdate(tol::T, barrier_tol_factor::T) where T
+    return LOQOUpdate{T}(; mu_min=min(1e-4, tol ) / (barrier_tol_factor + 1))
 end
 
 function get_adaptive_mu(solver::AbstractMadNLPSolver{T}, barrier::LOQOUpdate{T}) where T
