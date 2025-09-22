@@ -174,11 +174,6 @@ end
 
 num_variables(kkt::SparseUnreducedKKTSystem) = length(kkt.pr_diag)
 
-# function is_inertia_correct(kkt::SparseUnreducedKKTSystem, num_pos, num_zero, num_neg)
-#     n, nlb, nub = num_variables(kkt), length(kkt.ind_lb), length(kkt.ind_ub)
-#     return (num_zero == 0) && (num_pos == n )
-# end
-
 function build_kkt!(kkt::SparseUnreducedKKTSystem)
     transfer!(kkt.aug_com, kkt.aug_raw, kkt.aug_csc_map)
 end
