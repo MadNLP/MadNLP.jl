@@ -1,5 +1,12 @@
 testset = [
     [
+        "SparseKKTSystem + Mumps",
+        ()->MadNLP.Optimizer(
+            linear_solver=MadNLP.MumpsSolver,
+            print_level=MadNLP.ERROR),
+        []
+    ],
+    [
         "SparseKKTSystem + Umfpack",
         ()->MadNLP.Optimizer(
             linear_solver=MadNLP.UmfpackSolver,
