@@ -126,7 +126,7 @@ Update the barrier parameter using the classical Fiacco-McCormick monotone rule.
     mu_superlinear_decrease_power::T = 1.5
     mu_linear_decrease_factor::T = .2
 end
-function MonotoneUpdate(tol::T, barrier_tol_factor::T) where T
+function MonotoneUpdate(tol::T, barrier_tol_factor) where T
     return MonotoneUpdate{T}(; mu_min=min(1e-4, tol ) / (barrier_tol_factor + 1))
 end
 
@@ -231,7 +231,7 @@ The algorithm is described in [Nocedal2009, Section 4].
     free_mode::Bool = true
     globalization::Bool = true
 end
-function QualityFunctionUpdate(tol::T, barrier_tol_factor::T) where T
+function QualityFunctionUpdate(tol::T, barrier_tol_factor) where T
     return QualityFunctionUpdate{T}(; mu_min=min(1e-4, tol ) / (barrier_tol_factor + 1))
 end
 
@@ -393,7 +393,7 @@ The algorithm is described in [Nocedal2009, Section 3].
     free_mode::Bool = true
     globalization::Bool = true
 end
-function LOQOUpdate(tol::T, barrier_tol_factor::T) where T
+function LOQOUpdate(tol::T, barrier_tol_factor) where T
     return LOQOUpdate{T}(; mu_min=min(1e-4, tol ) / (barrier_tol_factor + 1))
 end
 
