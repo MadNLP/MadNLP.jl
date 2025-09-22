@@ -13,6 +13,7 @@ import NLPModels: finalize, AbstractNLPModel, obj, grad!, cons!, jac_coord!, hes
 import SolverCore: solve!, getStatus, AbstractOptimizationSolver, AbstractExecutionStats
 export MadNLPSolver, MadNLPOptions, MadNLPExecutionStats, UmfpackSolver, LDLSolver, CHOLMODSolver, LapackCPUSolver, madnlp, solve!
 import LDLFactorizations
+using PrecompileTools: @setup_workload, @compile_workload   
 
 # Version info
 version() = string(pkgversion(@__MODULE__))
@@ -28,5 +29,6 @@ include(joinpath("LinearSolvers","linearsolvers.jl"))
 include("options.jl")
 include(joinpath("IPM", "IPM.jl"))
 include("extension_templates.jl")
+include("precompile.jl")
 
 end # end module
