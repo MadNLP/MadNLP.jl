@@ -6,7 +6,7 @@ import CUDSS
     cudss_ordering::ORDERING = DEFAULT_ORDERING
     cudss_perm::Vector{Cint} = Cint[]
     cudss_ir::Int = 0
-    cudss_ir_tol::Float64 = 1e-8
+    cudss_ir_tol::Float64 = 1e-8  # currently ignored in cuDSS 0.6
     cudss_pivot_threshold::Float64 = 0.0
     cudss_pivot_epsilon::Float64 = 0.0
     cudss_matching_alg::String = "default"
@@ -20,7 +20,7 @@ import CUDSS
     cudss_hybrid_memory_limit::Int = 0
 end
 
-function set_cudss_options!(solver, opt::CudssSolverOptions)
+function set_cudss_options!(solver::CUDSS.CudssSolver, opt::CudssSolverOptions)
     if opt.cudss_ir > 0
         CUDSS.cudss_set(solver, "ir_n_steps", opt.cudss_ir)
         CUDSS.cudss_set(solver, "ir_tol", opt.cudss_ir_tol)
@@ -60,18 +60,20 @@ function set_cudss_options!(solver, opt::CudssSolverOptions)
     end
 end
 
-mutable struct CUDSSSolver{T} <: MadNLP.AbstractLinearSolver{T}
-    inner::Union{Nothing, CUDSS.CudssSolver}
-    tril::CUSPARSE.CuSparseMatrixCSC{T}
-    x_gpu::CUDA.CuVector{T}
-    b_gpu::CUDA.CuVector{T}
+mutable struct CUDSSSolver{T,V} <: MadNLP.AbstractLinearSolver{T}
+    inner::CUDSS.CudssSolver{T}
+    tril::CUSPARSE.CuSparseMatrixCSC{T,Cint}
+    x_gpu::CUDSS.CudssMatrix{T}
+    b_gpu::CUDSS.CudssMatrix{T}
+    buffer::V
+    fresh_factorization::Bool
 
     opt::CudssSolverOptions
-    logger::MadNLP.MadNLPLogger
+    logger::MadNLPLogger
 end
 
 function CUDSSSolver(
-    csc::CUSPARSE.CuSparseMatrixCSC{T};
+    csc::CUSPARSE.CuSparseMatrixCSC{T,Cint};
     opt=CudssSolverOptions(),
     logger=MadNLP.MadNLPLogger(),
     ) where T
@@ -79,24 +81,14 @@ function CUDSSSolver(
     @assert n == m
 
     view = 'U'
-    structure = if opt.cudss_algorithm == MadNLP.LU
-        "G"
-    elseif opt.cudss_algorithm == MadNLP.CHOLESKY
-        "SPD"
-    elseif opt.cudss_algorithm == MadNLP.LDL
-        "S"
-    end
+    structure = 'G'
+    # We need view = 'F' for the sparse LU decomposition
+    (opt.cudss_algorithm == MadNLP.LU) && error(logger, "The sparse LU of cuDSS is not supported.")
+    (opt.cudss_algorithm == MadNLP.CHOLESKY) && (structure = "SPD")
+    (opt.cudss_algorithm == MadNLP.LDL) && (structure = "S")
 
-    matrix = CUDSS.CudssMatrix(
-        CUSPARSE.CuSparseMatrixCSR(csc.colPtr, csc.rowVal, csc.nzVal, csc.dims),
-        structure,
-        view
-    )
-
-    config = CUDSS.CudssConfig()
-    data = CUDSS.CudssData()
-    solver = CUDSS.CudssSolver(matrix, config, data)
-
+    matrix = CUSPARSE.CuSparseMatrixCSR(csc.colPtr, csc.rowVal, csc.nzVal, csc.dims)
+    solver = CUDSS.CudssSolver(matrix, structure, view)
     set_cudss_options!(solver, opt)
 
     if opt.cudss_ordering != DEFAULT_ORDERING
@@ -115,42 +107,64 @@ function CUDSSSolver(
             A = SparseMatrixCSC(csc)
             opt.cudss_perm = AMD.colamd(A)
         elseif opt.cudss_ordering == USER_ORDERING
-            (!isempty(opt.cudss_perm) && isperm(opt.cudss_perm)) || error("The vector opt.cudss_perm is not a valid permutation.")
+            (!isempty(opt.cudss_perm) && isperm(opt.cudss_perm)) || error(logger, "The vector opt.cudss_perm is not a valid permutation.")
         else
-            error("The ordering $(opt.cudss_ordering) is not supported.")
+            error(logger, "The ordering $(opt.cudss_ordering) is not supported.")
         end
         CUDSS.cudss_set(solver, "user_perm", opt.cudss_perm)
     end
 
     # The phase "analysis" is "reordering" combined with "symbolic_factorization"
-    x_gpu = CUDA.zeros(T, n)
-    b_gpu = CUDA.zeros(T, n)
+    x_gpu = CUDSS.CudssMatrix(T, n)
+    b_gpu = CUDSS.CudssMatrix(T, n)
     CUDSS.cudss("analysis", solver, x_gpu, b_gpu)
+
+    # Allocate additional buffer for iterative refinement
+    # Always allocate it to support dynamic updates to opt.cudss_ir
+    buffer = CuVector{T}(undef, n)
+
+    # Indicates whether this is the first factorization or a refactorization
+    fresh_factorization = true
 
     return CUDSSSolver(
         solver, csc,
-        x_gpu, b_gpu,
-        opt, logger
+        x_gpu, b_gpu, buffer,
+        fresh_factorization, opt, logger,
     )
 end
 
 function MadNLP.factorize!(M::CUDSSSolver)
     CUDSS.cudss_set(M.inner.matrix, nonzeros(M.tril))
-    CUDSS.cudss("factorization", M.inner, M.x_gpu, M.b_gpu)
-    synchronize(CUDABackend())
+    if M.fresh_factorization
+        CUDSS.cudss("factorization", M.inner, M.x_gpu, M.b_gpu)
+        M.fresh_factorization = false
+    else
+        CUDSS.cudss("refactorization", M.inner, M.x_gpu, M.b_gpu)
+    end
+    if !M.opt.cudss_hybrid_memory && !M.opt.cudss_hybrid_execute
+        CUDA.synchronize()
+    end
     return M
 end
 
-function MadNLP.solve!(M::CUDSSSolver{T}, x) where T
-    CUDSS.cudss("solve", M.inner, M.x_gpu, x)
-    synchronize(CUDABackend())
-    copyto!(x, M.x_gpu)
-    return x
+function MadNLP.solve!(M::CUDSSSolver{T,V}, xb::V) where {T,V}
+    if M.opt.cudss_ir > 0
+        copyto!(M.buffer, xb)
+        CUDSS.cudss_set(M.b_gpu, M.buffer)
+    else
+        CUDSS.cudss_set(M.b_gpu, xb)
+    end
+    CUDSS.cudss_set(M.x_gpu, xb)
+    CUDSS.cudss("solve", M.inner, M.x_gpu, M.b_gpu)
+    if !M.opt.cudss_hybrid_memory && !M.opt.cudss_hybrid_execute
+        CUDA.synchronize()
+    end
+    return xb
 end
 
 MadNLP.input_type(::Type{CUDSSSolver}) = :csc
 MadNLP.default_options(::Type{CUDSSSolver}) = CudssSolverOptions()
-MadNLP.is_inertia(M::CUDSSSolver) = (M.opt.cudss_algorithm ∈ (MadNLP.CHOLESKY, MadNLP.LDL))
+MadNLP.is_inertia(M::CUDSSSolver) = true  # Uncomment if MadNLP.LU is supported -- (M.opt.cudss_algorithm ∈ (MadNLP.CHOLESKY, MadNLP.LDL))
 function inertia(M::CUDSSSolver)
     n = size(M.tril, 1)
     if M.opt.cudss_algorithm == MadNLP.CHOLESKY
@@ -158,14 +172,15 @@ function inertia(M::CUDSSSolver)
         if info == 0
             return (n, 0, 0)
         else
-            CUDSS.cudss_set(M.inner, "info", 0)
             return (n-2, 1, 1)
         end
     elseif M.opt.cudss_algorithm == MadNLP.LDL
         # N.B.: cuDSS does not always return the correct inertia.
         (k, l) = CUDSS.cudss_get(M.inner, "inertia")
-        k = min(n, k) # TODO: add safeguard for inertia
+        @assert 0 ≤ k + l ≤ n
         return (k, n - k - l, l)
+    else
+        error(M.logger, "Unsupported cudss_algorithm")
     end
 end
 MadNLP.improve!(M::CUDSSSolver) = false

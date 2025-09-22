@@ -239,6 +239,6 @@ end
 function regularize_diagonal!(kkt::ScaledSparseKKTSystem, primal, dual)
     kkt.reg .+= primal
     kkt.pr_diag .+= primal .* kkt.scaling_factor.^2
-    kkt.du_diag .= .-dual
+    kkt.du_diag .-= dual
 end
 

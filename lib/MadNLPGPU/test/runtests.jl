@@ -1,9 +1,11 @@
-using Test, CUDA, MadNLP, MadNLPGPU, MadNLPTests
-
-
-# Test DenseKKTSystem on GPU
+using Test, CUDA, AMDGPU, MadNLP, MadNLPGPU, MadNLPTests
 
 @testset "MadNLPGPU test" begin
     include("madnlpgpu_test.jl")
-    include("densekkt_gpu.jl")
+    if CUDA.functional()
+        include("densekkt_cuda.jl")
+    end
+    if AMDGPU.functional()
+        include("densekkt_rocm.jl")
+    end
 end
