@@ -27,27 +27,27 @@ iter    objective    inf_pr   inf_du inf_compl lg(mu) lg(rg) alpha_pr ir ls
    5  1.4692139e+00 9.99e-01 4.94e+02 2.31e+00  -1.0     -   1.46e-04  1  1h
    6  3.1727722e+00 9.97e-01 3.76e+02 2.36e+00  -1.0     -   9.77e-04  1 11h
    7  3.1746542e+00 9.96e-01 1.53e+02 3.13e-03  -1.0    4.0  7.98e-04  1  1h
-   8  8.2322599e+00 9.85e-01 2.47e+02 5.06e-03  -1.0     -   7.81e-03  1  8h
-   9  8.2886173e+00 9.84e-01 4.78e+02 1.51e-04  -1.0     -   2.48e-04  1  1h
+   8  8.2322585e+00 9.85e-01 2.47e+02 5.06e-03  -1.0     -   7.81e-03  1  8h
+   9  8.2886187e+00 9.84e-01 4.78e+02 1.51e-04  -1.0     -   2.48e-04  1  1h
 iter    objective    inf_pr   inf_du inf_compl lg(mu) lg(rg) alpha_pr ir ls
-  10  4.0285546e+01 8.72e-01 4.57e+02 6.32e-04  -1.0     -   6.25e-02  1  5h
-  11  2.8602303e+02 2.66e-01 4.91e+02 5.99e-04  -1.0     -   5.00e-01  1  2h
+  10  4.0285541e+01 8.72e-01 4.57e+02 6.32e-04  -1.0     -   6.25e-02  1  5h
+  11  2.8602305e+02 2.66e-01 4.91e+02 5.99e-04  -1.0     -   5.00e-01  1  2h
   12  3.9870638e+02 6.41e-03 4.21e+02 3.32e-03  -1.0     -   1.00e+00  1  1h
-  13  3.4928113e+02 2.93e-02 2.62e+01 1.02e+00  -1.0     -   1.00e+00  1  1h
+  13  3.4928112e+02 2.93e-02 2.62e+01 1.02e+00  -1.0     -   1.00e+00  1  1h
   14  3.5909050e+02 6.98e-03 1.66e+00 6.15e-02  -1.0     -   1.00e+00  1  1h
   15  3.6047026e+02 6.05e-05 1.44e-02 6.46e-02  -1.0     -   1.00e+00  1  1h
   16  3.6038251e+02 2.50e-07 7.99e-05 1.89e-03  -2.5     -   1.00e+00  1  1h
   17  3.6037976e+02 2.63e-10 7.93e-08 1.27e-06  -5.7     -   1.00e+00  1  1h
-  18  3.6037976e+02 1.11e-16 5.96e-14 1.58e-09  -8.6     -   1.00e+00  2  1h
+  18  3.6037976e+02 1.11e-16 1.19e-13 1.58e-09  -8.6     -   1.00e+00  2  1h
 
 Number of Iterations....: 18
 
                                    (scaled)                 (unscaled)
 Objective...............:   3.6037976240508465e+02    3.6037976240508465e+02
-Dual infeasibility......:   5.9563010060664213e-14    5.9563010060664213e-14
+Dual infeasibility......:   1.1912602012132843e-13    1.1912602012132843e-13
 Constraint violation....:   1.1102230246251565e-16    1.1102230246251565e-16
-Complementarity.........:   1.5755252336107799e-09    1.5755252336107799e-09
-Overall NLP error.......:   1.5755252336107799e-09    1.5755252336107799e-09
+Complementarity.........:   1.5755252336101401e-09    1.5755252336101401e-09
+Overall NLP error.......:   1.5755252336101401e-09    1.5755252336101401e-09
 
 Number of objective function evaluations              = 46
 Number of objective gradient evaluations              = 19
@@ -55,11 +55,11 @@ Number of constraint evaluations                      = 46
 Number of constraint Jacobian evaluations             = 19
 Number of Lagrangian Hessian evaluations              = 18
 
-Total wall secs in initializtion                      =  0.747
+Total wall secs in initializtion                      =  0.736
 Total wall secs in linear solver                      =  0.001
 Total wall secs in NLP function evaluations           =  0.000
-Total wall secs in solver (w/o init./fun./lin. alg.)  =  4.887
-Total wall secs                                       =  5.635
+Total wall secs in solver (w/o init./fun./lin. alg.)  =  4.724
+Total wall secs                                       =  5.462
 
 <span class="sgr32">EXIT: Optimal Solution Found (tol = 1.0e-08).</span></code></pre><p>MadNLP converges in 19 barrier iterations.  The solution is:</p><pre><code class="language-julia hljs">println(&quot;Objective: &quot;, results.objective)
 println(&quot;Solution:  &quot;, results.solution)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Objective: 360.37976240508465
@@ -172,8 +172,8 @@ status...................................: INITIAL
 copyto!(NLPModels.get_x0(nlp), results.solution)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">2-element Vector{Float64}:
  -0.7921232178470456
  -1.2624298435831804</code></pre><p>MadNLP stores in memory the dual solutions computed during the first solve. One can access to the (scaled) multipliers as</p><pre><code class="language-julia hljs">solver.y</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">2-element Vector{Float64}:
- -477.1704687391197
-   -3.126200011958605e-9</code></pre><p>and to the multipliers of the bound constraints with</p><pre><code class="language-julia hljs">[solver.zl.values solver.zu.values]</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">4×2 Matrix{Float64}:
+ -477.17046873911966
+   -3.1262000119573344e-9</code></pre><p>and to the multipliers of the bound constraints with</p><pre><code class="language-julia hljs">[solver.zl.values solver.zu.values]</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">4×2 Matrix{Float64}:
    0.0        1.93936e-9
    0.0        0.0
  477.17       0.0
@@ -203,7 +203,7 @@ Number of Lagrangian Hessian evaluations              = 22
 Total wall secs in initializtion                      =  0.001
 Total wall secs in linear solver                      =  0.002
 Total wall secs in NLP function evaluations           =  0.000
-Total wall secs in solver (w/o init./fun./lin. alg.)  =  0.380
-Total wall secs                                       =  0.383
+Total wall secs in solver (w/o init./fun./lin. alg.)  =  0.365
+Total wall secs                                       =  0.367
 
-<span class="sgr32">EXIT: Optimal Solution Found (tol = 1.0e-08).</span></code></pre><p>Three observations are in order:</p><ul><li>The iteration count starts directly from the previous count (as stored in <code>solver.cnt.k</code>).</li><li>MadNLP converges in only 4 iterations.</li><li>The factorization stored in <code>solver</code> is directly re-used, leading to significant savings. As a consequence, the warm-start does not work if the structure of the problem changes between the first and the second solve (e.g, if variables or constraints are added to the constraints).</li></ul></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../multiprecision/">« Multi-precision</a><a class="docs-footer-nextpage" href="../lbfgs/">LBFGS »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.14.1 on <span class="colophon-date" title="Monday 22 September 2025 03:39">Monday 22 September 2025</span>. Using Julia version 1.10.10.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+<span class="sgr32">EXIT: Optimal Solution Found (tol = 1.0e-08).</span></code></pre><p>Three observations are in order:</p><ul><li>The iteration count starts directly from the previous count (as stored in <code>solver.cnt.k</code>).</li><li>MadNLP converges in only 4 iterations.</li><li>The factorization stored in <code>solver</code> is directly re-used, leading to significant savings. As a consequence, the warm-start does not work if the structure of the problem changes between the first and the second solve (e.g, if variables or constraints are added to the constraints).</li></ul></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../multiprecision/">« Multi-precision</a><a class="docs-footer-nextpage" href="../lbfgs/">LBFGS »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.14.1 on <span class="colophon-date" title="Monday 22 September 2025 04:52">Monday 22 September 2025</span>. Using Julia version 1.10.10.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
