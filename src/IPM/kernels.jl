@@ -773,7 +773,6 @@ function get_sd(l, zl_r, zu_r, s_max)
         (norm(l, 1)+norm(zl_r, 1)+norm(zu_r, 1)) / max(1, (length(l)+length(zl_r)+length(zu_r))),
     ) / s_max
 end
-
 function get_sc(zl_r, zu_r, s_max)
     return max(
         s_max,

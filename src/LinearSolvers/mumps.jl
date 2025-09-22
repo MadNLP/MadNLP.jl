@@ -1,35 +1,13 @@
-module MadNLPMumps
-
-using MUMPS_seq_jll
-import MadNLP:
-    MadNLP, parsefile,
-    @kwdef, MadNLPLogger, @debug, @warn, @error,
-    SparseMatrixCSC, SubVector,
-    SymbolicException,FactorizationException,SolveException,InertiaException,
-    AbstractOptions, AbstractLinearSolver, set_options!, input_type, default_options,
-    introduce, factorize!, solve!, improve!, is_inertia, is_supported, inertia, findIJ, nnz
-import LinearAlgebra, OpenBLAS32_jll
-
-function __init__()
-    config = LinearAlgebra.BLAS.lbt_get_config()
-    if !any(lib -> lib.interface == :lp64, config.loaded_libs)
-        LinearAlgebra.BLAS.lbt_forward(OpenBLAS32_jll.libopenblas_path)
-    end
-end
-
-version = string(pkgversion(@__MODULE__))
-
 setindex(tup,a,n) = (tup[1:n-1]...,a,tup[n+1:end]...)
 tzeros(n) = tuple((0 for i=1:n)...)
 
 @kwdef mutable struct MumpsOptions <: AbstractOptions
-    mumps_dep_tol::Float64 = 0.
-    mumps_mem_percent::Int = 1000
-    mumps_permuting_scaling::Int = 7
-    mumps_pivot_order::Int = 7
+    mumps_mem_percent::Int = 35
+    mumps_permuting_scaling::Int = 0
+    mumps_pivot_order::Int = 0
     mumps_pivtol::Float64 = 1e-6
-    mumps_pivtolmax::Float64 = .1
-    mumps_scaling::Int = 77
+    mumps_pivtolmax::Float64 = 1e-1
+    mumps_scaling::Int = 1
 end
 
 @kwdef mutable struct Struc{T}
@@ -169,7 +147,7 @@ mumps_lock = Threads.SpinLock()
 function locked_mumps_c(mumps_struc::Struc{Float32})
     lock(mumps_lock)
     try
-        @ccall libsmumps.smumps_c(mumps_struc::Ref{Struc{Float32}})::Cvoid
+        @ccall MUMPS_seq_jll.libsmumps.smumps_c(mumps_struc::Ref{Struc{Float32}})::Cvoid
     finally
         unlock(mumps_lock)
     end
@@ -178,7 +156,7 @@ end
 function locked_mumps_c(mumps_struc::Struc{Float64})
     lock(mumps_lock)
     try
-        @ccall libdmumps.dmumps_c(mumps_struc::Ref{Struc{Float64}})::Cvoid
+        @ccall MUMPS_seq_jll.libdmumps.dmumps_c(mumps_struc::Ref{Struc{Float64}})::Cvoid
     finally
         unlock(mumps_lock)
     end
@@ -222,15 +200,11 @@ function MumpsSolver(csc::SparseMatrixCSC{T,Int32};
     mumps_struc.icntl = setindex(mumps_struc.icntl,1,13)
     mumps_struc.icntl = setindex(mumps_struc.icntl,opt.mumps_mem_percent,14)
 
-    mumps_struc.cntl = setindex(mumps_struc.cntl,opt.mumps_pivtol,1)
 
-    a = copy(csc.nzval) # would there be a better way?
-    csc.nzval.=1
+    mumps_struc.cntl = setindex(mumps_struc.cntl,opt.mumps_pivtol,1)
 
     locked_mumps_c(mumps_struc);
     mumps_struc.info[1] < 0 && throw(SymbolicException())
-
-    csc.nzval.=a
 
     M = MumpsSolver{T}(csc,I,J,sym_perm,pivnul_list,mumps_struc,false,opt,logger)
     finalizer(finalize,M)
@@ -244,7 +218,7 @@ function factorize!(M::MumpsSolver)
     cnt = 0
     while true
         locked_mumps_c(M.mumps_struc)
-        if M.mumps_struc.info[1] in [-8,-9]
+        if M.mumps_struc.info[1] in (-8,-9)
             cnt >= 10 && throw(FactorizationException())
             M.mumps_struc.icntl = setindex(M.mumps_struc.icntl,M.mumps_struc.icntl[14]*2.,14)
             cnt += 1
@@ -271,9 +245,7 @@ end
 
 is_inertia(::MumpsSolver) = true
 function inertia(M::MumpsSolver)
-    return (M.csc.n-M.is_singular-M.mumps_struc.infog[12],
-            M.is_singular,
-            M.mumps_struc.infog[12])
+    return (M.csc.n-M.is_singular-M.mumps_struc.infog[12], M.is_singular, M.mumps_struc.infog[12])
 end
 
 
@@ -292,20 +264,8 @@ function finalize(M::MumpsSolver)
     locked_mumps_c(M.mumps_struc);
 end
 
-introduce(::MumpsSolver)="mumps"
+introduce(M::MumpsSolver)="MUMPS v$(join(Char(c) for c in M.mumps_struc.version_number if c != 0))"
 input_type(::Type{MumpsSolver}) = :csc
 default_options(::Type{MumpsSolver}) = MumpsOptions()
 is_supported(::Type{MumpsSolver},::Type{Float32}) = true
 is_supported(::Type{MumpsSolver},::Type{Float64}) = true
-
-export MumpsSolver
-
-# re-export MadNLP, including deprecated names
-for name in names(MadNLP, all=true)
-    if Base.isexported(MadNLP, name)
-        @eval using MadNLP: $(name)
-        @eval export $(name)
-    end
-end
-
-end # module

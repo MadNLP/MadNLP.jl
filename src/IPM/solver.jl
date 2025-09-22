@@ -199,7 +199,7 @@ function solve!(
         if !(solver.status < SOLVE_SUCCEEDED)
             print_summary(solver)
         end
-        @notice(solver.logger,"EXIT: $(get_status_output(solver.status, solver.opt))")
+        @notice(solver.logger,"$(Base.text_colors[color_status(solver.status)])EXIT: $(get_status_output(solver.status, solver.opt))$(Base.text_colors[:normal])")
         solver.opt.disable_garbage_collector &&
             (GC.enable(true); @warn(solver.logger,"Julia garbage collector is turned back on"))
         finalize(solver.logger)
@@ -210,6 +210,10 @@ function solve!(
 
     return stats
 end
+
+color_status(status::Status) =
+    status <= SOLVE_SUCCEEDED ? :green :
+    status <= SOLVED_TO_ACCEPTABLE_LEVEL ? :blue : :red
 
 
 function regular!(solver::AbstractMadNLPSolver{T}) where T
@@ -617,6 +621,7 @@ function inertia_correction!(
 
     n_trial = 0
     solver.del_w = del_w_prev = zero(T)
+    solver.del_c = del_c_prev = zero(T)
 
     @trace(solver.logger,"Inertia-based regularization started.")
 
@@ -640,9 +645,10 @@ function inertia_correction!(
                 return false
             end
         end
-        solver.del_c = num_neg == 0 ? zero(T) : solver.opt.jacobian_regularization_value * solver.mu^(solver.opt.jacobian_regularization_exponent)
-        regularize_diagonal!(solver.kkt, solver.del_w - del_w_prev, solver.del_c)
+        solver.del_c = num_zero == 0 ? zero(T) : solver.opt.jacobian_regularization_value * solver.mu^(solver.opt.jacobian_regularization_exponent)
+        regularize_diagonal!(solver.kkt, solver.del_w - del_w_prev, solver.del_c - del_c_prev)
         del_w_prev = solver.del_w
+        del_c_prev = solver.del_c
 
         factorize_wrapper!(solver)
         num_pos,num_zero,num_neg = inertia(solver.kkt.linear_solver)
@@ -661,6 +667,7 @@ function inertia_correction!(
     ) where T
     n_trial = 0
     solver.del_w = del_w_prev = zero(T)
+    solver.del_c = del_c_prev = zero(T)
 
     @trace(solver.logger,"Inertia-free regularization started.")
     dx = primal(solver.d)
@@ -702,8 +709,9 @@ function inertia_correction!(
             end
         end
         solver.del_c = solver.opt.jacobian_regularization_value * solver.mu^(solver.opt.jacobian_regularization_exponent)
-        regularize_diagonal!(solver.kkt, solver.del_w - del_w_prev, solver.del_c)
+        regularize_diagonal!(solver.kkt, solver.del_w - del_w_prev, solver.del_c - del_c_prev)
         del_w_prev = solver.del_w
+        del_c_prev = solver.del_c
 
         factorize_wrapper!(solver)
         solve_status = solve_refine_wrapper!(
@@ -728,6 +736,7 @@ function inertia_correction!(
 
     n_trial = 0
     solver.del_w = del_w_prev = zero(T)
+    solver.del_c = del_c_prev = zero(T)
 
     @trace(solver.logger,"Inertia-based regularization started.")
 
@@ -750,8 +759,9 @@ function inertia_correction!(
             end
         end
         solver.del_c = solver.opt.jacobian_regularization_value * solver.mu^(solver.opt.jacobian_regularization_exponent)
-        regularize_diagonal!(solver.kkt, solver.del_w - del_w_prev, solver.del_c)
+        regularize_diagonal!(solver.kkt, solver.del_w - del_w_prev, solver.del_c - del_c_prev)
         del_w_prev = solver.del_w
+        del_c_prev = solver.del_c
 
         factorize_wrapper!(solver)
         solve_status = solve_refine_wrapper!(

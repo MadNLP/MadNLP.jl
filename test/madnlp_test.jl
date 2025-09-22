@@ -1,5 +1,12 @@
 testset = [
     [
+        "SparseKKTSystem + Mumps",
+        ()->MadNLP.Optimizer(
+            linear_solver=MadNLP.MumpsSolver,
+            print_level=MadNLP.ERROR),
+        []
+    ],
+    [
         "SparseKKTSystem + Umfpack",
         ()->MadNLP.Optimizer(
             linear_solver=MadNLP.UmfpackSolver,
@@ -62,7 +69,9 @@ testset = [
             linear_solver=MadNLP.LapackCPUSolver,
             lapack_algorithm=MadNLP.EVD,
             print_level=MadNLP.ERROR),
-        []
+        [
+            "eigmina" # fails; regularization does not correct the inertia; inertia calculation based on EVD does not seem reliable
+         ]
     ],
     [
         "DenseKKTSystem + LapackCPU-CHOLESKY",

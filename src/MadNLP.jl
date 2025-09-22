@@ -11,12 +11,22 @@ import SuiteSparse: UMFPACK, CHOLMOD
 import NLPModels
 import NLPModels: finalize, AbstractNLPModel, obj, grad!, cons!, jac_coord!, hess_coord!, hess_structure!, jac_structure!, NLPModelMeta, get_nvar, get_ncon, get_minimize, get_x0, get_y0, get_nnzj, get_nnzh, get_lvar, get_uvar, get_lcon, get_ucon
 import SolverCore: solve!, getStatus, AbstractOptimizationSolver, AbstractExecutionStats
-export MadNLPSolver, MadNLPOptions, UmfpackSolver, LDLSolver, CHOLMODSolver, LapackCPUSolver, madnlp, solve!
 import LDLFactorizations
+import MUMPS_seq_jll, OpenBLAS32_jll
+
+export MadNLPSolver, MadNLPOptions, UmfpackSolver, LDLSolver, CHOLMODSolver, LapackCPUSolver, MumpsSolver, MadNLPExecutionStats, madnlp, solve!
+
+function __init__()
+    config = BLAS.lbt_get_config()
+    if !any(lib -> lib.interface == :lp64, config.loaded_libs)
+        BLAS.lbt_forward(OpenBLAS32_jll.libopenblas_path)
+    end
+end
+using PrecompileTools: @setup_workload, @compile_workload   
 
 # Version info
 version() = string(pkgversion(@__MODULE__))
-introduce() = "MadNLP version v$(version())"
+introduce() = "\033[34mMad\033[31mN\033[32mL\033[35mP\033[0m version v$(version())"
 
 include("enums.jl")
 include("utils.jl")
@@ -27,5 +37,6 @@ include(joinpath("KKT", "KKTsystem.jl"))
 include(joinpath("LinearSolvers","linearsolvers.jl"))
 include(joinpath("IPM", "IPM.jl"))
 include("extension_templates.jl")
+include("precompile.jl")
 
 end # end module

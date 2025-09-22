@@ -1,7 +1,7 @@
 # Options
 
 parse_option(::Type{Module},str::String) = eval(Symbol(str))
-
+parse_option(type::Type{T},i::Int64) where {T<:Enum} = type(i)
 
 function set_options!(opt::AbstractOptions, options)
     other_options = Dict{Symbol, Any}()
@@ -51,7 +51,7 @@ end
     jacobian_constant::Bool = false
     hessian_constant::Bool = false
     hessian_approximation::Type = ExactHessian
-    quasi_newton_options::QuasiNewtonOptions = QuasiNewtonOptions()
+    quasi_newton_options::QuasiNewtonOptions{T} = QuasiNewtonOptions{T}()
     inertia_correction_method::Type = InertiaAuto
     inertia_free_tol::T = 0.
 
@@ -126,10 +126,8 @@ get_tolerance(::Type{T},::Type{SparseCondensedKKTSystem}) where T = 10^(round(lo
 function default_sparse_solver(nlp::AbstractNLPModel)
     if isdefined(Main, :MadNLPHSL)
         Main.MadNLPHSL.Ma27Solver
-    elseif isdefined(Main, :MadNLPMumps)
-        Main.MadNLPMumps.MumpsSolver
     else
-        UmfpackSolver
+        MumpsSolver
     end
 end
 
