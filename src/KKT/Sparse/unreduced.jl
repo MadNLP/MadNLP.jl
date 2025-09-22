@@ -165,14 +165,19 @@ function initialize!(kkt::SparseUnreducedKKTSystem{T}) where T
     fill!(kkt.hess, zero(T))
     fill!(kkt.l_lower, zero(T))
     fill!(kkt.u_lower, zero(T))
-    fill!(kkt.l_diag, one(T))
-    fill!(kkt.u_diag, one(T))
+    fill!(kkt.l_diag, -one(T))
+    fill!(kkt.u_diag, -one(T))
     fill!(kkt.l_lower_aug, zero(T))
     fill!(kkt.u_lower_aug, zero(T))
     fill!(nonzeros(kkt.hess_com), zero(T)) # so that mul! in the initial primal-dual solve has no effect
 end
 
 num_variables(kkt::SparseUnreducedKKTSystem) = length(kkt.pr_diag)
+
+# function is_inertia_correct(kkt::SparseUnreducedKKTSystem, num_pos, num_zero, num_neg)
+#     n, nlb, nub = num_variables(kkt), length(kkt.ind_lb), length(kkt.ind_ub)
+#     return (num_zero == 0) && (num_pos == n )
+# end
 
 function build_kkt!(kkt::SparseUnreducedKKTSystem)
     transfer!(kkt.aug_com, kkt.aug_raw, kkt.aug_csc_map)
