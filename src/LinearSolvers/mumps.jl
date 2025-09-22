@@ -5,8 +5,8 @@ tzeros(n) = tuple((0 for i=1:n)...)
     mumps_mem_percent::Int = 35
     mumps_permuting_scaling::Int = 0
     mumps_pivot_order::Int = 0
-    mumps_pivtol::Float64 = 1e-8
-    mumps_pivtolmax::Float64 = 1e-4
+    mumps_pivtol::Float64 = 1e-6
+    mumps_pivtolmax::Float64 = 1e-1
     mumps_scaling::Int = 1
 end
 
