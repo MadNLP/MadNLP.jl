@@ -296,21 +296,21 @@ function create_sparse_fixed_handler(
 
     nnzh = length(ind_hess_free)
     Hi, Hj = similar(hess_I, nnzh), similar(hess_J, nnzh)
-    Hi .= map_full_to_free[hess_I[ind_hess_free]]
-    Hj .= map_full_to_free[hess_J[ind_hess_free]]
+    copyto!(Hi, map_full_to_free[hess_I[ind_hess_free]])
+    copyto!(Hj, map_full_to_free[hess_J[ind_hess_free]])
     resize!(hess_I, nnzh)
     resize!(hess_J, nnzh)
-    hess_I .= Hi
-    hess_J .= Hj
+    copyto!(hess_I, Hi)
+    copyto!(hess_J, Hj)
 
     nnzj = length(ind_jac_free)
     Ji, Jj = similar(jac_I, nnzj), similar(jac_J, nnzj)
-    Ji .= jac_I[ind_jac_free]
-    Jj .= map_full_to_free[jac_J[ind_jac_free]]
+    copyto!(Ji, jac_I[ind_jac_free])
+    copyto!(Jj, map_full_to_free[jac_J[ind_jac_free]])
     resize!(jac_I, nnzj)
     resize!(jac_J, nnzj)
-    jac_I .= Ji
-    jac_J .= Jj
+    copyto!(jac_I, Ji)
+    copyto!(jac_J, Jj)
 
     x_full = copy(lvar)
 
@@ -362,6 +362,45 @@ function create_sparse_fixed_handler(
     n = get_nvar(nlp)
     fixed_handler = RelaxBound()
     return fixed_handler, n, get_nnzj(nlp.meta), get_nnzh(nlp.meta)
+end
+
+function _parse_indexes(lvar, uvar, lcon, ucon, equality_treatment)
+    m = length(lcon)
+    if m > 0
+        if equality_treatment == EnforceEquality
+            is_equality = lcon .== ucon
+            ind_eq = findall(is_equality)
+            ind_ineq = findall(~, is_equality)
+        else
+            ind_eq = similar(lvar, Int, 0)
+            ind_ineq = similar(lvar, Int, m) .= 1:m
+        end
+        xl = [lvar; view(lcon, ind_ineq)]
+        xu = [uvar; view(ucon, ind_ineq)]
+    else
+        ind_eq = similar(lvar, Int, 0)
+        ind_ineq = similar(lvar, Int, 0)
+        xl = lvar
+        xu = uvar
+    end
+
+    is_upper_unbounded = uvar .== Inf
+    is_lower_unbounded = lvar .==-Inf
+    ind_llb = findall((.~is_lower_unbounded) .* is_upper_unbounded)
+    ind_uub = findall((is_lower_unbounded) .* (.~is_upper_unbounded))
+    ind_lb = findall(xl .!= -Inf)
+    ind_ub = findall(xu .!= Inf)
+
+    return (
+        xl=xl,
+        xu=xu,
+        ind_eq=ind_eq,
+        ind_ineq=ind_ineq,
+        ind_lb=ind_lb,
+        ind_ub=ind_ub,
+        ind_llb=ind_llb,
+        ind_uub=ind_uub,
+    )
 end
 
 #=
@@ -434,27 +473,7 @@ function create_callback(
         uvar = uvar[ind_free]
     end
 
-    if m > 0
-        if equality_treatment == EnforceEquality
-            ind_eq = findall(lcon .== ucon)
-            ind_ineq = findall(lcon .!= ucon)
-        else
-            ind_eq = similar(lvar, Int, 0)
-            ind_ineq = similar(lvar, Int, m) .= 1:m
-        end
-        xl = [lvar; view(lcon, ind_ineq)]
-        xu = [uvar; view(ucon, ind_ineq)]
-    else
-        ind_eq = similar(lvar, Int, 0)
-        ind_ineq = similar(lvar, Int, 0)
-        xl = lvar
-        xu = uvar
-    end
-
-    ind_llb = findall((lvar .!= -Inf) .* (uvar .== Inf))
-    ind_uub = findall((lvar .== -Inf) .* (uvar .!= Inf))
-    ind_lb = findall(xl .!= -Inf)
-    ind_ub = findall(xu .!= Inf)
+    indexes = _parse_indexes(lvar, uvar, lcon, ucon, equality_treatment)
 
     return SparseCallback(
         nlp,
@@ -475,13 +494,13 @@ function create_callback(
         jac_scale,
         fixed_handler,
         equality_handler,
-        ind_eq,
-        ind_ineq,
+        indexes.ind_eq,
+        indexes.ind_ineq,
         ind_fixed,
-        ind_lb,
-        ind_ub,
-        ind_llb,
-        ind_uub,
+        indexes.ind_lb,
+        indexes.ind_ub,
+        indexes.ind_llb,
+        indexes.ind_uub,
     )
 end
 
@@ -514,35 +533,17 @@ function create_callback(
     lcon = get_lcon(nlp)
     ucon = get_ucon(nlp)
 
-    if m > 0
-        if equality_treatment == EnforceEquality
-            ind_eq = findall(lcon .== ucon)
-            ind_ineq = findall(lcon .!= ucon)
-        else
-            ind_eq = similar(lvar, Int, 0)
-            ind_ineq = similar(lvar, Int, ncon) .= 1:ncon
-        end
-        xl = [lvar; view(lcon, ind_ineq)]
-        xu = [uvar; view(ucon, ind_ineq)]
-    else
-        ind_eq = similar(lvar, Int, 0)
-        ind_ineq = similar(lvar, Int, 0)
-        xl = lvar
-        xu = uvar
-    end
-
-    ind_llb = findall((lvar .!= -Inf) .* (uvar .== Inf))
-    ind_uub = findall((lvar .== -Inf) .* (uvar .!= Inf))
+    indexes = _parse_indexes(lvar, uvar, lcon, ucon, equality_treatment)
 
     # Get fixed variables
     ind_fixed = findall(lvar .== uvar)
     if length(ind_fixed) > 0 && fixed_variable_treatment == MakeParameter
         # Keep fixed variables but remove them from lb/ub
-        ind_lb = findall((xl .!= -Inf) .* (xl .!= xu))
-        ind_ub = findall((xu .!= Inf) .* (xl .!= xu))
+        ind_lb = findall((indexes.xl .!= -Inf) .* (indexes.xl .!= indexes.xu))
+        ind_ub = findall((indexes.xu .!= Inf) .* (indexes.xl .!= indexes.xu))
     else
-        ind_lb = findall(xl .!= -Inf)
-        ind_ub = findall(xu .!= Inf)
+        ind_lb = indexes.ind_lb
+        ind_ub = indexes.ind_ub
     end
 
     return DenseCallback(
@@ -555,13 +556,13 @@ function create_callback(
         con_scale,
         fixed_handler,
         equality_handler,
-        ind_eq,
-        ind_ineq,
+        indexes.ind_eq,
+        indexes.ind_ineq,
         ind_fixed,
         ind_lb,
         ind_ub,
-        ind_llb,
-        ind_uub,
+        indexes.ind_llb,
+        indexes.ind_uub,
     )
 end
 

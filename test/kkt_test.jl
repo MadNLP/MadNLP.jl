@@ -55,7 +55,6 @@ end
 ]
     linear_solver = MadNLP.LapackCPUSolver
     nlp = MadNLPTests.HS15Model()
-    ind_cons = MadNLP.get_index_constraints(nlp)
     cb = MadNLP.create_callback(Callback, nlp)
     # Define options for LBFGS
     p = 20
@@ -64,7 +63,6 @@ end
     kkt = MadNLP.create_kkt_system(
         KKTSystem,
         cb,
-        ind_cons,
         linear_solver;
         hessian_approximation=MadNLP.CompactLBFGS,
         qn_options=qn_options,
