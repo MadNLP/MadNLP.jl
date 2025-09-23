@@ -639,6 +639,7 @@ function inertia_correction!(
     solver::AbstractMadNLPSolver{T}
     ) where {T}
 
+    n = num_variables(solver.kkt)
     n_trial = 0
     solver.del_w = del_w_prev = zero(T)
     solver.del_c = del_c_prev = zero(T)
@@ -648,24 +649,28 @@ function inertia_correction!(
     factorize_wrapper!(solver)
 
     num_pos,num_zero,num_neg = inertia(solver.kkt.linear_solver)
-
+    
     while !is_inertia_correct(solver.kkt, num_pos, num_zero, num_neg) ||
         !solve_refine_wrapper!(solver.d, solver, solver.p, solver._w4)
         
         @debug(solver.logger,"Primal-dual perturbed.")
+        if num_pos < n
+            if n_trial == 0
+                solver.del_w = solver.del_w_last==zero(T) ? solver.opt.first_hessian_perturbation :
+                    max(solver.opt.min_hessian_perturbation,solver.opt.perturb_dec_fact*solver.del_w_last)
 
-        if n_trial == 0
-            solver.del_w = solver.del_w_last==zero(T) ? solver.opt.first_hessian_perturbation :
-                max(solver.opt.min_hessian_perturbation,solver.opt.perturb_dec_fact*solver.del_w_last)
-        else
-            solver.del_w*= solver.del_w_last==zero(T) ? solver.opt.perturb_inc_fact_first : solver.opt.perturb_inc_fact
-            if solver.del_w>solver.opt.max_hessian_perturbation
-                solver.cnt.k+=1
-                @debug(solver.logger,"Primal regularization is too big. Switching to restoration phase.")
-                return false
+            else
+                solver.del_w*= solver.del_w_last==zero(T) ? solver.opt.perturb_inc_fact_first : solver.opt.perturb_inc_fact
+                if solver.del_w>solver.opt.max_hessian_perturbation
+                    solver.cnt.k+=1
+                    @debug(solver.logger,"Primal regularization is too big. Switching to restoration phase.")
+                    return false
+                end
             end
         end
+        
         solver.del_c = solver.opt.jacobian_regularization_value * solver.mu^(solver.opt.jacobian_regularization_exponent)
+
         regularize_diagonal!(solver.kkt, solver.del_w - del_w_prev, solver.del_c - del_c_prev)
         del_w_prev = solver.del_w
         del_c_prev = solver.del_c

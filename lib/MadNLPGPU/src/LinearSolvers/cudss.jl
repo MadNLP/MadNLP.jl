@@ -167,8 +167,10 @@ MadNLP.default_options(::Type{CUDSSSolver}) = CudssSolverOptions()
 MadNLP.is_inertia(M::CUDSSSolver) = true  # Uncomment if MadNLP.LU is supported -- (M.opt.cudss_algorithm ∈ (MadNLP.CHOLESKY, MadNLP.LDL))
 function inertia(M::CUDSSSolver)
     n = size(M.tril, 1)
+    info = CUDSS.cudss_get(M.inner, "info")
+    
     if M.opt.cudss_algorithm == MadNLP.CHOLESKY
-        info = CUDSS.cudss_get(M.inner, "info")
+        
         if info == 0
             return (n, 0, 0)
         else
@@ -177,6 +179,26 @@ function inertia(M::CUDSSSolver)
     elseif M.opt.cudss_algorithm == MadNLP.LDL
         # N.B.: cuDSS does not always return the correct inertia.
         (k, l) = CUDSS.cudss_get(M.inner, "inertia")
+        # println("1: $k,$l")
+
+        # diag = Vector{Float64}(undef,n)
+        # nbytes = sizeof(diag)
+        # nbytes_written = Ref{Csize_t}()
+        # CUDSS.cudssDataGet(handle(), M.inner.data, "diag", diag, nbytes, nbytes_written)
+
+        # npos = count(x->x>0, diag)
+        # nneg = count(x->x<0, diag)
+        # nzero = n - npos - nneg
+
+        # println("2: $npos,$nneg,$nzero")
+        
+        # CUDSS.cudss_get(M.inner, "diagonal", M.buffer)
+        # num_pos = count(x -> x > 0, M.buffer)
+        # num_neg = count(x -> x < 0, M.buffer)
+        # println("2: $num_pos,$num_neg")
+
+        # return (npos, nzero, nneg)
+        
         @assert 0 ≤ k + l ≤ n
         return (k, n - k - l, l)
     else
