@@ -168,7 +168,13 @@ MadNLP.is_inertia(M::CUDSSSolver) = true  # Uncomment if MadNLP.LU is supported 
 function inertia(M::CUDSSSolver)
     n = size(M.tril, 1)
     info = CUDSS.cudss_get(M.inner, "info")
-    
+
+    # nbytes = sizeof(buffer)
+    # nbytes_written = Ref{Csize_t}()
+    # CUDSS.cudssDataGet(M.inner.data.handle, M.inner.data, "diag", M.buffer, nbytes, nbytes_written)
+    #
+    # `buffer` contains the diagonal of the factorized matrix.
+
     if M.opt.cudss_algorithm == MadNLP.CHOLESKY
         if info == 0
             return (n, 0, 0)
