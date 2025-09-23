@@ -649,14 +649,9 @@ function inertia_correction!(
 
     num_pos,num_zero,num_neg = inertia(solver.kkt.linear_solver)
 
-
-    solve_status = !is_inertia_correct(solver.kkt, num_pos, num_zero, num_neg) ?
-        false : solve_refine_wrapper!(
-            solver.d, solver, solver.p, solver._w4,
-        )
-
-
-    while !solve_status
+    while !is_inertia_correct(solver.kkt, num_pos, num_zero, num_neg) ||
+        !solve_refine_wrapper!(solver.d, solver, solver.p, solver._w4)
+        
         @debug(solver.logger,"Primal-dual perturbed.")
 
         if n_trial == 0
@@ -678,10 +673,6 @@ function inertia_correction!(
         factorize_wrapper!(solver)
         num_pos,num_zero,num_neg = inertia(solver.kkt.linear_solver)
 
-        solve_status = !is_inertia_correct(solver.kkt, num_pos, num_zero, num_neg) ?
-            false : solve_refine_wrapper!(
-                solver.d, solver, solver.p, solver._w4
-            )
         n_trial += 1
     end
 
