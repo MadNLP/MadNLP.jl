@@ -170,8 +170,7 @@ function inertia(M::CUDSSSolver)
     info = CUDSS.cudss_get(M.inner, "info")
 
     # nbytes = sizeof(buffer)
-    # nbytes_written = Ref{Csize_t}()
-    # CUDSS.cudssDataGet(M.inner.data.handle, M.inner.data, "diag", M.buffer, nbytes, nbytes_written)
+    # CUDSS.cudssDataGet(M.inner.data.handle, M.inner.data.data, "diag", M.buffer, nbytes, M.inner.data.nbytes_written)
     #
     # `buffer` contains the diagonal of the factorized matrix.
 
