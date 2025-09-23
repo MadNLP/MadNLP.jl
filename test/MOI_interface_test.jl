@@ -41,12 +41,13 @@ function test_MOI_Test()
             # of returning infeasibility certificate.
             r"test_linear_DUAL_INFEASIBLE.*",
             "test_solve_TerminationStatus_DUAL_INFEASIBLE",
+            # Symbolic exception in Mumps
+            "test_solve_VariableIndex_ConstraintDual_",
             # Tests excluded on purpose
             # - Excluded because Hessian information is needed
             "test_nonlinear_hs071_hessian_vector_product",
             # - Excluded because Hessian information is needed
             "test_nonlinear_invalid",
-
             #  - Excluded because this test is optional
             "test_model_ScalarFunctionConstantNotZero",
             # Throw an error: "Unable to query the dual of a variable
