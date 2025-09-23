@@ -6,7 +6,7 @@ algorithm has terminated.
 
 """
 mutable struct MadNLPExecutionStats{T, VT} <: AbstractExecutionStats
-    options::MadNLPOptions
+    options::AbstractOptions
     status::Status
     solution::VT
     objective::T
@@ -46,7 +46,7 @@ function MadNLPExecutionStats(solver::MadNLPSolver{T, VT}) where {T, VT}
     )
 end
 
-function update!(stats::MadNLPExecutionStats, solver::MadNLPSolver)
+function update!(stats::MadNLPExecutionStats, solver::AbstractMadNLPSolver)
     stats.status = solver.status
     unpack_x!(stats.solution, solver.cb, variable(solver.x))
     unpack_y!(stats.multipliers, solver.cb, solver.y)
@@ -142,27 +142,32 @@ function print_init(solver::AbstractMadNLPSolver)
     return
 end
 
-function print_iter(solver::AbstractMadNLPSolver;is_resto=false)
+function print_iter(solver::AbstractMadNLPSolver; is_resto=false)
     obj_scale = solver.cb.obj_scale[]
     mod(solver.cnt.k,10)==0&& @info(solver.logger,@sprintf(
-        "iter    objective    inf_pr   inf_du lg(mu)  ||d||  lg(rg) alpha_du alpha_pr  ls"))
+        "iter    objective    inf_pr   inf_du inf_compl lg(mu) lg(rg) alpha_pr ir ls"))
     if is_resto
         RR = solver.RR::RobustRestorer
         inf_du = RR.inf_du_R
         inf_pr = RR.inf_pr_R
+        inf_compl = RR.inf_compl_R
         mu = log10(RR.mu_R)
     else
         inf_du = solver.inf_du
         inf_pr = solver.inf_pr
+        inf_compl = solver.inf_compl
         mu = log10(solver.mu)
     end
     @info(solver.logger,@sprintf(
-        "%4i%s% 10.7e %6.2e %6.2e %5.1f %6.2e %s %6.2e %6.2e%s  %i",
+        "%4i%s% 10.7e %6.2e %6.2e %7.2e %5.1f  %s  %6.2e %2i %2i%s",
         solver.cnt.k,is_resto ? "r" : " ",solver.obj_val/obj_scale,
-        inf_pr, inf_du, mu,
-        solver.cnt.k == 0 ? 0. : norm(primal(solver.d),Inf),
+        inf_pr, inf_du, inf_compl, mu,
+        # solver.cnt.k == 0 ? 0. : norm(primal(solver.d),Inf),
         solver.del_w == 0 ? "   - " : @sprintf("%5.1f",log(10,solver.del_w)),
-        solver.alpha_z,solver.alpha,solver.ftype,solver.cnt.l))
+        solver.alpha,
+        solver.cnt.ir,
+        solver.cnt.l,
+        solver.ftype,))
     return
 end
 
@@ -183,18 +188,20 @@ function print_summary(solver::AbstractMadNLPSolver)
                                 max(solver.inf_du*obj_scale,norm(solver.c,Inf),solver.inf_compl),
                                 max(solver.inf_du,solver.inf_pr,solver.inf_compl)))
 
-    @notice(solver.logger,"Number of objective function evaluations             = $(solver.cnt.obj_cnt)")
-    @notice(solver.logger,"Number of objective gradient evaluations             = $(solver.cnt.obj_grad_cnt)")
-    @notice(solver.logger,"Number of constraint evaluations                     = $(solver.cnt.con_cnt)")
-    @notice(solver.logger,"Number of constraint Jacobian evaluations            = $(solver.cnt.con_jac_cnt)")
-    @notice(solver.logger,"Number of Lagrangian Hessian evaluations             = $(solver.cnt.lag_hess_cnt)")
-    @notice(solver.logger,@sprintf("Total wall-clock secs in solver (w/o fun. eval./lin. alg.)  = %6.3f",
-                                solver.cnt.solver_time))
-    @notice(solver.logger,@sprintf("Total wall-clock secs in linear solver                      = %6.3f",
+    @notice(solver.logger,"Number of objective function evaluations              = $(solver.cnt.obj_cnt)")
+    @notice(solver.logger,"Number of objective gradient evaluations              = $(solver.cnt.obj_grad_cnt)")
+    @notice(solver.logger,"Number of constraint evaluations                      = $(solver.cnt.con_cnt)")
+    @notice(solver.logger,"Number of constraint Jacobian evaluations             = $(solver.cnt.con_jac_cnt)")
+    @notice(solver.logger,"Number of Lagrangian Hessian evaluations              = $(solver.cnt.lag_hess_cnt)\n")
+    @notice(solver.logger,@sprintf("Total wall secs in initializtion                      = %6.3f",
+                                solver.cnt.init_time))
+    @notice(solver.logger,@sprintf("Total wall secs in linear solver                      = %6.3f",
                                 solver.cnt.linear_solver_time))
-    @notice(solver.logger,@sprintf("Total wall-clock secs in NLP function evaluations           = %6.3f",
+    @notice(solver.logger,@sprintf("Total wall secs in NLP function evaluations           = %6.3f",
                                 solver.cnt.eval_function_time))
-    @notice(solver.logger,@sprintf("Total wall-clock secs                                       = %6.3f\n",
+    @notice(solver.logger,@sprintf("Total wall secs in solver (w/o init./fun./lin. alg.)  = %6.3f",
+                                solver.cnt.total_time - solver.cnt.init_time - solver.cnt.linear_solver_time - solver.cnt.eval_function_time))
+    @notice(solver.logger,@sprintf("Total wall secs                                       = %6.3f\n",
                                 solver.cnt.total_time))
 end
 

@@ -174,12 +174,12 @@ Solve the KKT system ``K x = w`` with the linear solver stored
 inside `kkt` and stores the result inplace inside the `AbstractKKTVector` `w`.
 
 """
-function solve! end
+function solve!(kkt, w) end
 
 """
     regularize_diagonal!(kkt::AbstractKKTSystem, primal_values::Number, dual_values::Number)
 
-Regularize the values in the diagonal of the KKT system.
+Regularize the values in the diagonal of the KKT system in an incremental fashion.
 Called internally inside the interior-point routine.
 """
 function regularize_diagonal! end
@@ -218,7 +218,8 @@ end
 function regularize_diagonal!(kkt::AbstractKKTSystem, primal, dual)
     kkt.reg .+= primal
     kkt.pr_diag .+= primal
-    kkt.du_diag .= .-dual
+    kkt.du_diag .-= dual
+    build_kkt!(kkt)
 end
 
 Base.size(kkt::AbstractKKTSystem) = size(kkt.aug_com)
@@ -243,5 +244,6 @@ include("Dense/utils.jl")
 include("Sparse/unreduced.jl")
 include("Sparse/augmented.jl")
 include("Sparse/condensed.jl")
+include("Sparse/scaled_augmented.jl")
 include("Sparse/utils.jl")
 

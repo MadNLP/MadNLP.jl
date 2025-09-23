@@ -1,7 +1,7 @@
 # Options
 
 parse_option(::Type{Module},str::String) = eval(Symbol(str))
-
+parse_option(type::Type{T},i::Int64) where {T<:Enum} = type(i)
 
 function set_options!(opt::AbstractOptions, options)
     other_options = Dict{Symbol, Any}()
@@ -17,9 +17,9 @@ function set_options!(opt::AbstractOptions, options)
     return other_options
 end
 
-@kwdef mutable struct MadNLPOptions <: AbstractOptions
+@kwdef mutable struct MadNLPOptions{T} <: AbstractOptions
     # Primary options
-    tol::Float64
+    tol::T
     callback::Type
     kkt_system::Type
     linear_solver::Type
@@ -36,86 +36,85 @@ end
     file_print_level::LogLevels = INFO
 
     # Termination options
-    acceptable_tol::Float64 = 1e-6
+    acceptable_tol::T = 1e-6
     acceptable_iter::Int = 15
-    diverging_iterates_tol::Float64 = 1e20
+    diverging_iterates_tol::T = 1e20
     max_iter::Int = 3000
-    max_wall_time::Float64 = 1e6
-    s_max::Float64 = 100.
+    max_wall_time::T = 1e6
+    s_max::T = 100.
 
     # NLP options
-    kappa_d::Float64 = 1e-5
-    fixed_variable_treatment::Type = kkt_system <: SparseCondensedKKTSystem ? RelaxBound : MakeParameter
-    equality_treatment::Type = kkt_system <: SparseCondensedKKTSystem ? RelaxEquality : EnforceEquality
-    boudn_relax_factor::Float64 = 1e-8
+    kappa_d::T = 1e-5
+    fixed_variable_treatment::Type = kkt_system <: MadNLP.SparseCondensedKKTSystem ? MadNLP.RelaxBound : MadNLP.MakeParameter
+    equality_treatment::Type = kkt_system <: MadNLP.SparseCondensedKKTSystem ? MadNLP.RelaxEquality : MadNLP.EnforceEquality
+    bound_relax_factor::T = 1e-8
     jacobian_constant::Bool = false
     hessian_constant::Bool = false
     hessian_approximation::Type = ExactHessian
-    quasi_newton_options::QuasiNewtonOptions = QuasiNewtonOptions()
+    quasi_newton_options::QuasiNewtonOptions{T} = QuasiNewtonOptions{T}()
     inertia_correction_method::Type = InertiaAuto
-    inertia_free_tol::Float64 = 0.
+    inertia_free_tol::T = 0.
 
     # initialization options
     dual_initialized::Bool = false
-    dual_initialization_method::Type = kkt_system <: SparseCondensedKKTSystem ? DualInitializeSetZero : DualInitializeLeastSquares
-    constr_mult_init_max::Float64 = 1e3
-    bound_push::Float64 = 1e-2
-    bound_fac::Float64 = 1e-2
+    dual_initialization_method::Type = kkt_system <: MadNLP.SparseCondensedKKTSystem ? DualInitializeSetZero : DualInitializeLeastSquares
+    constr_mult_init_max::T = 1e3
+    bound_push::T = 1e-2
+    bound_fac::T = 1e-2
     nlp_scaling::Bool = true
-    nlp_scaling_max_gradient::Float64 = 100.
+    nlp_scaling_max_gradient::T = 100.
 
     # Hessian Perturbation
-    min_hessian_perturbation::Float64 = 1e-20
-    first_hessian_perturbation::Float64 = 1e-4
-    max_hessian_perturbation::Float64 = 1e20
-    perturb_inc_fact_first::Float64 = 1e2
-    perturb_inc_fact::Float64 = 8.
-    perturb_dec_fact::Float64 = 1/3
-    jacobian_regularization_exponent::Float64 = 1/4
-    jacobian_regularization_value::Float64 = 1e-8
+    min_hessian_perturbation::T = 1e-20
+    first_hessian_perturbation::T = 1e-4
+    max_hessian_perturbation::T = 1e20
+    perturb_inc_fact_first::T = 1e2
+    perturb_inc_fact::T = 8.
+    perturb_dec_fact::T = 1/3
+    jacobian_regularization_exponent::T = 1/4
+    jacobian_regularization_value::T = 1e-8
 
     # restoration options
-    soft_resto_pderror_reduction_factor::Float64 = 0.9999
-    required_infeasibility_reduction::Float64 = 0.9
+    soft_resto_pderror_reduction_factor::T = 0.9999
+    required_infeasibility_reduction::T = 0.9
 
     # Line search
-    obj_max_inc::Float64 = 5.
-    kappha_soc::Float64 = 0.99
+    obj_max_inc::T = 5.
+    kappha_soc::T = 0.99
     max_soc::Int = 4
-    alpha_min_frac::Float64 = 0.05
-    s_theta::Float64 = 1.1
-    s_phi::Float64 = 2.3
-    eta_phi::Float64 = 1e-4
-    kappa_soc::Float64 = 0.99
-    gamma_theta::Float64 = 1e-5
-    gamma_phi::Float64 = 1e-5
-    delta::Float64 = 1
-    kappa_sigma::Float64 = 1e10
-    barrier_tol_factor::Float64 = 10.
-    rho::Float64 = 1000.
+    alpha_min_frac::T = 0.05
+    s_theta::T = 1.1
+    s_phi::T = 2.3
+    eta_phi::T = 1e-4
+    kappa_soc::T = 0.99
+    gamma_theta::T = 1e-5
+    gamma_phi::T = 1e-5
+    delta::T = 1
+    kappa_sigma::T = 1e10
+    barrier_tol_factor::T = 10.
+    rho::T = 1000.
 
     # Barrier
-    mu_init::Float64 = 1e-1
-    mu_min::Float64 = min(1e-4, tol ) / (barrier_tol_factor + 1) # by courtesy of Ipopt
-    mu_superlinear_decrease_power::Float64 = 1.5
-    tau_min::Float64 = 0.99
-    mu_linear_decrease_factor::Float64 = .2
+    mu_init::T = 1e-1
+    mu_min::T = min(1e-4, tol ) / (barrier_tol_factor + 1) # by courtesy of Ipopt
+    mu_superlinear_decrease_power::T = 1.5
+    tau_min::T = 0.99
+    mu_linear_decrease_factor::T = .2
 end
 
 is_dense_callback(nlp) = hasmethod(jac_dense!, Tuple{typeof(nlp), AbstractVector, AbstractMatrix}) &&
     hasmethod(hess_dense!, Tuple{typeof(nlp), AbstractVector, AbstractVector, AbstractMatrix})
 
 # smart option presets
-function MadNLPOptions(
+function MadNLPOptions{T}(
     nlp::AbstractNLPModel{T};
     dense_callback = MadNLP.is_dense_callback(nlp),
     callback = dense_callback ? DenseCallback : SparseCallback,
     kkt_system = dense_callback ? DenseCondensedKKTSystem : SparseKKTSystem,
     linear_solver = dense_callback ? LapackCPUSolver : default_sparse_solver(nlp),
     tol = get_tolerance(T,kkt_system)
-    ) where T
-
-    return MadNLPOptions(
+) where T
+    return MadNLPOptions{T}(
         tol = tol,
         callback = callback,
         kkt_system = kkt_system,
@@ -129,10 +128,8 @@ get_tolerance(::Type{T},::Type{SparseCondensedKKTSystem}) where T = 10^(round(lo
 function default_sparse_solver(nlp::AbstractNLPModel)
     if isdefined(Main, :MadNLPHSL)
         Main.MadNLPHSL.Ma27Solver
-    elseif isdefined(Main, :MadNLPMumps)
-        Main.MadNLPMumps.MumpsSolver
     else
-        UmfpackSolver
+        MumpsSolver
     end
 end
 
@@ -170,19 +167,19 @@ function _get_primary_options(options)
     return primary_opt, remaining_opt
 end
 
-function load_options(nlp; options...)
+function load_options(nlp::AbstractNLPModel{T,VT}; options...) where {T, VT}
 
     primary_opt, options = _get_primary_options(options)
 
     # Initiate interior-point options
-    opt_ipm = MadNLPOptions(nlp; primary_opt...)
+    opt_ipm = MadNLPOptions{T}(nlp; primary_opt...)
     linear_solver_options = set_options!(opt_ipm, options)
     check_option_sanity(opt_ipm)
     # Initiate linear-solver options
     opt_linear_solver = default_options(opt_ipm.linear_solver)
     iterator_options = set_options!(opt_linear_solver, linear_solver_options)
     # Initiate iterator options
-    opt_iterator = default_options(opt_ipm.iterator)
+    opt_iterator = default_options(opt_ipm.iterator, opt_ipm.tol)
     remaining_options = set_options!(opt_iterator, iterator_options)
 
     # Initiate logger

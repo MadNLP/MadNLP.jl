@@ -55,6 +55,7 @@ function create_kkt_system(
     linear_solver::Type;
     opt_linear_solver=default_options(linear_solver),
     hessian_approximation=ExactHessian,
+    qn_options=QuasiNewtonOptions(),
 ) where {T, VT}
 
     n = cb.nvar
@@ -92,7 +93,7 @@ function create_kkt_system(
     ind_eq_shifted = cb.ind_eq .+ n .+ ns
     ind_ineq_shifted = cb.ind_ineq .+ n .+ ns
 
-    quasi_newton = create_quasi_newton(hessian_approximation, cb, n)
+    quasi_newton = create_quasi_newton(hessian_approximation, cb, n; options=qn_options)
     _linear_solver = linear_solver(aug_com; opt = opt_linear_solver)
 
     return DenseCondensedKKTSystem(

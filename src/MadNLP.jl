@@ -4,19 +4,29 @@ import Pkg.TOML: parsefile
 import Printf: @sprintf
 import LinearAlgebra: BLAS, Adjoint, Symmetric, mul!, ldiv!, norm, dot, diagind, normInf, transpose!, issuccess
 import LinearAlgebra: cholesky, qr, lu, cholesky!, axpy!
-import LinearAlgebra.BLAS: symv!, ger!, libblas, liblapack, BlasInt, @blasfunc
+import LinearAlgebra.BLAS: symv!, ger!, libblastrampoline, BlasInt, @blasfunc
 import SparseArrays: SparseArrays, AbstractSparseMatrix, SparseMatrixCSC, sparse, getcolptr, rowvals, nnz, nonzeros
 import Base: string, show, print, size, getindex, copyto!, @kwdef
 import SuiteSparse: UMFPACK, CHOLMOD
 import NLPModels
 import NLPModels: finalize, AbstractNLPModel, obj, grad!, cons!, jac_coord!, hess_coord!, hess_structure!, jac_structure!, NLPModelMeta, get_nvar, get_ncon, get_minimize, get_x0, get_y0, get_nnzj, get_nnzh, get_lvar, get_uvar, get_lcon, get_ucon
 import SolverCore: solve!, getStatus, AbstractOptimizationSolver, AbstractExecutionStats
-export MadNLPSolver, MadNLPOptions, UmfpackSolver, LDLSolver, CHOLMODSolver, LapackCPUSolver, madnlp, solve!
 import LDLFactorizations
+import MUMPS_seq_jll, OpenBLAS32_jll
+
+export MadNLPSolver, MadNLPOptions, UmfpackSolver, LDLSolver, CHOLMODSolver, LapackCPUSolver, MumpsSolver, MadNLPExecutionStats, madnlp, solve!
+
+function __init__()
+    config = BLAS.lbt_get_config()
+    if !any(lib -> lib.interface == :lp64, config.loaded_libs)
+        BLAS.lbt_forward(OpenBLAS32_jll.libopenblas_path)
+    end
+end
+using PrecompileTools: @setup_workload, @compile_workload   
 
 # Version info
-version() = parsefile(joinpath(@__DIR__,"..","Project.toml"))["version"]
-introduce() = "MadNLP version v$(version())"
+version() = string(pkgversion(@__MODULE__))
+introduce() = "\033[34mMad\033[31mN\033[32mL\033[35mP\033[0m version v$(version())"
 
 include("enums.jl")
 include("utils.jl")
@@ -28,5 +38,6 @@ include(joinpath("LinearSolvers","linearsolvers.jl"))
 include("options.jl")
 include(joinpath("IPM", "IPM.jl"))
 include("extension_templates.jl")
+include("precompile.jl")
 
 end # end module

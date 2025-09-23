@@ -10,8 +10,8 @@ include("utils.jl")
 const _PARAMETER_OFFSET = 0x00f0000000000000
 
 _is_parameter(x::MOI.VariableIndex) = x.value >= _PARAMETER_OFFSET
-
 _is_parameter(term::MOI.ScalarAffineTerm) = _is_parameter(term.variable)
+_is_parameter(term::MOI.ScalarQuadraticTerm) = _is_parameter(term.variable_1) || _is_parameter(term.variable_2)
 
 """
     Optimizer()
@@ -120,13 +120,6 @@ function MOI.empty!(model::Optimizer)
     model.nlp_dual_start = nothing
     model.qp_data = QPBlockData{Float64}()
     model.nlp_model = nothing
-    # Delete options if they are problem dependent.
-    if haskey(model.options, :jacobian_constant)
-        delete!(model.options, :jacobian_constant)
-    end
-    if haskey(model.options, :hessian_approximation)
-        delete!(model.options, :hessian_approximation)
-    end
     return
 end
 
@@ -168,7 +161,6 @@ function MOI.add_constrained_variable(
     model::Optimizer,
     set::MOI.Parameter{Float64},
 )
-    model.inner = nothing
     if model.nlp_model === nothing
         model.nlp_model = MOI.Nonlinear.Model()
     end
@@ -321,6 +313,11 @@ function MOI.is_valid(model::Optimizer, x::MOI.VariableIndex)
         return haskey(model.parameters, x)
     end
     return MOI.is_valid(model.variables, x)
+end
+
+function MOI.is_valid(model::Optimizer, ci::MOI.ConstraintIndex{MOI.VariableIndex, MOI.Parameter{Float64}})
+    p = MOI.VariableIndex(ci.value)
+    return haskey(model.parameters, p)
 end
 
 function MOI.get(model::Optimizer, ::MOI.ListOfVariableIndices)
@@ -864,6 +861,7 @@ function MOIModel(model::Optimizer)
             clamp(0.0, model.variables.lower[i], model.variables.upper[i])
         end
     end
+
     # Constraints bounds
     g_L, g_U = copy(model.qp_data.g_L), copy(model.qp_data.g_U)
     for bound in model.nlp_data.constraint_bounds
@@ -896,13 +894,6 @@ function MOIModel(model::Optimizer)
         end
     end
     # TODO: initial bounds' multipliers.
-
-    if !has_nlp_constraints && !has_quadratic_constraints
-        model.options[:jacobian_constant] = true
-    end
-    if !has_hessian
-        model.options[:hessian_approximation] = MadNLP.CompactLBFGS
-    end
 
     return MOIModel(
         NLPModels.NLPModelMeta(
@@ -943,14 +934,28 @@ function MOI.optimize!(model::Optimizer)
     if model.silent
         model.options[:print_level] = MadNLP.ERROR
     end
-    model.solver = MadNLP.MadNLPSolver(model.nlp; model.options...)
+    options = copy(model.options)
+    # Specific options depending on problem's structure.
+    # 1/ Switch to LBFGS if the Hessian is not specified.
+    has_hessian = :Hess in MOI.features_available(model.nlp_data.evaluator)
+    if !has_hessian
+        options[:hessian_approximation] = MadNLP.CompactLBFGS
+    end
+    # 2/ Set Jacobian to constant if all constraints are linear.
+    has_nlp_constraints =
+        any(isequal(_kFunctionTypeScalarQuadratic), model.qp_data.function_type) ||
+        !isempty(model.nlp_data.constraint_bounds)
+    if !has_nlp_constraints
+        options[:jacobian_constant] = true
+    end
+    # Instantiate MadNLP.
+    model.solver = MadNLP.MadNLPSolver(model.nlp; options...)
     model.result = MadNLP.solve!(model.solver)
     model.solve_time = model.solver.cnt.total_time
     model.solve_iterations = model.solver.cnt.k
     return
 end
 
-# From Ipopt/src/Interfaces/IpReturnCodes_inc.h
 const _STATUS_CODES = Dict{MadNLP.Status,MOI.TerminationStatusCode}(
     MadNLP.SOLVE_SUCCEEDED => MOI.LOCALLY_SOLVED,
     MadNLP.SOLVED_TO_ACCEPTABLE_LEVEL => MOI.ALMOST_LOCALLY_SOLVED,

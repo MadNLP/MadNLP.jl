@@ -50,12 +50,12 @@ curvature(::Val{SCALAR2}, sk, yk) = dot(yk, yk) / dot(sk, yk)
 curvature(::Val{SCALAR3}, sk, yk) = 0.5 * (curvature(Val(SCALAR1), sk, yk) + curvature(Val(SCALAR2), sk, yk))
 curvature(::Val{SCALAR4}, sk, yk) = sqrt(curvature(Val(SCALAR1), sk, yk) * curvature(Val(SCALAR2), sk, yk))
 
-@kwdef mutable struct QuasiNewtonOptions <: AbstractOptions
+@kwdef mutable struct QuasiNewtonOptions{T} <: AbstractOptions
     init_strategy::BFGSInitStrategy = SCALAR1
     max_history::Int = 6
-    init_value::Float64 = 1.0
-    sigma_min::Float64 = 1e-8
-    sigma_max::Float64 = 1e+8
+    init_value::T = 1.0
+    sigma_min::T = 1e-8
+    sigma_max::T = 1e+8
 end
 
 
@@ -86,7 +86,7 @@ function create_quasi_newton(
     ::Type{BFGS},
     cb::AbstractCallback{T,VT},
     n;
-    options=QuasiNewtonOptions(),
+    options=QuasiNewtonOptions{T}(),
     ) where {T,VT}
     BFGS(
         options.init_strategy,
@@ -136,7 +136,7 @@ function create_quasi_newton(
     ::Type{DampedBFGS},
     cb::AbstractCallback{T,VT},
     n;
-    options=QuasiNewtonOptions(),
+    options=QuasiNewtonOptions{T}(),
     ) where {T,VT}
     return DampedBFGS(
         options.init_strategy,
@@ -233,7 +233,7 @@ function create_quasi_newton(
     ::Type{CompactLBFGS},
     cb::AbstractCallback{T,VT},
     n;
-    options=QuasiNewtonOptions(),
+    options=QuasiNewtonOptions{T}(),
     ) where {T, VT}
     return CompactLBFGS(
         options.init_strategy,
@@ -242,9 +242,9 @@ function create_quasi_newton(
         fill!(create_array(cb, n), zero(T)),
         fill!(create_array(cb, n), zero(T)),
         fill!(create_array(cb, n), zero(T)),
-        options.init_value,
-        options.sigma_min,
-        options.sigma_max,
+        T(options.init_value),
+        T(options.sigma_min),
+        T(options.sigma_max),
         options.max_history,
         0,
         0,

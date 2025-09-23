@@ -151,6 +151,7 @@ function MadNLPSolver(nlp::AbstractNLPModel{T,VT}; kwargs...) where {T, VT}
         ipm_opt.linear_solver;
         hessian_approximation=ipm_opt.hessian_approximation,
         opt_linear_solver=options.linear_solver,
+        qn_options=ipm_opt.quasi_newton_options,
     )
 
     @trace(logger,"Initializing iterative solver.")
@@ -230,6 +231,7 @@ include("utils.jl")
 include("kernels.jl")
 include("callbacks.jl")
 include("factorization.jl")
+include("line_search.jl")
 include("solver.jl")
 
 

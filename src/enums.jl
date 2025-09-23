@@ -30,6 +30,7 @@
       REGULAR = 12,
       RESTORE = 13,
       ROBUST  = 14,
+      LINESEARCH_SUCCEEDED = 15,
       RESTORATION_FAILED = -1,
       INVALID_NUMBER_DETECTED = -2,
       ERROR_IN_STEP_COMPUTATION = -3,
@@ -45,7 +46,7 @@
 
 function get_status_output(status, opt)
     if status == SOLVE_SUCCEEDED
-        return @sprintf "Optimal Solution Found (tol = %5.1e)." opt.tol 
+        return @sprintf "Optimal Solution Found (tol = %5.1e)." opt.tol
     elseif status == SOLVED_TO_ACCEPTABLE_LEVEL
         return @sprintf "Solved To Acceptable Level (tol = %5.1e)." opt.acceptable_tol
     elseif status == SEARCH_DIRECTION_BECOMES_TOO_SMALL
@@ -78,9 +79,9 @@ function get_status_output(status, opt)
         return "Invalid number in NLP constraint function detected."
     elseif status == INVALID_NUMBER_JACOBIAN
         return "Invalid number in NLP constraint Jacobian detected."
-    elseif INVALID_NUMBER_HESSIAN_LAGRANGIAN
+    elseif status == INVALID_NUMBER_HESSIAN_LAGRANGIAN
         return "Invalid number in NLP Hessian Lagrangian detected."
     else
-        error("status code is not valid") 
+        error("status code is not valid")
     end
 end

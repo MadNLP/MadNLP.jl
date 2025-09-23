@@ -131,6 +131,7 @@ LinearSolverException=Union{SymbolicException,FactorizationException,SolveExcept
     QR = 3,
     CHOLESKY = 4,
     LDL = 5,
+    EVD = 6,
 )
 
 # iterative solvers
@@ -145,3 +146,4 @@ include("lapack.jl")
 include("umfpack.jl")
 include("cholmod.jl")
 include("ldl.jl")
+include("mumps.jl")

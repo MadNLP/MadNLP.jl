@@ -392,7 +392,9 @@ function create_callback(
     con_scale = similar(jac_buffer, m)
     fill!(con_scale, one(T))
 
-    NLPModels.jac_structure!(nlp, jac_I, jac_J)
+    if nnzj > 0
+        NLPModels.jac_structure!(nlp, jac_I, jac_J)
+    end
     if nnzh > 0
         NLPModels.hess_structure!(nlp, hess_I, hess_J)
     end

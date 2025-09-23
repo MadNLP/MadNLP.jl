@@ -1,5 +1,12 @@
 testset = [
     [
+        "SparseKKTSystem + Mumps",
+        ()->MadNLP.Optimizer(
+            linear_solver=MadNLP.MumpsSolver,
+            print_level=MadNLP.ERROR),
+        []
+    ],
+    [
         "SparseKKTSystem + Umfpack",
         ()->MadNLP.Optimizer(
             linear_solver=MadNLP.UmfpackSolver,
@@ -17,6 +24,14 @@ testset = [
         "SparseKKTSystem + RelaxBound",
         ()->MadNLP.Optimizer(
             fixed_variable_treatment=MadNLP.RelaxBound,
+            print_level=MadNLP.ERROR),
+        []
+    ],
+    [
+        "ScaledSparseKKTSystem + LapackCPU",
+        ()->MadNLP.Optimizer(
+            linear_solver=MadNLP.LapackCPUSolver,
+            kkt_system=MadNLP.ScaledSparseKKTSystem,
             print_level=MadNLP.ERROR),
         []
     ],
@@ -46,6 +61,17 @@ testset = [
             lapack_algorithm=MadNLP.QR,
             print_level=MadNLP.ERROR),
         []
+    ],
+    [
+        "DenseKKTSystem + LapackCPU-EVD",
+        ()->MadNLP.Optimizer(
+            kkt_system=MadNLP.DenseKKTSystem,
+            linear_solver=MadNLP.LapackCPUSolver,
+            lapack_algorithm=MadNLP.EVD,
+            print_level=MadNLP.ERROR),
+        [
+            "eigmina" # fails; regularization does not correct the inertia; inertia calculation based on EVD does not seem reliable
+         ]
     ],
     [
         "DenseKKTSystem + LapackCPU-CHOLESKY",
@@ -236,3 +262,12 @@ end
     )
     @test result.status == MadNLP.SOLVE_SUCCEEDED
 end
+
+@testset "Issue #430" begin
+    # Test MadNLP is working with bound_relax_factor=0
+    nlp = MadNLPTests.HS15Model()
+    solver = MadNLPSolver(nlp; bound_relax_factor=0.0)
+    stats = MadNLP.solve!(solver)
+    @test stats.status == MadNLP.SOLVE_SUCCEEDED
+end
+

@@ -1,7 +1,7 @@
 
 # KKT system updates -------------------------------------------------------
 # Set diagonal
-function set_aug_diagonal!(kkt::AbstractKKTSystem{T}, solver::MadNLPSolver{T}) where T
+function set_aug_diagonal!(kkt::AbstractKKTSystem{T}, solver::AbstractMadNLPSolver{T}) where T
     x = full(solver.x)
     xl = full(solver.xl)
     xu = full(solver.xu)
@@ -10,8 +10,8 @@ function set_aug_diagonal!(kkt::AbstractKKTSystem{T}, solver::MadNLPSolver{T}) w
 
     fill!(kkt.reg, zero(T))
     fill!(kkt.du_diag, zero(T))
-    kkt.l_diag .= solver.xl_r .- solver.x_lr
-    kkt.u_diag .= solver.x_ur .- solver.xu_r
+    kkt.l_diag .= solver.xl_r .- solver.x_lr   # (Xˡ - X)
+    kkt.u_diag .= solver.x_ur .- solver.xu_r   # (X - Xᵘ)
     copyto!(kkt.l_lower, solver.zl_r)
     copyto!(kkt.u_lower, solver.zu_r)
 
@@ -33,8 +33,43 @@ function _set_aug_diagonal!(kkt::AbstractUnreducedKKTSystem)
     return
 end
 
+function set_aug_diagonal!(kkt::ScaledSparseKKTSystem{T}, solver::AbstractMadNLPSolver{T}) where T
+    fill!(kkt.reg, zero(T))
+    fill!(kkt.du_diag, zero(T))
+    # Ensure l_diag and u_diag have only non negative entries
+    kkt.l_diag .= solver.x_lr .- solver.xl_r   # (X - Xˡ)
+    kkt.u_diag .= solver.xu_r .- solver.x_ur   # (Xᵘ - X)
+    copyto!(kkt.l_lower, solver.zl_r)
+    copyto!(kkt.u_lower, solver.zu_r)
+    _set_aug_diagonal!(kkt)
+end
+
+function _set_aug_diagonal!(kkt::ScaledSparseKKTSystem{T}) where T
+    xlzu = kkt.buffer1
+    xuzl = kkt.buffer2
+    fill!(xlzu, zero(T))
+    fill!(xuzl, zero(T))
+
+    xlzu[kkt.ind_ub] .= kkt.u_lower    # zᵘ
+    xlzu[kkt.ind_lb] .*= kkt.l_diag    # (X - Xˡ) zᵘ
+
+    xuzl[kkt.ind_lb] .= kkt.l_lower    # zˡ
+    xuzl[kkt.ind_ub] .*= kkt.u_diag    # (Xᵘ - X) zˡ
+
+    kkt.pr_diag .= xlzu .+ xuzl
+
+    fill!(kkt.scaling_factor, one(T))
+    kkt.scaling_factor[kkt.ind_lb] .*= sqrt.(kkt.l_diag)
+    kkt.scaling_factor[kkt.ind_ub] .*= sqrt.(kkt.u_diag)
+
+    # Scale regularization by scaling factor.
+    kkt.pr_diag .+= kkt.reg .* kkt.scaling_factor.^2
+    return
+end
+
+
 # Robust restoration
-function set_aug_RR!(kkt::AbstractKKTSystem, solver::MadNLPSolver, RR::RobustRestorer)
+function set_aug_RR!(kkt::AbstractKKTSystem, solver::AbstractMadNLPSolver, RR::RobustRestorer)
     x = full(solver.x)
     xl = full(solver.xl)
     xu = full(solver.xu)
@@ -48,18 +83,34 @@ function set_aug_RR!(kkt::AbstractKKTSystem, solver::MadNLPSolver, RR::RobustRes
     kkt.u_diag .= solver.x_ur .- solver.xu_r
 
     _set_aug_diagonal!(kkt)
-
     return
 end
 
-function set_f_RR!(solver::MadNLPSolver, RR::RobustRestorer)
+function set_aug_RR!(kkt::ScaledSparseKKTSystem, solver::AbstractMadNLPSolver, RR::RobustRestorer)
+    x = full(solver.x)
+    xl = full(solver.xl)
+    xu = full(solver.xu)
+    zl = full(solver.zl)
+    zu = full(solver.zu)
+    kkt.reg .= RR.zeta .* RR.D_R .^ 2
+    kkt.du_diag .= .- RR.pp ./ RR.zp .- RR.nn ./ RR.zn
+    copyto!(kkt.l_lower, solver.zl_r)
+    copyto!(kkt.u_lower, solver.zu_r)
+    kkt.l_diag .= solver.x_lr .- solver.xl_r
+    kkt.u_diag .= solver.xu_r .- solver.x_ur
+
+    _set_aug_diagonal!(kkt)
+    return
+end
+
+function set_f_RR!(solver::AbstractMadNLPSolver, RR::RobustRestorer)
     x = full(solver.x)
     RR.f_R .= RR.zeta .* RR.D_R .^ 2 .* (x .- RR.x_ref)
     return
 end
 
 # Set RHS
-function set_aug_rhs!(solver::MadNLPSolver, kkt::AbstractKKTSystem, c::AbstractVector)
+function set_aug_rhs!(solver::AbstractMadNLPSolver, kkt::AbstractKKTSystem, c::AbstractVector)
     px = primal(solver.p)
     x = primal(solver.x)
     f = primal(solver.f)
@@ -80,7 +131,7 @@ end
 
 # Set RHS RR
 function set_aug_rhs_RR!(
-    solver::MadNLPSolver, kkt::AbstractKKTSystem, RR::RobustRestorer, rho,
+    solver::AbstractMadNLPSolver, kkt::AbstractKKTSystem, RR::RobustRestorer, rho,
 )
     x = full(solver.x)
     xl = full(solver.xl)
@@ -136,6 +187,12 @@ end
     xp_ur .-= wu ./ u_diag
     return
 end
+function reduce_rhs!(kkt::AbstractKKTSystem, d::AbstractKKTVector)
+    reduce_rhs!(
+        d.xp_lr, dual_lb(d), kkt.l_diag,
+        d.xp_ur, dual_ub(d), kkt.u_diag,
+    )
+end
 
 # Finish
 function finish_aug_solve!(kkt::AbstractKKTSystem, d::AbstractKKTVector)
@@ -147,17 +204,20 @@ function finish_aug_solve!(kkt::AbstractKKTSystem, d::AbstractKKTVector)
 end
 
 function set_initial_bounds!(xl::AbstractVector{T}, xu::AbstractVector{T}, tol) where T
-    map!(
-        x->x - max(one(T), abs(x)) .* tol,
-        xl, xl
-    )
-    map!(
-        x->x + max(one(T), abs(x)) .* tol,
-        xu, xu
-    )
+    # If `tol` is set to zero, keep the bounds unchanged.
+    if tol > zero(T)
+        map!(
+            x->x - max(one(T), abs(x)) .* tol,
+            xl, xl
+        )
+        map!(
+            x->x + max(one(T), abs(x)) .* tol,
+            xu, xu
+        )
+    end
 end
 
-function set_initial_rhs!(solver::MadNLPSolver{T}, kkt::AbstractKKTSystem) where T
+function set_initial_rhs!(solver::AbstractMadNLPSolver{T}, kkt::AbstractKKTSystem) where T
     f = primal(solver.f)
     zl = primal(solver.zl)
     zu = primal(solver.zu)
@@ -170,7 +230,7 @@ function set_initial_rhs!(solver::MadNLPSolver{T}, kkt::AbstractKKTSystem) where
 end
 
 # Set ifr
-function set_aug_rhs_ifr!(solver::MadNLPSolver{T}, kkt::AbstractKKTSystem, p0::AbstractKKTVector) where T
+function set_aug_rhs_ifr!(solver::AbstractMadNLPSolver{T}, kkt::AbstractKKTSystem, p0::AbstractKKTVector) where T
     fill!(primal(p0), zero(T))
     fill!(dual_lb(p0), zero(T))
     fill!(dual_ub(p0), zero(T))
@@ -179,7 +239,7 @@ function set_aug_rhs_ifr!(solver::MadNLPSolver{T}, kkt::AbstractKKTSystem, p0::A
     return
 end
 
-function set_g_ifr!(solver::MadNLPSolver, g::AbstractArray)
+function set_g_ifr!(solver::AbstractMadNLPSolver, g::AbstractArray)
     f = full(solver.f)
     x = full(solver.x)
     xl = full(solver.xl)
@@ -685,7 +745,6 @@ function get_sd(l, zl_r, zu_r, s_max)
         (norm(l, 1)+norm(zl_r, 1)+norm(zu_r, 1)) / max(1, (length(l)+length(zl_r)+length(zu_r))),
     ) / s_max
 end
-
 function get_sc(zl_r, zu_r, s_max)
     return max(
         s_max,

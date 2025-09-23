@@ -58,6 +58,7 @@ function create_kkt_system(
     linear_solver::Type;
     opt_linear_solver=default_options(linear_solver),
     hessian_approximation=ExactHessian,
+    qn_options=QuasiNewtonOptions(),
 ) where {T, VT}
     ind_ineq = cb.ind_ineq
     n = cb.nvar
@@ -73,7 +74,7 @@ function create_kkt_system(
     jac_sparsity_J = create_array(cb, Int32, cb.nnzj)
     _jac_sparsity_wrapper!(cb,jac_sparsity_I, jac_sparsity_J)
 
-    quasi_newton = create_quasi_newton(hessian_approximation, cb, n)
+    quasi_newton = create_quasi_newton(hessian_approximation, cb, n; options=qn_options)
     hess_sparsity_I, hess_sparsity_J = build_hessian_structure(cb, hessian_approximation)
 
     force_lower_triangular!(hess_sparsity_I,hess_sparsity_J)
@@ -220,15 +221,18 @@ nzval(H) = H.nzval
 
     n = size(H,2)
 
+    # N.B.: we should ensure that zind is allocated on the proper device.
+    zind = similar(nzval(H), Int, size(H, 2))
+    zind .= 1:size(H, 2)
     map!(
         i->(-1,i,0),
         @view(sym[1:n]),
-        1:size(H,2)
+        zind,
     )
     map!(
         i->(i,i),
         @view(sym2[1:n]),
-        1:size(H,2)
+        zind,
     )
 
     _build_condensed_aug_symbolic_hess(
