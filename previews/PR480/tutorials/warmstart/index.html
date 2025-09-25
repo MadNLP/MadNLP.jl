@@ -55,11 +55,11 @@ Number of constraint evaluations                      = 46
 Number of constraint Jacobian evaluations             = 19
 Number of Lagrangian Hessian evaluations              = 18
 
-Total wall secs in initializtion                      =  0.695
+Total wall secs in initializtion                      =  0.497
 Total wall secs in linear solver                      =  0.002
 Total wall secs in NLP function evaluations           =  0.000
-Total wall secs in solver (w/o init./fun./lin. alg.)  =  4.703
-Total wall secs                                       =  5.400
+Total wall secs in solver (w/o init./fun./lin. alg.)  =  3.542
+Total wall secs                                       =  4.041
 
 <span class="sgr32">EXIT: Optimal Solution Found (tol = 1.0e-08).</span></code></pre><p>MadNLP converges in 19 barrier iterations.  The solution is:</p><pre><code class="language-julia hljs">println(&quot;Objective: &quot;, results.objective)
 println(&quot;Solution:  &quot;, results.solution)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Objective: 360.37976240508465
@@ -98,8 +98,8 @@ Number of Iterations....: 6
 Objective...............:   5.9863692672462122e+01    3.6431986176592244e+02
 Dual infeasibility......:   3.5527136788005009e-13    2.1621188045252375e-12
 Constraint violation....:   3.6637359812630166e-15    3.6637359812630166e-15
-Complementarity.........:   1.4944579942412235e-10    9.0950074339032134e-10
-Overall NLP error.......:   9.0950074339032134e-10    9.0950074339032134e-10
+Complementarity.........:   1.4944579942406655e-10    9.0950074338998168e-10
+Overall NLP error.......:   9.0950074338998168e-10    9.0950074338998168e-10
 
 Number of objective function evaluations              = 7
 Number of objective gradient evaluations              = 7
@@ -110,8 +110,8 @@ Number of Lagrangian Hessian evaluations              = 6
 Total wall secs in initializtion                      =  0.001
 Total wall secs in linear solver                      =  0.001
 Total wall secs in NLP function evaluations           =  0.000
-Total wall secs in solver (w/o init./fun./lin. alg.)  =  0.002
-Total wall secs                                       =  0.003
+Total wall secs in solver (w/o init./fun./lin. alg.)  =  0.001
+Total wall secs                                       =  0.002
 
 <span class="sgr32">EXIT: Optimal Solution Found (tol = 1.0e-08).</span></code></pre><p>By decreasing the initial barrier parameter, we can reduce the total number of iterations to 5:</p><pre><code class="language-julia hljs">results_new = madnlp(nlp; mu_init=1e-7)
 nothing</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">The following options are ignored:
@@ -146,8 +146,8 @@ Number of Iterations....: 6
 Objective...............:   5.9863692672462122e+01    3.6431986176592244e+02
 Dual infeasibility......:   3.5527136788005009e-13    2.1621188045252375e-12
 Constraint violation....:   3.6637359812630166e-15    3.6637359812630166e-15
-Complementarity.........:   1.4944579942412235e-10    9.0950074339032134e-10
-Overall NLP error.......:   9.0950074339032134e-10    9.0950074339032134e-10
+Complementarity.........:   1.4944579942406655e-10    9.0950074338998168e-10
+Overall NLP error.......:   9.0950074338998168e-10    9.0950074338998168e-10
 
 Number of objective function evaluations              = 7
 Number of objective gradient evaluations              = 7
@@ -158,8 +158,8 @@ Number of Lagrangian Hessian evaluations              = 6
 Total wall secs in initializtion                      =  0.001
 Total wall secs in linear solver                      =  0.001
 Total wall secs in NLP function evaluations           =  0.000
-Total wall secs in solver (w/o init./fun./lin. alg.)  =  0.001
-Total wall secs                                       =  0.002
+Total wall secs in solver (w/o init./fun./lin. alg.)  =  0.002
+Total wall secs                                       =  0.003
 
 <span class="sgr32">EXIT: Optimal Solution Found (tol = 1.0e-08).</span></code></pre><p>The final solution is slightly different from the previous one, as we have updated the parameters inside the model <code>nlp</code>:</p><pre><code class="language-julia hljs">results_new.solution</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">2-element Vector{Float64}:
  -0.7920519043023828
@@ -208,7 +208,7 @@ Number of Lagrangian Hessian evaluations              = 24
 Total wall secs in initializtion                      =  0.001
 Total wall secs in linear solver                      =  0.002
 Total wall secs in NLP function evaluations           =  0.000
-Total wall secs in solver (w/o init./fun./lin. alg.)  =  0.253
-Total wall secs                                       =  0.256
+Total wall secs in solver (w/o init./fun./lin. alg.)  =  0.270
+Total wall secs                                       =  0.272
 
-<span class="sgr32">EXIT: Optimal Solution Found (tol = 1.0e-08).</span></code></pre><p>Three observations are in order:</p><ul><li>The iteration count starts directly from the previous count (as stored in <code>solver.cnt.k</code>).</li><li>MadNLP converges in only 4 iterations.</li><li>The factorization stored in <code>solver</code> is directly re-used, leading to significant savings. As a consequence, the warm-start does not work if the structure of the problem changes between the first and the second solve (e.g, if variables or constraints are added to the constraints).</li></ul></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../multiprecision/">« Multi-precision</a><a class="docs-footer-nextpage" href="../lbfgs/">LBFGS »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.14.1 on <span class="colophon-date" title="Thursday 25 September 2025 07:14">Thursday 25 September 2025</span>. Using Julia version 1.10.10.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+<span class="sgr32">EXIT: Optimal Solution Found (tol = 1.0e-08).</span></code></pre><p>Three observations are in order:</p><ul><li>The iteration count starts directly from the previous count (as stored in <code>solver.cnt.k</code>).</li><li>MadNLP converges in only 4 iterations.</li><li>The factorization stored in <code>solver</code> is directly re-used, leading to significant savings. As a consequence, the warm-start does not work if the structure of the problem changes between the first and the second solve (e.g, if variables or constraints are added to the constraints).</li></ul></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../multiprecision/">« Multi-precision</a><a class="docs-footer-nextpage" href="../lbfgs/">LBFGS »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.14.1 on <span class="colophon-date" title="Thursday 25 September 2025 12:14">Thursday 25 September 2025</span>. Using Julia version 1.10.10.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
