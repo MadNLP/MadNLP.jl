@@ -261,7 +261,7 @@ function regular!(solver::AbstractMadNLPSolver{T}) where T
         update_barrier!(solver.opt.barrier, solver, sc)
 
         # compute the newton step
-        @trace(_logger(solver),"Computing the newton step.")
+        @trace(_logger(solver),"Computing the Newton step.")
         set_aug_rhs!(solver, _kkt(solver), _c(solver), _mu(solver))
         dual_inf_perturbation!(primal(_p(solver)),_ind_llb(solver),_ind_uub(solver),_mu(solver),_opt(solver).kappa_d)
         solve_refine_wrapper!(_d(solver), solver, _p(solver), __w4(solver))
@@ -630,7 +630,12 @@ function inertia_correction!(
 
     num_pos,num_zero,num_neg = inertia(_kkt(solver).linear_solver)
 
-    solve_status = is_inertia_correct(_kkt(solver), num_pos, num_zero, num_neg)
+    solve_status = if is_inertia_correct(_kkt(solver), num_pos, num_zero, num_neg)
+        # Try a backsolve. If the factorization has failed, solve_refine_wrapper returns false.
+        solve_refine_wrapper!(_d(solver), solver, _p(solver), __w4(solver))
+    else
+        false
+    end
 
     while !solve_status
         @debug(_logger(solver),"Primal-dual perturbed.")
@@ -655,7 +660,12 @@ function inertia_correction!(
         factorize_wrapper!(solver)
         num_pos,num_zero,num_neg = inertia(_kkt(solver).linear_solver)
 
-        solve_status = is_inertia_correct(_kkt(solver), num_pos, num_zero, num_neg)
+        solve_status = if is_inertia_correct(_kkt(solver), num_pos, num_zero, num_neg)
+            solve_refine_wrapper!(_d(solver), solver, _p(solver), __w4(solver))
+        else
+            false
+        end
+
         n_trial += 1
     end
 
