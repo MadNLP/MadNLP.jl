@@ -23,9 +23,6 @@ import MadNLP:
     introduce, factorize!, solve!, improve!, is_inertia, inertia, tril_to_full!,
     LapackOptions, input_type, is_supported, default_options, symul!
 
-# AMD and Metis
-import AMD, Metis
-
 include("utils.jl")
 include("KKT/kernels_dense.jl")
 include("KKT/kernels_sparse.jl")
