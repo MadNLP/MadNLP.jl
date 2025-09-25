@@ -120,7 +120,7 @@ end
 Update the barrier parameter using the classical Fiacco-McCormick monotone rule.
 
 """
-@kwdef struct MonotoneUpdate{T} <: AbstractBarrierUpdate{T}
+@kwdef mutable struct MonotoneUpdate{T} <: AbstractBarrierUpdate{T}
     mu_init::T = 1e-1
     mu_min::T = 1e-11
     mu_superlinear_decrease_power::T = 1.5
