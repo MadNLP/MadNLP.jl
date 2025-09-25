@@ -198,7 +198,7 @@ function MadNLP._sym_length(Jt::oneMKL.oneSparseMatrixCSC)
 end
 
 function MadNLP._first_and_last_col(sym2::oneVector, ptr2)
-    AMDGPU.@allowscalar begin
+    @allowscalar begin
         first = sym2[1][2]
         last = sym2[ptr2[end]][2]
     end
