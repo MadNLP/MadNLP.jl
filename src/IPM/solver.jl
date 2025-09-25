@@ -254,6 +254,7 @@ function regular!(solver::AbstractMadNLPSolver{T}) where T
         # factorize the KKT system
         @trace(solver.logger,"Factorizing the KKT system.")
         set_aug_diagonal!(solver.kkt,solver)
+        set_aug_rhs!(solver, solver.kkt, solver.c, solver.mu)
         inertia_correction!(solver.inertia_corrector, solver) || return ROBUST
 
         # update the barrier parameter
@@ -454,11 +455,12 @@ function robust!(solver::AbstractMadNLPSolver{T}) where T
         @trace(_logger(solver),"Updating restoration phase barrier parameter.")
         _update_monotone_RR!(_opt(solver).barrier, solver, sc)
 
-        # compute the newton step
+        # compute the Newton step
         if !_opt(solver).hessian_constant
             eval_lag_hess_wrapper!(solver, _kkt(solver), _x(solver), _y(solver); is_resto=true)
         end
         set_aug_RR!(_kkt(solver), solver, RR)
+        set_aug_rhs_RR!(solver, _kkt(solver), RR, _opt(solver).rho)
         inertia_correction!(_inertia_corrector(solver), solver) || return RESTORATION_FAILED
 
         # without inertia correction,
