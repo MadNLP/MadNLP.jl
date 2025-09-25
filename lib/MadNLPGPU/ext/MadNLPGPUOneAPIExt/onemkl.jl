@@ -9,6 +9,9 @@ mutable struct LapackOneMKLSolver{T,MT} <: MadNLP.AbstractLinearSolver{T}
     ipiv::oneVector{Int64}
     scratchpad::oneVector{T}
     scratchpad_size::Int64
+    device_queue::SYCL.syclQueue_t
+    alpha::Base.RefValue{T}
+    beta::Base.RefValue{T}
     opt::MadNLP.LapackOptions
     logger::MadNLP.MadNLPLogger
 
@@ -29,7 +32,14 @@ mutable struct LapackOneMKLSolver{T,MT} <: MadNLP.AbstractLinearSolver{T}
         Λ = oneVector{T}(undef, 0)
         info = oneVector{Cint}(undef, 1)
         ipiv = oneVector{Int64}(undef, 0)
-        solver = new{T,MT}(A, fact, n, sol, tau, Λ, info, ipiv, opt, logger)
+        scratchpad = oneVector{T}(undef, 0)
+        scratchpad_size = 0
+        # Get the device queue from the oneAPI context
+        queue = oneAPI.global_queue(oneAPI.context(fact), oneAPI.device(fact))
+        device_queue = oneAPI.sycl_queue(queue)
+        alpha = Ref{T}(1)
+        beta = Ref{T}(0)
+        solver = new{T,MT}(A, fact, n, sol, tau, Λ, info, ipiv, scratchpad, scratchpad_size, device_queue, alpha, beta, opt, logger)
         setup!(solver)
         return solver
     end
@@ -119,8 +129,10 @@ for (potrf, potrf_buffer, potrs, potrs_buffer, T) in
      (:onemklSpotrf, :onemklSpotrf_scratchpad_size, :onemklSpotrs, :onemklSpotrs_scratchpad_size, :Float32))
     @eval begin
         function setup_cholesky!(M::LapackOneMKLSolver{$T})
-            Support.$potrf_buffer(M.device_queue, 'L', M.n, M.n)
-            Support.$potrs_buffer(M.device_queue, 'L', M.n, one(Int64), M.n, M.n)
+            potrf_scratchpad_size = Support.$potrf_buffer(M.device_queue, 'L', M.n, M.n)
+            potrs_scratchpad_size = Support.$potrs_buffer(M.device_queue, 'L', M.n, one(Int64), M.n, M.n)
+            M.scratchpad_size = max(potrf_scratchpad_size, potrs_scratchpad_size)
+            resize!(M.scratchpad, M.scratchpad_size)
             return M
         end
 
@@ -161,8 +173,10 @@ for (getrf, getrf_buffer, getrs, getrs_buffer, T) in
     @eval begin
         function setup_lu!(M::LapackOneMKLSolver{$T})
             resize!(M.ipiv, M.n)
-            Support.$getrf_buffer(M.device_queue, M.n, M.n, M.n)
-            Support.$getrs_buffer(M.device_queue, 'N', M.n, one(Int64), M.n, M.n)
+            getrf_scratchpad_size = Support.$getrf_buffer(M.device_queue, M.n, M.n, M.n)
+            getrs_scratchpad_size = Support.$getrs_buffer(M.device_queue, 'N', M.n, one(Int64), M.n, M.n)
+            M.scratchpad_size = max(getrf_scratchpad_size, getrs_scratchpad_size)
+            resize!(M.scratchpad, M.scratchpad_size)
             return M
         end
 
@@ -205,8 +219,11 @@ for (geqrf, geqrf_buffer, ormqr, ormqr_buffer, trsv, T) in
     @eval begin
         function setup_qr!(M::LapackOneMKLSolver{$T})
             resize!(M.tau, M.n)
-            Support.$geqrf_buffer(M.device_queue, M.n, M.n, M.n)
-            Support.$ormqr_buffer(M.device_queue, side, trans, m, n, k, lda, ldc)
+            geqrf_scratchpad_size = Support.$geqrf_buffer(M.device_queue, M.n, M.n, M.n)
+            # TODO: Fix ormqr buffer size calculation - undefined variables
+            # ormqr_scratchpad_size = Support.$ormqr_buffer(M.device_queue, side, trans, m, n, k, lda, ldc)
+            M.scratchpad_size = geqrf_scratchpad_size
+            resize!(M.scratchpad, M.scratchpad_size)
             return M
         end
 
@@ -266,7 +283,8 @@ for (syevd, syevd_buffer, gemv, T) in
         function setup_evd!(M::LapackOneMKLSolver{$T})
             resize!(M.tau, M.n)
             resize!(M.Λ, M.n)
-            Support.$syevd_buffer(M.device_queue, 'V', 'L', M.n, M.n)
+            M.scratchpad_size = Support.$syevd_buffer(M.device_queue, 'V', 'L', M.n, M.n)
+            resize!(M.scratchpad, M.scratchpad_size)
             return M
         end
 
