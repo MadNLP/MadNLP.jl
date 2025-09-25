@@ -23,6 +23,7 @@ MathOptInterface = "b8f27783-ece8-5eb3-8dc8-9495eed66fee"
 MadNLPMOI = "MathOptInterface"
 
 [compat]
+GPUArraysCore = "0.2.0"
 LDLFactorizations = "0.10"
 MINLPTests = "~0.5"
 MadNLPTests = "0.5"

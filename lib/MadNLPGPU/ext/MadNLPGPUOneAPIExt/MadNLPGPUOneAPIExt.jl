@@ -8,6 +8,7 @@ import MadNLP
 import MadNLPGPU
 
 import KernelAbstractions: synchronize
+import GPUArraysCore: @allowscalar
 
 using oneAPI
 using oneAPI.oneMKL, oneAPI.Support
