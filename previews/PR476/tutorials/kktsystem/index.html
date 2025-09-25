@@ -17,7 +17,7 @@
     r_1 \\ r_2 \\ r_3 \\ r_4
 \end{pmatrix}\]</p><p>with <span>$W$</span> a sparse matrix storing the Hessian of the Lagrangian, and <span>$J$</span> a sparse matrix storing the Jacobian of the constraints. We note the diagonal matrices <span>$Z_\ell = diag(z_\ell)$</span>, <span>$Z_u = diag(z_u)$</span>, <span>$X_\ell = diag(x_\ell - x)$</span>, <span>$X_u = diag(x - x_u)$</span>.</p><p>In MadNLP, every linear system with the structure <span>$K$</span> is implemented as an <a href="../../lib/kkt/#AbstractKKTSystem"><code>AbstractKKTSystem</code></a>. By default, MadNLP represents a KKT system as a <a href="../../lib/kkt/#MadNLP.SparseKKTSystem"><code>SparseKKTSystem</code></a>:</p><pre><code class="language-julia hljs">nlp = HS15Model()
 results = madnlp(nlp; kkt_system=MadNLP.SparseKKTSystem, linear_solver=LapackCPUSolver)
-nothing</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">This is MadNLP version v0.8.12, running with Lapack-CPU (BUNCHKAUFMAN)
+nothing</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">This is <span class="sgr34">Mad</span><span class="sgr31">N</span><span class="sgr32">L</span><span class="sgr35">P</span> version v0.8.12, running with Lapack-CPU (BUNCHKAUFMAN)
 
 Number of nonzeros in constraint Jacobian............:        4
 Number of nonzeros in Lagrangian Hessian.............:        3
@@ -32,48 +32,50 @@ Total number of inequality constraints...............:        2
    inequality constraints with lower and upper bounds:        0
         inequality constraints with only upper bounds:        0
 
-iter    objective    inf_pr   inf_du inf_compl lg(mu)  ||d||  lg(rg) alpha_du alpha_pr  ls
-   0  1.0000000e+00 1.01e+00 1.00e+00 5.00e-01  -1.0 0.00e+00    -  0.00e+00 0.00e+00   0
-   1  9.9758855e-01 1.00e+00 4.61e+01 3.80e-01  -1.0 1.01e+00    -  4.29e-01 9.80e-03h  1
-   2  9.9664309e-01 1.00e+00 5.00e+02 2.35e-03  -1.0 4.81e+00    -  1.00e+00 9.93e-05h  1
-   3  1.3615174e+00 9.99e-01 4.41e+02 2.44e-03  -1.0 5.73e+02    -  9.98e-05 4.71e-04H  1
-   4  1.3742697e+00 9.99e-01 3.59e+02 1.40e-01  -1.0 3.90e+01    -  2.30e-02 2.68e-05h  1
-   5  1.4692139e+00 9.99e-01 4.94e+02 2.31e+00  -1.0 5.07e+01    -  2.76e-04 1.46e-04h  1
-   6  3.1727722e+00 9.97e-01 3.76e+02 2.36e+00  -1.0 8.08e+01    -  1.88e-06 9.77e-04h  11
-   7  3.1746542e+00 9.96e-01 1.53e+02 3.13e-03  -1.0 9.93e-01   4.0 9.96e-01 7.98e-04h  1
-   8  8.2322599e+00 9.85e-01 2.47e+02 5.06e-03  -1.0 1.51e+01    -  1.43e-03 7.81e-03h  8
-   9  8.2886173e+00 9.84e-01 4.78e+02 1.51e-04  -1.0 3.92e+00    -  1.00e+00 2.48e-04h  1
-iter    objective    inf_pr   inf_du inf_compl lg(mu)  ||d||  lg(rg) alpha_du alpha_pr  ls
-  10  4.0285546e+01 8.72e-01 4.57e+02 6.32e-04  -1.0 4.94e+00    -  1.00e+00 6.25e-02h  5
-  11  2.8602303e+02 2.66e-01 4.91e+02 5.99e-04  -1.0 1.16e+00    -  6.87e-01 5.00e-01h  2
-  12  3.9870638e+02 6.41e-03 4.21e+02 3.32e-03  -1.0 1.89e-01    -  2.69e-01 1.00e+00h  1
-  13  3.4928113e+02 2.93e-02 2.62e+01 1.02e+00  -1.0 5.07e-01    -  1.00e+00 1.00e+00h  1
-  14  3.5909050e+02 6.98e-03 1.66e+00 6.15e-02  -1.0 2.60e-01    -  6.84e-01 1.00e+00h  1
-  15  3.6047026e+02 6.05e-05 1.44e-02 6.46e-02  -1.0 2.91e-02    -  1.00e+00 1.00e+00h  1
-  16  3.6038251e+02 2.50e-07 7.99e-05 1.89e-03  -2.5 1.37e-03    -  1.00e+00 1.00e+00h  1
-  17  3.6037976e+02 2.63e-10 7.93e-08 1.27e-06  -5.7 4.63e-05    -  1.00e+00 1.00e+00h  1
-  18  3.6037976e+02 1.11e-16 5.96e-14 1.58e-09  -8.6 3.06e-08    -  1.00e+00 1.00e+00h  1
+iter    objective    inf_pr   inf_du inf_compl lg(mu) lg(rg) alpha_pr ir ls
+   0  1.0000000e+00 1.01e+00 1.00e+00 5.00e-01  -1.0     -   0.00e+00  1  0
+   1  9.9758855e-01 1.00e+00 4.61e+01 3.80e-01  -1.0     -   9.80e-03  1  1h
+   2  9.9664309e-01 1.00e+00 5.00e+02 2.35e-03  -1.0     -   9.93e-05  1  1h
+   3  1.3615174e+00 9.99e-01 4.41e+02 2.44e-03  -1.0     -   4.71e-04  1  1H
+   4  1.3742697e+00 9.99e-01 3.59e+02 1.40e-01  -1.0     -   2.68e-05  1  1h
+   5  1.4692139e+00 9.99e-01 4.94e+02 2.31e+00  -1.0     -   1.46e-04  1  1h
+   6  3.1727722e+00 9.97e-01 3.76e+02 2.36e+00  -1.0     -   9.77e-04  1 11h
+   7  3.1746542e+00 9.96e-01 1.53e+02 3.13e-03  -1.0    4.0  7.98e-04  1  1h
+   8  8.2322585e+00 9.85e-01 2.47e+02 5.06e-03  -1.0     -   7.81e-03  1  8h
+   9  8.2886187e+00 9.84e-01 4.78e+02 1.51e-04  -1.0     -   2.48e-04  1  1h
+iter    objective    inf_pr   inf_du inf_compl lg(mu) lg(rg) alpha_pr ir ls
+  10  4.0285541e+01 8.72e-01 4.57e+02 6.32e-04  -1.0     -   6.25e-02  1  5h
+  11  2.8602305e+02 2.66e-01 4.91e+02 5.99e-04  -1.0     -   5.00e-01  1  2h
+  12  3.9870638e+02 6.41e-03 4.21e+02 3.32e-03  -1.0     -   1.00e+00  1  1h
+  13  3.4928112e+02 2.93e-02 2.62e+01 1.02e+00  -1.0     -   1.00e+00  1  1h
+  14  3.5909050e+02 6.98e-03 1.66e+00 6.15e-02  -1.0     -   1.00e+00  1  1h
+  15  3.6047026e+02 6.05e-05 1.44e-02 6.46e-02  -1.0     -   1.00e+00  1  1h
+  16  3.6038251e+02 2.50e-07 7.99e-05 1.89e-03  -2.5     -   1.00e+00  1  1h
+  17  3.6037976e+02 2.63e-10 7.93e-08 1.27e-06  -5.7     -   1.00e+00  1  1h
+  18  3.6037976e+02 1.11e-16 1.19e-13 1.58e-09  -8.6     -   1.00e+00  2  1h
 
 Number of Iterations....: 18
 
                                    (scaled)                 (unscaled)
 Objective...............:   3.6037976240508465e+02    3.6037976240508465e+02
-Dual infeasibility......:   5.9563010060664213e-14    5.9563010060664213e-14
+Dual infeasibility......:   1.1912602012132843e-13    1.1912602012132843e-13
 Constraint violation....:   1.1102230246251565e-16    1.1102230246251565e-16
-Complementarity.........:   1.5755252336109936e-09    1.5755252336109936e-09
-Overall NLP error.......:   1.5755252336109936e-09    1.5755252336109936e-09
+Complementarity.........:   1.5755252336099267e-09    1.5755252336099267e-09
+Overall NLP error.......:   1.5755252336099267e-09    1.5755252336099267e-09
 
-Number of objective function evaluations             = 46
-Number of objective gradient evaluations             = 19
-Number of constraint evaluations                     = 46
-Number of constraint Jacobian evaluations            = 19
-Number of Lagrangian Hessian evaluations             = 18
-Total wall-clock secs in solver (w/o fun. eval./lin. alg.)  =  5.706
-Total wall-clock secs in linear solver                      =  0.000
-Total wall-clock secs in NLP function evaluations           =  0.000
-Total wall-clock secs                                       =  5.707
+Number of objective function evaluations              = 46
+Number of objective gradient evaluations              = 19
+Number of constraint evaluations                      = 46
+Number of constraint Jacobian evaluations             = 19
+Number of Lagrangian Hessian evaluations              = 18
 
-EXIT: Optimal Solution Found (tol = 1.0e-08).</code></pre><h2 id="Solving-AbstractKKTSystem-in-MadNLP"><a class="docs-heading-anchor" href="#Solving-AbstractKKTSystem-in-MadNLP">Solving AbstractKKTSystem in MadNLP</a><a id="Solving-AbstractKKTSystem-in-MadNLP-1"></a><a class="docs-heading-anchor-permalink" href="#Solving-AbstractKKTSystem-in-MadNLP" title="Permalink"></a></h2><p>The <code>AbstractKKTSystem</code> object is an abstraction to solve the generic system <span>$K x = b$</span>. Depending on the implementation, the structure of the linear system is exploited in different fashions. Solving a KKT system amounts to the four following operations:</p><ol><li>Querying the current sensitivities to assemble the different blocks constituting the matrix <span>$K$</span>.</li><li>Assembling a reduced sparse matrix condensing the sparse matrix <span>$K$</span> to an equivalent smaller symmetric system.</li><li>Calling a linear solver to solve the condensed system.</li><li>Calling a routine to unpack the condensed solution to get the original descent direction <span>$(\Delta x, \Delta y, \Delta z_\ell, \Delta z_u)$</span>.</li></ol><p>Exploiting the problem&#39;s structure usually happens in steps (2) and (4). We skim through the four successive steps in more details.</p><h3 id="Getting-the-sensitivities"><a class="docs-heading-anchor" href="#Getting-the-sensitivities">Getting the sensitivities</a><a id="Getting-the-sensitivities-1"></a><a class="docs-heading-anchor-permalink" href="#Getting-the-sensitivities" title="Permalink"></a></h3><p>The KKT system requires the following information:</p><ul><li>the (approximated) Hessian of the Lagrangian <span>$W$</span> ;</li><li>the constraints&#39; Jacobian <span>$J$</span> ;</li><li>the diagonal matrices <span>$Z_\ell$</span>, <span>$Z_u$</span> and <span>$X_\ell$</span>, <span>$X_u$</span>.</li></ul><p>The Hessian and the Jacobian are assumed sparse by default.</p><p>At every IPM iteration, MadNLP updates automatically the values in <span>$W$</span>, <span>$J$</span> and in the diagonal matrices <span>$Z_\ell, Z_u, X_\ell, X_u$</span>. By default, we expect the following attributes available in every instance <code>kkt</code> of an <code>AbstractKKTSystem</code>:</p><ul><li><code>kkt.hess</code>: stores the nonzeroes of the Hessian <span>$W$</span>;</li><li><code>kkt.jac</code>: stores the nonzeroes of the Jacobian <span>$J$</span>;</li><li><code>kkt.l_diag</code>: stores the diagonal entries in <span>$X_\ell$</span>;</li><li><code>kkt.u_diag</code>: stores the diagonal entries in <span>$X_u$</span>;</li><li><code>kkt.l_lower</code>: stores the diagonal entries in <span>$Z_\ell$</span>;</li><li><code>kkt.u_lower</code>: stores the diagonal entries in <span>$Z_u$</span>.</li></ul><p>The attributes <code>kkt.hess</code> and <code>kkt.jac</code> are accessed respectively using the getters <a href="../../lib/kkt/#MadNLP.get_hessian"><code>get_hessian</code></a> and <a href="../../lib/kkt/#MadNLP.get_jacobian"><code>get_jacobian</code></a>.</p><p>Every time MadNLP queries the Hessian and the Jacobian, it updates the nonzeroes values in <code>kkt.hess</code> and <code>kkt.jac</code>. Rightafter, MadNLP calls respectively the functions <a href="../../lib/kkt/#MadNLP.compress_hessian!"><code>compress_hessian!</code></a> and <a href="../../lib/kkt/#MadNLP.compress_jacobian!"><code>compress_jacobian!</code></a> to update all the internal values in the KKT system <code>kkt</code>.</p><p>To recap, every time we evaluate the Hessian and the Jacobian, MadNLP calls automatically the functions:</p><pre><code class="language-julia hljs">hess = MadNLP.get_hessian(kkt)
+Total wall secs in initializtion                      =  0.730
+Total wall secs in linear solver                      =  0.000
+Total wall secs in NLP function evaluations           =  0.000
+Total wall secs in solver (w/o init./fun./lin. alg.)  =  5.151
+Total wall secs                                       =  5.881
+
+<span class="sgr32">EXIT: Optimal Solution Found (tol = 1.0e-08).</span></code></pre><h2 id="Solving-AbstractKKTSystem-in-MadNLP"><a class="docs-heading-anchor" href="#Solving-AbstractKKTSystem-in-MadNLP">Solving AbstractKKTSystem in MadNLP</a><a id="Solving-AbstractKKTSystem-in-MadNLP-1"></a><a class="docs-heading-anchor-permalink" href="#Solving-AbstractKKTSystem-in-MadNLP" title="Permalink"></a></h2><p>The <code>AbstractKKTSystem</code> object is an abstraction to solve the generic system <span>$K x = b$</span>. Depending on the implementation, the structure of the linear system is exploited in different fashions. Solving a KKT system amounts to the four following operations:</p><ol><li>Querying the current sensitivities to assemble the different blocks constituting the matrix <span>$K$</span>.</li><li>Assembling a reduced sparse matrix condensing the sparse matrix <span>$K$</span> to an equivalent smaller symmetric system.</li><li>Calling a linear solver to solve the condensed system.</li><li>Calling a routine to unpack the condensed solution to get the original descent direction <span>$(\Delta x, \Delta y, \Delta z_\ell, \Delta z_u)$</span>.</li></ol><p>Exploiting the problem&#39;s structure usually happens in steps (2) and (4). We skim through the four successive steps in more details.</p><h3 id="Getting-the-sensitivities"><a class="docs-heading-anchor" href="#Getting-the-sensitivities">Getting the sensitivities</a><a id="Getting-the-sensitivities-1"></a><a class="docs-heading-anchor-permalink" href="#Getting-the-sensitivities" title="Permalink"></a></h3><p>The KKT system requires the following information:</p><ul><li>the (approximated) Hessian of the Lagrangian <span>$W$</span> ;</li><li>the constraints&#39; Jacobian <span>$J$</span> ;</li><li>the diagonal matrices <span>$Z_\ell$</span>, <span>$Z_u$</span> and <span>$X_\ell$</span>, <span>$X_u$</span>.</li></ul><p>The Hessian and the Jacobian are assumed sparse by default.</p><p>At every IPM iteration, MadNLP updates automatically the values in <span>$W$</span>, <span>$J$</span> and in the diagonal matrices <span>$Z_\ell, Z_u, X_\ell, X_u$</span>. By default, we expect the following attributes available in every instance <code>kkt</code> of an <code>AbstractKKTSystem</code>:</p><ul><li><code>kkt.hess</code>: stores the nonzeroes of the Hessian <span>$W$</span>;</li><li><code>kkt.jac</code>: stores the nonzeroes of the Jacobian <span>$J$</span>;</li><li><code>kkt.l_diag</code>: stores the diagonal entries in <span>$X_\ell$</span>;</li><li><code>kkt.u_diag</code>: stores the diagonal entries in <span>$X_u$</span>;</li><li><code>kkt.l_lower</code>: stores the diagonal entries in <span>$Z_\ell$</span>;</li><li><code>kkt.u_lower</code>: stores the diagonal entries in <span>$Z_u$</span>.</li></ul><p>The attributes <code>kkt.hess</code> and <code>kkt.jac</code> are accessed respectively using the getters <a href="../../lib/kkt/#MadNLP.get_hessian"><code>get_hessian</code></a> and <a href="../../lib/kkt/#MadNLP.get_jacobian"><code>get_jacobian</code></a>.</p><p>Every time MadNLP queries the Hessian and the Jacobian, it updates the nonzeroes values in <code>kkt.hess</code> and <code>kkt.jac</code>. Rightafter, MadNLP calls respectively the functions <a href="../../lib/kkt/#MadNLP.compress_hessian!"><code>compress_hessian!</code></a> and <a href="../../lib/kkt/#MadNLP.compress_jacobian!"><code>compress_jacobian!</code></a> to update all the internal values in the KKT system <code>kkt</code>.</p><p>To recap, every time we evaluate the Hessian and the Jacobian, MadNLP calls automatically the functions:</p><pre><code class="language-julia hljs">hess = MadNLP.get_hessian(kkt)
 MadNLP.compress_hessian!(kkt)</code></pre><p>to update the values in the Hessian, and for the Jacobian:</p><pre><code class="language-julia hljs">jac = MadNLP.get_jacobian(kkt)
 MadNLP.compress_jacobian!(kkt)</code></pre><h3 id="Assembling-the-KKT-system"><a class="docs-heading-anchor" href="#Assembling-the-KKT-system">Assembling the KKT system</a><a id="Assembling-the-KKT-system-1"></a><a class="docs-heading-anchor-permalink" href="#Assembling-the-KKT-system" title="Permalink"></a></h3><p>Once the sensitivities have been updated, we can assemble the KKT matrix <span>$K$</span> and condense it to an equivalent system <span>$K_{c}$</span> before factorizing it with a linear solver. The assembling of the KKT system is done in the function <a href="../../lib/kkt/#MadNLP.build_kkt!"><code>build_kkt!</code></a>.</p><p>The system is usually stored in the attribute <code>kkt.aug_com</code>. Its dimension depends on the condensation used. The matrix <code>kkt.aug_com</code> can be dense or sparse, depending on the condensation used. MadNLP uses the getter <code>get_kkt</code> to query the matrix <code>kkt.aug_com</code> stored in the KKT system <code>kkt</code>.</p><h3 id="Solving-the-system"><a class="docs-heading-anchor" href="#Solving-the-system">Solving the system</a><a id="Solving-the-system-1"></a><a class="docs-heading-anchor-permalink" href="#Solving-the-system" title="Permalink"></a></h3><p>Once the matrix <span>$K_c$</span> is assembled, we pass it to the linear solver for factorization. The linear solver is stored internally in <code>kkt</code>: by default, it is stored in the attribute <code>kkt.linear_solver</code>. The factorization is handled internally in MadNLP.</p><p>Once factorized, it remains to solve the linear system using a backsolve. The backsolve has to be implemented by the user in the function <code>solve!</code>. It reduces the right-hand-side (RHS) down to a form adapted to the condensed matrix <span>$K_c$</span> and calls the linear solver to perform the backsolve. Then the condensed solution is unpacked to recover the full solution <span>$(\Delta x, \Delta y, \Delta z_\ell, \Delta z_u)$</span>.</p><p>To recap, MadNLP assembles and solves the KKT linear system using the following operations:</p><pre><code class="language-julia hljs"># Assemble
 MadNLP.build_kkt!(kkt)
@@ -222,7 +224,7 @@ end</code></pre><div class="admonition is-info" id="Note-283aec0dd2ec7d11"><head
     return w
 end</code></pre><h3 id="Demonstration"><a class="docs-heading-anchor" href="#Demonstration">Demonstration</a><a id="Demonstration-1"></a><a class="docs-heading-anchor-permalink" href="#Demonstration" title="Permalink"></a></h3><p>We now have all the elements needed to solve the problem with the new KKT linear system <code>DiagonalHessianKKTSystem</code>. We just have to pass the KKT system to MadNLP using the option <code>kkt_system</code>:</p><pre><code class="language-julia hljs">nlp = HS15Model()
 results = madnlp(nlp; kkt_system=DiagonalHessianKKTSystem, linear_solver=LapackCPUSolver)
-nothing</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">This is MadNLP version v0.8.12, running with Lapack-CPU (BUNCHKAUFMAN)
+nothing</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">This is <span class="sgr34">Mad</span><span class="sgr31">N</span><span class="sgr32">L</span><span class="sgr35">P</span> version v0.8.12, running with Lapack-CPU (BUNCHKAUFMAN)
 
 Number of nonzeros in constraint Jacobian............:        4
 Number of nonzeros in Lagrangian Hessian.............:        3
@@ -237,28 +239,28 @@ Total number of inequality constraints...............:        2
    inequality constraints with lower and upper bounds:        0
         inequality constraints with only upper bounds:        0
 
-iter    objective    inf_pr   inf_du inf_compl lg(mu)  ||d||  lg(rg) alpha_du alpha_pr  ls
-   0  1.0000000e+00 1.01e+00 1.00e+00 5.00e-01  -1.0 0.00e+00    -  0.00e+00 0.00e+00   0
-   1  9.9758678e-01 1.00e+00 4.59e+01 3.81e-01  -1.0 1.01e+00    -  4.27e-01 9.80e-03h  1
-   2  1.3281589e+00 1.00e+00 5.00e+02 2.08e-03  -1.0 3.42e+02    -  1.00e+00 1.68e-04h  1
-   3  1.3006439e+00 1.00e+00 5.00e+02 2.35e-03  -1.0 1.64e+02    -  3.71e-03 7.01e-04h  6
-   4  1.0646881e+00 1.00e+00 5.00e+02 3.00e-04  -1.0 4.07e+01    -  8.23e-02 6.76e-04h  2
-   5  9.7015669e-01 1.00e+00 4.74e+02 6.05e-02  -1.0 8.53e+01    -  1.00e+00 3.80e-04h  7
-   6  9.8003254e-01 1.00e+00 4.80e+02 1.83e-02  -1.0 6.56e+01    -  7.39e-01 1.22e-04h  14
-   7  1.0034592e+00 1.00e+00 4.84e+02 2.76e-03  -1.0 6.66e+01    -  4.67e-01 1.22e-04h  14
-   8  1.0405590e+00 1.00e+00 4.83e+02 2.75e-03  -1.0 6.75e+01    -  4.78e-03 1.22e-04h  14
-   9  6.5449345e+00 7.54e-01 4.76e+02 4.24e-04  -1.0 2.55e+01    -  2.10e-03 1.99e-02h  1
-iter    objective    inf_pr   inf_du inf_compl lg(mu)  ||d||  lg(rg) alpha_du alpha_pr  ls
-  10  6.1668009e+00 7.53e-01 1.84e+01 1.00e-01  -1.0 3.60e+00    -  1.00e+00 1.33e-03h  1
-  11  3.0904080e+02 9.13e-03 4.63e+02 1.01e-01  -1.0 1.72e+00    -  2.97e-01 1.00e+00H  1
-  12  3.0697414e+02 8.63e-03 2.18e+02 5.63e-02  -1.0 3.12e-01    -  1.00e+00 5.73e-02h  1
-  13  3.0670014e+02 6.87e-07 1.22e-01 1.23e-02  -1.0 5.26e-03    -  1.00e+00 1.00e+00h  1
-  14  3.0650569e+02 2.50e-07 6.70e-02 3.53e-04  -2.5 1.95e-03    -  1.00e+00 1.00e+00h  1
-  15  3.0650563e+02 1.42e-14 1.50e-05 3.46e-04  -2.5 2.08e-07    -  1.00e+00 1.00e+00h  1
-  16  3.0649998e+02 2.11e-10 1.95e-03 2.30e-07  -5.7 5.65e-05    -  1.00e+00 1.00e+00h  1
-  17  3.0649998e+02 1.11e-16 1.77e-08 2.26e-07  -5.7 7.18e-10    -  1.00e+00 1.00e+00h  1
-  18  3.0649998e+02 8.88e-16 1.27e-06 1.11e-10  -9.0 3.69e-08    -  1.00e+00 1.00e+00h  1
-  19  3.0649998e+02 0.00e+00 3.61e-14 1.11e-10  -9.0 3.54e-16    -  1.00e+00 1.00e+00h  1
+iter    objective    inf_pr   inf_du inf_compl lg(mu) lg(rg) alpha_pr ir ls
+   0  1.0000000e+00 1.01e+00 1.00e+00 5.00e-01  -1.0     -   0.00e+00  1  0
+   1  9.9758678e-01 1.00e+00 4.59e+01 3.81e-01  -1.0     -   9.80e-03  1  1h
+   2  1.3281589e+00 1.00e+00 5.00e+02 2.08e-03  -1.0     -   1.68e-04  1  1h
+   3  1.3006439e+00 1.00e+00 5.00e+02 2.35e-03  -1.0     -   7.01e-04  1  6h
+   4  1.0646881e+00 1.00e+00 5.00e+02 3.00e-04  -1.0     -   6.76e-04  1  2h
+   5  9.7015669e-01 1.00e+00 4.74e+02 6.05e-02  -1.0     -   3.80e-04  1  7h
+   6  9.8003254e-01 1.00e+00 4.80e+02 1.83e-02  -1.0     -   1.22e-04  1 14h
+   7  1.0034592e+00 1.00e+00 4.84e+02 2.76e-03  -1.0     -   1.22e-04  1 14h
+   8  1.0405590e+00 1.00e+00 4.83e+02 2.75e-03  -1.0     -   1.22e-04  1 14h
+   9  6.5449345e+00 7.54e-01 4.76e+02 4.24e-04  -1.0     -   1.99e-02  1  1h
+iter    objective    inf_pr   inf_du inf_compl lg(mu) lg(rg) alpha_pr ir ls
+  10  6.1668009e+00 7.53e-01 1.84e+01 1.00e-01  -1.0     -   1.33e-03  1  1h
+  11  3.0904080e+02 9.13e-03 4.63e+02 1.01e-01  -1.0     -   1.00e+00  1  1H
+  12  3.0697414e+02 8.63e-03 2.18e+02 5.63e-02  -1.0     -   5.73e-02  1  1h
+  13  3.0670014e+02 6.87e-07 1.22e-01 1.23e-02  -1.0     -   1.00e+00  1  1h
+  14  3.0650569e+02 2.50e-07 6.70e-02 3.53e-04  -2.5     -   1.00e+00  1  1h
+  15  3.0650563e+02 1.42e-14 1.50e-05 3.46e-04  -2.5     -   1.00e+00  1  1h
+  16  3.0649998e+02 2.11e-10 1.95e-03 2.30e-07  -5.7     -   1.00e+00  1  1h
+  17  3.0649998e+02 1.11e-16 1.77e-08 2.26e-07  -5.7     -   1.00e+00  1  1h
+  18  3.0649998e+02 8.88e-16 1.27e-06 1.11e-10  -9.0     -   1.00e+00  2  1h
+  19  3.0649998e+02 0.00e+00 3.61e-14 1.11e-10  -9.0     -   1.00e+00  1  1h
 
 Number of Iterations....: 19
 
@@ -269,14 +271,16 @@ Constraint violation....:   0.0000000000000000e+00    0.0000000000000000e+00
 Complementarity.........:   1.1127505952435713e-10    1.1127505952435713e-10
 Overall NLP error.......:   1.1127505952435713e-10    1.1127505952435713e-10
 
-Number of objective function evaluations             = 78
-Number of objective gradient evaluations             = 20
-Number of constraint evaluations                     = 78
-Number of constraint Jacobian evaluations            = 20
-Number of Lagrangian Hessian evaluations             = 19
-Total wall-clock secs in solver (w/o fun. eval./lin. alg.)  =  4.527
-Total wall-clock secs in linear solver                      =  0.061
-Total wall-clock secs in NLP function evaluations           =  0.000
-Total wall-clock secs                                       =  4.588
+Number of objective function evaluations              = 78
+Number of objective gradient evaluations              = 20
+Number of constraint evaluations                      = 78
+Number of constraint Jacobian evaluations             = 20
+Number of Lagrangian Hessian evaluations              = 19
 
-EXIT: Optimal Solution Found (tol = 1.0e-08).</code></pre></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../lbfgs/">« LBFGS</a><a class="docs-footer-nextpage" href="../../man/solver/">IPM solver »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.14.1 on <span class="colophon-date" title="Monday 15 September 2025 15:04">Monday 15 September 2025</span>. Using Julia version 1.10.10.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+Total wall secs in initializtion                      =  0.350
+Total wall secs in linear solver                      =  0.059
+Total wall secs in NLP function evaluations           =  0.000
+Total wall secs in solver (w/o init./fun./lin. alg.)  =  4.551
+Total wall secs                                       =  4.960
+
+<span class="sgr32">EXIT: Optimal Solution Found (tol = 1.0e-08).</span></code></pre></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../lbfgs/">« LBFGS</a><a class="docs-footer-nextpage" href="../../man/solver/">IPM solver »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.14.1 on <span class="colophon-date" title="Thursday 25 September 2025 16:26">Thursday 25 September 2025</span>. Using Julia version 1.10.10.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
