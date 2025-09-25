@@ -8,4 +8,7 @@ using Test, CUDA, AMDGPU, oneAPI, MadNLP, MadNLPGPU, MadNLPTests
     if AMDGPU.functional()
         include("densekkt_rocm.jl")
     end
+    # if oneAPI.functional()
+    #     include("densekkt_oneapi.jl")
+    # end
 end
