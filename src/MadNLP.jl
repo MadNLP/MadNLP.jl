@@ -38,6 +38,6 @@ include(joinpath("LinearSolvers","linearsolvers.jl"))
 include("options.jl")
 include(joinpath("IPM", "IPM.jl"))
 include("extension_templates.jl")
-include("precompile.jl")
+# include("precompile.jl")
 
 end # end module
