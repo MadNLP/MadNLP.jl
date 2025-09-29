@@ -252,21 +252,16 @@ function regular!(solver::AbstractMadNLPSolver{T}) where T
             eval_lag_hess_wrapper!(solver, solver.kkt, solver.x, solver.y)
         end
 
-        # factorize the KKT system
-        @trace(solver.logger,"Factorizing the KKT system.")
-        set_aug_diagonal!(solver.kkt,solver)
-        set_aug_rhs!(solver, solver.kkt, solver.c, solver.mu)
-        inertia_correction!(solver.inertia_corrector, solver) || return ROBUST
-
         # update the barrier parameter
         @trace(solver.logger,"Updating the barrier parameter.")
         update_barrier!(solver.opt.barrier, solver, sc)
 
-        # compute the newton step
+        # factorize the KKT system and solve Newton step
         @trace(solver.logger,"Computing the Newton step.")
+        set_aug_diagonal!(solver.kkt,solver)
         set_aug_rhs!(solver, solver.kkt, solver.c, solver.mu)
         dual_inf_perturbation!(primal(solver.p),solver.ind_llb,solver.ind_uub,solver.mu,solver.opt.kappa_d)
-        solve_refine_wrapper!(solver.d, solver, solver.p, solver._w4)
+        inertia_correction!(solver.inertia_corrector, solver) || return ROBUST
 
         @trace(solver.logger,"Backtracking line search initiated.")
         status = filter_line_search!(solver)
@@ -460,14 +455,11 @@ function robust!(solver::AbstractMadNLPSolver{T}) where T
         if !solver.opt.hessian_constant
             eval_lag_hess_wrapper!(solver, solver.kkt, solver.x, solver.y; is_resto=true)
         end
+
+        @trace(solver.logger,"Solving restoration phase primal-dual system.")
         set_aug_RR!(solver.kkt, solver, RR)
         set_aug_rhs_RR!(solver, solver.kkt, RR, solver.opt.rho)
         inertia_correction!(solver.inertia_corrector, solver) || return RESTORATION_FAILED
-
-        # without inertia correction,
-        @trace(solver.logger,"Solving restoration phase primal-dual system.")
-        set_aug_rhs_RR!(solver, solver.kkt, RR, solver.opt.rho)
-        solve_refine_wrapper!(solver.d, solver, solver.p, solver._w4)
         finish_aug_solve_RR!(
             RR.dpp,RR.dnn,RR.dzp,RR.dzn,solver.y,dual(solver.d),
             RR.pp,RR.nn,RR.zp,RR.zn,RR.mu_R,solver.opt.rho
@@ -691,9 +683,6 @@ function inertia_correction!(
     g = inertia_corrector.g
 
     set_g_ifr!(solver,g)
-    # Inertia-free correction compares to right-hand-side p and p0.
-    # Initialize p
-    set_aug_rhs!(solver, solver.kkt, solver.c, solver.mu)
     # Initialize p0
     set_aug_rhs_ifr!(solver, solver.kkt, p0)
 
