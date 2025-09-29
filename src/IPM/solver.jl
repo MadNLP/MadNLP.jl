@@ -251,21 +251,16 @@ function regular!(solver::AbstractMadNLPSolver{T}) where T
             eval_lag_hess_wrapper!(solver, solver.kkt, solver.x, solver.y)
         end
 
-        # factorize the KKT system
-        @trace(solver.logger,"Factorizing the KKT system.")
-        set_aug_diagonal!(solver.kkt,solver)
-        set_aug_rhs!(solver, solver.kkt, solver.c, solver.mu)
-        inertia_correction!(solver.inertia_corrector, solver) || return ROBUST
-
         # update the barrier parameter
         @trace(solver.logger,"Updating the barrier parameter.")
         update_barrier!(solver.opt.barrier, solver, sc)
 
-        # compute the newton step
+        # factorize the KKT system and solve Newton step
         @trace(_logger(solver),"Computing the Newton step.")
+        set_aug_diagonal!(_kkt(solver),solver)
         set_aug_rhs!(solver, _kkt(solver), _c(solver), _mu(solver))
         dual_inf_perturbation!(primal(_p(solver)),_ind_llb(solver),_ind_uub(solver),_mu(solver),_opt(solver).kappa_d)
-        solve_refine_wrapper!(_d(solver), solver, _p(solver), __w4(solver))
+        inertia_correction!(_inertia_corrector(solver), solver) || return ROBUST
 
         @trace(_logger(solver),"Backtracking line search initiated.")
         status = filter_line_search!(solver)
@@ -459,14 +454,11 @@ function robust!(solver::AbstractMadNLPSolver{T}) where T
         if !_opt(solver).hessian_constant
             eval_lag_hess_wrapper!(solver, _kkt(solver), _x(solver), _y(solver); is_resto=true)
         end
+
+        @trace(_logger(solver),"Solving restoration phase primal-dual system.")
         set_aug_RR!(_kkt(solver), solver, RR)
         set_aug_rhs_RR!(solver, _kkt(solver), RR, _opt(solver).rho)
         inertia_correction!(_inertia_corrector(solver), solver) || return RESTORATION_FAILED
-
-        # without inertia correction,
-        @trace(_logger(solver),"Solving restoration phase primal-dual system.")
-        set_aug_rhs_RR!(solver, _kkt(solver), RR, _opt(solver).rho)
-        solve_refine_wrapper!(_d(solver), solver, _p(solver), __w4(solver))
         finish_aug_solve_RR!(
             RR.dpp,RR.dnn,RR.dzp,RR.dzn,_y(solver),dual(_d(solver)),
             RR.pp,RR.nn,RR.zp,RR.zn,RR.mu_R,_opt(solver).rho
@@ -695,9 +687,6 @@ function inertia_correction!(
     g = inertia_corrector.g
 
     set_g_ifr!(solver,g)
-    # Inertia-free correction compares to right-hand-side p and p0.
-    # Initialize p
-    set_aug_rhs!(solver, _kkt(solver), _c(solver), _mu(solver))
     # Initialize p0
     set_aug_rhs_ifr!(solver, _kkt(solver), p0)
 
