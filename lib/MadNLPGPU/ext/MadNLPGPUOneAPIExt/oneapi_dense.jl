@@ -28,7 +28,7 @@ end
 
 function MadNLP.diag!(dest::oneVector{T}, src::oneMatrix{T}) where {T}
     @assert length(dest) == size(src, 1)
-    backend = OneAPIBackend()
+    backend = oneAPIBackend()
     MadNLPGPU._copy_diag_kernel!(backend)(dest, src, ndrange = length(dest))
     synchronize(backend)
     return
@@ -39,7 +39,7 @@ end
 =#
 
 function MadNLP.diag_add!(dest::oneMatrix, src1::oneVector, src2::oneVector)
-    backend = OneAPIBackend()
+    backend = oneAPIBackend()
     MadNLPGPU._add_diagonal_kernel!(backend)(dest, src1, src2, ndrange = size(dest, 1))
     synchronize(backend)
     return
@@ -51,7 +51,7 @@ end
 
 function MadNLP._set_diag!(A::oneMatrix, inds, a)
     if !isempty(inds)
-        backend = OneAPIBackend()
+        backend = oneAPIBackend()
         MadNLPGPU._set_diag_kernel!(backend)(A, inds, a; ndrange = length(inds))
         synchronize(backend)
     end
@@ -76,7 +76,7 @@ function MadNLP._build_dense_kkt_system!(
 )
     ind_ineq_gpu = oneVector(ind_ineq)
     ndrange = (n + m + ns, n)
-    backend = OneAPIBackend()
+    backend = oneAPIBackend()
     MadNLPGPU._build_dense_kkt_system_kernel!(backend)(
         dest,
         hess,
@@ -109,7 +109,7 @@ function MadNLP._build_ineq_jac!(
     (m_ineq == 0) && return # nothing to do if no ineq. constraints
     ind_ineq_gpu = oneVector(ind_ineq)
     ndrange = (m_ineq, n)
-    backend = OneAPIBackend()
+    backend = oneAPIBackend()
     MadNLPGPU._build_jacobian_condensed_kernel!(backend)(
         dest,
         jac,
@@ -138,7 +138,7 @@ function MadNLP._build_condensed_kkt_system!(
 )
     ind_eq_gpu = oneVector(ind_eq)
     ndrange = (n + m_eq, n)
-    backend = OneAPIBackend()
+    backend = oneAPIBackend()
     MadNLPGPU._build_condensed_kkt_system_kernel!(backend)(
         dest,
         hess,

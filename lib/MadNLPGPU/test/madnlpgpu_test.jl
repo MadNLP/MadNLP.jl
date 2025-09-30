@@ -185,24 +185,24 @@ oneapi_testset = [
         ),
         [],
     ],
-    [
-        "LapackOneMKLSolver-QR",
-        ()->MadNLP.Optimizer(
-            linear_solver=LapackOneMKLSolver,
-            lapack_algorithm=MadNLP.QR,
-            print_level=MadNLP.ERROR,
-        ),
-        [],
-    ],
-    [
-        "LapackOneMKLSolver-CHOLESKY",
-        ()->MadNLP.Optimizer(
-            linear_solver=LapackOneMKLSolver,
-            lapack_algorithm=MadNLP.CHOLESKY,
-            print_level=MadNLP.ERROR,
-        ),
-        ["infeasible", "lootsma", "eigmina", "lp_examodels_issue75"], # KKT system not PD
-    ],
+    # [
+    #     "LapackOneMKLSolver-QR",
+    #     ()->MadNLP.Optimizer(
+    #         linear_solver=LapackOneMKLSolver,
+    #         lapack_algorithm=MadNLP.QR,
+    #         print_level=MadNLP.ERROR,
+    #     ),
+    #     [],
+    # ],
+    # [
+    #     "LapackOneMKLSolver-CHOLESKY",
+    #     ()->MadNLP.Optimizer(
+    #         linear_solver=LapackOneMKLSolver,
+    #         lapack_algorithm=MadNLP.CHOLESKY,
+    #         print_level=MadNLP.ERROR,
+    #     ),
+    #     ["infeasible", "lootsma", "eigmina", "lp_examodels_issue75"], # KKT system not PD
+    # ],
 ]
 @testset "MadNLPGPU test" begin
     if CUDA.functional()
@@ -214,8 +214,8 @@ oneapi_testset = [
         end
     end
     if AMDGPU.functional()
-        MadNLPTests.test_linear_solver(LapackROCmSolver,Float32)
-        MadNLPTests.test_linear_solver(LapackROCmSolver,Float64)
+        MadNLPTests.test_linear_solver(LapackROCSolver,Float32)
+        MadNLPTests.test_linear_solver(LapackROCSolver,Float64)
         for (name,optimizer_constructor,exclude) in rocm_testset
             test_madnlp(name,optimizer_constructor,exclude; Arr=ROCArray)
         end

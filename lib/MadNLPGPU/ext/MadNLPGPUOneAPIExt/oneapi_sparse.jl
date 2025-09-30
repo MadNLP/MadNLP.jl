@@ -42,7 +42,7 @@ function MadNLP.mul!(
     MadNLP.mul!(wx, kkt.hess_com', xx, alpha, one(T))
     MadNLP.mul!(wx, kkt.jt_csc, xz, alpha, beta)
     if !isempty(kkt.ext.diag_map_to)
-        backend = OneAPIBackend()
+        backend = oneAPIBackend()
         MadNLPGPU._diag_operation_kernel!(backend)(
             wx,
             kkt.hess_com.nzVal,
@@ -84,7 +84,7 @@ function MadNLP.mul_hess_blk!(
     MadNLP.mul!(wxx, kkt.hess_com, tx, one(T), zero(T))
     MadNLP.mul!(wxx, kkt.hess_com', tx, one(T), one(T))
     if !isempty(kkt.ext.diag_map_to)
-        backend = OneAPIBackend()
+        backend = oneAPIBackend()
         MadNLPGPU._diag_operation_kernel!(backend)(
             wxx,
             kkt.hess_com.nzVal,
@@ -223,7 +223,7 @@ end
 
 function MadNLP._set_colptr!(colptr::oneVector, ptr2, sym2, guide)
     if length(ptr2) > 1 # otherwise error is thrown
-        backend = OneAPIBackend()
+        backend = oneAPIBackend()
         MadNLPGPU._set_colptr_kernel!(backend)(
             colptr,
             sym2,
@@ -243,7 +243,7 @@ end
 
 function MadNLP.tril_to_full!(dense::oneMatrix{T}) where {T}
     n = size(dense, 1)
-    backend = OneAPIBackend()
+    backend = oneAPIBackend()
     MadNLPGPU._tril_to_full_kernel!(backend)(dense; ndrange = div(n^2 + n, 2))
     synchronize(backend)
     return
@@ -255,7 +255,7 @@ end
 
 function MadNLP.force_lower_triangular!(I::oneVector{T}, J) where {T}
     if !isempty(I)
-        backend = OneAPIBackend()
+        backend = oneAPIBackend()
         MadNLPGPU._force_lower_triangular_kernel!(backend)(I, J; ndrange = length(I))
         synchronize(backend)
     end
@@ -281,7 +281,7 @@ function MadNLP.coo_to_csc(
 
     coord_csc = coord[@view(mapptr[1:end-1])]
 
-    backend = OneAPIBackend()
+    backend = oneAPIBackend()
     if length(coord_csc) > 0
         MadNLPGPU._set_coo_to_colptr_kernel!(backend)(
             colptr,
@@ -295,7 +295,7 @@ function MadNLP.coo_to_csc(
 
     rowval = map(x -> x[1][1], coord_csc)
     nzval = similar(rowval, T)
-
+    @show size(coo)
     csc = oneMKL.oneSparseMatrixCSC(colptr, rowval, nzval, size(coo))
 
     cscmap = similar(coo.I, Int)
@@ -320,7 +320,7 @@ function MadNLP.build_condensed_aug_coord!(
     kkt::MadNLP.AbstractCondensedKKTSystem{T,VT,MT},
 ) where {T,VT,MT<:oneMKL.oneSparseMatrixCSC{T}}
     fill!(kkt.aug_com.nzVal, zero(T))
-    backend = OneAPIBackend()
+    backend = oneAPIBackend()
     if length(kkt.hptr) > 0
         MadNLPGPU._transfer_hessian_kernel!(backend)(
             kkt.aug_com.nzVal,
@@ -361,7 +361,7 @@ function MadNLP.compress_hessian!(
     kkt::MadNLP.AbstractSparseKKTSystem{T,VT,MT},
 ) where {T,VT,MT<:oneMKL.oneSparseMatrixCSC{T,Int32}}
     fill!(kkt.hess_com.nzVal, zero(T))
-    backend = OneAPIBackend()
+    backend = oneAPIBackend()
     if length(kkt.ext.hess_com_ptrptr) > 1
         MadNLPGPU._transfer_to_csc_kernel!(backend)(
             kkt.hess_com.nzVal,
@@ -379,7 +379,7 @@ function MadNLP.compress_jacobian!(
     kkt::MadNLP.SparseCondensedKKTSystem{T,VT,MT},
 ) where {T,VT,MT<:oneMKL.oneSparseMatrixCSC{T,Int32}}
     fill!(kkt.jt_csc.nzVal, zero(T))
-    backend = OneAPIBackend()
+    backend = oneAPIBackend()
     if length(kkt.ext.jt_csc_ptrptr) > 1 # otherwise error is thrown
         MadNLPGPU._transfer_to_csc_kernel!(backend)(
             kkt.jt_csc.nzVal,
@@ -407,7 +407,7 @@ function MadNLP._set_con_scale_sparse!(
     !isempty(inds) && sort!(inds)
     ptr = MadNLP.getptr(inds; by = ((x1, x2), (y1, y2)) -> x1 != y1)
     if length(ptr) > 1
-        backend = OneAPIBackend()
+        backend = oneAPIBackend()
         MadNLPGPU._set_con_scale_sparse_kernel!(backend)(
             con_scale,
             ptr,
@@ -431,7 +431,7 @@ function MadNLP._build_condensed_aug_symbolic_hess(
     sym2,
 ) where {Tv,Ti}
     if size(H, 2) > 0
-        backend = OneAPIBackend()
+        backend = oneAPIBackend()
         MadNLPGPU._build_condensed_aug_symbolic_hess_kernel!(backend)(
             sym,
             sym2,
@@ -460,7 +460,7 @@ function MadNLP._build_condensed_aug_symbolic_jt(
             @view(Jt.colPtr[2:end])
         )
         offsets = cumsum(_offsets)
-        backend = OneAPIBackend()
+        backend = oneAPIBackend()
         MadNLPGPU._build_condensed_aug_symbolic_jt_kernel!(backend)(
             sym,
             sym2,
@@ -479,7 +479,7 @@ end
 =#
 
 function MadNLP._build_scale_augmented_system_coo!(dest, src, scaling::oneArray, n, m)
-    backend = OneAPIBackend()
+    backend = oneAPIBackend()
     MadNLPGPU._scale_augmented_system_coo_kernel!(backend)(
         dest.V,
         src.I,
