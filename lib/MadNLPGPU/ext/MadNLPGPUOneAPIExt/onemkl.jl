@@ -243,9 +243,9 @@ for (geqrf, geqrf_buffer, ormqr, ormqr_buffer, trsv, T) in
 
         function solve_qr!(M::LapackOneMKLSolver{$T}, x::oneVector{$T})
             Support.$ormqr(
-                device_queue,
-                side,
-                trans,
+                M.device_queue,
+                M.side,
+                M.trans,
                 M.n,
                 M.n,
                 M.n,
