@@ -37,7 +37,8 @@ include("LinearSolvers/cudss.jl")
 include("cuda.jl")
 
 global LapackROCSolver
-export LapackGPUSolver, CUDSSSolver, LapackROCSolver
+global LapackOneMKLSolver
+export LapackGPUSolver, CUDSSSolver, LapackROCSolver, LapackOneMKLSolver
 
 # re-export MadNLP, including deprecated names
 for name in names(MadNLP, all=true)
