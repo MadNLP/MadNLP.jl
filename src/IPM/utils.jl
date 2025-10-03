@@ -188,7 +188,7 @@ function print_summary(solver::AbstractMadNLPSolver)
     @notice(solver.logger,"Number of constraint evaluations                      = $(solver.cnt.con_cnt)")
     @notice(solver.logger,"Number of constraint Jacobian evaluations             = $(solver.cnt.con_jac_cnt)")
     @notice(solver.logger,"Number of Lagrangian Hessian evaluations              = $(solver.cnt.lag_hess_cnt)\n")
-    @notice(solver.logger,@sprintf("Total wall secs in initializtion                      = %6.3f",
+    @notice(solver.logger,@sprintf("Total wall secs in initialization                     = %6.3f",
                                 solver.cnt.init_time))
     @notice(solver.logger,@sprintf("Total wall secs in linear solver                      = %6.3f",
                                 solver.cnt.linear_solver_time))
@@ -207,8 +207,8 @@ function string(solver::AbstractMadNLPSolver)
 
                 number of variables......................: $(get_nvar(solver.nlp))
                 number of constraints....................: $(get_ncon(solver.nlp))
-                number of nonzeros in lagrangian hessian.: $(get_nnzh(solver.nlp.meta))
-                number of nonzeros in constraint jacobian: $(get_nnzj(solver.nlp.meta))
+                number of nonzeros in Lagrangian Hessian.: $(get_nnzh(solver.nlp.meta))
+                number of nonzeros in constraint Jacobian: $(get_nnzj(solver.nlp.meta))
                 status...................................: $(solver.status)
                 """
 end
