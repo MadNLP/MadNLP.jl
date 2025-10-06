@@ -870,14 +870,22 @@ function MOIModel(model::Optimizer)
     has_nlp_constraints = !isempty(model.nlp_data.constraint_bounds)
     has_nlp_objective = model.nlp_data.has_objective
     has_hessian = :Hess in MOI.features_available(model.nlp_data.evaluator)
+    has_jacobian_operator = :JacVec in MOI.features_available(model.nlp_data.evaluator)
+    has_hessian_operator = :HessVec in MOI.features_available(model.nlp_data.evaluator)
     is_nlp = has_nlp_constraints || has_nlp_objective
     # Initialize evaluator using model's structure.
     init_feat = [:Grad]
     if has_hessian
-        push!(init_feat, :Hess, :HessVec)
+        push!(init_feat, :Hess)
+    end
+    if has_hessian_operator
+        push!(init_feat, :HessVec)
     end
     if has_nlp_constraints
-        push!(init_feat, :Jac, :JacVec)
+        push!(init_feat, :Jac)
+    end
+    if has_jacobian_operator
+        push!(init_feat, :JacVec)
     end
     MOI.initialize(model.nlp_data.evaluator, init_feat)
 
