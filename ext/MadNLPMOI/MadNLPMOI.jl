@@ -93,14 +93,16 @@ MOI.get(::Optimizer, ::MOI.SolverVersion) = MadNLP.version()
 
 struct _EmptyNLPEvaluator <: MOI.AbstractNLPEvaluator end
 
-MOI.features_available(::_EmptyNLPEvaluator) = [:Grad, :Jac, :Hess]
+MOI.features_available(::_EmptyNLPEvaluator) = [:Grad, :Jac, :Hess, :JacVec, :HessVec]
 MOI.initialize(::_EmptyNLPEvaluator, ::Any) = nothing
 MOI.eval_constraint(::_EmptyNLPEvaluator, g, x) = nothing
 MOI.jacobian_structure(::_EmptyNLPEvaluator) = Tuple{Int64,Int64}[]
 MOI.hessian_lagrangian_structure(::_EmptyNLPEvaluator) = Tuple{Int64,Int64}[]
 MOI.eval_constraint_jacobian(::_EmptyNLPEvaluator, J, x) = nothing
-MOI.eval_constraint_jacobian_transpose_product(::_EmptyNLPEvaluator, Jtv, x, v) = nothing
 MOI.eval_hessian_lagrangian(::_EmptyNLPEvaluator, H, x, σ, μ) = nothing
+MOI.eval_constraint_jacobian_product(d::_EmptyNLPEvaluator, Jv, x, v) = nothing
+MOI.eval_constraint_jacobian_transpose_product(::_EmptyNLPEvaluator, Jtv, x, v) = nothing
+MOI.eval_hessian_lagrangian_product(::_EmptyNLPEvaluator, Hv, x, v, σ, μ) = nothing
 
 function MOI.empty!(model::Optimizer)
     model.solver = nothing
@@ -750,10 +752,30 @@ function MOI.eval_constraint_jacobian(model::Optimizer, values, x)
     return
 end
 
+function MOI.eval_constraint_jacobian_product(model::Optimizer, Jv, x, v)
+    fill!(Jv, 0.0)
+    qp_offset = length(model.qp_data)
+    Jv_nlp = view(Jv, (qp_offset+1):length(Jv))
+    MOI.eval_constraint_jacobian_product(model.nlp_data.evaluator, Jv_nlp, x, v)
+    MOI.eval_constraint_jacobian_product(model.Jv_data, y, x, v)
+    return
+end
+
 function MOI.eval_constraint_jacobian_transpose_product(model::Optimizer, Jtv, x, v)
-    MOI.eval_constraint_jacobian_transpose_product(model.nlp_data.evaluator, Jtv, x, v)
-    # Evaluate QPBlockData after NLPEvaluator to ensure that Jtv is not reset.
+    fill!(Jtv, 0.0)
+    qp_offset = length(model.qp_data)
+    v_nlp = view(v, (qp_offset+1):length(v))
+    MOI.eval_constraint_jacobian_transpose_product(model.nlp_data.evaluator, Jtv, x, v_nlp)
     MOI.eval_constraint_jacobian_transpose_product(model.qp_data, Jtv, x, v)
+    return
+end
+
+function MOI.eval_hessian_lagrangian_product(model::Optimizer, Hv, x, v, σ, μ)
+    fill!(Hv, 0.0)
+    qp_offset = length(model.qp_data)
+    μ_nlp = view(μ, (qp_offset+1):length(μ))
+    MOI.eval_hessian_lagrangian_product(model.nlp_data.evaluator, Hv, x, v, σ, μ_nlp)
+    MOI.eval_hessian_lagrangian_product(model.qp_data, Hv, x, v, σ, μ)
     return
 end
 
@@ -794,12 +816,20 @@ function NLPModels.jac_coord!(nlp::MOIModel, x::AbstractVector{Float64}, jac::Ab
     MOI.eval_constraint_jacobian(nlp.model, jac, x)
 end
 
+function NLPModels.jprod!(nlp::MOIModel, x::AbstractVector{Float64}, v::AbstractVector{Float64}, Jv::AbstractVector{Float64})
+    MOI.eval_constraint_jacobian_product(nlp.model, Jv, x, v)
+end
+
 function NLPModels.jtprod!(nlp::MOIModel, x::AbstractVector{Float64}, v::Vector{Float64}, Jtv::AbstractVector{Float64})
     MOI.eval_constraint_jacobian_transpose_product(nlp.model, Jtv, x, v)
 end
 
 function NLPModels.hess_coord!(nlp::MOIModel, x::AbstractVector{Float64}, l::AbstractVector{Float64}, hess::AbstractVector{Float64}; obj_weight::Float64=1.0)
     MOI.eval_hessian_lagrangian(nlp.model, hess, x, obj_weight, l)
+end
+
+function NLPModels.hprod!(nlp::MOIModel, x::AbstractVector{Float64}, l::AbstractVector{Float64}, v::AbstractVector{Float64}, Hv::AbstractVector{Float64}; obj_weight::Float64=1.0)
+  MOI.eval_hessian_lagrangian_product(nlp.model, Hv, x, v, obj_weight, l)
 end
 
 function NLPModels.hess_structure!(nlp::MOIModel, I::AbstractVector{T}, J::AbstractVector{T}) where T
@@ -840,14 +870,22 @@ function MOIModel(model::Optimizer)
     has_nlp_constraints = !isempty(model.nlp_data.constraint_bounds)
     has_nlp_objective = model.nlp_data.has_objective
     has_hessian = :Hess in MOI.features_available(model.nlp_data.evaluator)
+    has_jacobian_operator = :JacVec in MOI.features_available(model.nlp_data.evaluator)
+    has_hessian_operator = :HessVec in MOI.features_available(model.nlp_data.evaluator)
     is_nlp = has_nlp_constraints || has_nlp_objective
     # Initialize evaluator using model's structure.
     init_feat = [:Grad]
     if has_hessian
         push!(init_feat, :Hess)
     end
+    if has_hessian_operator
+        push!(init_feat, :HessVec)
+    end
     if has_nlp_constraints
         push!(init_feat, :Jac)
+    end
+    if has_jacobian_operator
+        push!(init_feat, :JacVec)
     end
     MOI.initialize(model.nlp_data.evaluator, init_feat)
 
