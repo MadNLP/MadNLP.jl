@@ -107,3 +107,5 @@ _del_c!(solver::AbstractMadNLPSolver{T}, rhs::T) where {T} = solver.del_c = rhs
 _theta(solver::AbstractMadNLPSolver) = get_theta(_c(solver))
 _varphi(solver::AbstractMadNLPSolver) = get_varphi(_obj_val(solver), _x_lr(solver), _xl_r(solver), _xu_r(solver), _x_ur(solver), _mu(solver))
 _kkt_error(solver::AbstractMadNLPSolver) = max(_inf_pr(solver), _inf_du(solver), _inf_compl(solver))
+_inf_compl(solver::AbstractMadNLPSolver{T}, sc::T; mu=_mu(solver)) where {T} = get_inf_compl(_x_lr(solver),_xl_r(solver),_zl_r(solver),_xu_r(solver),_x_ur(solver),_zu_r(solver), mu, sc)
+_inf_total(solver::AbstractMadNLPSolver) = max(_inf_pr(solver),_inf_du(solver),_inf_compl(solver))
