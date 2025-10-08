@@ -12,6 +12,7 @@ _cnt(solver::AbstractMadNLPSolver) = solver.cnt
 _logger(solver::AbstractMadNLPSolver) = solver.logger
 _iterator(solver::AbstractMadNLPSolver) = solver.iterator
 _RR(solver::AbstractMadNLPSolver) = solver.RR
+_RR!(solver::AbstractMadNLPSolver, rhs) = solver.RR = rhs
 _output(solver::AbstractMadNLPSolver) = solver.output
 _inertia_corrector(solver::AbstractMadNLPSolver) = solver.inertia_corrector
 

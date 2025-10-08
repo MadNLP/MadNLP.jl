@@ -435,7 +435,7 @@ function robust!(solver::AbstractMadNLPSolver{T}) where T
         sd = get_sd(_y(solver),_zl_r(solver),_zu_r(solver),_opt(solver).s_max)
         sc = get_sc(_zl_r(solver),_zu_r(solver),_opt(solver).s_max)
         _inf_pr!(solver, get_inf_pr(_c(solver)))
-        _inf_du!(get_inf_du(
+        _inf_du!(solver, get_inf_du(
             primal(_f(solver)),
             primal(_zl(solver)),
             primal(_zu(solver)),
