@@ -103,7 +103,7 @@ _del_w_last!(solver::AbstractMadNLPSolver{T}, rhs::T) where {T} = solver.del_w_l
 _del_c!(solver::AbstractMadNLPSolver{T}, rhs::T) where {T} = solver.del_c = rhs
 
 # Computed quantities
-# TODO(@anton) this is probably not necessary
-_theta(solver::AbstractMadNLPSolver) = get_theta(solver.c)
-_varphi(solver::AbstractMadNLPSolver) = get_varphi(solver.obj_val, solver.x_lr, solver.xl_r, solver.xu_r, solver.x_ur, solver.mu)
-_kkt_error(solver::AbstractMadNLPSolver) = max(solver.inf_pr, solver.inf_du, solver.inf_compl)
+# TODO(@anton) I now think these would be useful to have, but which quantities are wrapped this way is a good question
+_theta(solver::AbstractMadNLPSolver) = get_theta(_c(solver))
+_varphi(solver::AbstractMadNLPSolver) = get_varphi(_obj_val(solver), _x_lr(solver), _xl_r(solver), _xu_r(solver), _x_ur(solver), _mu(solver))
+_kkt_error(solver::AbstractMadNLPSolver) = max(_inf_pr(solver), _inf_du(solver), _inf_compl(solver))
