@@ -3,6 +3,7 @@
 
 abstract type AbstractMadNLPSolver{T} end
 
+include("api.jl")
 include("restoration.jl")
 include("inertiacorrector.jl")
 
