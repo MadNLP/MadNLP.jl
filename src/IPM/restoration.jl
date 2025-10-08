@@ -71,7 +71,7 @@ end
 
 function initialize_robust_restorer!(solver::AbstractMadNLPSolver{T}) where T
     @trace(_logger(solver),"Initializing restoration phase variables.")
-    _RR(solver) == nothing && (_RR(solver) = RobustRestorer(solver))
+    _RR(solver) == nothing && (_RR!(solver, RobustRestorer(solver)))
     RR = _RR(solver)
 
     copyto!(RR.x_ref, full(_x(solver)))
@@ -107,6 +107,6 @@ function initialize_robust_restorer!(solver::AbstractMadNLPSolver{T}) where T
     _cnt(solver).t = 0
 
     # misc
-    del_w!(solver, zero(T))
+    _del_w!(solver, zero(T))
 end
 
