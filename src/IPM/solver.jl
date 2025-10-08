@@ -232,18 +232,18 @@ function regular!(solver::AbstractMadNLPSolver{T}) where T
             _jacl(solver),
             sd,
         ))
-        _inf_compl!(solver, get_inf_compl(_x_lr(solver),_xl_r(solver),_zl_r(solver),_xu_r(solver),_x_ur(solver),_zu_r(solver),zero(T),sc))
-        inf_compl_mu = get_inf_compl(_x_lr(solver),_xl_r(solver),_zl_r(solver),_xu_r(solver),_x_ur(solver),_zu_r(solver),_mu(solver),sc)
+        _inf_compl!(solver, _inf_compl(solver, sc; mu=zero(T)))
+        inf_compl_mu = _inf_compl(solver, sc)
 
         print_iter(solver)
 
         # evaluate termination criteria
         @trace(_logger(solver),"Evaluating termination criteria.")
-        max(_inf_pr(solver),_inf_du(solver),_inf_compl(solver)) <= _opt(solver).tol && return SOLVE_SUCCEEDED
-        max(_inf_pr(solver),_inf_du(solver),_inf_compl(solver)) <= _opt(solver).acceptable_tol ?
+        _inf_total(solver) <= _opt(solver).tol && return SOLVE_SUCCEEDED
+        _inf_total(solver) <= _opt(solver).acceptable_tol ?
             (_cnt(solver).acceptable_cnt < _opt(solver).acceptable_iter ?
             _cnt(solver).acceptable_cnt+=1 : return SOLVED_TO_ACCEPTABLE_LEVEL) : (_cnt(solver).acceptable_cnt = 0)
-        max(_inf_pr(solver),_inf_du(solver),_inf_compl(solver)) >= _opt(solver).diverging_iterates_tol && return DIVERGING_ITERATES
+        _inf_total(solver) >= _opt(solver).diverging_iterates_tol && return DIVERGING_ITERATES
         _cnt(solver).k>=_opt(solver).max_iter && return MAXIMUM_ITERATIONS_EXCEEDED
         time()-_cnt(solver).start_time>=_opt(solver).max_wall_time && return MAXIMUM_WALLTIME_EXCEEDED
 
