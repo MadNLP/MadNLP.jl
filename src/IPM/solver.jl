@@ -298,7 +298,7 @@ function regular!(solver::AbstractMadNLPSolver{T}) where T
 end
 
 function restore!(solver::AbstractMadNLPSolver{T}) where T
-    _del_w!(solver, 0)
+    _del_w!(solver, zero(T))
     # Backup the previous primal iterate
     copyto!(primal(__w1(solver)), full(_x(solver)))
     copyto!(dual(__w1(solver)), _y(solver))
