@@ -15,17 +15,17 @@ solve!(nlp::AbstractNLPModel, solver::AbstractMadNLPSolver; kwargs...) = solve!(
     nlp, solver, MadNLPExecutionStats(solver);
     kwargs...)
 solve!(solver::AbstractMadNLPSolver; kwargs...) = solve!(
-    solver.nlp, solver;
+    _nlp(solver), solver;
     kwargs...)
 
 
 function initialize!(solver::AbstractMadNLPSolver{T}) where T
 
-    nlp = solver.nlp
-    opt = solver.opt
+    nlp = _nlp(solver)
+    opt = _opt(solver)
 
     # Initializing variables
-    @trace(solver.logger,"Initializing variables.")
+    @trace(_logger(solver),"Initializing variables.")
     initialize!(
         solver.cb,
         solver.x,
@@ -64,21 +64,21 @@ function initialize!(solver::AbstractMadNLPSolver{T}) where T
     eval_grad_f_wrapper!(solver, solver.f,solver.x)
 
 
-    @trace(solver.logger,"Initializing constraint duals.")
+    @trace(_logger(solver),"Initializing constraint duals.")
     if !solver.opt.dual_initialized
         initialize_dual(solver, opt.dual_initialization_method)
     end
 
     # Initializing
-    solver.obj_val = eval_f_wrapper(solver, solver.x)
+    _obj_val!(solver, eval_f_wrapper(solver, solver.x))
     eval_cons_wrapper!(solver, solver.c, solver.x)
     eval_lag_hess_wrapper!(solver, solver.kkt, solver.x, solver.y)
 
     theta = get_theta(solver.c)
-    solver.theta_max = 1e4*max(1,theta)
-    solver.theta_min = 1e-4*max(1,theta)
-    solver.mu = solver.opt.mu_init
-    solver.tau = max(solver.opt.tau_min,1-solver.opt.mu_init)
+    _theta_max!(solver, 1e4*max(1,theta))
+    _theta_min!(solver, 1e-4*max(1,theta))
+    _mu!(solver, solver.opt.mu_init)
+    _tau!(solver, max(solver.opt.tau_min,1-solver.opt.mu_init))
     push!(solver.filter, (solver.theta_max,-Inf))
 
     return REGULAR
@@ -89,10 +89,10 @@ struct DualInitializeSetZero <: DualInitializeOptions end
 struct DualInitializeLeastSquares <: DualInitializeOptions end
 
 function initialize_dual(solver::AbstractMadNLPSolver{T}, ::Type{DualInitializeSetZero}) where T
-    fill!(solver.y, zero(T))
+    fill!(_y(solver), zero(T))
 end
 function initialize_dual(solver::AbstractMadNLPSolver{T}, ::Type{DualInitializeLeastSquares}) where T
-    set_initial_rhs!(solver, solver.kkt)
+    set_initial_rhs!(solver, _kkt(solver))
     factorize_wrapper!(solver)
     is_solved = solve_refine_wrapper!(
         solver.d, solver, solver.p, solver._w4
@@ -107,17 +107,17 @@ end
 function reinitialize!(solver::AbstractMadNLPSolver)
     variable(solver.x) .= get_x0(solver.nlp)
 
-    solver.obj_val = eval_f_wrapper(solver, solver.x)
+    _obj_val!(solver, eval_f_wrapper(solver, solver.x))
     eval_grad_f_wrapper!(solver, solver.f, solver.x)
     eval_cons_wrapper!(solver, solver.c, solver.x)
     eval_jac_wrapper!(solver, solver.kkt, solver.x)
     eval_lag_hess_wrapper!(solver, solver.kkt, solver.x, solver.y)
 
     theta = get_theta(solver.c)
-    solver.theta_max=1e4*max(1,theta)
-    solver.theta_min=1e-4*max(1,theta)
-    solver.mu=solver.opt.mu_init
-    solver.tau=max(solver.opt.tau_min,1-solver.opt.mu_init)
+    _theta_max!(solver, 1e4*max(1,theta))
+    _theta_min!(solver, 1e-4*max(1,theta))
+    _mu!(solver, solver.opt.mu_init)
+    _tau!(solver, max(solver.opt.tau_min,1-solver.opt.mu_init))
     empty!(solver.filter)
     push!(solver.filter, (solver.theta_max,-Inf))
 
@@ -135,62 +135,62 @@ function solve!(
         )
 
     if x != nothing
-        full(solver.x)[1:get_nvar(nlp)] .= x
+        full(_x(solver))[1:get_nvar(nlp)] .= x
     end
     if y != nothing
-        solver.y[1:get_ncon(nlp)] .= y
+        _y(solver)[1:get_ncon(nlp)] .= y
     end
     if zl != nothing
-        full(solver.zl)[1:get_nvar(nlp)] .= zl
+        full(_zl(solver))[1:get_nvar(nlp)] .= zl
     end
     if zu != nothing
-        full(solver.zu)[1:get_nvar(nlp)] .= zu
+        full(_zu(solver))[1:get_nvar(nlp)] .= zu
     end
 
     if !isempty(kwargs)
-        @warn(solver.logger,"The options set during resolve may not have an effect")
-        set_options!(solver.opt, kwargs)
+        @warn(_logger(solver),"The options set during resolve may not have an effect")
+        set_options!(_opt(solver), kwargs)
     end
 
     try
-        if solver.status == INITIAL
-            @notice(solver.logger,"This is $(introduce()), running with $(introduce(solver.kkt.linear_solver))\n")
+        if _status(solver) == INITIAL
+            @notice(_logger(solver),"This is $(introduce()), running with $(introduce(solver.kkt.linear_solver))\n")
             print_init(solver)
-            solver.status = initialize!(solver)
+            _status!(solver, initialize!(solver))
         else # resolving the problem
-            solver.status = reinitialize!(solver)
+            _status!(solver, reinitialize!(solver))
         end
 
         while solver.status >= REGULAR
-            solver.status == REGULAR && (solver.status = regular!(solver))
-            solver.status == RESTORE && (solver.status = restore!(solver))
-            solver.status == ROBUST && (solver.status = robust!(solver))
+            solver.status == REGULAR && (_status!(solver, regular!(solver)))
+            solver.status == RESTORE && (_status!(solver, restore!(solver)))
+            solver.status == ROBUST && (_status!(solver, robust!(solver)))
         end
     catch e
         if e isa InvalidNumberException
             if e.callback == :obj
-                solver.status=INVALID_NUMBER_OBJECTIVE
+                _status!(solver, INVALID_NUMBER_OBJECTIVE)
             elseif e.callback == :grad
-                solver.status=INVALID_NUMBER_GRADIENT
+                _status!(solver, INVALID_NUMBER_GRADIENT)
             elseif e.callback == :cons
-                solver.status=INVALID_NUMBER_CONSTRAINTS
+                _status!(solver, INVALID_NUMBER_CONSTRAINTS)
             elseif e.callback == :jac
-                solver.status=INVALID_NUMBER_JACOBIAN
+                _status!(solver, INVALID_NUMBER_JACOBIAN)
             elseif e.callback == :hess
-                solver.status=INVALID_NUMBER_HESSIAN_LAGRANGIAN
+                _status!(solver, INVALID_NUMBER_HESSIAN_LAGRANGIAN)
             else
-                solver.status=INVALID_NUMBER_DETECTED
+                _status!(solver, INVALID_NUMBER_DETECTED)
             end
         elseif e isa NotEnoughDegreesOfFreedomException
-            solver.status=NOT_ENOUGH_DEGREES_OF_FREEDOM
+            _status!(solver, NOT_ENOUGH_DEGREES_OF_FREEDOM)
         elseif e isa LinearSolverException
-            solver.status=ERROR_IN_STEP_COMPUTATION;
+            _status!(solver, ERROR_IN_STEP_COMPUTATION;)
             solver.opt.rethrow_error && rethrow(e)
         elseif e isa InterruptException
-            solver.status=USER_REQUESTED_STOP
+            _status!(solver, USER_REQUESTED_STOP)
             solver.opt.rethrow_error && rethrow(e)
         else
-            solver.status=INTERNAL_ERROR
+            _status!(solver, INTERNAL_ERROR)
             solver.opt.rethrow_error && rethrow(e)
         end
     finally
@@ -198,10 +198,10 @@ function solve!(
         if !(solver.status < SOLVE_SUCCEEDED)
             print_summary(solver)
         end
-        @notice(solver.logger,"$(Base.text_colors[color_status(solver.status)])EXIT: $(get_status_output(solver.status, solver.opt))$(Base.text_colors[:normal])")
+        @notice(_logger(solver),"$(Base.text_colors[color_status(solver.status)])EXIT: $(get_status_output(solver.status, solver.opt))$(Base.text_colors[:normal])")
         solver.opt.disable_garbage_collector &&
-            (GC.enable(true); @warn(solver.logger,"Julia garbage collector is turned back on"))
-        finalize(solver.logger)
+            (GC.enable(true); @warn(_logger(solver),"Julia garbage collector is turned back on"))
+        finalize(_logger(solver))
 
         update!(stats,solver)
     end
@@ -224,21 +224,21 @@ function regular!(solver::AbstractMadNLPSolver{T}) where T
         jtprod!(solver.jacl, solver.kkt, solver.y)
         sd = get_sd(solver.y,solver.zl_r,solver.zu_r,T(solver.opt.s_max))
         sc = get_sc(solver.zl_r,solver.zu_r,T(solver.opt.s_max))
-        solver.inf_pr = get_inf_pr(solver.c)
-        solver.inf_du = get_inf_du(
+        _inf_pr!(solver, get_inf_pr(solver.c))
+        _inf_du!(solver, get_inf_du(
             full(solver.f),
             full(solver.zl),
             full(solver.zu),
             solver.jacl,
             sd,
-        )
-        solver.inf_compl = get_inf_compl(solver.x_lr,solver.xl_r,solver.zl_r,solver.xu_r,solver.x_ur,solver.zu_r,zero(T),sc)
+        ))
+        _inf_compl!(solver, get_inf_compl(solver.x_lr,solver.xl_r,solver.zl_r,solver.xu_r,solver.x_ur,solver.zu_r,zero(T),sc))
         inf_compl_mu = get_inf_compl(solver.x_lr,solver.xl_r,solver.zl_r,solver.xu_r,solver.x_ur,solver.zu_r,solver.mu,sc)
 
         print_iter(solver)
 
         # evaluate termination criteria
-        @trace(solver.logger,"Evaluating termination criteria.")
+        @trace(_logger(solver),"Evaluating termination criteria.")
         max(solver.inf_pr,solver.inf_du,solver.inf_compl) <= solver.opt.tol && return SOLVE_SUCCEEDED
         max(solver.inf_pr,solver.inf_du,solver.inf_compl) <= solver.opt.acceptable_tol ?
             (solver.cnt.acceptable_cnt < solver.opt.acceptable_iter ?
@@ -248,20 +248,20 @@ function regular!(solver::AbstractMadNLPSolver{T}) where T
         time()-solver.cnt.start_time>=solver.opt.max_wall_time && return MAXIMUM_WALLTIME_EXCEEDED
 
         # update the barrier parameter
-        @trace(solver.logger,"Updating the barrier parameter.")
+        @trace(_logger(solver),"Updating the barrier parameter.")
         while solver.mu != max(solver.opt.mu_min,solver.opt.tol/10) &&
             max(solver.inf_pr,solver.inf_du,inf_compl_mu) <= solver.opt.barrier_tol_factor*solver.mu
             mu_new = get_mu(solver.mu,solver.opt.mu_min,
                             solver.opt.mu_linear_decrease_factor,solver.opt.mu_superlinear_decrease_power,solver.opt.tol)
             inf_compl_mu = get_inf_compl(solver.x_lr,solver.xl_r,solver.zl_r,solver.xu_r,solver.x_ur,solver.zu_r,solver.mu,sc)
-            solver.tau= get_tau(solver.mu,solver.opt.tau_min)
-            solver.mu = mu_new
+            _tau!(solver, get_tau(solver.mu,solver.opt.tau_min))
+            _mu!(solver, mu_new)
             empty!(solver.filter)
             push!(solver.filter,(solver.theta_max,-Inf))
         end
 
         # compute the newton step
-        @trace(solver.logger,"Computing the newton step.")
+        @trace(_logger(solver),"Computing the newton step.")
         if (solver.cnt.k!=0 && !solver.opt.hessian_constant)
             eval_lag_hess_wrapper!(solver, solver.kkt, solver.x, solver.y)
         end
@@ -272,16 +272,16 @@ function regular!(solver::AbstractMadNLPSolver{T}) where T
 
         inertia_correction!(solver.inertia_corrector, solver) || return ROBUST
 
-        @trace(solver.logger,"Backtracking line search initiated.")
+        @trace(_logger(solver),"Backtracking line search initiated.")
         status = filter_line_search!(solver)
         if status != LINESEARCH_SUCCEEDED
             return status
         end
 
-        @trace(solver.logger,"Updating primal-dual variables.")
+        @trace(_logger(solver),"Updating primal-dual variables.")
         copyto!(full(solver.x), full(solver.x_trial))
         copyto!(solver.c, solver.c_trial)
-        solver.obj_val = solver.obj_val_trial
+        _obj_val!(solver, solver.obj_val_trial)
         adjust_boundary!(solver.x_lr,solver.xl_r,solver.x_ur,solver.xu_r,solver.mu)
 
         axpy!(solver.alpha,dual(solver.d),solver.y)
@@ -304,13 +304,13 @@ function regular!(solver::AbstractMadNLPSolver{T}) where T
         eval_grad_f_wrapper!(solver, solver.f,solver.x)
 
         solver.cnt.k+=1
-            @trace(solver.logger,"Proceeding to the next interior point iteration.")
+            @trace(_logger(solver),"Proceeding to the next interior point iteration.")
     end
 end
 
 
 function restore!(solver::AbstractMadNLPSolver{T}) where T
-    solver.del_w = 0
+    _del_w!(solver, 0)
     # Backup the previous primal iterate
     copyto!(primal(solver._w1), full(solver.x))
     copyto!(dual(solver._w1), solver.y)
@@ -330,8 +330,8 @@ function restore!(solver::AbstractMadNLPSolver{T}) where T
         solver.zu_r,
         solver.mu,
     )
-    solver.alpha_z = zero(T)
-    solver.ftype = "R"
+    _alpha_z!(solver, zero(T))
+    _ftype!(solver, "R")
     while true
         alpha_max = get_alpha_max(
             primal(solver.x),
@@ -340,10 +340,10 @@ function restore!(solver::AbstractMadNLPSolver{T}) where T
             primal(solver.d),
             solver.tau,
         )
-        solver.alpha = min(
+        _alpha!(solver,min(
             alpha_max,
             get_alpha_z(solver.zl_r,solver.zu_r,dual_lb(solver.d),dual_ub(solver.d),solver.tau),
-            )
+        ))
 
         axpy!(solver.alpha, primal(solver.d), full(solver.x))
         axpy!(solver.alpha, dual(solver.d), solver.y)
@@ -352,7 +352,7 @@ function restore!(solver::AbstractMadNLPSolver{T}) where T
 
         eval_cons_wrapper!(solver,solver.c,solver.x)
         eval_grad_f_wrapper!(solver,solver.f,solver.x)
-        solver.obj_val = eval_f_wrapper(solver,solver.x)
+        _obj_val!(solver, eval_f_wrapper(solver,solver.x))
 
         !solver.opt.jacobian_constant && eval_jac_wrapper!(solver,solver.kkt,solver.x)
         jtprod!(solver.jacl,solver.kkt,solver.y)
@@ -394,16 +394,16 @@ function restore!(solver::AbstractMadNLPSolver{T}) where T
 
         sd = get_sd(solver.y,solver.zl_r,solver.zu_r,solver.opt.s_max)
         sc = get_sc(solver.zl_r,solver.zu_r,solver.opt.s_max)
-        solver.inf_pr = get_inf_pr(solver.c)
-        solver.inf_du = get_inf_du(
+        _inf_pr!(solver, get_inf_pr(solver.c))
+        _inf_du!(solver, get_inf_du(
             primal(solver.f),
             primal(solver.zl),
             primal(solver.zu),
             solver.jacl,
             sd,
-        )
+        ))
 
-        solver.inf_compl = get_inf_compl(solver.x_lr,solver.xl_r,solver.zl_r,solver.xu_r,solver.x_ur,solver.zu_r,zero(T),sc)
+        _inf_compl!(solver, get_inf_compl(solver.x_lr,solver.xl_r,solver.zl_r,solver.xu_r,solver.x_ur,solver.zu_r,zero(T),sc))
         inf_compl_mu = get_inf_compl(solver.x_lr,solver.xl_r,solver.zl_r,solver.xu_r,solver.x_ur,solver.zu_r,solver.mu,sc)
         print_iter(solver)
 
@@ -417,7 +417,7 @@ function restore!(solver::AbstractMadNLPSolver{T}) where T
             solver.d, solver, solver.p, solver._w4
         )
 
-        solver.ftype = "f"
+        _ftype!(solver, "f")
     end
 end
 
@@ -431,18 +431,18 @@ function robust!(solver::AbstractMadNLPSolver{T}) where T
         jtprod!(solver.jacl, solver.kkt, solver.y)
 
         # evaluate termination criteria
-        @trace(solver.logger,"Evaluating restoration phase termination criteria.")
+        @trace(_logger(solver),"Evaluating restoration phase termination criteria.")
         sd = get_sd(solver.y,solver.zl_r,solver.zu_r,solver.opt.s_max)
         sc = get_sc(solver.zl_r,solver.zu_r,solver.opt.s_max)
-        solver.inf_pr = get_inf_pr(solver.c)
-        solver.inf_du = get_inf_du(
+        _inf_pr!(solver, get_inf_pr(solver.c))
+        _inf_du!(get_inf_du(
             primal(solver.f),
             primal(solver.zl),
             primal(solver.zu),
             solver.jacl,
             sd,
-        )
-        solver.inf_compl = get_inf_compl(solver.x_lr,solver.xl_r,solver.zl_r,solver.xu_r,solver.x_ur,solver.zu_r,zero(T),sc)
+        ))
+        _inf_compl!(solver, get_inf_compl(solver.x_lr,solver.xl_r,solver.zl_r,solver.xu_r,solver.x_ur,solver.zu_r,zero(T),sc))
 
         # Robust restoration phase error
         RR.inf_pr_R = get_inf_pr_R(solver.c,RR.pp,RR.nn)
@@ -459,7 +459,7 @@ function robust!(solver::AbstractMadNLPSolver{T}) where T
         time()-solver.cnt.start_time>=solver.opt.max_wall_time && return MAXIMUM_WALLTIME_EXCEEDED
 
         # update the barrier parameter
-        @trace(solver.logger,"Updating restoration phase barrier parameter.")
+        @trace(_logger(solver),"Updating restoration phase barrier parameter.")
         while RR.mu_R >= solver.opt.mu_min &&
             max(RR.inf_pr_R,RR.inf_du_R,inf_compl_mu_R) <= solver.opt.barrier_tol_factor*RR.mu_R
             RR.mu_R = get_mu(RR.mu_R,solver.opt.mu_min,
@@ -480,7 +480,7 @@ function robust!(solver::AbstractMadNLPSolver{T}) where T
         set_aug_RR!(solver.kkt, solver, RR)
 
         # without inertia correction,
-        @trace(solver.logger,"Solving restoration phase primal-dual system.")
+        @trace(_logger(solver),"Solving restoration phase primal-dual system.")
         set_aug_rhs_RR!(solver, solver.kkt, RR, solver.opt.rho)
 
         inertia_correction!(solver.inertia_corrector, solver) || return RESTORATION_FAILED
@@ -492,13 +492,13 @@ function robust!(solver::AbstractMadNLPSolver{T}) where T
         )
 
         # filter start
-        @trace(solver.logger,"Backtracking line search initiated.")
+        @trace(_logger(solver),"Backtracking line search initiated.")
         status = filter_line_search_RR!(solver)
         if status != LINESEARCH_SUCCEEDED
             return status
         end
 
-        @trace(solver.logger,"Updating primal-dual variables.")
+        @trace(_logger(solver),"Updating primal-dual variables.")
         copyto!(full(solver.x), full(solver.x_trial))
         copyto!(solver.c, solver.c_trial)
         copyto!(RR.pp, RR.pp_trial)
@@ -532,8 +532,8 @@ function robust!(solver::AbstractMadNLPSolver{T}) where T
         adjust_boundary!(solver.x_lr,solver.xl_r,solver.x_ur,solver.xu_r,solver.mu)
 
         # check if going back to regular phase
-        @trace(solver.logger,"Checking if going back to regular phase.")
-        solver.obj_val = eval_f_wrapper(solver, solver.x)
+        @trace(_logger(solver),"Checking if going back to regular phase.")
+        _obj_val!(solver, eval_f_wrapper(solver, solver.x))
         eval_grad_f_wrapper!(solver, solver.f, solver.x)
         theta = get_theta(solver.c)
         varphi= get_varphi(solver.obj_val,solver.x_lr,solver.xl_r,solver.xu_r,solver.x_ur,solver.mu)
@@ -541,7 +541,7 @@ function robust!(solver::AbstractMadNLPSolver{T}) where T
         if is_filter_acceptable(solver.filter,theta,varphi) &&
             theta <= solver.opt.required_infeasibility_reduction * RR.theta_ref
 
-            @trace(solver.logger,"Going back to the regular phase.")
+            @trace(_logger(solver),"Going back to the regular phase.")
             set_initial_rhs!(solver, solver.kkt)
             initialize!(solver.kkt)
 
@@ -564,7 +564,7 @@ function robust!(solver::AbstractMadNLPSolver{T}) where T
         solver.cnt.k>=solver.opt.max_iter && return MAXIMUM_ITERATIONS_EXCEEDED
         time()-solver.cnt.start_time>=solver.opt.max_wall_time && return MAXIMUM_WALLTIME_EXCEEDED
 
-        @trace(solver.logger,"Proceeding to the next restoration phase iteration.")
+        @trace(_logger(solver),"Proceeding to the next restoration phase iteration.")
         solver.cnt.k+=1
         solver.cnt.t+=1
     end
@@ -572,7 +572,7 @@ end
 
 function second_order_correction(solver::AbstractMadNLPSolver,alpha_max,theta,varphi,
                                  theta_trial,varphi_d,switching_condition::Bool)
-    @trace(solver.logger,"Second-order correction started.")
+    @trace(_logger(solver),"Second-order correction started.")
 
     wx = primal(solver._w1)
     wy = dual(solver._w1)
@@ -600,7 +600,7 @@ function second_order_correction(solver::AbstractMadNLPSolver,alpha_max,theta,va
         copyto!(primal(solver.x_trial), primal(solver.x))
         axpy!(alpha_soc, wx, primal(solver.x_trial))
         eval_cons_wrapper!(solver, solver.c_trial, solver.x_trial)
-        solver.obj_val_trial = eval_f_wrapper(solver, solver.x_trial)
+        _obj_val_trial!(solver, eval_f_wrapper(solver, solver.x_trial))
 
         theta_soc = get_theta(solver.c_trial)
         varphi_soc= get_varphi(solver.obj_val_trial,solver.x_trial_lr,solver.xl_r,solver.xu_r,solver.x_trial_ur,solver.mu)
@@ -610,17 +610,17 @@ function second_order_correction(solver::AbstractMadNLPSolver,alpha_max,theta,va
         if theta <=solver.theta_min && switching_condition
             # Case I
             if is_armijo(varphi_soc,varphi,solver.opt.eta_phi,solver.alpha,varphi_d)
-                @trace(solver.logger,"Step in second order correction accepted by armijo condition.")
-                solver.ftype = "F"
-                solver.alpha=alpha_soc
+                @trace(_logger(solver),"Step in second order correction accepted by armijo condition.")
+                _ftype!(solver, "F")
+                _alpha!(solver, alpha_soc)
                 return true
             end
         else
             # Case II
             if is_sufficient_progress(theta_soc,theta,solver.opt.gamma_theta,varphi_soc,varphi,solver.opt.gamma_phi,has_constraints(solver))
-                @trace(solver.logger,"Step in second order correction accepted by sufficient progress.")
-                solver.ftype = "H"
-                solver.alpha=alpha_soc
+                @trace(_logger(solver),"Step in second order correction accepted by sufficient progress.")
+                _ftype!(solver, "H")
+                _alpha!(solver, alpha_soc)
                 return true
             end
         end
@@ -628,7 +628,7 @@ function second_order_correction(solver::AbstractMadNLPSolver,alpha_max,theta,va
         theta_soc>solver.opt.kappa_soc*theta_soc_old && break
         theta_soc_old = theta_soc
     end
-    @trace(solver.logger,"Second-order correction terminated.")
+    @trace(_logger(solver),"Second-order correction terminated.")
 
     return false
 end
@@ -640,10 +640,10 @@ function inertia_correction!(
     ) where {T}
 
     n_trial = 0
-    solver.del_w = del_w_prev = zero(T)
-    solver.del_c = del_c_prev = zero(T)
+    _del_w!(solver, del_w_prev = zero(T))
+    _del_c!(solver, del_c_prev = zero(T))
 
-    @trace(solver.logger,"Inertia-based regularization started.")
+    @trace(_logger(solver),"Inertia-based regularization started.")
 
     factorize_wrapper!(solver)
 
@@ -657,20 +657,21 @@ function inertia_correction!(
 
 
     while !solve_status
-        @debug(solver.logger,"Primal-dual perturbed.")
+        @debug(_logger(solver),"Primal-dual perturbed.")
 
         if n_trial == 0
-            solver.del_w = solver.del_w_last==zero(T) ? solver.opt.first_hessian_perturbation :
+            _del_w!(solver, solver.del_w_last==zero(T) ? solver.opt.first_hessian_perturbation :
                 max(solver.opt.min_hessian_perturbation,solver.opt.perturb_dec_fact*solver.del_w_last)
+                    )
         else
-            solver.del_w*= solver.del_w_last==zero(T) ? solver.opt.perturb_inc_fact_first : solver.opt.perturb_inc_fact
+            _del_w!(solver, solver.del_w * solver.del_w_last==zero(T) ? solver.opt.perturb_inc_fact_first : solver.opt.perturb_inc_fact)
             if solver.del_w>solver.opt.max_hessian_perturbation
                 solver.cnt.k+=1
-                @debug(solver.logger,"Primal regularization is too big. Switching to restoration phase.")
+                @debug(_logger(solver),"Primal regularization is too big. Switching to restoration phase.")
                 return false
             end
         end
-        solver.del_c = num_zero == 0 ? zero(T) : solver.opt.jacobian_regularization_value * solver.mu^(solver.opt.jacobian_regularization_exponent)
+        _del_c!(solver, num_zero == 0 ? zero(T) : solver.opt.jacobian_regularization_value * solver.mu^(solver.opt.jacobian_regularization_exponent))
         regularize_diagonal!(solver.kkt, solver.del_w - del_w_prev, solver.del_c - del_c_prev)
         del_w_prev = solver.del_w
         del_c_prev = solver.del_c
@@ -685,7 +686,7 @@ function inertia_correction!(
         n_trial += 1
     end
 
-    solver.del_w != 0 && (solver.del_w_last = solver.del_w)
+    solver.del_w != 0 && (_del_w_last!(solver, solver.del_w))
     return true
 end
 
@@ -695,10 +696,10 @@ function inertia_correction!(
     ) where T
 
     n_trial = 0
-    solver.del_w = del_w_prev = zero(T)
-    solver.del_c = del_c_prev = zero(T)
+    _del_w!(solver, del_w_prev = zero(T))
+    _del_c!(solver, del_c_prev = zero(T))
 
-    @trace(solver.logger,"Inertia-free regularization started.")
+    @trace(_logger(solver),"Inertia-free regularization started.")
     dx = primal(solver.d)
     p0 = inertia_corrector.p0
     d0 = inertia_corrector.d0
@@ -721,19 +722,20 @@ function inertia_correction!(
     axpy!(-1.,n,t)
 
     while !curv_test(t,n,g,solver.kkt,wx,solver.opt.inertia_free_tol)  || !solve_status
-        @debug(solver.logger,"Primal-dual perturbed.")
+        @debug(_logger(solver),"Primal-dual perturbed.")
         if n_trial == 0
-            solver.del_w = solver.del_w_last==.0 ? solver.opt.first_hessian_perturbation :
+            _del_w!(solver, solver.del_w_last==.0 ? solver.opt.first_hessian_perturbation :
                 max(solver.opt.min_hessian_perturbation,solver.opt.perturb_dec_fact*solver.del_w_last)
+                    )
         else
-            solver.del_w*= solver.del_w_last==.0 ? solver.opt.perturb_inc_fact_first : solver.opt.perturb_inc_fact
+            _del_w!(solver, solver.del_w * solver.del_w_last==.0 ? solver.opt.perturb_inc_fact_first : solver.opt.perturb_inc_fact)
             if solver.del_w>solver.opt.max_hessian_perturbation
                 solver.cnt.k+=1
-                @debug(solver.logger,"Primal regularization is too big. Switching to restoration phase.")
+                @debug(_logger(solver),"Primal regularization is too big. Switching to restoration phase.")
                 return false
             end
         end
-        solver.del_c = solver.opt.jacobian_regularization_value * solver.mu^(solver.opt.jacobian_regularization_exponent)
+        _del_c!(solver, solver.opt.jacobian_regularization_value * solver.mu^(solver.opt.jacobian_regularization_exponent))
         regularize_diagonal!(solver.kkt, solver.del_w - del_w_prev, solver.del_c - del_c_prev)
         del_w_prev = solver.del_w
         del_c_prev = solver.del_c
@@ -750,7 +752,7 @@ function inertia_correction!(
         n_trial += 1
     end
 
-    solver.del_w != 0 && (solver.del_w_last = solver.del_w)
+    solver.del_w != 0 && (_del_w_last!(solver, solver.del_w))
     return true
 end
 
@@ -760,10 +762,10 @@ function inertia_correction!(
     ) where T
 
     n_trial = 0
-    solver.del_w = del_w_prev = zero(T)
-    solver.del_c = del_c_prev = zero(T)
+    _del_w!(solver, del_w_prev = zero(T))
+    _del_c!(solver, del_c_prev = zero(T))
 
-    @trace(solver.logger,"Inertia-based regularization started.")
+    @trace(_logger(solver),"Inertia-based regularization started.")
 
     factorize_wrapper!(solver)
 
@@ -771,19 +773,19 @@ function inertia_correction!(
         solver.d, solver, solver.p, solver._w4,
     )
     while !solve_status
-        @debug(solver.logger,"Primal-dual perturbed.")
+        @debug(_logger(solver),"Primal-dual perturbed.")
         if n_trial == 0
-            solver.del_w = solver.del_w_last==zero(T) ? solver.opt.first_hessian_perturbation :
-                max(solver.opt.min_hessian_perturbation,solver.opt.perturb_dec_fact*solver.del_w_last)
+            _del_w!(solver, solver.del_w_last==zero(T) ? solver.opt.first_hessian_perturbation :
+                max(solver.opt.min_hessian_perturbation,solver.opt.perturb_dec_fact*solver.del_w_last))
         else
-            solver.del_w*= solver.del_w_last==zero(T) ? solver.opt.perturb_inc_fact_first : solver.opt.perturb_inc_fact
+            _del_w!(solver.del_w * solver.del_w_last==zero(T) ? solver.opt.perturb_inc_fact_first : solver.opt.perturb_inc_fact)
             if solver.del_w>solver.opt.max_hessian_perturbation
                 solver.cnt.k+=1
-                @debug(solver.logger,"Primal regularization is too big. Switching to restoration phase.")
+                @debug(_logger(solver),"Primal regularization is too big. Switching to restoration phase.")
                 return false
             end
         end
-        solver.del_c = solver.opt.jacobian_regularization_value * solver.mu^(solver.opt.jacobian_regularization_exponent)
+        _del_c!(solver, solver.opt.jacobian_regularization_value * solver.mu^(solver.opt.jacobian_regularization_exponent))
         regularize_diagonal!(solver.kkt, solver.del_w - del_w_prev, solver.del_c - del_c_prev)
         del_w_prev = solver.del_w
         del_c_prev = solver.del_c
@@ -794,7 +796,7 @@ function inertia_correction!(
         )
         n_trial += 1
     end
-    solver.del_w != 0 && (solver.del_w_last = solver.del_w)
+    solver.del_w != 0 && (_del_w_last!(solver, solver.del_w))
     return true
 end
 
