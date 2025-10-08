@@ -1,4 +1,4 @@
-function eval_f_wrapper(solver::AbstractMadNLPSolver, x::PrimalVector{T}) where T
+function eval_f_wrapper(solver::AbstractMadNLPSolver{T}, x::PrimalVector{T}) where T
     nlp = _nlp(solver)
     cnt = _cnt(solver)
     @trace(_logger(solver),"Evaluating objective.")

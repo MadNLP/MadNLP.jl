@@ -753,14 +753,14 @@ function get_sc(zl_r, zu_r, s_max)
 end
 
 function get_mu(
-    mu,
+    mu::T,
     mu_min,
     mu_linear_decrease_factor,
     mu_superlinear_decrease_power,
     tol,
-)
+) where {T}
     # Warning: `a * tol` should be strictly less than 100 * mu_min, see issue #242
-    a = min(99.0 * mu_min / tol, 0.01)
+    a = min(T(99.0) * mu_min / tol, T(0.01))
     return max(
         mu_min,
         a * tol,
@@ -826,8 +826,8 @@ function is_filter_acceptable(filter, theta, varphi)
     return true
 end
 
-function is_barr_obj_rapid_increase(varphi, varphi_trial, obj_max_inc)
-    return (varphi_trial >= varphi) && (log10(varphi_trial-varphi) > obj_max_inc + max(1.0, log10(abs(varphi))))
+function is_barr_obj_rapid_increase(varphi::T, varphi_trial, obj_max_inc) where T
+    return (varphi_trial >= varphi) && (log10(varphi_trial-varphi) > obj_max_inc + max(one(T), log10(abs(varphi))))
 end
 
 function reset_bound_dual!(
