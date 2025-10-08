@@ -2,12 +2,12 @@
     # Putting some things in `@setup_workload` instead of `@compile_workload` can reduce the size of the
     # precompile file and potentially make loading faster.
 
-    struct HS15Model{T} <: NLPModels.AbstractNLPModel{T,Vector{T}}
-        meta::NLPModels.NLPModelMeta{T, Vector{T}}
+    struct HS15Model{T, VT <: AbstractVector{T}} <: NLPModels.AbstractNLPModel{T,VT}
+        meta::NLPModels.NLPModelMeta{T, VT}
         counters::NLPModels.Counters
     end
 
-    function HS15Model(;T = Float64, x0=zeros(T,2), y0=zeros(T,2))
+    function HS15Model(;T = Float64, x0=zeros(T,2))
         return HS15Model(
             NLPModels.NLPModelMeta(
                 2,     #nvar
@@ -15,11 +15,11 @@
                 nnzj = 4,
                 nnzh = 3,
                 x0 = x0,
-                y0 = y0,
-                lvar = T[-Inf, -Inf],
-                uvar = T[0.5, Inf],
-                lcon = T[1.0, 0.0],
-                ucon = T[Inf, Inf],
+                y0 = copyto!(similar(x0,2), (0.0, 0.0)),
+                lvar = copyto!(similar(x0,2), (-Inf, -Inf)),
+                uvar = copyto!(similar(x0,2), (0.5, Inf)),
+                lcon = copyto!(similar(x0,2), (1.0, 0.0)),
+                ucon = copyto!(similar(x0,2), (Inf, Inf)),
                 minimize = true
             ),
             NLPModels.Counters()
