@@ -75,11 +75,11 @@ function initialize!(solver::AbstractMadNLPSolver{T}) where T
     eval_lag_hess_wrapper!(solver, _kkt(solver), _x(solver), _y(solver))
 
     theta = get_theta(_c(solver))
-    _theta_max!(solver, 1e4*max(1,theta))
-    _theta_min!(solver, 1e-4*max(1,theta))
+    _theta_max!(solver, T(1e4)*max(one(T),theta))
+    _theta_min!(solver, T(1e-4)*max(one(T),theta))
     _mu!(solver, _opt(solver).mu_init)
-    _tau!(solver, max(_opt(solver).tau_min,1-_opt(solver).mu_init))
-    push!(_filter(solver), (_theta_max(solver),-Inf))
+    _tau!(solver, max(_opt(solver).tau_min,one(T)-_opt(solver).mu_init))
+    push!(_filter(solver), (_theta_max(solver),-T(Inf)))
 
     return REGULAR
 end
@@ -97,7 +97,7 @@ function initialize_dual(solver::AbstractMadNLPSolver{T}, ::Type{DualInitializeL
     is_solved = solve_refine_wrapper!(
         _d(solver), solver, _p(solver), __w4(solver)
     )
-    if !is_solved || (norm(dual(_d(solver)), Inf) > _opt(solver).constr_mult_init_max)
+    if !is_solved || (norm(dual(_d(solver)), T(Inf)) > _opt(solver).constr_mult_init_max)
         fill!(_y(solver), zero(T))
     else
         copyto!(_y(solver), dual(_d(solver)))
