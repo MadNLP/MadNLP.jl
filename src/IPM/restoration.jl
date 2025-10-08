@@ -33,23 +33,23 @@ end
 
 function RobustRestorer(solver::AbstractMadNLPSolver{T}) where {T}
 
-    f_R = similar(solver.y, solver.n)
-    x_ref = similar(solver.y, solver.n)
-    D_R = similar(solver.y, solver.n)
-    pp = similar(solver.y, solver.m)
-    nn = similar(solver.y, solver.m)
-    pp_trial = similar(solver.y, solver.m)
-    nn_trial = similar(solver.y, solver.m)
+    f_R = similar(_y(solver), _n(solver))
+    x_ref = similar(_y(solver), _n(solver))
+    D_R = similar(_y(solver), _n(solver))
+    pp = similar(_y(solver), _m(solver))
+    nn = similar(_y(solver), _m(solver))
+    pp_trial = similar(_y(solver), _m(solver))
+    nn_trial = similar(_y(solver), _m(solver))
 
-    nn = similar(solver.y, solver.m)
-    zp = similar(solver.y, solver.m)
-    zn = similar(solver.y, solver.m)
-    dpp= similar(solver.y, solver.m)
-    dnn= similar(solver.y, solver.m)
-    dzp= similar(solver.y, solver.m)
-    dzn= similar(solver.y, solver.m)
-    pp_trial = similar(solver.y, solver.m)
-    nn_trial = similar(solver.y, solver.m)
+    nn = similar(_y(solver), _m(solver))
+    zp = similar(_y(solver), _m(solver))
+    zn = similar(_y(solver), _m(solver))
+    dpp= similar(_y(solver), _m(solver))
+    dnn= similar(_y(solver), _m(solver))
+    dzp= similar(_y(solver), _m(solver))
+    dzn= similar(_y(solver), _m(solver))
+    pp_trial = similar(_y(solver), _m(solver))
+    nn_trial = similar(_y(solver), _m(solver))
 
     return RobustRestorer(
         zero(T), 
@@ -70,43 +70,43 @@ function RobustRestorer(solver::AbstractMadNLPSolver{T}) where {T}
 end
 
 function initialize_robust_restorer!(solver::AbstractMadNLPSolver{T}) where T
-    @trace(solver.logger,"Initializing restoration phase variables.")
-    solver.RR == nothing && (solver.RR = RobustRestorer(solver))
-    RR = solver.RR
+    @trace(_logger(solver),"Initializing restoration phase variables.")
+    _RR(solver) == nothing && (_RR(solver) = RobustRestorer(solver))
+    RR = _RR(solver)
 
-    copyto!(RR.x_ref, full(solver.x))
-    RR.theta_ref = get_theta(solver.c)
+    copyto!(RR.x_ref, full(_x(solver)))
+    RR.theta_ref = get_theta(_c(solver))
     RR.D_R .= min.(one(T), one(T) ./ abs.(RR.x_ref))
 
-    RR.mu_R = max(solver.mu, norm(solver.c, Inf))
-    RR.tau_R= max(solver.opt.tau_min,1-RR.mu_R)
+    RR.mu_R = max(_mu(solver), norm(_c(solver), Inf))
+    RR.tau_R= max(_opt(solver).tau_min,1-RR.mu_R)
     RR.zeta = sqrt(RR.mu_R)
 
-    rho = solver.opt.rho
+    rho = _opt(solver).rho
     mu = RR.mu_R
     RR.nn .=
-        (mu .- rho*solver.c)./2 ./rho .+
+        (mu .- rho*_c(solver))./2 ./rho .+
         sqrt.(
-            ((mu.-rho*solver.c)./2 ./rho).^2 + mu.*solver.c./2 ./rho
+            ((mu.-rho*_c(solver))./2 ./rho).^2 + mu.*_c(solver)./2 ./rho
         )
-    RR.pp .= solver.c .+ RR.nn
+    RR.pp .= _c(solver) .+ RR.nn
     RR.zp .= RR.mu_R ./ RR.pp
     RR.zn .= RR.mu_R ./ RR.nn
 
-    RR.obj_val_R = get_obj_val_R(RR.pp,RR.nn,RR.D_R,full(solver.x),RR.x_ref,solver.opt.rho,RR.zeta)
+    RR.obj_val_R = get_obj_val_R(RR.pp,RR.nn,RR.D_R,full(_x(solver)),RR.x_ref,_opt(solver).rho,RR.zeta)
     fill!(RR.f_R, zero(T))
     empty!(RR.filter)
-    push!(RR.filter, (solver.theta_max,-Inf))
+    push!(RR.filter, (_theta_max(solver),-Inf))
 
-    fill!(solver.y, zero(T))
-    solver.zl_r .= min.(solver.opt.rho, solver.zl_r)
-    solver.zu_r .= min.(solver.opt.rho, solver.zu_r)
-    # fill!(solver.zl_r, one(T)) # Experimental
-    # fill!(solver.zu_r, one(T)) # Experimental
+    fill!(_y(solver), zero(T))
+    _zl_r(solver) .= min.(_opt(solver).rho, _zl_r(solver))
+    _zu_r(solver) .= min.(_opt(solver).rho, _zu_r(solver))
+    # fill!(_zl_r(solver), one(T)) # Experimental
+    # fill!(_zu_r(solver), one(T)) # Experimental
     
-    solver.cnt.t = 0
+    _cnt(solver).t = 0
 
     # misc
-    solver.del_w = zero(T)
+    del_w!(solver, zero(T))
 end
 
