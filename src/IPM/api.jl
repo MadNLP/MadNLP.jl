@@ -2,7 +2,7 @@
 # The idea here is that a subtype of AbstractMadNLPSolver may specialize
 # some or all of these and the core functionality of the IPM in MadNLP
 # should function as normal.
-# TODO(@anton) We could in principle write a macro to define this "automatically"
+# TODO(@anton) We could in principle write a macro to define this "automagically"
 
 # Solver data
 _kkt(solver::AbstractMadNLPSolver) = solver.kkt
