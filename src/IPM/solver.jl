@@ -633,7 +633,6 @@ function inertia_correction!(
     end
 
     while !solve_status
-        println("($(num_pos),$(num_zero),$(num_neg))")
         @debug(_logger(solver),"Primal-dual perturbed.")
 
         if n_trial == 0
@@ -641,23 +640,20 @@ function inertia_correction!(
                 max(_opt(solver).min_hessian_perturbation,_opt(solver).perturb_dec_fact*_del_w_last(solver))
                     )
         else
-            _del_w!(solver, _del_w(solver) * _del_w_last(solver)==zero(T) ? _opt(solver).perturb_inc_fact_first : _opt(solver).perturb_inc_fact)
+            _del_w!(solver, _del_w(solver) * (_del_w_last(solver)==zero(T) ? _opt(solver).perturb_inc_fact_first : _opt(solver).perturb_inc_fact))
             if _del_w(solver)>_opt(solver).max_hessian_perturbation
                 _cnt(solver).k+=1
                 @debug(_logger(solver),"Primal regularization is too big. Switching to restoration phase.")
                 return false
             end
         end
-        _del_c!(solver, num_zero == 0 ? zero(T) : _opt(solver).jacobian_regularization_value * _mu(solver)^(_opt(solver).jacobian_regularization_exponent))
+        _del_c!(solver, (num_zero == 0 ? zero(T) : _opt(solver).jacobian_regularization_value * _mu(solver)^(_opt(solver).jacobian_regularization_exponent)))
         regularize_diagonal!(_kkt(solver), _del_w(solver) - del_w_prev, _del_c(solver) - del_c_prev)
-        println("$(_del_w(solver) - del_w_prev), $(_del_c(solver) - del_c_prev)")
         del_w_prev = _del_w(solver)
         del_c_prev = _del_c(solver)
 
         factorize_wrapper!(solver)
         num_pos,num_zero,num_neg = inertia(_kkt(solver).linear_solver)
-        println("$(is_inertia_correct(_kkt(solver), num_pos, num_zero, num_neg))")
-        println("$(_kkt(solver).pr_diag), $(num_variables(_kkt(solver)))")
 
         solve_status = if is_inertia_correct(_kkt(solver), num_pos, num_zero, num_neg)
             solve_refine_wrapper!(_d(solver), solver, _p(solver), __w4(solver))
@@ -711,7 +707,7 @@ function inertia_correction!(
                 max(_opt(solver).min_hessian_perturbation,_opt(solver).perturb_dec_fact*_del_w_last(solver))
                     )
         else
-            _del_w!(solver, _del_w(solver) * _del_w_last(solver)==.0 ? _opt(solver).perturb_inc_fact_first : _opt(solver).perturb_inc_fact)
+            _del_w!(solver, _del_w(solver) * (_del_w_last(solver)==.0 ? _opt(solver).perturb_inc_fact_first : _opt(solver).perturb_inc_fact))
             if _del_w(solver)>_opt(solver).max_hessian_perturbation
                 _cnt(solver).k+=1
                 @debug(_logger(solver),"Primal regularization is too big. Switching to restoration phase.")
@@ -763,7 +759,7 @@ function inertia_correction!(
             _del_w!(solver, _del_w_last(solver)==zero(T) ? _opt(solver).first_hessian_perturbation :
                 max(_opt(solver).min_hessian_perturbation,_opt(solver).perturb_dec_fact*_del_w_last(solver)))
         else
-            _del_w!(solver, _del_w(solver) * _del_w_last(solver)==zero(T) ? _opt(solver).perturb_inc_fact_first : _opt(solver).perturb_inc_fact)
+            _del_w!(solver, _del_w(solver) * (_del_w_last(solver)==zero(T) ? _opt(solver).perturb_inc_fact_first : _opt(solver).perturb_inc_fact))
             if _del_w(solver)>_opt(solver).max_hessian_perturbation
                 _cnt(solver).k+=1
                 @debug(_logger(solver),"Primal regularization is too big. Switching to restoration phase.")
