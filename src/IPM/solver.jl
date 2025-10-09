@@ -70,15 +70,15 @@ function initialize!(solver::AbstractMadNLPSolver{T}) where T
     end
 
     # Initializing
-    _obj_val!(solver, eval_f_wrapper(solver, _x(solver)))
+    set_obj_val!(solver, eval_f_wrapper(solver, _x(solver)))
     eval_cons_wrapper!(solver, _c(solver), _x(solver))
     eval_lag_hess_wrapper!(solver, _kkt(solver), _x(solver), _y(solver))
 
     theta = get_theta(_c(solver))
-    _theta_max!(solver, T(1e4)*max(one(T),theta))
-    _theta_min!(solver, T(1e-4)*max(one(T),theta))
-    _mu!(solver, _opt(solver).barrier.mu_init)
-    _tau!(solver, max(_opt(solver).tau_min,one(T)-_opt(solver).barrier.mu_init))
+    set_theta_max!(solver, T(1e4)*max(one(T),theta))
+    set_theta_min!(solver, T(1e-4)*max(one(T),theta))
+    set_mu!(solver, _opt(solver).barrier.mu_init)
+    set_tau!(solver, max(_opt(solver).tau_min,one(T)-_opt(solver).barrier.mu_init))
     push!(_filter(solver), (_theta_max(solver),-T(Inf)))
 
     return REGULAR
@@ -107,17 +107,17 @@ end
 function reinitialize!(solver::AbstractMadNLPSolver)
     variable(_x(solver)) .= get_x0(_nlp(solver))
 
-    _obj_val!(solver, eval_f_wrapper(solver, _x(solver)))
+    set_obj_val!(solver, eval_f_wrapper(solver, _x(solver)))
     eval_grad_f_wrapper!(solver, _f(solver), _x(solver))
     eval_cons_wrapper!(solver, _c(solver), _x(solver))
     eval_jac_wrapper!(solver, _kkt(solver), _x(solver))
     eval_lag_hess_wrapper!(solver, _kkt(solver), _x(solver), _y(solver))
 
     theta = get_theta(_c(solver))
-    _theta_max!(solver, 1e4*max(1,theta))
-    _theta_min!(solver, 1e-4*max(1,theta))
-    _mu!(solver, _opt(solver).barrier.mu_init)
-    _tau!(solver, max(_opt(solver).tau_min,1-_opt(solver).barrier.mu_init))
+    set_theta_max!(solver, 1e4*max(1,theta))
+    set_theta_min!(solver, 1e-4*max(1,theta))
+    set_mu!(solver, _opt(solver).barrier.mu_init)
+    set_tau!(solver, max(_opt(solver).tau_min,1-_opt(solver).barrier.mu_init))
     empty!(_filter(solver))
     push!(_filter(solver), (_theta_max(solver),-Inf))
 
@@ -156,41 +156,41 @@ function solve!(
         if _status(solver) == INITIAL
             @notice(_logger(solver),"This is $(introduce()), running with $(introduce(_kkt(solver).linear_solver))\n")
             print_init(solver)
-            _status!(solver, initialize!(solver))
+            set_status!(solver, initialize!(solver))
         else # resolving the problem
-            _status!(solver, reinitialize!(solver))
+            set_status!(solver, reinitialize!(solver))
         end
 
         while _status(solver) >= REGULAR
-            _status(solver) == REGULAR && (_status!(solver, regular!(solver)))
-            _status(solver) == RESTORE && (_status!(solver, restore!(solver)))
-            _status(solver) == ROBUST && (_status!(solver, robust!(solver)))
+            _status(solver) == REGULAR && (set_status!(solver, regular!(solver)))
+            _status(solver) == RESTORE && (set_status!(solver, restore!(solver)))
+            _status(solver) == ROBUST && (set_status!(solver, robust!(solver)))
         end
     catch e
         if e isa InvalidNumberException
             if e.callback == :obj
-                _status!(solver, INVALID_NUMBER_OBJECTIVE)
+                set_status!(solver, INVALID_NUMBER_OBJECTIVE)
             elseif e.callback == :grad
-                _status!(solver, INVALID_NUMBER_GRADIENT)
+                set_status!(solver, INVALID_NUMBER_GRADIENT)
             elseif e.callback == :cons
-                _status!(solver, INVALID_NUMBER_CONSTRAINTS)
+                set_status!(solver, INVALID_NUMBER_CONSTRAINTS)
             elseif e.callback == :jac
-                _status!(solver, INVALID_NUMBER_JACOBIAN)
+                set_status!(solver, INVALID_NUMBER_JACOBIAN)
             elseif e.callback == :hess
-                _status!(solver, INVALID_NUMBER_HESSIAN_LAGRANGIAN)
+                set_status!(solver, INVALID_NUMBER_HESSIAN_LAGRANGIAN)
             else
-                _status!(solver, INVALID_NUMBER_DETECTED)
+                set_status!(solver, INVALID_NUMBER_DETECTED)
             end
         elseif e isa NotEnoughDegreesOfFreedomException
-            _status!(solver, NOT_ENOUGH_DEGREES_OF_FREEDOM)
+            set_status!(solver, NOT_ENOUGH_DEGREES_OF_FREEDOM)
         elseif e isa LinearSolverException
-            _status!(solver, ERROR_IN_STEP_COMPUTATION;)
+            set_status!(solver, ERROR_IN_STEP_COMPUTATION;)
             _opt(solver).rethrow_error && rethrow(e)
         elseif e isa InterruptException
-            _status!(solver, USER_REQUESTED_STOP)
+            set_status!(solver, USER_REQUESTED_STOP)
             _opt(solver).rethrow_error && rethrow(e)
         else
-            _status!(solver, INTERNAL_ERROR)
+            set_status!(solver, INTERNAL_ERROR)
             _opt(solver).rethrow_error && rethrow(e)
         end
     finally
@@ -224,15 +224,15 @@ function regular!(solver::AbstractMadNLPSolver{T}) where T
         jtprod!(_jacl(solver), _kkt(solver), _y(solver))
         sd = get_sd(_y(solver),_zl_r(solver),_zu_r(solver),T(_opt(solver).s_max))
         sc = get_sc(_zl_r(solver),_zu_r(solver),T(_opt(solver).s_max))
-        _inf_pr!(solver, get_inf_pr(_c(solver)))
-        _inf_du!(solver, get_inf_du(
+        set_inf_pr!(solver, get_inf_pr(_c(solver)))
+        set_inf_du!(solver, get_inf_du(
             full(_f(solver)),
             full(_zl(solver)),
             full(_zu(solver)),
             _jacl(solver),
             sd,
         ))
-        _inf_compl!(solver, _inf_compl(solver, sc; mu=zero(T)))
+        set_inf_compl!(solver, _inf_compl(solver, sc; mu=zero(T)))
 
         print_iter(solver)
 
@@ -271,7 +271,7 @@ function regular!(solver::AbstractMadNLPSolver{T}) where T
         @trace(_logger(solver),"Updating primal-dual variables.")
         copyto!(full(_x(solver)), full(_x_trial(solver)))
         copyto!(_c(solver), _c_trial(solver))
-        _obj_val!(solver, _obj_val_trial(solver))
+        set_obj_val!(solver, _obj_val_trial(solver))
         adjust_boundary!(_x_lr(solver),_xl_r(solver),_x_ur(solver),_xu_r(solver),_mu(solver))
 
         axpy!(_alpha(solver),dual(_d(solver)),_y(solver))
@@ -300,7 +300,7 @@ end
 
 
 function restore!(solver::AbstractMadNLPSolver{T}) where T
-    _del_w!(solver, zero(T))
+    set_del_w!(solver, zero(T))
     # Backup the previous primal iterate
     copyto!(primal(__w1(solver)), full(_x(solver)))
     copyto!(dual(__w1(solver)), _y(solver))
@@ -320,8 +320,8 @@ function restore!(solver::AbstractMadNLPSolver{T}) where T
         _zu_r(solver),
         _mu(solver),
     )
-    _alpha_z!(solver, zero(T))
-    _ftype!(solver, "R")
+    set_alpha_z!(solver, zero(T))
+    set_ftype!(solver, "R")
     while true
         alpha_max = get_alpha_max(
             primal(_x(solver)),
@@ -330,7 +330,7 @@ function restore!(solver::AbstractMadNLPSolver{T}) where T
             primal(_d(solver)),
             _tau(solver),
         )
-        _alpha!(solver,min(
+        set_alpha!(solver,min(
             alpha_max,
             get_alpha_z(_zl_r(solver),_zu_r(solver),dual_lb(_d(solver)),dual_ub(_d(solver)),_tau(solver)),
         ))
@@ -342,7 +342,7 @@ function restore!(solver::AbstractMadNLPSolver{T}) where T
 
         eval_cons_wrapper!(solver,_c(solver),_x(solver))
         eval_grad_f_wrapper!(solver,_f(solver),_x(solver))
-        _obj_val!(solver, eval_f_wrapper(solver,_x(solver)))
+        set_obj_val!(solver, eval_f_wrapper(solver,_x(solver)))
 
         !_opt(solver).jacobian_constant && eval_jac_wrapper!(solver,_kkt(solver),_x(solver))
         jtprod!(_jacl(solver),_kkt(solver),_y(solver))
@@ -384,8 +384,8 @@ function restore!(solver::AbstractMadNLPSolver{T}) where T
 
         sd = get_sd(_y(solver),_zl_r(solver),_zu_r(solver),_opt(solver).s_max)
         sc = get_sc(_zl_r(solver),_zu_r(solver),_opt(solver).s_max)
-        _inf_pr!(solver, get_inf_pr(_c(solver)))
-        _inf_du!(solver, get_inf_du(
+        set_inf_pr!(solver, get_inf_pr(_c(solver)))
+        set_inf_du!(solver, get_inf_du(
             primal(_f(solver)),
             primal(_zl(solver)),
             primal(_zu(solver)),
@@ -393,7 +393,7 @@ function restore!(solver::AbstractMadNLPSolver{T}) where T
             sd,
         ))
 
-        _inf_compl!(solver, get_inf_compl(_x_lr(solver),_xl_r(solver),_zl_r(solver),_xu_r(solver),_x_ur(solver),_zu_r(solver),zero(T),sc))
+        set_inf_compl!(solver, get_inf_compl(_x_lr(solver),_xl_r(solver),_zl_r(solver),_xu_r(solver),_x_ur(solver),_zu_r(solver),zero(T),sc))
         inf_compl_mu = get_inf_compl(_x_lr(solver),_xl_r(solver),_zl_r(solver),_xu_r(solver),_x_ur(solver),_zu_r(solver),_mu(solver),sc)
         print_iter(solver)
 
@@ -407,7 +407,7 @@ function restore!(solver::AbstractMadNLPSolver{T}) where T
             _d(solver), solver, _p(solver), __w4(solver)
         )
 
-        _ftype!(solver, "f")
+        set_ftype!(solver, "f")
     end
 end
 
@@ -424,15 +424,15 @@ function robust!(solver::AbstractMadNLPSolver{T}) where T
         @trace(_logger(solver),"Evaluating restoration phase termination criteria.")
         sd = get_sd(_y(solver),_zl_r(solver),_zu_r(solver),_opt(solver).s_max)
         sc = get_sc(_zl_r(solver),_zu_r(solver),_opt(solver).s_max)
-        _inf_pr!(solver, get_inf_pr(_c(solver)))
-        _inf_du!(solver, get_inf_du(
+        set_inf_pr!(solver, get_inf_pr(_c(solver)))
+        set_inf_du!(solver, get_inf_du(
             primal(_f(solver)),
             primal(_zl(solver)),
             primal(_zu(solver)),
             _jacl(solver),
             sd,
         ))
-        _inf_compl!(solver, get_inf_compl(_x_lr(solver),_xl_r(solver),_zl_r(solver),_xu_r(solver),_x_ur(solver),_zu_r(solver),zero(T),sc))
+        set_inf_compl!(solver, get_inf_compl(_x_lr(solver),_xl_r(solver),_zl_r(solver),_xu_r(solver),_x_ur(solver),_zu_r(solver),zero(T),sc))
 
         # Robust restoration phase error
         RR.inf_pr_R = get_inf_pr_R(_c(solver),RR.pp,RR.nn)
@@ -506,7 +506,7 @@ function robust!(solver::AbstractMadNLPSolver{T}) where T
 
         # check if going back to regular phase
         @trace(_logger(solver),"Checking if going back to regular phase.")
-        _obj_val!(solver, eval_f_wrapper(solver, _x(solver)))
+        set_obj_val!(solver, eval_f_wrapper(solver, _x(solver)))
         eval_grad_f_wrapper!(solver, _f(solver), _x(solver))
         theta = get_theta(_c(solver))
         varphi= get_varphi(_obj_val(solver),_x_lr(solver),_xl_r(solver),_xu_r(solver),_x_ur(solver),_mu(solver))
@@ -573,7 +573,7 @@ function second_order_correction(solver::AbstractMadNLPSolver,alpha_max,theta,va
         copyto!(primal(_x_trial(solver)), primal(_x(solver)))
         axpy!(alpha_soc, wx, primal(_x_trial(solver)))
         eval_cons_wrapper!(solver, _c_trial(solver), _x_trial(solver))
-        _obj_val_trial!(solver, eval_f_wrapper(solver, _x_trial(solver)))
+        set_obj_val_trial!(solver, eval_f_wrapper(solver, _x_trial(solver)))
 
         theta_soc = get_theta(_c_trial(solver))
         varphi_soc= get_varphi(_obj_val_trial(solver),_x_trial_lr(solver),_xl_r(solver),_xu_r(solver),_x_trial_ur(solver),_mu(solver))
@@ -584,16 +584,16 @@ function second_order_correction(solver::AbstractMadNLPSolver,alpha_max,theta,va
             # Case I
             if is_armijo(varphi_soc,varphi,_opt(solver).eta_phi,_alpha(solver),varphi_d)
                 @trace(_logger(solver),"Step in second order correction accepted by armijo condition.")
-                _ftype!(solver, "F")
-                _alpha!(solver, alpha_soc)
+                set_ftype!(solver, "F")
+                set_alpha!(solver, alpha_soc)
                 return true
             end
         else
             # Case II
             if is_sufficient_progress(theta_soc,theta,_opt(solver).gamma_theta,varphi_soc,varphi,_opt(solver).gamma_phi,has_constraints(solver))
                 @trace(_logger(solver),"Step in second order correction accepted by sufficient progress.")
-                _ftype!(solver, "H")
-                _alpha!(solver, alpha_soc)
+                set_ftype!(solver, "H")
+                set_alpha!(solver, alpha_soc)
                 return true
             end
         end
@@ -615,8 +615,8 @@ function inertia_correction!(
     n_trial = 0
     del_w_prev = zero(T)
     del_c_prev = zero(T)
-    _del_w!(solver, zero(T))
-    _del_c!(solver, zero(T))
+    set_del_w!(solver, zero(T))
+    set_del_c!(solver, zero(T))
 
     @trace(_logger(solver),"Inertia-based regularization started.")
 
@@ -636,18 +636,18 @@ function inertia_correction!(
         @debug(_logger(solver),"Primal-dual perturbed.")
 
         if n_trial == 0
-            _del_w!(solver, _del_w_last(solver)==zero(T) ? _opt(solver).first_hessian_perturbation :
+            set_del_w!(solver, _del_w_last(solver)==zero(T) ? _opt(solver).first_hessian_perturbation :
                 max(_opt(solver).min_hessian_perturbation,_opt(solver).perturb_dec_fact*_del_w_last(solver))
                     )
         else
-            _del_w!(solver, _del_w(solver) * (_del_w_last(solver)==zero(T) ? _opt(solver).perturb_inc_fact_first : _opt(solver).perturb_inc_fact))
+            set_del_w!(solver, _del_w(solver) * (_del_w_last(solver)==zero(T) ? _opt(solver).perturb_inc_fact_first : _opt(solver).perturb_inc_fact))
             if _del_w(solver)>_opt(solver).max_hessian_perturbation
                 _cnt(solver).k+=1
                 @debug(_logger(solver),"Primal regularization is too big. Switching to restoration phase.")
                 return false
             end
         end
-        _del_c!(solver, (num_zero == 0 ? zero(T) : _opt(solver).jacobian_regularization_value * _mu(solver)^(_opt(solver).jacobian_regularization_exponent)))
+        set_del_c!(solver, (num_zero == 0 ? zero(T) : _opt(solver).jacobian_regularization_value * _mu(solver)^(_opt(solver).jacobian_regularization_exponent)))
         regularize_diagonal!(_kkt(solver), _del_w(solver) - del_w_prev, _del_c(solver) - del_c_prev)
         del_w_prev = _del_w(solver)
         del_c_prev = _del_c(solver)
@@ -664,7 +664,7 @@ function inertia_correction!(
         n_trial += 1
     end
 
-    _del_w(solver) != 0 && (_del_w_last!(solver, _del_w(solver)))
+    _del_w(solver) != 0 && (set_del_w_last!(solver, _del_w(solver)))
     return true
 end
 
@@ -675,8 +675,8 @@ function inertia_correction!(
     n_trial = 0
     del_w_prev = zero(T)
     del_c_prev = zero(T)
-    _del_w!(solver, zero(T))
-    _del_c!(solver, zero(T))
+    set_del_w!(solver, zero(T))
+    set_del_c!(solver, zero(T))
 
     @trace(_logger(solver),"Inertia-free regularization started.")
     dx = primal(_d(solver))
@@ -703,18 +703,18 @@ function inertia_correction!(
     while !curv_test(t,n,g,_kkt(solver),wx,_opt(solver).inertia_free_tol) || !solve_status
         @debug(_logger(solver),"Primal-dual perturbed.")
         if n_trial == 0
-            _del_w!(solver, _del_w_last(solver)==.0 ? _opt(solver).first_hessian_perturbation :
+            set_del_w!(solver, _del_w_last(solver)==.0 ? _opt(solver).first_hessian_perturbation :
                 max(_opt(solver).min_hessian_perturbation,_opt(solver).perturb_dec_fact*_del_w_last(solver))
                     )
         else
-            _del_w!(solver, _del_w(solver) * (_del_w_last(solver)==.0 ? _opt(solver).perturb_inc_fact_first : _opt(solver).perturb_inc_fact))
+            set_del_w!(solver, _del_w(solver) * (_del_w_last(solver)==.0 ? _opt(solver).perturb_inc_fact_first : _opt(solver).perturb_inc_fact))
             if _del_w(solver)>_opt(solver).max_hessian_perturbation
                 _cnt(solver).k+=1
                 @debug(_logger(solver),"Primal regularization is too big. Switching to restoration phase.")
                 return false
             end
         end
-        _del_c!(solver, _opt(solver).jacobian_regularization_value * _mu(solver)^(_opt(solver).jacobian_regularization_exponent))
+        set_del_c!(solver, _opt(solver).jacobian_regularization_value * _mu(solver)^(_opt(solver).jacobian_regularization_exponent))
         regularize_diagonal!(_kkt(solver), _del_w(solver) - del_w_prev, _del_c(solver) - del_c_prev)
         del_w_prev = _del_w(solver)
         del_c_prev = _del_c(solver)
@@ -731,7 +731,7 @@ function inertia_correction!(
         n_trial += 1
     end
 
-    _del_w(solver) != 0 && (_del_w_last!(solver, _del_w(solver)))
+    _del_w(solver) != 0 && (set_del_w_last!(solver, _del_w(solver)))
     return true
 end
 
@@ -743,8 +743,8 @@ function inertia_correction!(
     n_trial = 0
     del_w_prev = zero(T)
     del_c_prev = zero(T)
-    _del_w!(solver, zero(T))
-    _del_c!(solver, zero(T))
+    set_del_w!(solver, zero(T))
+    set_del_c!(solver, zero(T))
 
     @trace(_logger(solver),"Inertia-based regularization started.")
 
@@ -756,17 +756,17 @@ function inertia_correction!(
     while !solve_status
         @debug(_logger(solver),"Primal-dual perturbed.")
         if n_trial == 0
-            _del_w!(solver, _del_w_last(solver)==zero(T) ? _opt(solver).first_hessian_perturbation :
+            set_del_w!(solver, _del_w_last(solver)==zero(T) ? _opt(solver).first_hessian_perturbation :
                 max(_opt(solver).min_hessian_perturbation,_opt(solver).perturb_dec_fact*_del_w_last(solver)))
         else
-            _del_w!(solver, _del_w(solver) * (_del_w_last(solver)==zero(T) ? _opt(solver).perturb_inc_fact_first : _opt(solver).perturb_inc_fact))
+            set_del_w!(solver, _del_w(solver) * (_del_w_last(solver)==zero(T) ? _opt(solver).perturb_inc_fact_first : _opt(solver).perturb_inc_fact))
             if _del_w(solver)>_opt(solver).max_hessian_perturbation
                 _cnt(solver).k+=1
                 @debug(_logger(solver),"Primal regularization is too big. Switching to restoration phase.")
                 return false
             end
         end
-        _del_c!(solver, _opt(solver).jacobian_regularization_value * _mu(solver)^(_opt(solver).jacobian_regularization_exponent))
+        set_del_c!(solver, _opt(solver).jacobian_regularization_value * _mu(solver)^(_opt(solver).jacobian_regularization_exponent))
         regularize_diagonal!(_kkt(solver), _del_w(solver) - del_w_prev, _del_c(solver) - del_c_prev)
         del_w_prev = _del_w(solver)
         del_c_prev = _del_c(solver)
@@ -777,7 +777,7 @@ function inertia_correction!(
         )
         n_trial += 1
     end
-    _del_w(solver) != 0 && (_del_w_last!(solver, _del_w(solver)))
+    _del_w(solver) != 0 && (set_del_w_last!(solver, _del_w(solver)))
     return true
 end
 
