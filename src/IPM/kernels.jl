@@ -302,6 +302,7 @@ end
 
 function get_average_complementarity(x_lr, xl_r, zl_r, x_ur, xu_r, zu_r)
     n_lb, n_ub = length(x_lr), length(x_ur)
+    # If the problem is unconstrained, average complementarity is 0
     if n_lb + n_ub == 0
         return 0.0
     end

@@ -241,8 +241,8 @@ function _evaluate_quality_function(solver, sigma, step_aff, step_cen, res_dual,
     nlb, nub = solver.nlb, solver.nub
     tau = solver.tau
     d = solver.d # Load buffer
-    # Δ(σ) = Δ(0) + σ (Δ(1) - Δ(0))
-    full(d) .= full(step_aff) .+ sigma .* (full(step_cen) .- full(step_aff))
+    # Δ(σ) = Δ_aff + σ Δ_cen
+    full(d) .= full(step_aff) .+ sigma .* full(step_cen)
     # Primal step
     alpha_pr = get_alpha_max(
         primal(solver.x),
@@ -259,14 +259,15 @@ function _evaluate_quality_function(solver, sigma, step_aff, step_cen, res_dual,
         dual_ub(d),
         tau,
     )
-    # (x + αp Δx - xl)ᵀ (zl + αd Δzl)
+    # ||(X + αp ΔX - Xl) (Zl + αd ΔZl)||^2
     inf_compl_lb = mapreduce(
         (x, xl, dx, z, dz) -> ((x + alpha_pr * dx - xl) * (z + alpha_du * dz))^2,
         +,
         solver.x_lr, solver.xl_r, solver.dx_lr, solver.zl_r, dual_lb(d);
         init=0.0,
     )
-    # (xu - x - αp Δx)ᵀ (zu + αd Δzu)
+
+    # ||(Xu - X - αp ΔX) (Zu + αd ΔZu)||^2
     inf_compl_ub = mapreduce(
         (x, xu, dx, z, dz) -> ((xu - x - alpha_pr * dx) * (z + alpha_du * dz))^2,
         +,
@@ -274,11 +275,12 @@ function _evaluate_quality_function(solver, sigma, step_aff, step_cen, res_dual,
         init=0.0,
     )
     # Primal infeasibility
-    inf_pr = (1.0 - alpha_pr)^2 * res_primal^2 / n
+    inf_pr = (m > 0) ? (1.0 - alpha_pr)^2 * res_primal^2 / m : 0.0
     # Dual infeasibility
-    inf_du = (1.0 - alpha_du)^2 * res_dual^2 / m
+    inf_du = (1.0 - alpha_du)^2 * res_dual^2 / n
     # Complementarity infeasibility
     inf_compl = (inf_compl_lb + inf_compl_ub ) / (nlb + nub)
+    # println((sigma, alpha_pr, alpha_du, inf_pr, inf_du, inf_compl_lb, inf_compl_ub))
     # Return quality function qL defined in Eq. (4.2)
     return inf_du + inf_pr + inf_compl
 end
@@ -332,7 +334,10 @@ function set_centering_aug_rhs!(solver::AbstractMadNLPSolver, kkt::AbstractKKTSy
 end
 
 function get_adaptive_mu(solver::AbstractMadNLPSolver{T}, barrier::QualityFunctionUpdate{T}) where T
-    linear_solver = solver.kkt.linear_solver
+    # No inequality constraint: early return as barrier update is useless
+    if solver.nlb + solver.nub == 0
+        return barrier.mu_min
+    end
     step_aff = solver._w1 # buffer 1
     step_cen = solver._w2 # buffer 2
     # Affine step
@@ -342,7 +347,7 @@ function get_adaptive_mu(solver::AbstractMadNLPSolver{T}, barrier::QualityFuncti
     res_dual = norm(primal(solver.p))
     # Get approximate solution without iterative refinement
     copyto!(full(step_aff), full(solver.p))
-    solve!(linear_solver, full(step_aff))
+    solve!(solver.kkt, full(step_aff))
     # Get average complementarity
     mu = get_average_complementarity(solver)
     # Centering step
@@ -351,7 +356,7 @@ function get_adaptive_mu(solver::AbstractMadNLPSolver{T}, barrier::QualityFuncti
     dual_inf_perturbation!(primal(solver.p),solver.ind_llb,solver.ind_uub,mu,solver.opt.kappa_d)
     # Get (again) approximate solution without iterative refinement
     copyto!(full(step_cen), full(solver.p))
-    solve!(linear_solver, full(step_cen))
+    solve!(solver.kkt, full(step_cen))
     # Refine the search interval using Ipopt's heuristics
     # First, check if sigma is greater than 1.
     phi1 = _evaluate_quality_function(solver, one(T), step_aff, step_cen, res_primal, res_dual)
@@ -398,11 +403,16 @@ function LOQOUpdate(tol::T, barrier_tol_factor) where T
 end
 
 function get_adaptive_mu(solver::AbstractMadNLPSolver{T}, barrier::LOQOUpdate{T}) where T
+    # No inequality constraint: early return as barrier update is useless
+    if solver.nlb + solver.nub == 0
+        return barrier.mu_min
+    end
     mu = get_average_complementarity(solver) # get average complementarity.
     ncc = solver.nlb + solver.nub
     min_cc = get_min_complementarity(solver)
     xi = min_cc/mu
     sigma = barrier.gamma*min((1-barrier.r)*((1-xi)/xi),2)^3
-    return clamp(sigma * mu, barrier.mu_min, barrier.mu_max)
+    mu = clamp(sigma * mu, barrier.mu_min, barrier.mu_max)
+    return mu
 end
 
