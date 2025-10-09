@@ -74,6 +74,6 @@ function initialize_robust_restorer!(solver::AbstractMadNLPSolver{T}) where T
     _cnt(solver).t = 0
 
     # misc
-    _del_w!(solver, zero(T))
+    set_del_w!(solver, zero(T))
 end
 

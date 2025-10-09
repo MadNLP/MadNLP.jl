@@ -14,27 +14,27 @@ for (k, attribute) in enumerate(fieldnames(MadNLPSolver))
 end
 
 # Necessary Mutators
-_RR!(solver::AbstractMadNLPSolver, rhs) = solver.RR = rhs
-_n!(solver::AbstractMadNLPSolver, rhs::Int) = solver.n = rhs
-_m!(solver::AbstractMadNLPSolver, rhs::Int) = solver.m = rhs
-_nlb!(solver::AbstractMadNLPSolver, rhs::Int) = solver.nlb = rhs
-_nub!(solver::AbstractMadNLPSolver, rhs::Int) = solver.nub = rhs
-_status!(solver::AbstractMadNLPSolver, rhs::Status) = solver.status = rhs
-_mu!(solver::AbstractMadNLPSolver{T}, rhs::T) where{T} = solver.mu = rhs
-_obj_val!(solver::AbstractMadNLPSolver{T}, rhs::T) where {T} = solver.obj_val = rhs
-_obj_val_trial!(solver::AbstractMadNLPSolver{T}, rhs::T) where {T} = solver.obj_val_trial = rhs
-_inf_pr!(solver::AbstractMadNLPSolver{T}, rhs::T) where {T} = solver.inf_pr = rhs
-_inf_du!(solver::AbstractMadNLPSolver{T}, rhs::T) where {T} = solver.inf_du = rhs
-_inf_compl!(solver::AbstractMadNLPSolver{T}, rhs::T) where {T} = solver.inf_compl = rhs
-_theta_min!(solver::AbstractMadNLPSolver{T}, rhs::T) where {T} = solver.theta_min = rhs
-_theta_max!(solver::AbstractMadNLPSolver{T}, rhs::T) where {T} = solver.theta_max = rhs
-_tau!(solver::AbstractMadNLPSolver{T}, rhs::T) where {T} = solver.tau = rhs
-_alpha!(solver::AbstractMadNLPSolver{T}, rhs::T) where {T} = solver.alpha = rhs
-_alpha_z!(solver::AbstractMadNLPSolver{T}, rhs::T) where {T} = solver.alpha_z = rhs
-_ftype!(solver::AbstractMadNLPSolver, rhs::String) = solver.ftype = rhs
-_del_w!(solver::AbstractMadNLPSolver{T}, rhs::T) where {T} = solver.del_w = rhs
-_del_w_last!(solver::AbstractMadNLPSolver{T}, rhs::T) where {T} = solver.del_w_last = rhs
-_del_c!(solver::AbstractMadNLPSolver{T}, rhs::T) where {T} = solver.del_c = rhs
+set_RR!(solver::AbstractMadNLPSolver, rhs) = solver.RR = rhs
+set_n!(solver::AbstractMadNLPSolver, rhs::Int) = solver.n = rhs
+set_m!(solver::AbstractMadNLPSolver, rhs::Int) = solver.m = rhs
+set_nlb!(solver::AbstractMadNLPSolver, rhs::Int) = solver.nlb = rhs
+set_nub!(solver::AbstractMadNLPSolver, rhs::Int) = solver.nub = rhs
+set_status!(solver::AbstractMadNLPSolver, rhs::Status) = solver.status = rhs
+set_mu!(solver::AbstractMadNLPSolver{T}, rhs::T) where{T} = solver.mu = rhs
+set_obj_val!(solver::AbstractMadNLPSolver{T}, rhs::T) where {T} = solver.obj_val = rhs
+set_obj_val_trial!(solver::AbstractMadNLPSolver{T}, rhs::T) where {T} = solver.obj_val_trial = rhs
+set_inf_pr!(solver::AbstractMadNLPSolver{T}, rhs::T) where {T} = solver.inf_pr = rhs
+set_inf_du!(solver::AbstractMadNLPSolver{T}, rhs::T) where {T} = solver.inf_du = rhs
+set_inf_compl!(solver::AbstractMadNLPSolver{T}, rhs::T) where {T} = solver.inf_compl = rhs
+set_theta_min!(solver::AbstractMadNLPSolver{T}, rhs::T) where {T} = solver.theta_min = rhs
+set_theta_max!(solver::AbstractMadNLPSolver{T}, rhs::T) where {T} = solver.theta_max = rhs
+set_tau!(solver::AbstractMadNLPSolver{T}, rhs::T) where {T} = solver.tau = rhs
+set_alpha!(solver::AbstractMadNLPSolver{T}, rhs::T) where {T} = solver.alpha = rhs
+set_alpha_z!(solver::AbstractMadNLPSolver{T}, rhs::T) where {T} = solver.alpha_z = rhs
+set_ftype!(solver::AbstractMadNLPSolver, rhs::String) = solver.ftype = rhs
+set_del_w!(solver::AbstractMadNLPSolver{T}, rhs::T) where {T} = solver.del_w = rhs
+set_del_w_last!(solver::AbstractMadNLPSolver{T}, rhs::T) where {T} = solver.del_w_last = rhs
+set_del_c!(solver::AbstractMadNLPSolver{T}, rhs::T) where {T} = solver.del_c = rhs
 
 # Computed quantities
 # TODO(@anton) I now think these would be useful to have, but which quantities are wrapped this way is a good question
