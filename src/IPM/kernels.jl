@@ -905,13 +905,13 @@ function evaluate_termination_criteria!(solver::AbstractMadNLPSolver)
     return REGULAR
 end
 
-function update_mu!(solver::AbstractMadNLPSolver)
+function update_mu!(solver::AbstractMadNLPSolver{T}) where {T}
     @trace(_logger(solver),"Updating the barrier parameter.")
     while _mu(solver) != max(_opt(solver).mu_min,_opt(solver).tol/10) &&
-        max(_inf_pr(solver),_inf_du(solver),inf_compl_mu) <= _opt(solver).barrier_tol_factor*_mu(solver)
+        max(_inf_pr(solver),_inf_du(solver),_inf_compl_mu(solver)) <= _opt(solver).barrier_tol_factor*_mu(solver)
         mu_new = get_mu(_mu(solver),_opt(solver).mu_min,
                         _opt(solver).mu_linear_decrease_factor,_opt(solver).mu_superlinear_decrease_power,_opt(solver).tol)
-        inf_compl_mu = get_inf_compl(_x_lr(solver),_xl_r(solver),_zl_r(solver),_xu_r(solver),_x_ur(solver),_zu_r(solver),_mu(solver),sc)
+        set_inf_compl_mu!(solver, get_inf_compl(_x_lr(solver),_xl_r(solver),_zl_r(solver),_xu_r(solver),_x_ur(solver),_zu_r(solver),_mu(solver),_sc(solver)))
         set_tau!(solver, get_tau(_mu(solver),_opt(solver).tau_min))
         set_mu!(solver, mu_new)
         empty!(_filter(solver))
@@ -962,7 +962,7 @@ function update_variables!(solver::AbstractMadNLPSolver)
     )
 end
 
-function eval_for_next_iter!(solver::AbstractMadNLPSolver)
+function eval_for_next_iter!(solver::AbstractMadNLPSolver{T}) where {T}
     if _cnt(solver).k!=0
         if !_opt(solver).jacobian_constant
             eval_jac_wrapper!(solver, _kkt(solver), _x(solver))
@@ -981,12 +981,12 @@ function eval_for_next_iter!(solver::AbstractMadNLPSolver)
         _jacl(solver),
         _sd(solver),
     ))
-    set_inf_compl!(solver, _inf_compl(solver, sc; mu=zero(T)))
-    set_inf_compl_mu!(_inf_compl(solver))
+    set_inf_compl!(solver, _inf_compl(solver, mu=zero(T)))
+    set_inf_compl_mu!(solver, _inf_compl(solver))
 end
 
 # Sections of the robust restorer IPM algorithm
-function eval_for_next_iter_RR!(solver::AbstractMadNLPSolver)
+function eval_for_next_iter_RR!(solver::AbstractMadNLPSolver{T}) where {T}
     RR = _RR(solver)
     if _cnt(solver).k!=0
         if !_opt(solver).jacobian_constant
@@ -1009,15 +1009,15 @@ function eval_for_next_iter_RR!(solver::AbstractMadNLPSolver)
         _jacl(solver),
         sd,
     ))
-    set_inf_compl!(solver, get_inf_compl(_x_lr(solver),_xl_r(solver),_zl_r(solver),_xu_r(solver),_x_ur(solver),_zu_r(solver),zero(T),sc))
+    set_inf_compl!(solver, get_inf_compl(_x_lr(solver),_xl_r(solver),_zl_r(solver),_xu_r(solver),_x_ur(solver),_zu_r(solver),zero(T),_sc(solver)))
 
     # Robust restoration phase error
     RR.inf_pr_R = get_inf_pr_R(_c(solver),RR.pp,RR.nn)
-    RR.inf_du_R = get_inf_du_R(RR.f_R,_y(solver),primal(_zl(solver)),primal(_zu(solver)),_jacl(solver),RR.zp,RR.zn,_opt(solver).rho,sd)
+    RR.inf_du_R = get_inf_du_R(RR.f_R,_y(solver),primal(_zl(solver)),primal(_zu(solver)),_jacl(solver),RR.zp,RR.zn,_opt(solver).rho,_sd(solver))
     RR.inf_compl_R = get_inf_compl_R(
-        _x_lr(solver),_xl_r(solver),_zl_r(solver),_xu_r(solver),_x_ur(solver),_zu_r(solver),RR.pp,RR.zp,RR.nn,RR.zn,zero(T),sc)
+        _x_lr(solver),_xl_r(solver),_zl_r(solver),_xu_r(solver),_x_ur(solver),_zu_r(solver),RR.pp,RR.zp,RR.nn,RR.zn,zero(T),_sc(solver))
     RR.inf_compl_mu_R = get_inf_compl_R(
-        _x_lr(solver),_xl_r(solver),_zl_r(solver),_xu_r(solver),_x_ur(solver),_zu_r(solver),RR.pp,RR.zp,RR.nn,RR.zn,RR.mu_R,sc)
+        _x_lr(solver),_xl_r(solver),_zl_r(solver),_xu_r(solver),_x_ur(solver),_zu_r(solver),RR.pp,RR.zp,RR.nn,RR.zn,RR.mu_R,_sc(solver))
 end
 
 function evaluate_termination_criteria_RR!(solver::AbstractMadNLPSolver)
@@ -1033,11 +1033,11 @@ function update_mu_RR!(solver::AbstractMadNLPSolver)
     RR = _RR(solver)
     @trace(_logger(solver),"Updating restoration phase barrier parameter.")
     while RR.mu_R >= _opt(solver).mu_min &&
-        max(RR.inf_pr_R,RR.inf_du_R,inf_compl_mu_R) <= _opt(solver).barrier_tol_factor*RR.mu_R
+        max(RR.inf_pr_R,RR.inf_du_R,RR.inf_compl_mu_R) <= _opt(solver).barrier_tol_factor*RR.mu_R
         RR.mu_R = get_mu(RR.mu_R,_opt(solver).mu_min,
                          _opt(solver).mu_linear_decrease_factor,_opt(solver).mu_superlinear_decrease_power,_opt(solver).tol)
-        inf_compl_mu_R = get_inf_compl_R(
-            _x_lr(solver),_xl_r(solver),_zl_r(solver),_xu_r(solver),_x_ur(solver),_zu_r(solver),RR.pp,RR.zp,RR.nn,RR.zn,RR.mu_R,sc)
+        RR.inf_compl_mu_R = get_inf_compl_R(
+            _x_lr(solver),_xl_r(solver),_zl_r(solver),_xu_r(solver),_x_ur(solver),_zu_r(solver),RR.pp,RR.zp,RR.nn,RR.zn,RR.mu_R,_sc(solver))
         RR.tau_R= max(_opt(solver).tau_min,1-RR.mu_R)
         RR.zeta = sqrt(RR.mu_R)
 
@@ -1125,7 +1125,7 @@ function check_restoration_successful!(solver::AbstractMadNLPSolver)
     end
 end
 
-function return_from_restoration!(solver::AbstractMadNLPSolver)
+function return_from_restoration!(solver::AbstractMadNLPSolver{T}) where {T}
     RR = _RR(solver)
     @trace(_logger(solver),"Going back to the regular phase.")
     set_initial_rhs!(solver, _kkt(solver))

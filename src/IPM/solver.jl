@@ -222,16 +222,16 @@ function regular!(solver::AbstractMadNLPSolver{T}) where T
         print_iter(solver)
 
         # evaluate termination criteria
-        (status = evaluate_termination_criteria!(solver::AbstractMadNLPSolver)) != REGULAR || return status
+        (status = evaluate_termination_criteria!(solver::AbstractMadNLPSolver)) == REGULAR || return status
 
         # update the barrier parameter
         update_mu!(solver)
 
         # compute the newton step
-        (status = compute_newton_step!(solver)) != REGULAR || return status
+        (status = compute_newton_step!(solver)) == REGULAR || return status
 
         # line search
-        (status = line_search!(solver)) != LINESEARCH_SUCCEEDED || return status
+        (status = line_search!(solver)) == LINESEARCH_SUCCEEDED || return status
 
         update_variables!(solver)
 
@@ -362,16 +362,16 @@ function robust!(solver::AbstractMadNLPSolver{T}) where T
 
         print_iter(solver;is_resto=true)
 
-        (status = evaluate_termination_criteria_RR!(solver) != ROBUST) || return status
+        (status = evaluate_termination_criteria_RR!(solver) == ROBUST) || return status
 
         # update the barrier parameter
         update_mu_RR!(solver)
 
         # compute the newton step
-        (status = compute_newton_step_RR!(solver)) != ROBUST || return status
+        (status = compute_newton_step_RR!(solver)) == ROBUST || return status
 
         # filter start
-        (status = line_search_RR!(solver)) != LINESEARCH_SUCCEEDED || return status
+        (status = line_search_RR!(solver)) == LINESEARCH_SUCCEEDED || return status
 
         # update variables
         update_variables_RR!(solver)
