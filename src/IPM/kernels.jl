@@ -940,9 +940,9 @@ function eval_for_next_iter!(solver::AbstractMadNLPSolver)
         full(get_zl(solver)),
         full(get_zu(solver)),
         get_jacl(solver),
-        _sd(solver),
+        get_sd(solver),
     ))
-    set_inf_compl!(solver, get_inf_compl(solver, sc; mu=zero(T)))
+    set_inf_compl!(solver, get_inf_compl(solver, get_sc(solver); mu=zero(T)))
     set_inf_compl_mu!(get_inf_compl(solver))
 end
 
@@ -1035,15 +1035,15 @@ function eval_for_next_iter_RR!(solver::AbstractMadNLPSolver)
         get_jacl(solver),
         sd,
     ))
-    set_inf_compl!(solver, get_inf_compl(get_x_lr(solver),get_xl_r(solver),get_zl_r(solver),get_xu_r(solver),get_x_ur(solver),get_zu_r(solver),zero(T),sc))
+    set_inf_compl!(solver, get_inf_compl(get_x_lr(solver),get_xl_r(solver),get_zl_r(solver),get_xu_r(solver),get_x_ur(solver),get_zu_r(solver),zero(T),get_sc(solver)))
 
     # Robust restoration phase error
     RR.inf_pr_R = get_inf_pr_R(get_c(solver),RR.pp,RR.nn)
-    RR.inf_du_R = get_inf_du_R(RR.f_R,get_y(solver),primal(get_zl(solver)),primal(get_zu(solver)),get_jacl(solver),RR.zp,RR.zn,get_opt(solver).rho,sd)
+    RR.inf_du_R = get_inf_du_R(RR.f_R,get_y(solver),primal(get_zl(solver)),primal(get_zu(solver)),get_jacl(solver),RR.zp,RR.zn,get_opt(solver).rho,get_sd(solver))
     RR.inf_compl_R = get_inf_compl_R(
-        get_x_lr(solver),get_xl_r(solver),get_zl_r(solver),get_xu_r(solver),get_x_ur(solver),get_zu_r(solver),RR.pp,RR.zp,RR.nn,RR.zn,zero(T),sc)
+        get_x_lr(solver),get_xl_r(solver),get_zl_r(solver),get_xu_r(solver),get_x_ur(solver),get_zu_r(solver),RR.pp,RR.zp,RR.nn,RR.zn,zero(T),get_sc(solver))
     RR.inf_compl_mu_R = get_inf_compl_R(
-        get_x_lr(solver),get_xl_r(solver),get_zl_r(solver),get_xu_r(solver),get_x_ur(solver),get_zu_r(solver),RR.pp,RR.zp,RR.nn,RR.zn,RR.mu_R,sc)
+        get_x_lr(solver),get_xl_r(solver),get_zl_r(solver),get_xu_r(solver),get_x_ur(solver),get_zu_r(solver),RR.pp,RR.zp,RR.nn,RR.zn,RR.mu_R,get_sc(solver))
 end
 
 function evaluate_termination_criteria_RR!(solver::AbstractMadNLPSolver)
@@ -1140,7 +1140,7 @@ function check_restoration_successful!(solver::AbstractMadNLPSolver)
     end
 end
 
-function return_from_restoration!(solver::AbstractMadNLPSolver)
+function return_from_restoration!(solver::AbstractMadNLPSolver) where {T}
     RR = get_RR(solver)
     @trace(get_logger(solver),"Going back to the regular phase.")
     set_initial_rhs!(solver, get_kkt(solver))
