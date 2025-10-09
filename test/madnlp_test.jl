@@ -199,7 +199,7 @@ end
     MadNLP.eval_lag_hess_wrapper!(solver, kkt, x, solver.y)
 
     n_allocs = @allocated MadNLP.eval_f_wrapper(solver, x)
-    @test n_allocs == 16 # objective is still allocating
+    @test n_allocs == 0
     n_allocs = @allocated MadNLP.eval_grad_f_wrapper!(solver, f, x)
     @test n_allocs == 0
     n_allocs = @allocated MadNLP.eval_cons_wrapper!(solver, c, x)
