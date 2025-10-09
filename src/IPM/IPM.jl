@@ -76,9 +76,13 @@ mutable struct MadNLPSolver{
 
     iterator::Iterator
 
+    sc::T
+    sd::T
+    
     inf_pr::T
     inf_du::T
     inf_compl::T
+    inf_compl_mu::T
 
     theta_min::T
     theta_max::T

@@ -217,94 +217,26 @@ color_status(status::Status) =
 
 function regular!(solver::AbstractMadNLPSolver{T}) where T
     while true
-        if (_cnt(solver).k!=0 && !_opt(solver).jacobian_constant)
-            eval_jac_wrapper!(solver, _kkt(solver), _x(solver))
-        end
-
-        jtprod!(_jacl(solver), _kkt(solver), _y(solver))
-        sd = get_sd(_y(solver),_zl_r(solver),_zu_r(solver),T(_opt(solver).s_max))
-        sc = get_sc(_zl_r(solver),_zu_r(solver),T(_opt(solver).s_max))
-        set_inf_pr!(solver, get_inf_pr(_c(solver)))
-        set_inf_du!(solver, get_inf_du(
-            full(_f(solver)),
-            full(_zl(solver)),
-            full(_zu(solver)),
-            _jacl(solver),
-            sd,
-        ))
-        set_inf_compl!(solver, _inf_compl(solver, sc; mu=zero(T)))
-        inf_compl_mu = _inf_compl(solver, sc)
+        eval_for_next_iter!(solver)
 
         print_iter(solver)
 
         # evaluate termination criteria
-        @trace(_logger(solver),"Evaluating termination criteria.")
-        _inf_total(solver) <= _opt(solver).tol && return SOLVE_SUCCEEDED
-        _inf_total(solver) <= _opt(solver).acceptable_tol ?
-            (_cnt(solver).acceptable_cnt < _opt(solver).acceptable_iter ?
-            _cnt(solver).acceptable_cnt+=1 : return SOLVED_TO_ACCEPTABLE_LEVEL) : (_cnt(solver).acceptable_cnt = 0)
-        _inf_total(solver) >= _opt(solver).diverging_iterates_tol && return DIVERGING_ITERATES
-        _cnt(solver).k>=_opt(solver).max_iter && return MAXIMUM_ITERATIONS_EXCEEDED
-        time()-_cnt(solver).start_time>=_opt(solver).max_wall_time && return MAXIMUM_WALLTIME_EXCEEDED
+        (status = evaluate_termination_criteria!(solver::AbstractMadNLPSolver)) != REGULAR || return status
 
         # update the barrier parameter
-        @trace(_logger(solver),"Updating the barrier parameter.")
-        while _mu(solver) != max(_opt(solver).mu_min,_opt(solver).tol/10) &&
-            max(_inf_pr(solver),_inf_du(solver),inf_compl_mu) <= _opt(solver).barrier_tol_factor*_mu(solver)
-            mu_new = get_mu(_mu(solver),_opt(solver).mu_min,
-                            _opt(solver).mu_linear_decrease_factor,_opt(solver).mu_superlinear_decrease_power,_opt(solver).tol)
-            inf_compl_mu = get_inf_compl(_x_lr(solver),_xl_r(solver),_zl_r(solver),_xu_r(solver),_x_ur(solver),_zu_r(solver),_mu(solver),sc)
-            set_tau!(solver, get_tau(_mu(solver),_opt(solver).tau_min))
-            set_mu!(solver, mu_new)
-            empty!(_filter(solver))
-            push!(_filter(solver),(_theta_max(solver),-Inf))
-        end
+        update_mu!(solver)
 
         # compute the newton step
-        @trace(_logger(solver),"Computing the newton step.")
-        if (_cnt(solver).k!=0 && !_opt(solver).hessian_constant)
-            eval_lag_hess_wrapper!(solver, _kkt(solver), _x(solver), _y(solver))
-        end
+        (status = compute_newton_step!(solver)) != REGULAR || return status
 
-        set_aug_diagonal!(_kkt(solver),solver)
-        set_aug_rhs!(solver, _kkt(solver), _c(solver))
-        dual_inf_perturbation!(primal(_p(solver)),_ind_llb(solver),_ind_uub(solver),_mu(solver),_opt(solver).kappa_d)
+        # line search
+        (status = line_search!(solver)) != LINESEARCH_SUCCEEDED || return status
 
-        inertia_correction!(_inertia_corrector(solver), solver) || return ROBUST
-
-        @trace(_logger(solver),"Backtracking line search initiated.")
-        status = filter_line_search!(solver)
-        if status != LINESEARCH_SUCCEEDED
-            return status
-        end
-
-        @trace(_logger(solver),"Updating primal-dual variables.")
-        copyto!(full(_x(solver)), full(_x_trial(solver)))
-        copyto!(_c(solver), _c_trial(solver))
-        set_obj_val!(solver, _obj_val_trial(solver))
-        adjust_boundary!(_x_lr(solver),_xl_r(solver),_x_ur(solver),_xu_r(solver),_mu(solver))
-
-        axpy!(_alpha(solver),dual(_d(solver)),_y(solver))
-
-        _zl_r(solver) .+= _alpha_z(solver) .* dual_lb(_d(solver))
-        _zu_r(solver) .+= _alpha_z(solver) .* dual_ub(_d(solver))
-        reset_bound_dual!(
-            primal(_zl(solver)),
-            primal(_x(solver)),
-            primal(_xl(solver)),
-            _mu(solver),_opt(solver).kappa_sigma,
-        )
-        reset_bound_dual!(
-            primal(_zu(solver)),
-            primal(_xu(solver)),
-            primal(_x(solver)),
-            _mu(solver),_opt(solver).kappa_sigma,
-        )
-
-        eval_grad_f_wrapper!(solver, _f(solver),_x(solver))
+        update_variables!(solver)
 
         _cnt(solver).k+=1
-            @trace(_logger(solver),"Proceeding to the next interior point iteration.")
+        @trace(_logger(solver),"Proceeding to the next interior point iteration.")
     end
 end
 
@@ -425,148 +357,37 @@ function robust!(solver::AbstractMadNLPSolver{T}) where T
     initialize_robust_restorer!(solver)
     RR = _RR(solver)
     while true
-        if !_opt(solver).jacobian_constant
-            eval_jac_wrapper!(solver, _kkt(solver), _x(solver))
-        end
-        jtprod!(_jacl(solver), _kkt(solver), _y(solver))
-
         # evaluate termination criteria
-        @trace(_logger(solver),"Evaluating restoration phase termination criteria.")
-        sd = get_sd(_y(solver),_zl_r(solver),_zu_r(solver),_opt(solver).s_max)
-        sc = get_sc(_zl_r(solver),_zu_r(solver),_opt(solver).s_max)
-        set_inf_pr!(solver, get_inf_pr(_c(solver)))
-        set_inf_du!(solver, get_inf_du(
-            primal(_f(solver)),
-            primal(_zl(solver)),
-            primal(_zu(solver)),
-            _jacl(solver),
-            sd,
-        ))
-        set_inf_compl!(solver, get_inf_compl(_x_lr(solver),_xl_r(solver),_zl_r(solver),_xu_r(solver),_x_ur(solver),_zu_r(solver),zero(T),sc))
-
-        # Robust restoration phase error
-        RR.inf_pr_R = get_inf_pr_R(_c(solver),RR.pp,RR.nn)
-        RR.inf_du_R = get_inf_du_R(RR.f_R,_y(solver),primal(_zl(solver)),primal(_zu(solver)),_jacl(solver),RR.zp,RR.zn,_opt(solver).rho,sd)
-        RR.inf_compl_R = get_inf_compl_R(
-            _x_lr(solver),_xl_r(solver),_zl_r(solver),_xu_r(solver),_x_ur(solver),_zu_r(solver),RR.pp,RR.zp,RR.nn,RR.zn,zero(T),sc)
-        inf_compl_mu_R = get_inf_compl_R(
-            _x_lr(solver),_xl_r(solver),_zl_r(solver),_xu_r(solver),_x_ur(solver),_zu_r(solver),RR.pp,RR.zp,RR.nn,RR.zn,RR.mu_R,sc)
+        eval_for_next_iter_RR!(solver)
 
         print_iter(solver;is_resto=true)
 
-        max(RR.inf_pr_R,RR.inf_du_R,RR.inf_compl_R) <= _opt(solver).tol && return INFEASIBLE_PROBLEM_DETECTED
-        _cnt(solver).k>=_opt(solver).max_iter && return MAXIMUM_ITERATIONS_EXCEEDED
-        time()-_cnt(solver).start_time>=_opt(solver).max_wall_time && return MAXIMUM_WALLTIME_EXCEEDED
+        (status = evaluate_termination_criteria_RR!(solver) != ROBUST) || return status
 
         # update the barrier parameter
-        @trace(_logger(solver),"Updating restoration phase barrier parameter.")
-        while RR.mu_R >= _opt(solver).mu_min &&
-            max(RR.inf_pr_R,RR.inf_du_R,inf_compl_mu_R) <= _opt(solver).barrier_tol_factor*RR.mu_R
-            RR.mu_R = get_mu(RR.mu_R,_opt(solver).mu_min,
-                             _opt(solver).mu_linear_decrease_factor,_opt(solver).mu_superlinear_decrease_power,_opt(solver).tol)
-            inf_compl_mu_R = get_inf_compl_R(
-                _x_lr(solver),_xl_r(solver),_zl_r(solver),_xu_r(solver),_x_ur(solver),_zu_r(solver),RR.pp,RR.zp,RR.nn,RR.zn,RR.mu_R,sc)
-            RR.tau_R= max(_opt(solver).tau_min,1-RR.mu_R)
-            RR.zeta = sqrt(RR.mu_R)
-
-            empty!(RR.filter)
-            push!(RR.filter,(_theta_max(solver),-Inf))
-        end
+        update_mu_RR!(solver)
 
         # compute the newton step
-        if !_opt(solver).hessian_constant
-            eval_lag_hess_wrapper!(solver, _kkt(solver), _x(solver), _y(solver); is_resto=true)
-        end
-        set_aug_RR!(_kkt(solver), solver, RR)
-
-        # without inertia correction,
-        @trace(_logger(solver),"Solving restoration phase primal-dual system.")
-        set_aug_rhs_RR!(solver, _kkt(solver), RR, _opt(solver).rho)
-
-        inertia_correction!(_inertia_corrector(solver), solver) || return RESTORATION_FAILED
-
-
-        finish_aug_solve_RR!(
-            RR.dpp,RR.dnn,RR.dzp,RR.dzn,_y(solver),dual(_d(solver)),
-            RR.pp,RR.nn,RR.zp,RR.zn,RR.mu_R,_opt(solver).rho
-        )
+        (status = compute_newton_step_RR!(solver)) != ROBUST || return status
 
         # filter start
-        @trace(_logger(solver),"Backtracking line search initiated.")
-        status = filter_line_search_RR!(solver)
-        if status != LINESEARCH_SUCCEEDED
-            return status
-        end
+        (status = line_search_RR!(solver)) != LINESEARCH_SUCCEEDED || return status
 
-        @trace(_logger(solver),"Updating primal-dual variables.")
-        copyto!(full(_x(solver)), full(_x_trial(solver)))
-        copyto!(_c(solver), _c_trial(solver))
-        copyto!(RR.pp, RR.pp_trial)
-        copyto!(RR.nn, RR.nn_trial)
+        # update variables
+        update_variables_RR!(solver)
 
-        RR.obj_val_R=RR.obj_val_R_trial
-        set_f_RR!(solver,RR)
-
-        axpy!(_alpha(solver), dual(_d(solver)), _y(solver))
-        axpy!(_alpha_z(solver), RR.dzp,RR.zp)
-        axpy!(_alpha_z(solver), RR.dzn,RR.zn)
-
-        _zl_r(solver) .+= _alpha_z(solver) .* dual_lb(_d(solver))
-        _zu_r(solver) .+= _alpha_z(solver) .* dual_ub(_d(solver))
-
-        reset_bound_dual!(
-            primal(_zl(solver)),
-            primal(_x(solver)),
-            primal(_xl(solver)),
-            RR.mu_R, _opt(solver).kappa_sigma,
-        )
-        reset_bound_dual!(
-            primal(_zu(solver)),
-            primal(_xu(solver)),
-            primal(_x(solver)),
-            RR.mu_R, _opt(solver).kappa_sigma,
-        )
-        reset_bound_dual!(RR.zp,RR.pp,RR.mu_R,_opt(solver).kappa_sigma)
-        reset_bound_dual!(RR.zn,RR.nn,RR.mu_R,_opt(solver).kappa_sigma)
-
-        adjust_boundary!(_x_lr(solver),_xl_r(solver),_x_ur(solver),_xu_r(solver),_mu(solver))
-
+        # compeleted an iteration
+        _cnt(solver).k+=1
+        _cnt(solver).t+=1
+        
         # check if going back to regular phase
-        @trace(_logger(solver),"Checking if going back to regular phase.")
-        set_obj_val!(solver, eval_f_wrapper(solver, _x(solver)))
-        eval_grad_f_wrapper!(solver, _f(solver), _x(solver))
-        theta = get_theta(_c(solver))
-        varphi= get_varphi(_obj_val(solver),_x_lr(solver),_xl_r(solver),_xu_r(solver),_x_ur(solver),_mu(solver))
-
-        if is_filter_acceptable(_filter(solver),theta,varphi) &&
-            theta <= _opt(solver).required_infeasibility_reduction * RR.theta_ref
-
-            @trace(_logger(solver),"Going back to the regular phase.")
-            set_initial_rhs!(solver, _kkt(solver))
-            initialize!(_kkt(solver))
-
-            factorize_wrapper!(solver)
-            solve_refine_wrapper!(
-                _d(solver), solver, _p(solver), __w4(solver)
-            )
-            if norm(dual(_d(solver)), Inf)>_opt(solver).constr_mult_init_max
-                fill!(_y(solver), zero(T))
-            else
-                copyto!(_y(solver), dual(_d(solver)))
-            end
-
-            _cnt(solver).k+=1
-            _cnt(solver).t+=1
-
+        status = compute_newton_step_RR!(solver)
+        if status == REGULAR
+            return_from_restoration!(solver)
             return REGULAR
         end
 
-        _cnt(solver).k>=_opt(solver).max_iter && return MAXIMUM_ITERATIONS_EXCEEDED
-        time()-_cnt(solver).start_time>=_opt(solver).max_wall_time && return MAXIMUM_WALLTIME_EXCEEDED
-
         @trace(_logger(solver),"Proceeding to the next restoration phase iteration.")
-        _cnt(solver).k+=1
-        _cnt(solver).t+=1
     end
 end
 
