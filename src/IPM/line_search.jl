@@ -22,11 +22,11 @@ function filter_line_search!(solver::AbstractMadNLPSolver{T}) where T
         primal(_d(solver)),
         _tau(solver),
     )
-    _alpha_z!(solver, get_alpha_z(_zl_r(solver),_zu_r(solver),dual_lb(_d(solver)),dual_ub(_d(solver)),_tau(solver)))
+    set_alpha_z!(solver, get_alpha_z(_zl_r(solver),_zu_r(solver),dual_lb(_d(solver)),dual_ub(_d(solver)),_tau(solver)))
     alpha_min = get_alpha_min(theta,varphi_d,_theta_min(solver),_opt(solver).gamma_theta,_opt(solver).gamma_phi,
                                 _opt(solver).alpha_min_frac,_opt(solver).delta,_opt(solver).s_theta,_opt(solver).s_phi)
     _cnt(solver).l = 1
-    _alpha!(solver, alpha_max)
+    set_alpha!(solver, alpha_max)
     varphi_trial= zero(T)
     theta_trial = zero(T)
     small_search_norm = get_rel_search_norm(primal(_x(solver)), primal(_d(solver))) < 10*eps(T)
@@ -38,7 +38,7 @@ function filter_line_search!(solver::AbstractMadNLPSolver{T}) where T
 
         copyto!(full(_x_trial(solver)), full(_x(solver)))
         axpy!(_alpha(solver), primal(_d(solver)), primal(_x_trial(solver)))
-        _obj_val_trial!(solver, eval_f_wrapper(solver, _x_trial(solver)))
+        set_obj_val_trial!(solver, eval_f_wrapper(solver, _x_trial(solver)))
         eval_cons_wrapper!(solver, _c_trial(solver), _x_trial(solver))
 
         theta_trial = get_theta(_c_trial(solver))
@@ -47,7 +47,7 @@ function filter_line_search!(solver::AbstractMadNLPSolver{T}) where T
 
         small_search_norm && break
 
-        _ftype!(solver, get_ftype(
+        set_ftype!(solver, get_ftype(
             _filter(solver),theta,theta_trial,varphi,varphi_trial,switching_condition,armijo_condition,
             _theta_min(solver),_opt(solver).obj_max_inc,_opt(solver).gamma_theta,_opt(solver).gamma_phi,
             has_constraints(solver))
@@ -66,7 +66,7 @@ function filter_line_search!(solver::AbstractMadNLPSolver{T}) where T
         end
 
         unsuccessful_iterate = true
-        _alpha!(solver, _alpha(solver)/2)
+        set_alpha!(solver, _alpha(solver)/2)
         _cnt(solver).l += 1
         if _alpha(solver) < alpha_min
             @debug(_logger(solver),
@@ -103,7 +103,7 @@ function filter_line_search!(solver::AbstractMadNLPSolver{T}) where T
         if (_cnt(solver).unsuccessful_iterate += 1) >= 4
             if _theta_max(solver)/10 > theta_trial
                 @debug(_logger(solver), "restarting filter")
-                _theta_max!(solver, _theta_max(solver)/10)
+                set_theta_max!(solver, _theta_max(solver)/10)
                 empty!(_filter(solver))
                 push!(_filter(solver),(_theta_max(solver),-Inf))
             end
@@ -146,11 +146,11 @@ function filter_line_search_RR!(solver::AbstractMadNLPSolver{T}) where T
         primal(_d(solver)),
         RR.pp,RR.dpp,RR.nn,RR.dnn,RR.tau_R,
     )
-    _alpha_z!(solver, get_alpha_z_R(_zl_r(solver),_zu_r(solver),dual_lb(_d(solver)),dual_ub(_d(solver)),RR.zp,RR.dzp,RR.zn,RR.dzn,RR.tau_R))
+    set_alpha_z!(solver, get_alpha_z_R(_zl_r(solver),_zu_r(solver),dual_lb(_d(solver)),dual_ub(_d(solver)),RR.zp,RR.dzp,RR.zn,RR.dzn,RR.tau_R))
     alpha_min = get_alpha_min(theta_R,varphi_d_R,_theta_min(solver),_opt(solver).gamma_theta,_opt(solver).gamma_phi,
                                 _opt(solver).alpha_min_frac,_opt(solver).delta,_opt(solver).s_theta,_opt(solver).s_phi)
 
-    _alpha!(solver, alpha_max)
+    set_alpha!(solver, alpha_max)
     _cnt(solver).l = 1
     theta_R_trial = zero(T)
     varphi_R_trial = zero(T)
@@ -176,7 +176,7 @@ function filter_line_search_RR!(solver::AbstractMadNLPSolver{T}) where T
         armijo_condition = is_armijo(varphi_R_trial,varphi_R,_opt(solver).eta_phi,_alpha(solver),varphi_d_R)
 
         small_search_norm && break
-        _ftype!(solver, get_ftype(
+        set_ftype!(solver, get_ftype(
             RR.filter,theta_R,theta_R_trial,varphi_R,varphi_R_trial,
             switching_condition,armijo_condition,
             _theta_min(solver),_opt(solver).obj_max_inc,_opt(solver).gamma_theta,_opt(solver).gamma_phi,
@@ -184,7 +184,7 @@ function filter_line_search_RR!(solver::AbstractMadNLPSolver{T}) where T
                 )
         _ftype(solver) in ["f","h"] && (@trace(_logger(solver),"Step accepted with type $(_ftype(solver))"); break)
 
-        _alpha!(solver, _alpha(solver)/2)
+        set_alpha!(solver, _alpha(solver)/2)
         _cnt(solver).l += 1
         if _alpha(solver) < alpha_min
             @debug(_logger(solver),"Restoration phase cannot find an acceptable step at iteration $(_cnt(solver).k).")
