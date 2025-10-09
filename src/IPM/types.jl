@@ -23,6 +23,7 @@ mutable struct RobustRestorer{T, VT}
     inf_pr_R::T
     inf_du_R::T
     inf_compl_R::T
+    inf_compl_mu_R::T
 
     mu_R::T
     tau_R::T
