@@ -230,6 +230,7 @@ The algorithm is described in [Nocedal2009, Section 4].
     mu_linear_decrease_factor::T = .2
     free_mode::Bool = true
     globalization::Bool = true
+    n_update::Int = 0
 end
 function QualityFunctionUpdate(tol::T, barrier_tol_factor) where T
     return QualityFunctionUpdate{T}(; mu_min=min(1e-4, tol ) / (barrier_tol_factor + 1))
@@ -280,7 +281,9 @@ function _evaluate_quality_function(solver, sigma, step_aff, step_cen, res_dual,
     inf_du = (1.0 - alpha_du)^2 * res_dual^2 / n
     # Complementarity infeasibility
     inf_compl = (inf_compl_lb + inf_compl_ub ) / (nlb + nub)
-    # println((sigma, alpha_pr, alpha_du, inf_pr, inf_du, inf_compl_lb, inf_compl_ub))
+
+    @debug(solver.logger, @sprintf("sigma=%4.1e inf_pr=%4.2e inf_du=%4.2e inf_cc=%4.2e a_pr=%4.2e a_du=%4.2e", sigma, inf_pr, inf_du, inf_compl, alpha_pr, alpha_du))
+
     # Return quality function qL defined in Eq. (4.2)
     return inf_du + inf_pr + inf_compl
 end
@@ -293,6 +296,7 @@ function _run_golden_search!(solver, barrier, sigma_lb, sigma_ub, step_aff, step
     # Initiate Golden search
     phi_1 = _evaluate_quality_function(solver, sigma_1, step_aff, step_cen, res_primal, res_dual)
     phi_2 = _evaluate_quality_function(solver, sigma_2, step_aff, step_cen, res_primal, res_dual)
+    sigma_1_in, sigma_2_in, phi_1_in, phi_2_in = sigma_1, sigma_2, phi_1, phi_2
     sigma_mid1 = sigma_lb + gfac * (sigma_ub - sigma_lb)
     sigma_mid2 = sigma_lb + (1.0 - gfac) * (sigma_ub - sigma_lb)
     phi_mid1 = _evaluate_quality_function(solver, sigma_mid1, step_aff, step_cen, res_primal, res_dual)
@@ -304,6 +308,7 @@ function _run_golden_search!(solver, barrier, sigma_lb, sigma_ub, step_aff, step
             phi_1 = phi_mid1
             sigma_mid1 = sigma_mid2
             sigma_mid2 = sigma_1 + (1.0 - gfac) * (sigma_2 - sigma_1)
+            phi_mid1 = phi_mid2
             phi_mid2 = _evaluate_quality_function(solver, sigma_mid2, step_aff, step_cen, res_primal, res_dual)
         else
             sigma_2 = sigma_mid2
@@ -311,13 +316,20 @@ function _run_golden_search!(solver, barrier, sigma_lb, sigma_ub, step_aff, step
             sigma_mid2 = sigma_mid1
             sigma_mid1 = sigma_1 + gfac * (sigma_2 - sigma_1)
             phi_mid1 = _evaluate_quality_function(solver, sigma_mid1, step_aff, step_cen, res_primal, res_dual)
+            phi_mid2 = phi_mid1
         end
-        if sigma_2 - sigma_1 < barrier.sigma_tol * sigma_2
+        if (sigma_2 - sigma_1 < barrier.sigma_tol * sigma_2)
             break
         end
     end
     # Compute final sigma
     sigma, phi = phi_mid1 < phi_mid2 ? (sigma_mid1, phi_mid1) : (sigma_mid2, phi_mid2)
+    # Take into account that most the time the algorithm hasn't converged.
+    if sigma_2 == sigma_2_in && phi_2_in < phi
+        sigma = sigma_2_in
+    elseif sigma_1 == sigma_1_in && phi_1_in < phi
+        sigma = sigma_1_in
+    end
     return sigma
 end
 
@@ -338,8 +350,8 @@ function get_adaptive_mu(solver::AbstractMadNLPSolver{T}, barrier::QualityFuncti
     if solver.nlb + solver.nub == 0
         return barrier.mu_min
     end
-    step_aff = solver._w1 # buffer 1
-    step_cen = solver._w2 # buffer 2
+    step_aff = solver._w3 # buffer 1
+    step_cen = solver._w4 # buffer 2
     # Affine step
     set_aug_rhs!(solver, solver.kkt, solver.c, zero(T))
     # Get primal and dual infeasibility directly from the values in RHS p
@@ -347,7 +359,7 @@ function get_adaptive_mu(solver::AbstractMadNLPSolver{T}, barrier::QualityFuncti
     res_dual = norm(primal(solver.p))
     # Get approximate solution without iterative refinement
     copyto!(full(step_aff), full(solver.p))
-    solve!(solver.kkt, full(step_aff))
+    solve!(solver.kkt, step_aff)
     # Get average complementarity
     mu = get_average_complementarity(solver)
     # Centering step
@@ -356,7 +368,7 @@ function get_adaptive_mu(solver::AbstractMadNLPSolver{T}, barrier::QualityFuncti
     dual_inf_perturbation!(primal(solver.p),solver.ind_llb,solver.ind_uub,mu,solver.opt.kappa_d)
     # Get (again) approximate solution without iterative refinement
     copyto!(full(step_cen), full(solver.p))
-    solve!(solver.kkt, full(step_cen))
+    solve!(solver.kkt, step_cen)
     # Refine the search interval using Ipopt's heuristics
     # First, check if sigma is greater than 1.
     phi1 = _evaluate_quality_function(solver, one(T), step_aff, step_cen, res_primal, res_dual)
@@ -372,6 +384,8 @@ function get_adaptive_mu(solver::AbstractMadNLPSolver{T}, barrier::QualityFuncti
     end
     # Run Golden-section search (assume the quality function is unimodal)
     sigma_opt = _run_golden_search!(solver, barrier, sigma_min, sigma_max, step_aff, step_cen, res_primal, res_dual)
+    # Increment counter
+    barrier.n_update += 1
     return clamp(sigma_opt * mu, barrier.mu_min, barrier.mu_max)
 end
 
