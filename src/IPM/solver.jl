@@ -362,7 +362,7 @@ function robust!(solver::AbstractMadNLPSolver{T}) where T
 
         print_iter(solver;is_resto=true)
 
-        (status = evaluate_termination_criteria_RR!(solver) == ROBUST) || return status
+        (status = evaluate_termination_criteria_RR!(solver)) == ROBUST || return status
 
         # update the barrier parameter
         update_mu_RR!(solver)
@@ -381,7 +381,7 @@ function robust!(solver::AbstractMadNLPSolver{T}) where T
         _cnt(solver).t+=1
         
         # check if going back to regular phase
-        status = compute_newton_step_RR!(solver)
+        status = check_restoration_successful!(solver)
         if status == REGULAR
             return_from_restoration!(solver)
             return REGULAR

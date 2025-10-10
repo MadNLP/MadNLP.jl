@@ -1022,9 +1022,9 @@ end
 
 function evaluate_termination_criteria_RR!(solver::AbstractMadNLPSolver)
     RR = _RR(solver)
-    max(RR.inf_pr_R,RR.inf_du_R,RR.inf_compl_R) <= _opt(solver).tol && return INFEASIBLE_PROBLEM_DETECTED
-    _cnt(solver).k>=_opt(solver).max_iter && return MAXIMUM_ITERATIONS_EXCEEDED
-    time()-_cnt(solver).start_time>=_opt(solver).max_wall_time && return MAXIMUM_WALLTIME_EXCEEDED
+    (max(RR.inf_pr_R,RR.inf_du_R,RR.inf_compl_R) <= _opt(solver).tol) && return INFEASIBLE_PROBLEM_DETECTED
+    (_cnt(solver).k>=_opt(solver).max_iter) && return MAXIMUM_ITERATIONS_EXCEEDED
+    (time()-_cnt(solver).start_time>=_opt(solver).max_wall_time) && return MAXIMUM_WALLTIME_EXCEEDED
 
     return ROBUST
 end
