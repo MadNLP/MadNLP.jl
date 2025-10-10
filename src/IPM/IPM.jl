@@ -3,8 +3,7 @@
 
 abstract type AbstractMadNLPSolver{T} end
 
-include("restoration.jl")
-include("inertiacorrector.jl")
+include("types.jl")
 
 mutable struct MadNLPSolver{
     T,
@@ -101,6 +100,11 @@ mutable struct MadNLPSolver{
     status::Status
     output::Dict
 end
+
+include("api.jl")
+include("restoration.jl")
+include("inertiacorrector.jl")
+
 
 """
     MadNLPSolver(nlp::AbstractNLPModel{T, VT}; options...) where {T, VT}
