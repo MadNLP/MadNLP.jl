@@ -43,6 +43,7 @@ import HSL:
     Ma97Info
 
 import LinearAlgebra
+import PrecompileTools: @setup_workload, @compile_workload
 
 include("common.jl")
 include("ma27.jl")
@@ -50,6 +51,13 @@ include("ma57.jl")
 include("ma77.jl")
 include("ma86.jl")
 include("ma97.jl")
+
+@setup_workload begin
+    nlp = MadNLP.HS15Model()    
+    @compile_workload begin
+        MadNLP.madnlp(nlp; lienar_solver=Ma27Solver, print_level=MadNLP.ERROR)
+    end
+end
 
 export Ma27Solver, Ma57Solver, Ma77Solver, Ma86Solver, Ma97Solver
 
