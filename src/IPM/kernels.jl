@@ -110,7 +110,7 @@ function set_f_RR!(solver::AbstractMadNLPSolver, RR::RobustRestorer)
 end
 
 # Set RHS
-function set_aug_rhs!(solver::AbstractMadNLPSolver, kkt::AbstractKKTSystem, c::AbstractVector)
+function set_aug_rhs!(solver::AbstractMadNLPSolver, kkt::AbstractKKTSystem, c::AbstractVector, mu)
     px = primal(solver.p)
     x = primal(solver.x)
     f = primal(solver.f)
@@ -124,8 +124,8 @@ function set_aug_rhs!(solver::AbstractMadNLPSolver, kkt::AbstractKKTSystem, c::A
 
     px .= .-f .+ zl .- zu .- solver.jacl
     py .= .-c
-    pzl .= (solver.xl_r .- solver.x_lr) .* solver.zl_r .+ solver.mu
-    pzu .= (solver.xu_r .- solver.x_ur) .* solver.zu_r .- solver.mu
+    pzl .= (solver.xl_r .- solver.x_lr) .* solver.zl_r .+ mu
+    pzu .= (solver.xu_r .- solver.x_ur) .* solver.zu_r .- mu
     return
 end
 
@@ -298,6 +298,37 @@ function get_inf_compl(x_lr, xl_r, zl_r, xu_r, x_ur, zu_r, mu, sc)
             init = zero(eltype(x_lr))
         )
     ) / sc
+end
+
+function get_average_complementarity(x_lr, xl_r, zl_r, x_ur, xu_r, zu_r)
+    n_lb, n_ub = length(x_lr), length(x_ur)
+    # If the problem is unconstrained, average complementarity is 0
+    if n_lb + n_ub == 0
+        return 0.0
+    end
+    cc_lb = dot(x_lr, zl_r) - dot(xl_r, zl_r)
+    cc_ub = dot(xu_r, zu_r) - dot(x_ur, zu_r)
+    return (cc_lb + cc_ub) / (n_lb + n_ub)
+end
+function get_average_complementarity(solver::AbstractMadNLPSolver)
+    return get_average_complementarity(
+        solver.x_lr, solver.xl_r, solver.zl_r,
+        solver.x_ur, solver.xu_r, solver.zu_r,
+    )
+end
+
+function get_min_complementarity(x_lr::AbstractVector{T}, xl_r::AbstractVector{T}, zl_r::AbstractVector{T},
+                                 x_ur::AbstractVector{T}, xu_r::AbstractVector{T}, zu_r::AbstractVector{T}) where T
+    cc_lb = mapreduce((x_l, xl, zl) -> (x_l-xl)*zl, min, x_lr, xl_r, zl_r, init=T(Inf))
+    cc_ub = mapreduce((x_u, xu, zu) -> (xu-x_u)*zu, min, x_ur, xu_r, zu_r, init=T(Inf))
+    return min(cc_lb,cc_ub)
+end
+
+function get_min_complementarity(solver::AbstractMadNLPSolver)
+    return get_min_complementarity(
+        solver.x_lr, solver.xl_r, solver.zl_r,
+        solver.x_ur, solver.xu_r, solver.zu_r,
+    )
 end
 
 function get_varphi_d(
