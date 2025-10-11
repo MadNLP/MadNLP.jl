@@ -55,13 +55,12 @@ end
 function create_kkt_system(
     ::Type{SparseCondensedKKTSystem},
     cb::SparseCallback{T,VT},
-    ind_cons,
     linear_solver::Type;
     opt_linear_solver=default_options(linear_solver),
     hessian_approximation=ExactHessian,
     qn_options=QuasiNewtonOptions(),
 ) where {T, VT}
-    ind_ineq = ind_cons.ind_ineq
+    ind_ineq = cb.ind_ineq
     n = cb.nvar
     m = cb.ncon
     n_slack = length(ind_ineq)
@@ -83,8 +82,8 @@ function create_kkt_system(
     n_jac = length(jac_sparsity_I)
     n_hess = length(hess_sparsity_I)
     n_tot = n + n_slack
-    nlb = length(ind_cons.ind_lb)
-    nub = length(ind_cons.ind_ub)
+    nlb = length(cb.ind_lb)
+    nub = length(cb.ind_ub)
 
 
     reg = VT(undef, n_tot)
@@ -127,7 +126,7 @@ function create_kkt_system(
         buffer, buffer2,
         aug_com, diag_buffer, dptr, hptr, jptr,
         _linear_solver,
-        ind_ineq, ind_cons.ind_lb, ind_cons.ind_ub,
+        ind_ineq, cb.ind_lb, cb.ind_ub,
         ext
     )
 end
