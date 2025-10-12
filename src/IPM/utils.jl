@@ -58,8 +58,8 @@ function update!(stats::MadNLPExecutionStats, solver::AbstractMadNLPSolver)
     return stats
 end
 
-get_counters(nlp::NLPModels.AbstractNLPModel) = nlp.counters
-get_counters(nlp::NLPModels.AbstractNLSModel) = nlp.counters.counters
+get_counters(@nospecialize(nlp::NLPModels.AbstractNLPModel)) = nlp.counters
+get_counters(@nospecialize(nlp::NLPModels.AbstractNLSModel)) = nlp.counters.counters
 getStatus(result::MadNLPExecutionStats) = get_status_output(result.status, result.options)
 
 # Exceptions

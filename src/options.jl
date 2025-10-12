@@ -107,7 +107,7 @@ is_dense_callback(nlp) = hasmethod(MadNLP.jac_dense!, Tuple{typeof(nlp), Abstrac
 
 # smart option presets
 function MadNLPOptions{T}(
-    nlp::AbstractNLPModel{T};
+    @nospecialize(nlp::AbstractNLPModel);
     dense_callback = MadNLP.is_dense_callback(nlp),
     callback = dense_callback ? DenseCallback : SparseCallback,
     kkt_system = dense_callback ? DenseCondensedKKTSystem : SparseKKTSystem,
@@ -125,7 +125,7 @@ end
 get_tolerance(::Type{T},::Type{KKT}) where {T, KKT} = 10^round(log10(eps(T))/2)
 get_tolerance(::Type{T},::Type{SparseCondensedKKTSystem}) where T = 10^(round(log10(eps(T))/4))
 
-function default_sparse_solver(nlp::AbstractNLPModel)
+function default_sparse_solver(@nospecialize(nlp::AbstractNLPModel))
     if isdefined(Main, :MadNLPHSL)
         Main.MadNLPHSL.Ma27Solver
     else
@@ -167,8 +167,8 @@ function _get_primary_options(options)
     return primary_opt, remaining_opt
 end
 
-function load_options(nlp::AbstractNLPModel{T,VT}; options...) where {T, VT}
-
+function load_options(@nospecialize(nlp::AbstractNLPModel); options...)
+    T = eltype(get_x0(nlp))
     primary_opt, options = _get_primary_options(options)
 
     # Initiate interior-point options

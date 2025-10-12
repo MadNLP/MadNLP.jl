@@ -6,20 +6,20 @@ the interior-point method. Return the solution
 as a [`MadNLPExecutionStats`](@ref).
 
 """
-function madnlp(model::AbstractNLPModel; kwargs...)
+function madnlp(@nospecialize(model::AbstractNLPModel); kwargs...)
     solver = MadNLPSolver(model;kwargs...)
     return solve!(solver)
 end
 
-solve!(nlp::AbstractNLPModel, solver::AbstractMadNLPSolver; kwargs...) = solve!(
+@noinline solve!(@nospecialize(nlp::AbstractNLPModel), solver::AbstractMadNLPSolver; kwargs...) = solve!(
     nlp, solver, MadNLPExecutionStats(solver);
     kwargs...)
-solve!(solver::AbstractMadNLPSolver; kwargs...) = solve!(
+@noinline solve!(solver::AbstractMadNLPSolver; kwargs...) = solve!(
     solver.nlp, solver;
     kwargs...)
 
 
-function initialize!(solver::AbstractMadNLPSolver{T}) where T
+@noinline function initialize!(solver::AbstractMadNLPSolver{T}) where T
 
     nlp = solver.nlp
     opt = solver.opt
@@ -126,7 +126,7 @@ end
 
 # major loops ---------------------------------------------------------
 function solve!(
-    nlp::AbstractNLPModel,
+    @nospecialize(nlp::AbstractNLPModel),
     solver::AbstractMadNLPSolver,
     stats::MadNLPExecutionStats;
     x = nothing, y = nothing,
