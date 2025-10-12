@@ -85,6 +85,7 @@
     end
 
     nlp = HS15Model()
+    __init__()
     
     @compile_workload begin
         madnlp(nlp; print_level=MadNLP.ERROR)

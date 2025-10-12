@@ -71,7 +71,7 @@ function Base.fill!(rhs::AbstractKKTVector{T}, val::T) where T
 end
 
 # Overload basic BLAS operations.
-norm(X::AbstractKKTVector, p::Real) = norm(full(X), p)
+norm(X::AbstractKKTVector, p::Real=2.0) = norm(full(X), p)
 dot(X::AbstractKKTVector, Y::AbstractKKTVector) = dot(full(X), full(Y))
 function axpy!(a::Number, X::AbstractKKTVector, Y::AbstractKKTVector)
     axpy!(a, full(X), full(Y))
