@@ -180,8 +180,8 @@ function inertia(M::CUDSSSolver)
     n = size(M.tril, 1)
     info = CUDSS.cudss_get(M.inner, "info")
 
-    # nbytes = sizeof(buffer)
-    # CUDSS.cudssDataGet(M.inner.data.handle, M.inner.data.data, "diag", M.buffer, nbytes, M.inner.data.nbytes_written)
+    # cudss_set(M.inner, "diag", buffer)  # specify the vector to update in `cudss_get`
+    # cudss_get(M.inner, "diag")          # update the vector specified in `cudss_set`
     #
     # `buffer` contains the diagonal of the factorized matrix.
 
