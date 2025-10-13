@@ -1123,7 +1123,6 @@ function update_variables_RR!(solver::AbstractMadNLPSolver)
     adjust_boundary!(get_x_lr(solver),get_xl_r(solver),get_x_ur(solver),get_xu_r(solver),get_mu(solver))
 end
 
-
 function check_restoration_successful!(solver::AbstractMadNLPSolver)
     RR = get_RR(solver)
     @trace(get_logger(solver),"Checking if going back to regular phase.")
@@ -1155,4 +1154,15 @@ function return_from_restoration!(solver::AbstractMadNLPSolver) where {T}
     else
         copyto!(get_y(solver), dual(get_d(solver)))
     end
+end
+
+# Sections of `restore!` heuristic.
+function initialize_restore!(solver::AbstractMadNLPSolver{T}) where T
+    set_del_w!(solver, zero(T))
+    # Backup the previous primal iterate
+    copyto!(primal(get__w1(solver)), full(get_x(solver)))
+    copyto!(dual(get__w1(solver)), get_y(solver))
+    copyto!(dual(get__w2(solver)), get_c(solver))
+    set_alpha_z!(solver, zero(T))
+    set_ftype!(solver, "R")
 end
