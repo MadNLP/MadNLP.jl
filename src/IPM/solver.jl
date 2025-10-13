@@ -76,8 +76,8 @@ function initialize!(solver::AbstractMadNLPSolver{T}) where T
     theta = get_theta(_c(solver))
     set_theta_max!(solver, T(1e4)*max(one(T),theta))
     set_theta_min!(solver, T(1e-4)*max(one(T),theta))
-    set_mu!(solver, _opt(solver).mu_init)
-    set_tau!(solver, max(_opt(solver).tau_min,one(T)-_opt(solver).mu_init))
+    set_mu!(solver, _opt(solver).barrier.mu_init)
+    set_tau!(solver, max(_opt(solver).tau_min,one(T)-_opt(solver).barrier.mu_init))
     push!(_filter(solver), (_theta_max(solver),-T(Inf)))
 
     return REGULAR

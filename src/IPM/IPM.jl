@@ -107,7 +107,6 @@ include("restoration.jl")
 include("inertiacorrector.jl")
 include("barrier.jl")
 
-
 """
     MadNLPSolver(nlp::AbstractNLPModel{T, VT}; options...) where {T, VT}
 
