@@ -1165,4 +1165,95 @@ function initialize_restore!(solver::AbstractMadNLPSolver{T}) where T
     copyto!(dual(get__w2(solver)), get_c(solver))
     set_alpha_z!(solver, zero(T))
     set_ftype!(solver, "R")
+
+    return nothing
+end
+
+function take_ftb_step!(solver::AbstractMadNLPSolver{T}) where T
+    alpha_max = get_alpha_max(
+        primal(get_x(solver)),
+        primal(get_xl(solver)),
+        primal(get_xu(solver)),
+        primal(get_d(solver)),
+        get_tau(solver),
+    )
+    set_alpha!(solver,min(
+        alpha_max,
+        get_alpha_z(get_zl_r(solver),get_zu_r(solver),dual_lb(get_d(solver)),dual_ub(get_d(solver)),get_tau(solver)),
+    ))
+
+    axpy!(get_alpha(solver), primal(get_d(solver)), full(get_x(solver)))
+    axpy!(get_alpha(solver), dual(get_d(solver)), get_y(solver))
+    get_zl_r(solver) .+= get_alpha(solver) .* dual_lb(get_d(solver))
+    get_zu_r(solver) .+= get_alpha(solver) .* dual_ub(get_d(solver))
+
+    return nothing
+end
+
+function evaluate_for_sufficient_decrease_restore!(solver::AbstractMadNLPSolver{T}) where T
+    eval_cons_wrapper!(solver,get_c(solver),get_x(solver))
+    eval_grad_f_wrapper!(solver,get_f(solver),get_x(solver))
+    set_obj_val!(solver, eval_f_wrapper(solver,get_x(solver)))
+
+    if !get_opt(solver).jacobian_constant
+        eval_jac_wrapper!(solver,get_kkt(solver),get_x(solver))
+    end
+
+    jtprod!(get_jacl(solver),get_kkt(solver),get_y(solver))
+
+    return nothing
+end
+
+function backtrack_restore!(solver::AbstractMadNLPSolver{T}) where T
+    copyto!(primal(get_x(solver)), primal(get__w1(solver)))
+    copyto!(get_y(solver), dual(get__w1(solver)))
+    copyto!(get_c(solver), dual(get__w2(solver))) # backup the previous primal iterate
+
+    return nothing
+end
+
+function evaluate_termination_criteria_restore!(solver::AbstractMadNLPSolver{T}) where T
+    theta = get_theta(get_c(solver))
+    varphi= get_varphi(get_obj_val(solver),get_x_lr(solver),get_xl_r(solver),get_xu_r(solver),get_x_ur(solver),get_mu(solver))
+
+    get_cnt(solver).k+=1
+
+    is_filter_acceptable(get_filter(solver),theta,varphi) ? (return REGULAR) : (get_cnt(solver).t+=1)
+    get_cnt(solver).k>=get_opt(solver).max_iter && return MAXIMUM_ITERATIONS_EXCEEDED
+    time()-get_cnt(solver).start_time>=get_opt(solver).max_wall_time && return MAXIMUM_WALLTIME_EXCEEDED
+
+    return RESTORE
+end
+
+function evaluate_for_next_iter_restore!(solver::AbstractMadNLPSolver{T}) where T
+    set_sd!(solver, get_sd(get_y(solver),get_zl_r(solver),get_zu_r(solver),get_opt(solver).s_max))
+    set_sc!(solver, get_sc(get_zl_r(solver),get_zu_r(solver),get_opt(solver).s_max))
+    set_inf_pr!(solver, get_inf_pr(get_c(solver)))
+    set_inf_du!(solver, get_inf_du(
+        primal(get_f(solver)),
+        primal(get_zl(solver)),
+        primal(get_zu(solver)),
+        get_jacl(solver),
+        sd,
+    ))
+
+    set_inf_compl!(solver, get_inf_compl(get_x_lr(solver),get_xl_r(solver),get_zl_r(solver),get_xu_r(solver),get_x_ur(solver),get_zu_r(solver),zero(T),sc))
+    set_inf_compl_mu!(solver, get_inf_compl(get_x_lr(solver),get_xl_r(solver),get_zl_r(solver),get_xu_r(solver),get_x_ur(solver),get_zu_r(solver),get_mu(solver),sc))
+
+    return nothing
+end
+
+function compute_newton_step_restore!(solver::AbstractMadNLPSolver{T}) where T
+    if !get_opt(solver).hessian_constant
+        eval_lag_hess_wrapper!(solver,get_kkt(solver),get_x(solver),get_y(solver))
+    end
+
+    set_aug_diagonal!(get_kkt(solver),solver)
+    set_aug_rhs!(solver, get_kkt(solver), get_c(solver))
+
+    dual_inf_perturbation!(primal(get_p(solver)),get_ind_llb(solver),get_ind_uub(solver),get_mu(solver),get_opt(solver).kappa_d)
+    factorize_wrapper!(solver)
+    solve_refine_wrapper!(
+        get_d(solver), solver, get_p(solver), get__w4(solver)
+    )
 end
