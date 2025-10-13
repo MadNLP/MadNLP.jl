@@ -3,8 +3,7 @@
 
 abstract type AbstractMadNLPSolver{T} end
 
-include("restoration.jl")
-include("inertiacorrector.jl")
+include("types.jl")
 
 mutable struct MadNLPSolver{
     T,
@@ -77,9 +76,13 @@ mutable struct MadNLPSolver{
 
     iterator::Iterator
 
+    sc::T
+    sd::T
+    
     inf_pr::T
     inf_du::T
     inf_compl::T
+    inf_compl_mu::T
 
     theta_min::T
     theta_max::T
@@ -101,6 +104,11 @@ mutable struct MadNLPSolver{
     status::Status
     output::Dict
 end
+
+include("api.jl")
+include("restoration.jl")
+include("inertiacorrector.jl")
+
 
 """
     MadNLPSolver(nlp::AbstractNLPModel{T, VT}; options...) where {T, VT}
@@ -225,7 +233,7 @@ function MadNLPSolver(nlp::AbstractNLPModel{T,VT}; kwargs...) where {T, VT}
         ind_cons.ind_ineq, ind_cons.ind_fixed, ind_cons.ind_llb, ind_cons.ind_uub,
         x_lr, x_ur, xl_r, xu_r, zl_r, zu_r, dx_lr, dx_ur, x_trial_lr, x_trial_ur,
         iterator,
-        zero(T), zero(T), zero(T), zero(T), zero(T), zero(T), zero(T), zero(T), zero(T),
+        zero(T), zero(T), zero(T), zero(T), zero(T), zero(T), zero(T), zero(T), zero(T), zero(T), zero(T), zero(T),
         " ",
         zero(T), zero(T), zero(T),
         Tuple{T, T}[],
