@@ -261,32 +261,9 @@ function restore!(solver::AbstractMadNLPSolver{T}) where T
     )
 
     while true
-        alpha_max = get_alpha_max(
-            primal(_x(solver)),
-            primal(_xl(solver)),
-            primal(_xu(solver)),
-            primal(_d(solver)),
-            _tau(solver),
-        )
-        set_alpha!(solver,min(
-            alpha_max,
-            get_alpha_z(_zl_r(solver),_zu_r(solver),dual_lb(_d(solver)),dual_ub(_d(solver)),_tau(solver)),
-        ))
+        take_ftb_step!(solver)
 
-        axpy!(_alpha(solver), primal(_d(solver)), full(_x(solver)))
-        axpy!(_alpha(solver), dual(_d(solver)), _y(solver))
-        _zl_r(solver) .+= _alpha(solver) .* dual_lb(_d(solver))
-        _zu_r(solver) .+= _alpha(solver) .* dual_ub(_d(solver))
-
-        eval_cons_wrapper!(solver,_c(solver),_x(solver))
-        eval_grad_f_wrapper!(solver,_f(solver),_x(solver))
-        set_obj_val!(solver, eval_f_wrapper(solver,_x(solver)))
-
-        if !_opt(solver).jacobian_constant
-            eval_jac_wrapper!(solver,_kkt(solver),_x(solver))
-        end
-
-        jtprod!(_jacl(solver),_kkt(solver),_y(solver))
+        evaluate_for_sufficient_decrease_restore!(solver)
 
         F_trial = get_F(
             _c(solver),
@@ -302,51 +279,23 @@ function restore!(solver::AbstractMadNLPSolver{T}) where T
             _zu_r(solver),
             _mu(solver),
         )
+        # Check for sufficient decrease
         if F_trial > _opt(solver).soft_resto_pderror_reduction_factor*F
-            copyto!(primal(_x(solver)), primal(__w1(solver)))
-            copyto!(_y(solver), dual(__w1(solver)))
-            copyto!(_c(solver), dual(__w2(solver))) # backup the previous primal iterate
+            # Sufficient decrease not observed, backing up and starting robust restorer.
+            backtrack_restore!(solver)
             return ROBUST
         end
+        F = F_trial
 
         adjust_boundary!(_x_lr(solver),_xl_r(solver),_x_ur(solver),_xu_r(solver),_mu(solver))
 
-        F = F_trial
+        (status = evaluate_termination_criteria_restore!(solver)) == RESTORE || return status
 
-        theta = get_theta(_c(solver))
-        varphi= get_varphi(_obj_val(solver),_x_lr(solver),_xl_r(solver),_xu_r(solver),_x_ur(solver),_mu(solver))
+        evaluate_for_next_iter_restore!(solver)
 
-        _cnt(solver).k+=1
-
-        is_filter_acceptable(_filter(solver),theta,varphi) ? (return REGULAR) : (_cnt(solver).t+=1)
-        _cnt(solver).k>=_opt(solver).max_iter && return MAXIMUM_ITERATIONS_EXCEEDED
-        time()-_cnt(solver).start_time>=_opt(solver).max_wall_time && return MAXIMUM_WALLTIME_EXCEEDED
-
-
-        sd = get_sd(_y(solver),_zl_r(solver),_zu_r(solver),_opt(solver).s_max)
-        sc = get_sc(_zl_r(solver),_zu_r(solver),_opt(solver).s_max)
-        set_inf_pr!(solver, get_inf_pr(_c(solver)))
-        set_inf_du!(solver, get_inf_du(
-            primal(_f(solver)),
-            primal(_zl(solver)),
-            primal(_zu(solver)),
-            _jacl(solver),
-            sd,
-        ))
-
-        set_inf_compl!(solver, get_inf_compl(_x_lr(solver),_xl_r(solver),_zl_r(solver),_xu_r(solver),_x_ur(solver),_zu_r(solver),zero(T),sc))
-        inf_compl_mu = get_inf_compl(_x_lr(solver),_xl_r(solver),_zl_r(solver),_xu_r(solver),_x_ur(solver),_zu_r(solver),_mu(solver),sc)
         print_iter(solver)
 
-        !_opt(solver).hessian_constant && eval_lag_hess_wrapper!(solver,_kkt(solver),_x(solver),_y(solver))
-        set_aug_diagonal!(_kkt(solver),solver)
-        set_aug_rhs!(solver, _kkt(solver), _c(solver))
-
-        dual_inf_perturbation!(primal(_p(solver)),_ind_llb(solver),_ind_uub(solver),_mu(solver),_opt(solver).kappa_d)
-        factorize_wrapper!(solver)
-        solve_refine_wrapper!(
-            _d(solver), solver, _p(solver), __w4(solver)
-        )
+        compute_newton_step_restore!(solver)
 
         set_ftype!(solver, "f")
     end
