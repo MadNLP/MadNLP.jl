@@ -30,6 +30,7 @@ makedocs(
         ],
         "API Reference" => [
             "IPM solver" => "lib/ipm.md",
+            "Barrier strategies" => "lib/barrier.md",
             "Callback wrappers" => "lib/callbacks.md",
             "KKT systems" => "lib/kkt.md",
             "Linear Solvers" => "lib/linear_solvers.md",
