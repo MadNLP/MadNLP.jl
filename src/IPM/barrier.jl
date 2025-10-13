@@ -24,38 +24,38 @@ function _update_monotone!(
     sc::T
 ) where T
     inf_compl_mu = get_inf_compl(
-        solver.x_lr,
-        solver.xl_r,
-        solver.zl_r,
-        solver.xu_r,
-        solver.x_ur,
-        solver.zu_r,
-        solver.mu,
+        _x_lr(solver),
+        _xl_r(solver),
+        _zl_r(solver),
+        _xu_r(solver),
+        _x_ur(solver),
+        _zu_r(solver),
+        _mu(solver),
         sc,
     )
-    while (solver.mu > max(barrier.mu_min, solver.opt.tol/10)) &&
-        (max(solver.inf_pr, solver.inf_du, inf_compl_mu) <= solver.opt.barrier_tol_factor*solver.mu)
+    while (_mu(solver) > max(barrier.mu_min, _opt(solver).tol/10)) &&
+        (max(_inf_pr(solver), _inf_du(solver), inf_compl_mu) <= _opt(solver).barrier_tol_factor*_mu(solver))
         mu_new = get_mu(
-            solver.mu,
+            _mu(solver),
             barrier.mu_min,
             barrier.mu_linear_decrease_factor,
             barrier.mu_superlinear_decrease_power,
-            solver.opt.tol,
+            _opt(solver).tol,
         )
         inf_compl_mu = get_inf_compl(
-            solver.x_lr,
-            solver.xl_r,
-            solver.zl_r,
-            solver.xu_r,
-            solver.x_ur,
-            solver.zu_r,
-            solver.mu,
+            _x_lr(solver),
+            _xl_r(solver),
+            _zl_r(solver),
+            _xu_r(solver),
+            _x_ur(solver),
+            _zu_r(solver),
+            _mu(solver),
             sc,
         )
-        solver.tau = get_tau(solver.mu, solver.opt.tau_min)
-        solver.mu = mu_new
-        empty!(solver.filter)
-        push!(solver.filter, (solver.theta_max, -Inf))
+        set_tau!(solver, get_tau(_mu(solver), _opt(solver).tau_min))
+        set_mu!(solver, mu_new)
+        empty!(_filter(solver))
+        push!(_filter(solver), (_theta_max(solver), -Inf))
     end
     return
 end
@@ -68,14 +68,14 @@ function _update_monotone_RR!(
     solver::AbstractMadNLPSolver{T},
     sc::T
 ) where T
-    RR = solver.RR
+    RR = _RR(solver)
     inf_compl_mu_R = get_inf_compl_R(
-        solver.x_lr,
-        solver.xl_r,
-        solver.zl_r,
-        solver.xu_r,
-        solver.x_ur,
-        solver.zu_r,
+        _x_lr(solver),
+        _xl_r(solver),
+        _zl_r(solver),
+        _xu_r(solver),
+        _x_ur(solver),
+        _zu_r(solver),
         RR.pp,
         RR.zp,
         RR.nn,
@@ -84,21 +84,21 @@ function _update_monotone_RR!(
         sc,
     )
     while RR.mu_R >= barrier.mu_min &&
-        max(RR.inf_pr_R,RR.inf_du_R,inf_compl_mu_R) <= solver.opt.barrier_tol_factor*RR.mu_R
+        max(RR.inf_pr_R,RR.inf_du_R,inf_compl_mu_R) <= _opt(solver).barrier_tol_factor*RR.mu_R
         RR.mu_R = get_mu(
             RR.mu_R,
             barrier.mu_min,
             barrier.mu_linear_decrease_factor,
             barrier.mu_superlinear_decrease_power,
-            solver.opt.tol,
+            _opt(solver).tol,
         )
         inf_compl_mu_R = get_inf_compl_R(
-            solver.x_lr,
-            solver.xl_r,
-            solver.zl_r,
-            solver.xu_r,
-            solver.x_ur,
-            solver.zu_r,
+            _x_lr(solver),
+            _xl_r(solver),
+            _zl_r(solver),
+            _xu_r(solver),
+            _x_ur(solver),
+            _zu_r(solver),
             RR.pp,
             RR.zp,
             RR.nn,
@@ -106,10 +106,10 @@ function _update_monotone_RR!(
             RR.mu_R,
             sc,
         )
-        RR.tau_R= max(solver.opt.tau_min,1-RR.mu_R)
+        RR.tau_R= max(_opt(solver).tau_min,1-RR.mu_R)
         RR.zeta = sqrt(RR.mu_R)
         empty!(RR.filter)
-        push!(RR.filter,(solver.theta_max,-Inf))
+        push!(RR.filter,(_theta_max(solver),-Inf))
     end
     return
 end
@@ -164,42 +164,42 @@ function _check_progress(barrier::AbstractAdaptiveUpdate{T}, solver::AbstractMad
     kappa_1 = T(1e-5) # filter margin width
     kappa_2 = T(1.0)  # filter margin maximum width
     # Check current progress using filter line search
-    theta = get_theta(solver.c)
-    varphi = get_varphi(solver.obj_val, solver.x_lr, solver.xl_r, solver.xu_r, solver.x_ur, solver.mu)
-    kkt_error = max(solver.inf_pr, solver.inf_du, solver.inf_compl)
+    theta = get_theta(_c(solver))
+    varphi = get_varphi(_obj_val(solver), _x_lr(solver), _xl_r(solver), _xu_r(solver), _x_ur(solver), _mu(solver))
+    kkt_error = max(_inf_pr(solver), _inf_du(solver), _inf_compl(solver))
     delta = kappa_1 * min(kappa_2, kkt_error)
-    return is_filter_acceptable(solver.filter, theta + delta, varphi + delta)
+    return is_filter_acceptable(_filter(solver), theta + delta, varphi + delta)
 end
 
 function update_barrier!(barrier::AbstractAdaptiveUpdate{T}, solver::AbstractMadNLPSolver{T}, sc::T) where T
-    old_mu = solver.mu
+    old_mu = _mu(solver)
     progress = _check_progress(barrier, solver)
     # Update state of barrier algorithm
     if !barrier.free_mode
         if progress
-            @trace(solver.logger, "Moving adaptive barrier back to free mode.")
+            @trace(_logger(solver), "Moving adaptive barrier back to free mode.")
             barrier.free_mode = true
         else
             _update_monotone!(barrier, solver, sc)
         end
     else
         if !progress
-            @trace(solver.logger, "Moving adaptive barrier to monotone mode.")
+            @trace(_logger(solver), "Moving adaptive barrier to monotone mode.")
             barrier.free_mode = false
             # Reset barrier parameter using current average complementarity
-            solver.mu = get_fixed_mu(solver, barrier)
+            set_mu!(solver, get_fixed_mu(solver, barrier))
         else
-            @trace(solver.logger, "Keeping adaptive barrier in free mode.")
+            @trace(_logger(solver), "Keeping adaptive barrier in free mode.")
         end
     end
     if barrier.free_mode
-        solver.mu = get_adaptive_mu(solver, barrier)
+        set_mu!(solver, get_adaptive_mu(solver, barrier))
     end
     # Update tau and reset filter is barrier has been updated
-    if solver.mu != old_mu
-        solver.tau = get_tau(solver.mu, solver.opt.tau_min)
-        empty!(solver.filter)
-        push!(solver.filter, (solver.theta_max, -Inf))
+    if _mu(solver) != old_mu
+        set_tau!(solver, get_tau(_mu(solver), _opt(solver).tau_min))
+        empty!(_filter(solver))
+        push!(_filter(solver), (_theta_max(solver), -Inf))
     end
     return
 end
@@ -238,24 +238,24 @@ end
 
 # Evaluate the linear quality function described in [Nocedal2009, Eq. (4.2)]
 function _evaluate_quality_function(solver, sigma, step_aff, step_cen, res_dual, res_primal)
-    n, m = solver.n, solver.m
-    nlb, nub = solver.nlb, solver.nub
-    tau = solver.tau
-    d = solver.d # Load buffer
+    n, m = _n(solver), _m(solver)
+    nlb, nub = _nlb(solver), _nub(solver)
+    tau = _tau(solver)
+    d = _d(solver) # Load buffer
     # Δ(σ) = Δ_aff + σ Δ_cen
     full(d) .= full(step_aff) .+ sigma .* full(step_cen)
     # Primal step
     alpha_pr = get_alpha_max(
-        primal(solver.x),
-        primal(solver.xl),
-        primal(solver.xu),
+        primal(_x(solver)),
+        primal(_xl(solver)),
+        primal(_xu(solver)),
         primal(d),
         tau,
     )
     # Dual step
     alpha_du = get_alpha_z(
-        solver.zl_r,
-        solver.zu_r,
+        _zl_r(solver),
+        _zu_r(solver),
         dual_lb(d),
         dual_ub(d),
         tau,
@@ -264,7 +264,7 @@ function _evaluate_quality_function(solver, sigma, step_aff, step_cen, res_dual,
     inf_compl_lb = mapreduce(
         (x, xl, dx, z, dz) -> ((x + alpha_pr * dx - xl) * (z + alpha_du * dz))^2,
         +,
-        solver.x_lr, solver.xl_r, solver.dx_lr, solver.zl_r, dual_lb(d);
+        _x_lr(solver), _xl_r(solver), _dx_lr(solver), _zl_r(solver), dual_lb(d);
         init=0.0,
     )
 
@@ -272,7 +272,7 @@ function _evaluate_quality_function(solver, sigma, step_aff, step_cen, res_dual,
     inf_compl_ub = mapreduce(
         (x, xu, dx, z, dz) -> ((xu - x - alpha_pr * dx) * (z + alpha_du * dz))^2,
         +,
-        solver.x_ur, solver.xu_r, solver.dx_ur, solver.zu_r, dual_ub(d);
+        _x_ur(solver), _xu_r(solver), _dx_ur(solver), _zu_r(solver), dual_ub(d);
         init=0.0,
     )
     # Primal infeasibility
@@ -282,7 +282,7 @@ function _evaluate_quality_function(solver, sigma, step_aff, step_cen, res_dual,
     # Complementarity infeasibility
     inf_compl = (inf_compl_lb + inf_compl_ub ) / (nlb + nub)
 
-    @debug(solver.logger, @sprintf("sigma=%4.1e inf_pr=%4.2e inf_du=%4.2e inf_cc=%4.2e a_pr=%4.2e a_du=%4.2e", sigma, inf_pr, inf_du, inf_compl, alpha_pr, alpha_du))
+    @debug(_logger(solver), @sprintf("sigma=%4.1e inf_pr=%4.2e inf_du=%4.2e inf_cc=%4.2e a_pr=%4.2e a_du=%4.2e", sigma, inf_pr, inf_du, inf_compl, alpha_pr, alpha_du))
 
     # Return quality function qL defined in Eq. (4.2)
     return inf_du + inf_pr + inf_compl
@@ -334,10 +334,10 @@ function _run_golden_search!(solver, barrier, sigma_lb, sigma_ub, step_aff, step
 end
 
 function set_centering_aug_rhs!(solver::AbstractMadNLPSolver, kkt::AbstractKKTSystem, mu)
-    px = primal(solver.p)
-    py = dual(solver.p)
-    pzl = dual_lb(solver.p)
-    pzu = dual_ub(solver.p)
+    px = primal(_p(solver))
+    py = dual(_p(solver))
+    pzl = dual_lb(_p(solver))
+    pzu = dual_ub(_p(solver))
     px .= 0
     py .= 0
     pzl .= mu
@@ -347,28 +347,28 @@ end
 
 function get_adaptive_mu(solver::AbstractMadNLPSolver{T}, barrier::QualityFunctionUpdate{T}) where T
     # No inequality constraint: early return as barrier update is useless
-    if solver.nlb + solver.nub == 0
+    if _nlb(solver) + _nub(solver) == 0
         return barrier.mu_min
     end
-    step_aff = solver._w3 # buffer 1
-    step_cen = solver._w4 # buffer 2
+    step_aff = __w3(solver) # buffer 1
+    step_cen = __w4(solver) # buffer 2
     # Affine step
-    set_aug_rhs!(solver, solver.kkt, solver.c, zero(T))
+    set_aug_rhs!(solver, _kkt(solver), _c(solver), zero(T))
     # Get primal and dual infeasibility directly from the values in RHS p
-    res_primal = norm(dual(solver.p))
-    res_dual = norm(primal(solver.p))
+    res_primal = norm(dual(_p(solver)))
+    res_dual = norm(primal(_p(solver)))
     # Get approximate solution without iterative refinement
-    copyto!(full(step_aff), full(solver.p))
-    solve!(solver.kkt, step_aff)
+    copyto!(full(step_aff), full(_p(solver)))
+    solve!(_kkt(solver), step_aff)
     # Get average complementarity
     mu = get_average_complementarity(solver)
     # Centering step
-    set_centering_aug_rhs!(solver, solver.kkt, mu)
+    set_centering_aug_rhs!(solver, _kkt(solver), mu)
     # NOTE(@anton) Ipopt also applies the dual infeasibility perturbation for some reason???
-    dual_inf_perturbation!(primal(solver.p),solver.ind_llb,solver.ind_uub,mu,solver.opt.kappa_d)
+    dual_inf_perturbation!(primal(_p(solver)),_ind_llb(solver),_ind_uub(solver),mu,_opt(solver).kappa_d)
     # Get (again) approximate solution without iterative refinement
-    copyto!(full(step_cen), full(solver.p))
-    solve!(solver.kkt, step_cen)
+    copyto!(full(step_cen), full(_p(solver)))
+    solve!(_kkt(solver), step_cen)
     # Refine the search interval using Ipopt's heuristics
     # First, check if sigma is greater than 1.
     phi1 = _evaluate_quality_function(solver, one(T), step_aff, step_cen, res_primal, res_dual)
@@ -418,11 +418,11 @@ end
 
 function get_adaptive_mu(solver::AbstractMadNLPSolver{T}, barrier::LOQOUpdate{T}) where T
     # No inequality constraint: early return as barrier update is useless
-    if solver.nlb + solver.nub == 0
+    if _nlb(solver) + _nub(solver) == 0
         return barrier.mu_min
     end
     mu = get_average_complementarity(solver) # get average complementarity.
-    ncc = solver.nlb + solver.nub
+    ncc = _nlb(solver) + _nub(solver)
     min_cc = get_min_complementarity(solver)
     xi = min_cc/mu
     sigma = barrier.gamma*min((1-barrier.r)*((1-xi)/xi),2)^3
