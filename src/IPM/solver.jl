@@ -242,11 +242,8 @@ end
 
 
 function restore!(solver::AbstractMadNLPSolver{T}) where T
-    set_del_w!(solver, zero(T))
-    # Backup the previous primal iterate
-    copyto!(primal(__w1(solver)), full(_x(solver)))
-    copyto!(dual(__w1(solver)), _y(solver))
-    copyto!(dual(__w2(solver)), _c(solver))
+    # Backup previous point and zero out del_w and alpha_z
+    initialize_restore!(solver)
 
     F = get_F(
         _c(solver),
@@ -262,8 +259,7 @@ function restore!(solver::AbstractMadNLPSolver{T}) where T
         _zu_r(solver),
         _mu(solver),
     )
-    set_alpha_z!(solver, zero(T))
-    set_ftype!(solver, "R")
+
     while true
         alpha_max = get_alpha_max(
             primal(_x(solver)),
@@ -286,7 +282,10 @@ function restore!(solver::AbstractMadNLPSolver{T}) where T
         eval_grad_f_wrapper!(solver,_f(solver),_x(solver))
         set_obj_val!(solver, eval_f_wrapper(solver,_x(solver)))
 
-        !_opt(solver).jacobian_constant && eval_jac_wrapper!(solver,_kkt(solver),_x(solver))
+        if !_opt(solver).jacobian_constant
+            eval_jac_wrapper!(solver,_kkt(solver),_x(solver))
+        end
+
         jtprod!(_jacl(solver),_kkt(solver),_y(solver))
 
         F_trial = get_F(
