@@ -124,8 +124,8 @@ function set_aug_rhs!(solver::AbstractMadNLPSolver, kkt::AbstractKKTSystem, c::A
 
     px .= .-f .+ zl .- zu .- _jacl(solver)
     py .= .-c
-    pzl .= (solver.xl_r .- solver.x_lr) .* solver.zl_r .+ mu
-    pzu .= (solver.xu_r .- solver.x_ur) .* solver.zu_r .- mu
+    pzl .= (_xl_r(solver) .- _x_lr(solver)) .* _zl_r(solver) .+ mu
+    pzu .= (_xu_r(solver) .- _x_ur(solver)) .* _zu_r(solver) .- mu
     return
 end
 
@@ -312,8 +312,8 @@ function get_average_complementarity(x_lr, xl_r, zl_r, x_ur, xu_r, zu_r)
 end
 function get_average_complementarity(solver::AbstractMadNLPSolver)
     return get_average_complementarity(
-        solver.x_lr, solver.xl_r, solver.zl_r,
-        solver.x_ur, solver.xu_r, solver.zu_r,
+        _x_lr(solver), _xl_r(solver), _zl_r(solver),
+        _x_ur(solver), _xu_r(solver), _zu_r(solver),
     )
 end
 
@@ -326,8 +326,8 @@ end
 
 function get_min_complementarity(solver::AbstractMadNLPSolver)
     return get_min_complementarity(
-        solver.x_lr, solver.xl_r, solver.zl_r,
-        solver.x_ur, solver.xu_r, solver.zu_r,
+        _x_lr(solver), _xl_r(solver), _zl_r(solver),
+        _x_ur(solver), _xu_r(solver), _zu_r(solver),
     )
 end
 

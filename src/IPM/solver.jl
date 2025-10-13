@@ -247,13 +247,13 @@ function regular!(solver::AbstractMadNLPSolver{T}) where T
         time()-_cnt(solver).start_time>=_opt(solver).max_wall_time && return MAXIMUM_WALLTIME_EXCEEDED
 
         # evaluate Hessian
-        if (solver.cnt.k!=0 && !solver.opt.hessian_constant)
-            eval_lag_hess_wrapper!(solver, solver.kkt, solver.x, solver.y)
+        if (_cnt(solver).k!=0 && !_opt(solver).hessian_constant)
+            eval_lag_hess_wrapper!(solver, _kkt(solver), _x(solver), _y(solver))
         end
 
         # update the barrier parameter
-        @trace(solver.logger,"Updating the barrier parameter.")
-        update_barrier!(solver.opt.barrier, solver, sc)
+        @trace(_logger(solver),"Updating the barrier parameter.")
+        update_barrier!(_opt(solver).barrier, solver, sc)
 
         # factorize the KKT system and solve Newton step
         @trace(_logger(solver),"Computing the Newton step.")
