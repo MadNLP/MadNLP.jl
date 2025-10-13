@@ -1234,11 +1234,11 @@ function evaluate_for_next_iter_restore!(solver::AbstractMadNLPSolver{T}) where 
         primal(get_zl(solver)),
         primal(get_zu(solver)),
         get_jacl(solver),
-        sd,
+        get_sd(solver),
     ))
 
-    set_inf_compl!(solver, get_inf_compl(get_x_lr(solver),get_xl_r(solver),get_zl_r(solver),get_xu_r(solver),get_x_ur(solver),get_zu_r(solver),zero(T),sc))
-    set_inf_compl_mu!(solver, get_inf_compl(get_x_lr(solver),get_xl_r(solver),get_zl_r(solver),get_xu_r(solver),get_x_ur(solver),get_zu_r(solver),get_mu(solver),sc))
+    set_inf_compl!(solver, get_inf_compl(get_x_lr(solver),get_xl_r(solver),get_zl_r(solver),get_xu_r(solver),get_x_ur(solver),get_zu_r(solver),zero(T),get_sc(solver)))
+    set_inf_compl_mu!(solver, get_inf_compl(get_x_lr(solver),get_xl_r(solver),get_zl_r(solver),get_xu_r(solver),get_x_ur(solver),get_zu_r(solver),get_mu(solver),get_sc(solver)))
 
     return nothing
 end
