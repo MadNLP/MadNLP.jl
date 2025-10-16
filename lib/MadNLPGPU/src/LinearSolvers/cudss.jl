@@ -178,18 +178,28 @@ MadNLP.default_options(::Type{CUDSSSolver}) = CudssSolverOptions()
 MadNLP.is_inertia(M::CUDSSSolver) = true  # Uncomment if MadNLP.LU is supported -- (M.opt.cudss_algorithm ∈ (MadNLP.CHOLESKY, MadNLP.LDL))
 function inertia(M::CUDSSSolver)
     n = size(M.tril, 1)
+    info = CUDSS.cudss_get(M.inner, "info")
+
+    # cudss_set(M.inner, "diag", buffer)  # specify the vector to update in `cudss_get`
+    # cudss_get(M.inner, "diag")          # update the vector specified in `cudss_set`
+    #
+    # `buffer` contains the diagonal of the factorized matrix.
+
     if M.opt.cudss_algorithm == MadNLP.CHOLESKY
-        info = CUDSS.cudss_get(M.inner, "info")
         if info == 0
             return (n, 0, 0)
         else
-            return (n-2, 1, 1)
+            return (n-2, 1, 1) # if factorization fails, return a dummy inertia
         end
     elseif M.opt.cudss_algorithm == MadNLP.LDL
         # N.B.: cuDSS does not always return the correct inertia.
-        (k, l) = CUDSS.cudss_get(M.inner, "inertia")
-        @assert 0 ≤ k + l ≤ n
-        return (k, n - k - l, l)
+        if info == 0
+            (k, l) = CUDSS.cudss_get(M.inner, "inertia")
+            @assert 0 ≤ k + l ≤ n
+            return (k, n - k - l, l)
+        else
+            return (0, 1, n) # if factorization fails, return a dummy inertia
+        end
     else
         error(M.logger, "Unsupported cudss_algorithm")
     end
