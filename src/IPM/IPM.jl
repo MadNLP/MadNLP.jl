@@ -110,8 +110,9 @@ mutable struct MadNLPSolver{
     status::Status
     output::Dict
 
-    function MadNLPSolver(@nospecialize(nlp::AbstractNLPModel); kwargs...)
-
+    function MadNLPSolver(nlp::AbstractNLPModel; kwargs...)
+        @nospecialize
+        
         x0 = get_x0(nlp)
         T = eltype(x0)
         VT = typeof(x0)

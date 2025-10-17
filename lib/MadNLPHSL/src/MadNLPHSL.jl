@@ -52,10 +52,22 @@ include("ma77.jl")
 include("ma86.jl")
 include("ma97.jl")
 
-@setup_workload begin
+MadNLP.@setup_workload begin
     nlp = MadNLP.HS15Model()    
-    @compile_workload begin
-        MadNLP.madnlp(nlp; lienar_solver=Ma27Solver, print_level=MadNLP.ERROR)
+    MadNLP.@compile_workload begin
+        for linear_solver in (Ma27Solver, Ma57Solver, Ma77Solver, Ma86Solver, Ma97Solver)
+            try 
+                MadNLP.madnlp(nlp; linear_solver, print_level=MadNLP.ERROR)
+            catch e
+                Base.@warn """
+Failed to precompile MadNLPHSL. This may be caused by the absence of installed HSL_jll.jl package.
+Please obtain HSL_jll.jl from https://licences.stfc.ac.uk/products/Software/HSL/libhsl, and
+
+] dev path/to/HSL_jll.jl
+"""
+                break
+            end
+        end
     end
 end
 

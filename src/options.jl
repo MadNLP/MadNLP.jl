@@ -4,6 +4,8 @@ parse_option(::Type{Module},str::String) = eval(Symbol(str))
 parse_option(type::Type{T},i::Int64) where {T<:Enum} = type(i)
 
 function set_options!(opt::AbstractOptions, options)
+    @nospecialize
+    
     other_options = Dict{Symbol, Any}()
     for (key, val) in options
         if hasproperty(opt, key)
@@ -17,6 +19,7 @@ function set_options!(opt::AbstractOptions, options)
     return other_options
 end
 
+@nospecialize
 @kwdef mutable struct MadNLPOptions{T} <: AbstractOptions
     # Primary options
     tol::T
@@ -101,19 +104,22 @@ end
     tau_min::T = 0.99
     mu_linear_decrease_factor::T = .2
 end
+@specialize
 
 is_dense_callback(nlp) = hasmethod(MadNLP.jac_dense!, Tuple{typeof(nlp), AbstractVector, AbstractMatrix}) &&
     hasmethod(MadNLP.hess_dense!, Tuple{typeof(nlp), AbstractVector, AbstractVector, AbstractMatrix})
 
 # smart option presets
 function MadNLPOptions{T}(
-    @nospecialize(nlp::AbstractNLPModel);
+    nlp::AbstractNLPModel;
     dense_callback = MadNLP.is_dense_callback(nlp),
     callback = dense_callback ? DenseCallback : SparseCallback,
     kkt_system = dense_callback ? DenseCondensedKKTSystem : SparseKKTSystem,
     linear_solver = dense_callback ? LapackCPUSolver : default_sparse_solver(nlp),
     tol = get_tolerance(T,kkt_system)
-) where T
+    ) where T
+    @nospecialize
+    
     return MadNLPOptions{T}(
         tol = tol,
         callback = callback,
@@ -134,6 +140,8 @@ function default_sparse_solver(@nospecialize(nlp::AbstractNLPModel))
 end
 
 function check_option_sanity(options)
+    @nospecialize
+    
     is_kkt_dense = options.kkt_system <: AbstractDenseKKTSystem
     is_hess_approx_dense = options.hessian_approximation <: Union{BFGS, DampedBFGS}
     if input_type(options.linear_solver) == :csc && is_kkt_dense
@@ -154,6 +162,8 @@ function print_ignored_options(logger,option_dict)
 end
 
 function _get_primary_options(options)
+    @nospecialize
+    
     primary_opt = Dict{Symbol,Any}()
     remaining_opt = Dict{Symbol,Any}()
     for (k,v) in options
@@ -167,7 +177,9 @@ function _get_primary_options(options)
     return primary_opt, remaining_opt
 end
 
-function load_options(@nospecialize(nlp::AbstractNLPModel); options...)
+function load_options(nlp::AbstractNLPModel; options...)
+    @nospecialize
+    
     T = eltype(get_x0(nlp))
     primary_opt, options = _get_primary_options(options)
 

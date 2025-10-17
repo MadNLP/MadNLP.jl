@@ -1,4 +1,3 @@
-
 """
     AbstractKKTSystem{T, VT<:AbstractVector{T}, MT<:AbstractMatrix{T}, QN<:AbstractHessian{T}}
 
@@ -236,6 +235,15 @@ function is_inertia_correct(kkt::AbstractKKTSystem, num_pos, num_zero, num_neg)
 end
 
 compress_hessian!(kkt::AbstractKKTSystem) = nothing
+
+# Linear solver
+"""
+    AbstractLinearSolver
+
+Abstract type for linear solver targeting
+the resolution of the linear system ``Ax=b``.
+"""
+abstract type AbstractLinearSolver{T} end
 
 include("rhs.jl")
 include("Dense/augmented.jl")

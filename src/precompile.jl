@@ -85,11 +85,15 @@ end
     # Putting some things in `@setup_workload` instead of `@compile_workload` can reduce the size of the
     # precompile file and potentially make loading faster.
 
-    nlp = HS15Model()
     __init__()
     
     @compile_workload begin
-        madnlp(nlp)
+        nlp = HS15Model()
+        s = MadNLPSolver(nlp)
+        r = madnlp(nlp)
+        introduce()
+        introduce(s.kkt.linear_solver)
+        get_status_output(r.status, r.options)
     end
 end
 

@@ -4,7 +4,7 @@
 Implement the [`AbstractReducedKKTSystem`](@ref) in sparse COO format.
 
 """
-struct SparseKKTSystem{T, VT, MT, QN, LS, VI, VI32} <: AbstractReducedKKTSystem{T, VT, MT, QN}
+struct SparseKKTSystem{T, VT, MT, QN, VI, VI32} <: AbstractReducedKKTSystem{T, VT, MT, QN}
     hess::VT
     jac_callback::VT
     jac::VT
@@ -29,7 +29,7 @@ struct SparseKKTSystem{T, VT, MT, QN, LS, VI, VI32} <: AbstractReducedKKTSystem{
     jac_com::MT
     jac_csc_map::Union{Nothing, VI}
     # LinearSolver
-    linear_solver::LS
+    linear_solver::AbstractLinearSolver{T}
     # Info
     ind_ineq::VI
     ind_lb::VI
@@ -42,7 +42,7 @@ function create_kkt_system(
     cb::SparseCallback{T,VT},
     ind_cons,
     linear_solver::Type;
-    opt_linear_solver=default_options(linear_solver),
+    @nospecialize(opt_linear_solver=default_options(linear_solver)),
     hessian_approximation=ExactHessian,
     qn_options=QuasiNewtonOptions(),
 ) where {T,VT}

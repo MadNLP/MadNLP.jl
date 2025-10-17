@@ -1,6 +1,6 @@
 module MadNLPMOI
 
-import MadNLP, MathOptInterface, NLPModels
+import MadNLP, MathOptInterface, NLPModels, PrecompileTools
 
 const MOI = MathOptInterface
 const MOIU = MathOptInterface.Utilities
@@ -1172,18 +1172,6 @@ end
 
 ### MOI.BarrierIterations
 MOI.get(model::Optimizer,::MOI.BarrierIterations) = model.solve_iterations
-
-MadNLP.@setup_workload begin
-    # Putting some things in `@setup_workload` instead of `@compile_workload` can reduce the size of the
-    # precompile file and potentially make loading faster.
-
-    nlp = MadNLP.HS15Model()
-
-    MadNLP.@compile_workload begin
-        MadNLP.madnlp(nlp)
-    end
-end
-
 
 end # module
 

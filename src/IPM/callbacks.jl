@@ -1,4 +1,5 @@
-function eval_f_wrapper(solver::AbstractMadNLPSolver, x::PrimalVector{T}) where T
+Base.@nospecializeinfer function eval_f_wrapper(solver::AbstractMadNLPSolver, x::PrimalVector{T}) where T
+    @nospecialize
     nlp = solver.nlp
     cnt = solver.cnt
     @trace(solver.logger,"Evaluating objective.")
@@ -13,7 +14,8 @@ function eval_f_wrapper(solver::AbstractMadNLPSolver, x::PrimalVector{T}) where 
     return obj_val
 end
 
-function eval_grad_f_wrapper!(solver::AbstractMadNLPSolver, f::PrimalVector{T}, x::PrimalVector{T}) where T
+Base.@nospecializeinfer function eval_grad_f_wrapper!(solver::AbstractMadNLPSolver, f::PrimalVector{T}, x::PrimalVector{T}) where T
+    @nospecialize
     nlp = solver.nlp
     cnt = solver.cnt
     @trace(solver.logger,"Evaluating objective gradient.")
@@ -71,7 +73,8 @@ function eval_jac_wrapper!(solver::AbstractMadNLPSolver, kkt::AbstractKKTSystem,
     return jac
 end
 
-function eval_lag_hess_wrapper!(solver::AbstractMadNLPSolver, kkt::AbstractKKTSystem, x::PrimalVector{T},l::AbstractVector{T};is_resto=false) where T
+Base.@nospecializeinfer function eval_lag_hess_wrapper!(solver::AbstractMadNLPSolver, kkt::AbstractKKTSystem, x::PrimalVector{T},l::AbstractVector{T};is_resto=false) where T
+    @nospecialize
     nlp = solver.nlp
     cnt = solver.cnt
     @trace(solver.logger,"Evaluating Lagrangian Hessian.")
@@ -112,13 +115,14 @@ function eval_jac_wrapper!(solver::AbstractMadNLPSolver, kkt::AbstractDenseKKTSy
     return jac
 end
 
-function eval_lag_hess_wrapper!(
+Base.@nospecializeinfer function eval_lag_hess_wrapper!(
     solver::AbstractMadNLPSolver,
     kkt::AbstractDenseKKTSystem{T, VT, MT, QN},
     x::PrimalVector{T},
     l::AbstractVector{T};
     is_resto=false,
-) where {T, VT, MT, QN<:ExactHessian}
+    ) where {T, VT, MT, QN<:ExactHessian}
+    @nospecialize
     nlp = solver.nlp
     cnt = solver.cnt
     @trace(solver.logger,"Evaluating Lagrangian Hessian.")

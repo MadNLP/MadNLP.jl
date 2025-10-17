@@ -18,22 +18,24 @@ mutable struct MadNLPExecutionStats{T, VT} <: AbstractExecutionStats
     multipliers_U::VT
     iter::Int
     counters::MadNLPCounters
+    MadNLPExecutionStats(@nospecialize(solver::AbstractMadNLPSolver)) = new{
+        typeof(solver.obj_val), typeof(primal(solver.x))
+    }(
+        solver.opt,
+        solver.status,
+        primal(solver.x)[1:get_nvar(solver.nlp)],
+        solver.obj_val / solver.cb.obj_scale[],
+        solver.c ./ solver.cb.con_scale,
+        solver.inf_du,
+        solver.inf_pr,
+        copy(solver.y),
+        primal(solver.zl)[1:get_nvar(solver.nlp)],
+        primal(solver.zu)[1:get_nvar(solver.nlp)],
+        0,
+        solver.cnt,
+    )
 end
 
-MadNLPExecutionStats(solver::AbstractMadNLPSolver) =MadNLPExecutionStats(
-    solver.opt,
-    solver.status,
-    primal(solver.x)[1:get_nvar(solver.nlp)],
-    solver.obj_val / solver.cb.obj_scale[],
-    solver.c ./ solver.cb.con_scale,
-    solver.inf_du,
-    solver.inf_pr,
-    copy(solver.y),
-    primal(solver.zl)[1:get_nvar(solver.nlp)],
-    primal(solver.zu)[1:get_nvar(solver.nlp)],
-    0,
-    solver.cnt,
-)
 
 function update!(stats::MadNLPExecutionStats, solver::AbstractMadNLPSolver)
     stats.status = solver.status
