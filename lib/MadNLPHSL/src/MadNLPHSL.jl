@@ -31,8 +31,8 @@ import MadNLP:
     is_supported,
     default_options
 
-import HSL
 import HSL:
+    HSL,
     Mc68Control,
     Mc68Info,
     Ma77Control,
@@ -43,6 +43,7 @@ import HSL:
     Ma97Info
 
 import LinearAlgebra
+import PrecompileTools: @setup_workload, @compile_workload
 
 include("common.jl")
 include("ma27.jl")
@@ -50,6 +51,25 @@ include("ma57.jl")
 include("ma77.jl")
 include("ma86.jl")
 include("ma97.jl")
+
+@setup_workload begin
+    nlp = MadNLP.HS15Model()    
+    @compile_workload begin
+        for linear_solver in (Ma27Solver, Ma57Solver, Ma77Solver, Ma86Solver, Ma97Solver)
+            try 
+                MadNLP.madnlp(nlp; linear_solver, print_level=MadNLP.ERROR)
+            catch e
+                Base.@warn """
+Failed to precompile MadNLPHSL. This may be caused by the absence of installed HSL_jll.jl package.
+Please obtain HSL_jll.jl from https://licences.stfc.ac.uk/products/Software/HSL/libhsl, and
+
+] dev path/to/HSL_jll.jl
+"""
+                break
+            end
+        end
+    end
+end
 
 export Ma27Solver, Ma57Solver, Ma77Solver, Ma86Solver, Ma97Solver
 
