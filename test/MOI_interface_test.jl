@@ -36,22 +36,18 @@ function test_MOI_Test()
                 MOI.ObjectiveBound,
             ]
         );
-        exclude=[
-            # TODO: MadNLP does not return the correct multiplier
-            # when a variable is fixed with MOI.EqualTo (Issue #229).
-            r"^test_linear_integration$",
-            "test_quadratic_constraint_GreaterThan",
-            "test_quadratic_constraint_LessThan",
+        exclude = [
             # MadNLP reaches maximum number of iterations instead
             # of returning infeasibility certificate.
             r"test_linear_DUAL_INFEASIBLE.*",
             "test_solve_TerminationStatus_DUAL_INFEASIBLE",
+            # Symbolic exception in Mumps
+            "test_solve_VariableIndex_ConstraintDual_",
             # Tests excluded on purpose
             # - Excluded because Hessian information is needed
             "test_nonlinear_hs071_hessian_vector_product",
             # - Excluded because Hessian information is needed
             "test_nonlinear_invalid",
-
             #  - Excluded because this test is optional
             "test_model_ScalarFunctionConstantNotZero",
             # Throw an error: "Unable to query the dual of a variable

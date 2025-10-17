@@ -52,7 +52,6 @@ end
 function create_kkt_system(
     ::Type{DenseCondensedKKTSystem},
     cb::AbstractCallback{T,VT},
-    ind_cons,
     linear_solver::Type;
     opt_linear_solver=default_options(linear_solver),
     hessian_approximation=ExactHessian,
@@ -61,10 +60,10 @@ function create_kkt_system(
 
     n = cb.nvar
     m = cb.ncon
-    ns = length(ind_cons.ind_ineq)
+    ns = length(cb.ind_ineq)
     n_eq = m - ns
-    nlb = length(ind_cons.ind_lb)
-    nub = length(ind_cons.ind_ub)
+    nlb = length(cb.ind_lb)
+    nub = length(cb.ind_ub)
 
     aug_com  = create_array(cb, n+m-ns, n+m-ns)
     hess     = create_array(cb, n, n)
@@ -91,8 +90,8 @@ function create_kkt_system(
     fill!(du_diag, zero(T))
 
     # Shift indexes to avoid additional allocation in views
-    ind_eq_shifted = ind_cons.ind_eq .+ n .+ ns
-    ind_ineq_shifted = ind_cons.ind_ineq .+ n .+ ns
+    ind_eq_shifted = cb.ind_eq .+ n .+ ns
+    ind_ineq_shifted = cb.ind_ineq .+ n .+ ns
 
     quasi_newton = create_quasi_newton(hessian_approximation, cb, n; options=qn_options)
     _linear_solver = linear_solver(aug_com; opt = opt_linear_solver)
@@ -102,9 +101,9 @@ function create_kkt_system(
         reg, pr_diag, du_diag, l_diag, u_diag, l_lower, u_lower,
         pd_buffer, diag_buffer, buffer,
         aug_com,
-        n_eq, ind_cons.ind_eq, ind_eq_shifted,
+        n_eq, cb.ind_eq, ind_eq_shifted,
         ns,
-        ind_cons.ind_ineq, ind_cons.ind_lb, ind_cons.ind_ub,
+        cb.ind_ineq, cb.ind_lb, cb.ind_ub,
         ind_ineq_shifted,
         _linear_solver,
         Dict{Symbol, Any}(),
