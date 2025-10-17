@@ -276,7 +276,6 @@ MadNLP instantiates a new KKT system with the function [`create_kkt_system`](@re
 function MadNLP.create_kkt_system(
     ::Type{DiagonalHessianKKTSystem},
     cb::MadNLP.SparseCallback{T,VT},
-    ind_cons,
     linear_solver::Type;
     opt_linear_solver=MadNLP.default_options(linear_solver),
     hessian_approximation=MadNLP.ExactHessian,
