@@ -1,5 +1,6 @@
-Base.@nospecializeinfer function eval_f_wrapper(solver::AbstractMadNLPSolver, x::PrimalVector{T}) where T
+Base.@nospecializeinfer function eval_f_wrapper(solver::AbstractMadNLPSolver, x::PrimalVector)
     @nospecialize
+    T = eltype(variable(x))
     nlp = solver.nlp
     cnt = solver.cnt
     @trace(solver.logger,"Evaluating objective.")
@@ -14,8 +15,9 @@ Base.@nospecializeinfer function eval_f_wrapper(solver::AbstractMadNLPSolver, x:
     return obj_val
 end
 
-Base.@nospecializeinfer function eval_grad_f_wrapper!(solver::AbstractMadNLPSolver, f::PrimalVector{T}, x::PrimalVector{T}) where T
+Base.@nospecializeinfer function eval_grad_f_wrapper!(solver::AbstractMadNLPSolver, f::PrimalVector, x::PrimalVector)
     @nospecialize
+    T= eltype(variable(x))
     nlp = solver.nlp
     cnt = solver.cnt
     @trace(solver.logger,"Evaluating objective gradient.")
@@ -73,13 +75,12 @@ function eval_jac_wrapper!(solver::AbstractMadNLPSolver, kkt::AbstractKKTSystem,
     return jac
 end
 
-Base.@nospecializeinfer function eval_lag_hess_wrapper!(solver::AbstractMadNLPSolver, kkt::AbstractKKTSystem, x::PrimalVector{T},l::AbstractVector{T};is_resto=false) where T
+Base.@nospecializeinfer function eval_lag_hess_wrapper!(solver::AbstractMadNLPSolver, kkt::AbstractKKTSystem, x::PrimalVector{T},l::AbstractVector;is_resto=false) where T
     @nospecialize
-    nlp = solver.nlp
     cnt = solver.cnt
     @trace(solver.logger,"Evaluating Lagrangian Hessian.")
     hess = get_hessian(kkt)
-    scale = (get_minimize(nlp) ? one(T) : -one(T)) * (is_resto ? zero(T) : one(T))
+    scale = (get_minimize(Base.inferencebarrier(solver.nlp)) ? one(T) : -one(T)) * (is_resto ? zero(T) : one(T))
     cnt.eval_function_time += @elapsed _eval_lag_hess_wrapper!(
         solver.cb,
         variable(x),
@@ -143,13 +144,14 @@ Base.@nospecializeinfer function eval_lag_hess_wrapper!(
     return hess
 end
 
-function eval_lag_hess_wrapper!(
+Base.@nospecializeinfer function eval_lag_hess_wrapper!(
     solver::AbstractMadNLPSolver,
     kkt::AbstractKKTSystem{T, VT, MT, QN},
     x::PrimalVector{T},
     l::AbstractVector{T};
     is_resto=false,
 ) where {T, VT, MT<:AbstractMatrix{T}, QN<:AbstractQuasiNewton{T, VT}}
+    @nospecialize
     cb = solver.cb
     cnt = solver.cnt
     @trace(solver.logger, "Update BFGS matrices.")

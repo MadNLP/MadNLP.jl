@@ -68,7 +68,7 @@ function NLPModels.hess_structure!(nlp::HS15Model, I::AbstractVector{T}, J::Abst
     copyto!(J, [1, 1, 2])
 end
 
-function NLPModels.hess_coord!(nlp::HS15Model, x, y, H::AbstractVector; obj_weight=1.0)
+function NLPModels.hess_coord!(nlp::HS15Model, x::AbstractVector{T}, y::AbstractVector{T}, H::AbstractVector{T}; obj_weight::T=one(T)) where T
     # Objective
     H[1] = obj_weight * (-400.0 * x[2] + 1200.0 * x[1]^2 + 2.0)
     H[2] = obj_weight * (-400.0 * x[1])
@@ -90,7 +90,8 @@ end
     @compile_workload begin
         nlp = HS15Model()
         s = MadNLPSolver(nlp)
-        r = madnlp(nlp)
+        r = madnlp(nlp; print_level=MadNLP.ERROR)
+        precompile(Tuple{typeof(MadNLP.madnlp), NLPModels.AbstractNLPModel{T, S} where S where T})
         introduce()
         introduce(s.kkt.linear_solver)
         get_status_output(r.status, r.options)

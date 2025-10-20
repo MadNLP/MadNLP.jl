@@ -24,7 +24,8 @@ MathOptInterface = "b8f27783-ece8-5eb3-8dc8-9495eed66fee"
 
 [extensions]
 MadNLPExaModelsExt = "ExaModels"
-MadNLPJuMPExt = "JuMP"
+MadNLPMOI = "MathOptInterface"
+MadNLPJuMPExt = ["MathOptInterface", "JuMP"]
 
 [compat]
 ExaModels = "0.9"

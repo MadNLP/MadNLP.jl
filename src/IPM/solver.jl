@@ -6,28 +6,28 @@ the interior-point method. Return the solution
 as a [`MadNLPExecutionStats`](@ref).
 
 """
-Base.@nospecializeinfer function madnlp(@nospecialize(model::AbstractNLPModel); @nospecialize(kwargs...))
+function madnlp(model::AbstractNLPModel; kwargs...)
     solver = MadNLPSolver(model;kwargs...)
     return solve!(solver)
 end
 
-Base.@nospecializeinfer function solve!(nlp::AbstractNLPModel, solver::AbstractMadNLPSolver; kwargs...)
-    @nospecialize
+function solve!(nlp::AbstractNLPModel, solver::AbstractMadNLPSolver; kwargs...)
+    
     solve!(
     nlp, solver, MadNLPExecutionStats(solver);
     kwargs...)
 end
 
-Base.@nospecializeinfer function solve!(solver::AbstractMadNLPSolver; kwargs...)
-    @nospecialize
+function solve!(solver::AbstractMadNLPSolver; kwargs...)
+    
     solve!(
     solver.nlp, solver;
     kwargs...)
 end
 
 
-Base.@nospecializeinfer function initialize!(solver::AbstractMadNLPSolver{T}) where T
-    @nospecialize
+function initialize!(solver::AbstractMadNLPSolver{T}) where T
+    
     nlp = solver.nlp
     opt = solver.opt
 
@@ -132,7 +132,7 @@ function reinitialize!(solver::AbstractMadNLPSolver)
 end
 
 # major loops ---------------------------------------------------------
-Base.@nospecializeinfer function solve!(
+function solve!(
     nlp::AbstractNLPModel,
     solver::AbstractMadNLPSolver,
     stats::MadNLPExecutionStats;
@@ -140,7 +140,7 @@ Base.@nospecializeinfer function solve!(
     zl = nothing, zu = nothing,
     kwargs...
         )
-    @nospecialize
+    
     
     if x != nothing
         full(solver.x)[1:get_nvar(nlp)] .= x
@@ -223,8 +223,8 @@ color_status(status::Status) =
     status <= SOLVED_TO_ACCEPTABLE_LEVEL ? :blue : :red
 
 
-Base.@nospecializeinfer function regular!(solver::AbstractMadNLPSolver{T}) where T
-    @nospecialize
+function regular!(solver::AbstractMadNLPSolver{T}) where T
+    
     while true
         if (solver.cnt.k!=0 && !solver.opt.jacobian_constant)
             eval_jac_wrapper!(solver, solver.kkt, solver.x)
@@ -318,8 +318,8 @@ Base.@nospecializeinfer function regular!(solver::AbstractMadNLPSolver{T}) where
 end
 
 
-Base.@nospecializeinfer function restore!(solver::AbstractMadNLPSolver{T}) where T
-    @nospecialize
+function restore!(solver::AbstractMadNLPSolver{T}) where T
+    
     solver.del_w = 0
     # Backup the previous primal iterate
     copyto!(primal(solver._w1), full(solver.x))
@@ -431,8 +431,8 @@ Base.@nospecializeinfer function restore!(solver::AbstractMadNLPSolver{T}) where
     end
 end
 
-Base.@nospecializeinfer function robust!(solver::AbstractMadNLPSolver{T}) where T
-    @nospecialize
+function robust!(solver::AbstractMadNLPSolver{T}) where T
+    
     initialize_robust_restorer!(solver)
     RR = solver.RR
     while true
