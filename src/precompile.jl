@@ -68,7 +68,7 @@ function NLPModels.hess_structure!(nlp::HS15Model, I::AbstractVector, J::Abstrac
     copyto!(J, [1, 1, 2])
 end
 
-function NLPModels.hess_coord!(nlp::HS15Model{T}, x::AbstractVector, y::AbstractVector, H::AbstractVector; obj_weight::T=one(T)) where T
+function NLPModels.hess_coord!(nlp::HS15Model{T}, x::AbstractVector{T}, y::AbstractVector{T}, H::AbstractVector{T}; obj_weight::T=one(T)) where T
     # Objective
     H[1] = obj_weight * (T(-400.0) * x[2] + T(1200.0) * x[1]^2 + T(2.0))
     H[2] = obj_weight * (T(-400.0) * x[1])
@@ -77,7 +77,7 @@ function NLPModels.hess_coord!(nlp::HS15Model{T}, x::AbstractVector, y::Abstract
     H[2] += y[1] * T(1.0)
     # Second constraint
     H[3] += y[2] * T(2.0)
-    return H
+    return 
 end
 
 

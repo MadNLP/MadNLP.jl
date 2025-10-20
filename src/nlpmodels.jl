@@ -366,7 +366,7 @@ function create_sparse_fixed_handler(
     hess_buffer,
 )
     fixed_handler = RelaxBound()
-    return fixed_handler, get_nnzj(nlp), get_nnzh(nlp)
+    return fixed_handler, get_nnzj(nlp.meta), get_nnzh(nlp.meta)
 end
 
 function create_callback(
@@ -382,8 +382,8 @@ function create_callback(
 
     n = get_nvar(nlp)
     m = get_ncon(nlp)
-    nnzj = get_nnzj(nlp)
-    nnzh = get_nnzh(nlp)
+    nnzj = get_nnzj(nlp.meta)
+    nnzh = get_nnzh(nlp.meta)
     
     jac_I = similar(x0, Int, nnzj)
     jac_J = similar(x0, Int, nnzj)
@@ -707,15 +707,16 @@ function _eval_lag_hess_wrapper!(
     y::AbstractVector,
     hess::AbstractVector{T};
     obj_weight::T = one(T)
-    ) where {T}
+    ) where T
     nnzh_orig = get_nnzh(cb.nlp)::Int
 
     cb.con_buffer .= y .* cb.con_scale
     hess_coord!(
-        cb.nlp, x, cb.con_buffer, _madnlp_unsafe_wrap(hess, nnzh_orig);
-        obj_weight=obj_weight * cb.obj_scale[]
+        cb.nlp, x, cb.con_buffer, hess;
+        obj_weight = obj_weight * cb.obj_scale[]
     )
     _treat_fixed_variable_hess_coord!(cb.fixed_handler, cb, hess)
+    return
 end
 
 function _treat_fixed_variable_hess_coord!(fixed_handler::RelaxBound, cb, hess) end
