@@ -14,7 +14,6 @@ import NLPModels: NLPModels, AbstractNLPModel, AbstractNLPModel, AbstractNLPMode
 import SolverCore: solve!, getStatus, AbstractOptimizationSolver, AbstractExecutionStats
 import LDLFactorizations
 import MUMPS_seq_jll, OpenBLAS32_jll
-import Random
 import PrecompileTools: @setup_workload, @compile_workload   
 
 export MadNLPSolver, MadNLPOptions, UmfpackSolver, LDLSolver, CHOLMODSolver, LapackCPUSolver, MumpsSolver, MadNLPExecutionStats, madnlp, solve!
