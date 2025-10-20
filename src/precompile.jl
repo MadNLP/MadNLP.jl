@@ -89,12 +89,14 @@ end
     
     @compile_workload begin
         nlp = HS15Model()
-        s = MadNLPSolver(nlp)
-        r = madnlp(nlp; print_level=MadNLP.ERROR)
+        madnlp(nlp; print_level=MadNLP.ERROR)
+        
         precompile(Tuple{typeof(MadNLP.madnlp), NLPModels.AbstractNLPModel{T, S} where S where T})
-        introduce()
-        introduce(s.kkt.linear_solver)
-        get_status_output(r.status, r.options)
+        precompile(Tuple{Type{NamedTuple{(:color,), T} where T<:Tuple}, Tuple{Int64}})
+        precompile(Tuple{typeof(Base.argtail), Float64, Float64, Vararg{Float64}})
+        precompile(Tuple{typeof(MadNLP.get_status_output), MadNLP.Status, MadNLP.MadNLPOptions{Float64}})
+        precompile(Tuple{typeof(MadNLP.improve!), MadNLP.MumpsSolver{Float64}})
+        precompile(Tuple{typeof(MadNLP.introduce), MadNLP.MumpsSolver{Float64}})
     end
 end
 

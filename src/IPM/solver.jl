@@ -7,12 +7,13 @@ as a [`MadNLPExecutionStats`](@ref).
 
 """
 function madnlp(model::AbstractNLPModel; kwargs...)
+    @nospecialize
     solver = MadNLPSolver(model;kwargs...)
     return solve!(solver)
 end
 
 function solve!(nlp::AbstractNLPModel, solver::AbstractMadNLPSolver; kwargs...)
-    
+    @nospecialize
     solve!(
     nlp, solver, MadNLPExecutionStats(solver);
     kwargs...)
@@ -140,7 +141,7 @@ function solve!(
     zl = nothing, zu = nothing,
     kwargs...
         )
-    
+    @nospecialize
     
     if x != nothing
         full(solver.x)[1:get_nvar(nlp)] .= x

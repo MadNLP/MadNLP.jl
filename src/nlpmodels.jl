@@ -76,7 +76,7 @@ Return a named-tuple witht the following keys:return (
 
 """
 function get_index_constraints(
-    nlp::AbstractNLPModel; options...
+    @nospecialize(nlp::AbstractNLPModel); options...
 )
     get_index_constraints(
         get_lvar(nlp), get_uvar(nlp),
@@ -202,7 +202,7 @@ struct SparseCallback{
     equality_handler::EH
 
     function SparseCallback(
-        nlp::AbstractNLPModel,
+        @nospecialize(nlp::AbstractNLPModel),
         n,m,nnzj,nnzh,
         con_buffer,
         jac_buffer,
@@ -304,7 +304,7 @@ end
 
 function create_dense_fixed_handler(
     fixed_variable_treatment::Type{MakeParameter},
-    nlp::AbstractNLPModel,
+    @nospecialize(nlp::AbstractNLPModel),
 )
     lvar = get_lvar(nlp)
     uvar = get_uvar(nlp)
@@ -320,7 +320,7 @@ end
 
 function create_sparse_fixed_handler(
     fixed_variable_treatment::Type{MakeParameter},
-    nlp::AbstractNLPModel,
+    @nospecialize(nlp::AbstractNLPModel),
     jac_I,
     jac_J,
     hess_I,
@@ -358,7 +358,7 @@ end
 
 function create_sparse_fixed_handler(
     fixed_variable_treatment::Type{RelaxBound},
-    nlp::AbstractNLPModel,
+    @nospecialize(nlp::AbstractNLPModel),
     jac_I,
     jac_J,
     hess_I,
@@ -371,7 +371,7 @@ end
 
 function create_callback(
     ::Type{SparseCallback},
-    nlp::AbstractNLPModel;
+    @nospecialize(nlp::AbstractNLPModel);
     fixed_variable_treatment=MakeParameter,
     equality_treatment=EnforceEquality,
     ) 
@@ -438,7 +438,7 @@ end
 
 function create_callback(
     ::Type{DenseCallback},
-    nlp::AbstractNLPModel;
+    @nospecialize(nlp::AbstractNLPModel);
     fixed_variable_treatment=MakeParameter,
     equality_treatment=EnforceEquality,
     ) 
@@ -499,7 +499,7 @@ function initialize!(
     bound_push=1e-2,
     bound_fac=1e-2,
     )
-    
+    @nospecialize
 
     x0= variable(x)
     lvar= variable(xl)
@@ -560,7 +560,7 @@ function set_scaling!(
     ind_ineq,
     nlp_scaling_max_gradient
     )
-    
+    @nospecialize
     x0= variable(x)
 
     nlp = cb.nlp
@@ -594,7 +594,7 @@ function set_scaling!(
     ind_ineq,
     nlp_scaling_max_gradient
     )
-    
+    @nospecialize
     x0 = variable(x)
 
     nlp = cb.nlp
@@ -641,7 +641,7 @@ end
 
 
 function _eval_cons_wrapper!(cb::AbstractCallback,x::AbstractVector,c::AbstractVector)
-    
+    @nospecialize
     cons!(cb.nlp, x,c)
     c .*= cb.con_scale
     return c
@@ -652,7 +652,7 @@ function _eval_jac_wrapper!(
     x::AbstractVector,
     jac::AbstractVector
     )
-    
+    @nospecialize
     nnzj_orig = get_nnzj(cb.nlp)
     jac_coord!(cb.nlp, x, jac)
     jac .*= cb.jac_scale
@@ -684,14 +684,14 @@ function _eval_grad_f_wrapper!(
     x::AbstractVector,
     grad::AbstractVector
     ) 
-    
+    @nospecialize
     grad!(Base.inferencebarrier(cb.nlp), x, grad)
     grad .*= cb.obj_scale[]
     _treat_fixed_variable_grad!(cb.fixed_handler, cb, x, grad)
 end
 function _treat_fixed_variable_grad!(fixed_handler::RelaxBound, cb, x, grad) end
 function _treat_fixed_variable_grad!(fixed_handler::MakeParameter, cb::AbstractCallback, x, grad)
-    
+    @nospecialize
     fixed_handler.grad_storage .= @view(grad[fixed_handler.fixed])
     map!(
         (x,y)->x-y,
@@ -702,7 +702,7 @@ function _treat_fixed_variable_grad!(fixed_handler::MakeParameter, cb::AbstractC
 end
 
 function _eval_f_wrapper(cb::AbstractCallback,x::AbstractVector)
-    
+    @nospecialize
     return obj(cb.nlp,x)* cb.obj_scale[]
 end
 
@@ -713,7 +713,7 @@ function _eval_lag_hess_wrapper!(
     hess::AbstractVector;
     obj_weight = one(eltype(x))
     )
-    
+    @nospecialize
     nnzh_orig = get_nnzh(cb.nlp)
 
     cb.con_buffer .= y .* cb.con_scale
