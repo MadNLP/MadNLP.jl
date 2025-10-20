@@ -30,13 +30,13 @@ function NLPModels.grad!(nlp::HS15Model{T}, x::AbstractVector, g::AbstractVector
     z = x[2] - x[1]^2
     g[1] = -T(400.0) * z * x[1] - 2.0 * (T(1.0) - x[1])
     g[2] = T(200.0) * z
-    return
+    return g
 end
 
 function NLPModels.cons!(nlp::HS15Model, x::AbstractVector, c::AbstractVector) 
     c[1] = x[1] * x[2]
     c[2] = x[1] + x[2]^2
-    return 
+    return c
 end
 
 function NLPModels.jac_structure!(nlp::HS15Model, I::AbstractVector, J::AbstractVector)
@@ -78,7 +78,7 @@ function NLPModels.hess_coord!(nlp::HS15Model{T}, x::AbstractVector{T}, y::Abstr
     H[2] += y[1] * T(1.0)
     # Second constraint
     H[3] += y[2] * T(2.0)
-    return 
+    return H
 end
 
 
