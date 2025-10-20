@@ -36,6 +36,7 @@ end
 function NLPModels.cons!(nlp::HS15Model, x::AbstractVector, c::AbstractVector)
     c[1] = x[1] * x[2]
     c[2] = x[1] + x[2]^2
+    return
 end 
 
 function NLPModels.jac_structure!(nlp::HS15Model, I::AbstractVector{T}, J::AbstractVector{T}) where T

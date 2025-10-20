@@ -1,16 +1,17 @@
-function eval_f_wrapper(solver::AbstractMadNLPSolver, x::PrimalVector{T}) where T
+function eval_f_wrapper(solver::AbstractMadNLPSolver, x::PrimalVector)
+    T = eltype(variable(x))
     nlp = solver.nlp
     cnt = solver.cnt
     @trace(solver.logger,"Evaluating objective.")
     cnt.eval_function_time += @elapsed begin
-        sense = (get_minimize(nlp)::Bool ? one(T) : -one(T))
-        obj_val = sense * _eval_f_wrapper(solver.cb, variable(x))::T
+        sense = (get_minimize(nlp) ? one(T) : -one(T))
+        obj_val = _eval_f_wrapper(solver.cb, variable(x))
     end
     cnt.obj_cnt += 1
     if cnt.obj_cnt == 1 && !is_valid(obj_val)
         throw(InvalidNumberException(:obj))
     end
-    return obj_val::T
+    return obj_val
 end
 
 function eval_grad_f_wrapper!(solver::AbstractMadNLPSolver, f::PrimalVector, x::PrimalVector)
@@ -52,7 +53,7 @@ function eval_cons_wrapper!(solver::AbstractMadNLPSolver, c::AbstractVector, x::
     return c
 end
 
-function eval_jac_wrapper!(solver::AbstractMadNLPSolver, kkt::AbstractKKTSystem, x::PrimalVector{T}) where T
+function eval_jac_wrapper!(solver::AbstractMadNLPSolver, kkt::AbstractKKTSystem, x::PrimalVector)
     nlp = solver.nlp
     cnt = solver.cnt
     ns = length(solver.ind_ineq)
@@ -72,7 +73,8 @@ function eval_jac_wrapper!(solver::AbstractMadNLPSolver, kkt::AbstractKKTSystem,
     return jac
 end
 
-function eval_lag_hess_wrapper!(solver::AbstractMadNLPSolver, kkt::AbstractKKTSystem, x::PrimalVector{T},l::AbstractVector;is_resto=false) where T
+function eval_lag_hess_wrapper!(solver::AbstractMadNLPSolver, kkt::AbstractKKTSystem, x::PrimalVector,l::AbstractVector;is_resto=false)
+    T = eltype(variable(x))
     cnt = solver.cnt
     @trace(solver.logger,"Evaluating Lagrangian Hessian.")
     hess = get_hessian(kkt)

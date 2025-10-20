@@ -676,11 +676,11 @@ function _treat_fixed_variable_jac_coord!(fixed_handler::MakeParameter, cb::Spar
     fill!(@view(jac[fixed_handler.fixedj]), zero(T))
 end
 
-function _eval_grad_f_wrapper!(
+@noinline function _eval_grad_f_wrapper!(
     cb::AbstractCallback,
     x::AbstractVector,
-    grad::AbstractVector{T}
-    )  where T
+    grad::AbstractVector
+    ) 
     grad!(cb.nlp, x, grad)
     grad .*= cb.obj_scale[]
     _treat_fixed_variable_grad!(cb.fixed_handler, cb, x, grad)
@@ -697,8 +697,8 @@ function _treat_fixed_variable_grad!(fixed_handler::MakeParameter, cb::AbstractC
     )
 end
 
-function _eval_f_wrapper(cb::AbstractCallback,x::AbstractVector{T}) where T
-    return (obj(cb.nlp,x)::T) * cb.obj_scale[]
+function _eval_f_wrapper(cb::AbstractCallback{T}, x::AbstractVector{T}) where T
+    return (obj(cb.nlp,x)::T) * cb.obj_scale[]::T
 end
 
 function _eval_lag_hess_wrapper!(

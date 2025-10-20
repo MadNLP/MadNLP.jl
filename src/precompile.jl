@@ -22,8 +22,8 @@ function HS15Model(;T = Float64, x0=zeros(T,2))
     )
 end
 
-function NLPModels.obj(nlp::HS15Model{T}, x::AbstractVector) where T
-    return T(100.0) * (x[2] - x[1]^2)^2 + (one(T) - x[1])^2
+function NLPModels.obj(nlp::HS15Model{T}, x::AbstractVector{T}) where T
+    return (T(100.0) * (x[2] - x[1]^2)^2 + (one(T) - x[1])^2)::T
 end
 
 function NLPModels.grad!(nlp::HS15Model{T}, x::AbstractVector, g::AbstractVector) where T
@@ -33,9 +33,10 @@ function NLPModels.grad!(nlp::HS15Model{T}, x::AbstractVector, g::AbstractVector
     return
 end
 
-function NLPModels.cons!(nlp::HS15Model{T}, x::AbstractVector, c::AbstractVector) where T
+function NLPModels.cons!(nlp::HS15Model, x::AbstractVector, c::AbstractVector) 
     c[1] = x[1] * x[2]
     c[2] = x[1] + x[2]^2
+    return 
 end
 
 function NLPModels.jac_structure!(nlp::HS15Model, I::AbstractVector, J::AbstractVector)
