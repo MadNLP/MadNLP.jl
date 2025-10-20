@@ -52,7 +52,7 @@ function get_status_output(status, opt)
     elseif status == SEARCH_DIRECTION_BECOMES_TOO_SMALL
         return "Search Direction is becoming Too Small."
     elseif status == DIVERGING_ITERATES
-        return "Iterates divering; problem might be unbounded."
+        return "Iterates diverging; problem might be unbounded."
     elseif status == MAXIMUM_ITERATIONS_EXCEEDED
         return "Maximum Number of Iterations Exceeded."
     elseif status == MAXIMUM_WALLTIME_EXCEEDED

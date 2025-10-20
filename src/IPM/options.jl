@@ -174,7 +174,7 @@ function load_options(nlp::AbstractNLPModel{T,VT}; options...) where {T, VT}
     linear_solver_options = set_options!(opt_ipm, options)
     check_option_sanity(opt_ipm)
     # Initiate linear-solver options
-    opt_linear_solver = default_options(opt_ipm.linear_solver)
+    opt_linear_solver = default_options(nlp, opt_ipm.kkt_system, opt_ipm.linear_solver)
     iterator_options = set_options!(opt_linear_solver, linear_solver_options)
     # Initiate iterator options
     opt_iterator = default_options(opt_ipm.iterator, opt_ipm.tol)
@@ -200,3 +200,14 @@ function load_options(nlp::AbstractNLPModel{T,VT}; options...) where {T, VT}
     )
 end
 
+"""
+        default_options(
+                nlp::AbstractNLPModel,
+                kkt::Type,
+                linear_solver::Type;
+                iterator_options=Dict{Symbol,Any}(),
+        )
+
+default options for `linear_solver` associated to the KKT system `kkt_system` and `nlp`.
+"""
+default_options(nlp::AbstractNLPModel, kkt, linear_solver) = default_options(linear_solver)
