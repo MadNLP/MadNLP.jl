@@ -55,23 +55,14 @@ include("ma97.jl")
 MadNLP.@setup_workload begin
     # nlp = MadNLP.HS15Model()    
     MadNLP.@compile_workload begin
-        nlp = MadNLP.HS15Model()
-        MadNLP.madnlp(nlp; print_level=MadNLP.ERROR)
-        precompile(Tuple{typeof(MadNLP.madnlp), MadNLP.AbstractNLPModel{T, S} where S where T})
-        precompile(Tuple{typeof(MadNLP.default_options), Type{MadNLPHSL.Ma27Solver{T, INT} where INT where T}})
-#         for linear_solver in (Ma27Solver, Ma57Solver, Ma77Solver, Ma86Solver, Ma97Solver)
-#             try 
-#                 MadNLP.madnlp(nlp; linear_solver, print_level=MadNLP.ERROR)
-#             catch e
-#                 Base.@warn """
-# Failed to precompile MadNLPHSL. This may be caused by the absence of installed HSL_jll.jl package.
-# Please obtain HSL_jll.jl from https://licences.stfc.ac.uk/products/Software/HSL/libhsl, and
-
-# ] dev path/to/HSL_jll.jl
-# """
-#                 break
-#             end
-#         end
+        if HSL.LIBHSL_isfunctional()
+            nlp = MadNLP.HS15Model()
+            for  linear_solver in (Ma27Solver, Ma57Solver, Ma77Solver, Ma86Solver, Ma97Solver)
+                MadNLP.madnlp(nlp; print_level=MadNLP.ERROR, linear_solver)
+                precompile(Tuple{typeof(MadNLP.madnlp), MadNLP.AbstractNLPModel{T, S} where S where T})
+                precompile(Tuple{typeof(MadNLP.default_options), Type{MadNLPHSL.Ma27Solver{T, INT} where INT where T}})
+            end
+        end
     end
 end
 
