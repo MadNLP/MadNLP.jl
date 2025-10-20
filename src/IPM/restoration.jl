@@ -1,22 +1,22 @@
 function RobustRestorer(solver::AbstractMadNLPSolver{T}) where {T}
 
-    f_R = similar(_y(solver), _n(solver))
-    x_ref = similar(_y(solver), _n(solver))
-    D_R = similar(_y(solver), _n(solver))
-    pp = similar(_y(solver), _m(solver))
-    nn = similar(_y(solver), _m(solver))
-    pp_trial = similar(_y(solver), _m(solver))
-    nn_trial = similar(_y(solver), _m(solver))
+    f_R = similar(get_y(solver), get_n(solver))
+    x_ref = similar(get_y(solver), get_n(solver))
+    D_R = similar(get_y(solver), get_n(solver))
+    pp = similar(get_y(solver), get_m(solver))
+    nn = similar(get_y(solver), get_m(solver))
+    pp_trial = similar(get_y(solver), get_m(solver))
+    nn_trial = similar(get_y(solver), get_m(solver))
 
-    nn = similar(_y(solver), _m(solver))
-    zp = similar(_y(solver), _m(solver))
-    zn = similar(_y(solver), _m(solver))
-    dpp= similar(_y(solver), _m(solver))
-    dnn= similar(_y(solver), _m(solver))
-    dzp= similar(_y(solver), _m(solver))
-    dzn= similar(_y(solver), _m(solver))
-    pp_trial = similar(_y(solver), _m(solver))
-    nn_trial = similar(_y(solver), _m(solver))
+    nn = similar(get_y(solver), get_m(solver))
+    zp = similar(get_y(solver), get_m(solver))
+    zn = similar(get_y(solver), get_m(solver))
+    dpp= similar(get_y(solver), get_m(solver))
+    dnn= similar(get_y(solver), get_m(solver))
+    dzp= similar(get_y(solver), get_m(solver))
+    dzn= similar(get_y(solver), get_m(solver))
+    pp_trial = similar(get_y(solver), get_m(solver))
+    nn_trial = similar(get_y(solver), get_m(solver))
 
     return RobustRestorer(
         zero(T), 
@@ -37,41 +37,41 @@ function RobustRestorer(solver::AbstractMadNLPSolver{T}) where {T}
 end
 
 function initialize_robust_restorer!(solver::AbstractMadNLPSolver{T}) where T
-    @trace(_logger(solver),"Initializing restoration phase variables.")
-    _RR(solver) == nothing && (set_RR!(solver, RobustRestorer(solver)))
-    RR = _RR(solver)
+    @trace(get_logger(solver),"Initializing restoration phase variables.")
+    get_RR(solver) == nothing && (set_RR!(solver, RobustRestorer(solver)))
+    RR = get_RR(solver)
 
-    copyto!(RR.x_ref, full(_x(solver)))
-    RR.theta_ref = get_theta(_c(solver))
+    copyto!(RR.x_ref, full(get_x(solver)))
+    RR.theta_ref = get_theta(get_c(solver))
     RR.D_R .= min.(one(T), one(T) ./ abs.(RR.x_ref))
 
-    RR.mu_R = max(_mu(solver), norm(_c(solver), Inf))
-    RR.tau_R= max(_opt(solver).tau_min,1-RR.mu_R)
+    RR.mu_R = max(get_mu(solver), norm(get_c(solver), Inf))
+    RR.tau_R= max(get_opt(solver).tau_min,1-RR.mu_R)
     RR.zeta = sqrt(RR.mu_R)
 
-    rho = _opt(solver).rho
+    rho = get_opt(solver).rho
     mu = RR.mu_R
     RR.nn .=
-        (mu .- rho*_c(solver))./2 ./rho .+
+        (mu .- rho*get_c(solver))./2 ./rho .+
         sqrt.(
-            ((mu.-rho*_c(solver))./2 ./rho).^2 + mu.*_c(solver)./2 ./rho
+            ((mu.-rho*get_c(solver))./2 ./rho).^2 + mu.*get_c(solver)./2 ./rho
         )
-    RR.pp .= _c(solver) .+ RR.nn
+    RR.pp .= get_c(solver) .+ RR.nn
     RR.zp .= RR.mu_R ./ RR.pp
     RR.zn .= RR.mu_R ./ RR.nn
 
-    RR.obj_val_R = get_obj_val_R(RR.pp,RR.nn,RR.D_R,full(_x(solver)),RR.x_ref,_opt(solver).rho,RR.zeta)
+    RR.obj_val_R = get_obj_val_R(RR.pp,RR.nn,RR.D_R,full(get_x(solver)),RR.x_ref,get_opt(solver).rho,RR.zeta)
     fill!(RR.f_R, zero(T))
     empty!(RR.filter)
-    push!(RR.filter, (_theta_max(solver),-Inf))
+    push!(RR.filter, (get_theta_max(solver),-Inf))
 
-    fill!(_y(solver), zero(T))
-    _zl_r(solver) .= min.(_opt(solver).rho, _zl_r(solver))
-    _zu_r(solver) .= min.(_opt(solver).rho, _zu_r(solver))
-    # fill!(_zl_r(solver), one(T)) # Experimental
-    # fill!(_zu_r(solver), one(T)) # Experimental
+    fill!(get_y(solver), zero(T))
+    get_zl_r(solver) .= min.(get_opt(solver).rho, get_zl_r(solver))
+    get_zu_r(solver) .= min.(get_opt(solver).rho, get_zu_r(solver))
+    # fill!(get_zl_r(solver), one(T)) # Experimental
+    # fill!(get_zu_r(solver), one(T)) # Experimental
     
-    _cnt(solver).t = 0
+    get_cnt(solver).t = 0
 
     # misc
     set_del_w!(solver, zero(T))

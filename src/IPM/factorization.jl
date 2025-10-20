@@ -1,12 +1,12 @@
 function solve_refine_wrapper!(d, solver, p, w)
     result = false
 
-    _cnt(solver).linear_solver_time += @elapsed begin
-        if solve_refine!(d, _iterator(solver), p, w)
+    get_cnt(solver).linear_solver_time += @elapsed begin
+        if solve_refine!(d, get_iterator(solver), p, w)
             result = true
         else
-            if improve!(_kkt(solver).linear_solver)
-                if solve_refine!(d, _iterator(solver), p, w)
+            if improve!(get_kkt(solver).linear_solver)
+                if solve_refine!(d, get_iterator(solver), p, w)
                     result = true
                 end
             end
@@ -17,9 +17,9 @@ function solve_refine_wrapper!(d, solver, p, w)
 end
 
 function factorize_wrapper!(solver::AbstractMadNLPSolver)
-    @trace(_logger(solver),"Factorization started.")
-    build_kkt!(_kkt(solver))
-    _cnt(solver).linear_solver_time += @elapsed factorize!(_kkt(solver).linear_solver)
+    @trace(get_logger(solver),"Factorization started.")
+    build_kkt!(get_kkt(solver))
+    get_cnt(solver).linear_solver_time += @elapsed factorize!(get_kkt(solver).linear_solver)
 end
 
 function solve!(kkt::SparseUnreducedKKTSystem, w::AbstractKKTVector)

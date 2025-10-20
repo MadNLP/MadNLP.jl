@@ -5,7 +5,7 @@
 
 # getters for all fields
 for (k, attribute) in enumerate(fieldnames(MadNLPSolver))
-    fname = "_$(attribute)"
+    fname = "get_$(attribute)"
     @eval begin
         @inline function $(Symbol(fname))(solver::MadNLPSolver)
             return getfield(solver, $k)
@@ -38,8 +38,8 @@ set_del_c!(solver::AbstractMadNLPSolver{T}, rhs::T) where {T} = solver.del_c = r
 
 # Computed quantities
 # TODO(@anton) I now think these would be useful to have, but which quantities are wrapped this way is a good question
-_theta(solver::AbstractMadNLPSolver) = get_theta(_c(solver))
-_varphi(solver::AbstractMadNLPSolver) = get_varphi(_obj_val(solver), _x_lr(solver), _xl_r(solver), _xu_r(solver), _x_ur(solver), _mu(solver))
-_kkt_error(solver::AbstractMadNLPSolver) = max(_inf_pr(solver), _inf_du(solver), _inf_compl(solver))
-_inf_compl(solver::AbstractMadNLPSolver{T}, sc::T; mu=_mu(solver)) where {T} = get_inf_compl(_x_lr(solver),_xl_r(solver),_zl_r(solver),_xu_r(solver),_x_ur(solver),_zu_r(solver), mu, sc)
-_inf_total(solver::AbstractMadNLPSolver) = max(_inf_pr(solver),_inf_du(solver),_inf_compl(solver))
+get_theta(solver::AbstractMadNLPSolver) = get_theta(get_c(solver))
+get_varphi(solver::AbstractMadNLPSolver) = get_varphi(get_obj_val(solver), get_x_lr(solver), get_xl_r(solver), get_xu_r(solver), get_x_ur(solver), get_mu(solver))
+get_kkt_error(solver::AbstractMadNLPSolver) = max(get_inf_pr(solver), get_inf_du(solver), get_inf_compl(solver))
+get_inf_compl(solver::AbstractMadNLPSolver{T}, sc::T; mu=get_mu(solver)) where {T} = get_inf_compl(get_x_lr(solver),get_xl_r(solver),get_zl_r(solver),get_xu_r(solver),get_x_ur(solver),get_zu_r(solver), mu, sc)
+get_inf_total(solver::AbstractMadNLPSolver) = max(get_inf_pr(solver),get_inf_du(solver),get_inf_compl(solver))
