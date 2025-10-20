@@ -9,7 +9,7 @@ import SparseArrays: SparseArrays, AbstractSparseMatrix, SparseMatrixCSC, sparse
 import Base: Base, string, show, print, size, getindex, copyto!, @kwdef
 import SuiteSparse: UMFPACK, CHOLMOD
 import NLPModels: NLPModels, AbstractNLPModel, AbstractNLPModel, AbstractNLPModelMeta,
-    finalize, AbstractNLPModel, obj, grad!, cons!, jac_coord!, hess_coord!, hess_structure!, jac_structure!,
+    finalize, AbstractNLPModel, obj, grad!, cons!, jac_coord!, hess_coord!, hess_structure!, jac_structure!, jtprod!
     get_nvar, get_ncon, get_minimize, get_x0, get_y0, get_nnzj, get_nnzh, get_lvar, get_uvar, get_lcon, get_ucon
 import SolverCore: solve!, getStatus, AbstractOptimizationSolver, AbstractExecutionStats
 import LDLFactorizations

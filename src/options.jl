@@ -224,4 +224,4 @@ end
 
 default options for `linear_solver` associated to the KKT system `kkt_system` and `nlp`.
 """
-default_options(nlp::AbstractNLPModel, kkt, linear_solver) = default_options(linear_solver)
+default_options(@nospecialize(nlp::AbstractNLPModel), kkt, linear_solver) = default_options(linear_solver)
