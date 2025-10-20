@@ -18,7 +18,7 @@ mutable struct MadNLPExecutionStats{T, VT} <: AbstractExecutionStats
     multipliers_U::VT
     iter::Int
     counters::MadNLPCounters
-    MadNLPExecutionStats(@nospecialize(solver::AbstractMadNLPSolver)) = new{
+    MadNLPExecutionStats(solver::AbstractMadNLPSolver) = new{
         typeof(solver.obj_val), typeof(primal(solver.x))
     }(
         solver.opt,

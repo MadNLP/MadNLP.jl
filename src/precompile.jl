@@ -97,6 +97,10 @@ end
         precompile(Tuple{typeof(MadNLP.get_status_output), MadNLP.Status, MadNLP.MadNLPOptions{Float64}})
         precompile(Tuple{typeof(MadNLP.improve!), MadNLP.MumpsSolver{Float64}})
         precompile(Tuple{typeof(MadNLP.introduce), MadNLP.MumpsSolver{Float64}})
+        precompile(Tuple{typeof(Base.indexed_iterate), Pair{Symbol, Float64}, Int64})
+        precompile(Tuple{typeof(Base.indexed_iterate), Pair{Symbol, Float64}, Int64, Int64})
+        precompile(Tuple{typeof(Base.round), Float64})                                                                               
+        precompile(Tuple{typeof(Core.kwcall), NamedTuple{names, T} where T<:Tuple where names, Type{MadNLP.MadNLPOptions{Float64}}, NLPModels.AbstractNLPModel{T, S} where S where T})
     end
 end
 

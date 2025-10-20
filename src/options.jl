@@ -111,14 +111,14 @@ is_dense_callback(nlp) = hasmethod(MadNLP.jac_dense!, Tuple{typeof(nlp), Abstrac
 
 # smart option presets
 function MadNLPOptions{T}(
-    nlp::AbstractNLPModel;
+    @nospecialize(nlp::AbstractNLPModel);
     dense_callback = MadNLP.is_dense_callback(nlp),
     callback = dense_callback ? DenseCallback : SparseCallback,
     kkt_system = dense_callback ? DenseCondensedKKTSystem : SparseKKTSystem,
     linear_solver = dense_callback ? LapackCPUSolver : default_sparse_solver(nlp),
     tol = get_tolerance(T,kkt_system)
     ) where T
-    @nospecialize
+    
     
     return MadNLPOptions{T}(
         tol = tol,
