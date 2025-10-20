@@ -376,21 +376,19 @@ function create_callback(
     equality_treatment=EnforceEquality,
     ) 
 
+    x0   = get_x0(nlp)
+    T = eltype(x0)
+    VT = typeof(x0)
+
     n = get_nvar(nlp)
     m = get_ncon(nlp)
     nnzj = get_nnzj(nlp)
     nnzh = get_nnzh(nlp)
-
-    x0   = get_x0(nlp)
     
     jac_I = similar(x0, Int, nnzj)
     jac_J = similar(x0, Int, nnzj)
     hess_I = similar(x0, Int, nnzh)
     hess_J = similar(x0, Int, nnzh)
-
-    T = eltype(x0)
-    VT = typeof(x0)
-    VI = typeof(jac_I)
 
     con_buffer = similar(x0, m)     ; fill!(con_buffer, zero(T))
     grad_buffer = similar(x0, n)    ; fill!(grad_buffer, zero(T))
@@ -512,8 +510,8 @@ function initialize!(
     y0   .= get_y0(nlp)
     lvar .= get_lvar(nlp)
     uvar .= get_uvar(nlp)
-    lcon = copy(Base.inferencebarrier(get_lcon(nlp)))
-    ucon = copy(Base.inferencebarrier(get_ucon(nlp)))
+    lcon = copy(get_lcon(nlp))
+    ucon = copy(get_ucon(nlp))
 
     _treat_fixed_variable_initialize!(cb.fixed_handler, x0, lvar, uvar)
     _treat_equality_initialize!(cb.equality_handler, lcon, ucon, tol)
@@ -638,8 +636,12 @@ function _hess_sparsity_wrapper!(
 end
 
 
-function _eval_cons_wrapper!(cb::AbstractCallback,x::AbstractVector,c::AbstractVector)
-    cons!(cb.nlp, x,c)
+function _eval_cons_wrapper!(
+    cb::AbstractCallback,
+    x::AbstractVector,
+    c::AbstractVector
+    )
+    cons!(cb.nlp, x, c)
     c .*= cb.con_scale
     return c
 end
@@ -649,7 +651,6 @@ function _eval_jac_wrapper!(
     x::AbstractVector,
     jac::AbstractVector
     )
-    nnzj_orig = get_nnzj(cb.nlp)
     jac_coord!(cb.nlp, x, jac)
     jac .*= cb.jac_scale
 
@@ -678,25 +679,26 @@ end
 function _eval_grad_f_wrapper!(
     cb::AbstractCallback,
     x::AbstractVector,
-    grad::AbstractVector
-    ) 
-    grad!(Base.inferencebarrier(cb.nlp), x, grad)
+    grad::AbstractVector{T}
+    )  where T
+    grad!(cb.nlp, x, grad)
     grad .*= cb.obj_scale[]
     _treat_fixed_variable_grad!(cb.fixed_handler, cb, x, grad)
 end
 function _treat_fixed_variable_grad!(fixed_handler::RelaxBound, cb, x, grad) end
-function _treat_fixed_variable_grad!(fixed_handler::MakeParameter, cb::AbstractCallback, x, grad)
+function _treat_fixed_variable_grad!(fixed_handler::MakeParameter, cb::AbstractCallback{T,VT}, x, grad) where {T,VT}
+    lvar = get_lvar(cb.nlp)::VT
     fixed_handler.grad_storage .= @view(grad[fixed_handler.fixed])
     map!(
         (x,y)->x-y,
         @view(grad[fixed_handler.fixed]),
         @view(x[cb.fixed_handler.fixed]),
-        @view(get_lvar(Base.inferencebarrier(cb.nlp))[cb.fixed_handler.fixed])
+        @view(lvar[cb.fixed_handler.fixed])
     )
 end
 
-function _eval_f_wrapper(cb::AbstractCallback,x::AbstractVector)
-    return obj(cb.nlp,x)* cb.obj_scale[]
+function _eval_f_wrapper(cb::AbstractCallback,x::AbstractVector{T}) where T
+    return (obj(cb.nlp,x)::T) * cb.obj_scale[]
 end
 
 function _eval_lag_hess_wrapper!(
@@ -704,9 +706,9 @@ function _eval_lag_hess_wrapper!(
     x::AbstractVector,
     y::AbstractVector,
     hess::AbstractVector{T};
-    obj_weight = one(T)
-    ) where T
-    nnzh_orig = get_nnzh(cb.nlp)
+    obj_weight::T = one(T)
+    ) where {T}
+    nnzh_orig = get_nnzh(cb.nlp)::Int
 
     cb.con_buffer .= y .* cb.con_scale
     hess_coord!(
@@ -717,8 +719,8 @@ function _eval_lag_hess_wrapper!(
 end
 
 function _treat_fixed_variable_hess_coord!(fixed_handler::RelaxBound, cb, hess) end
-function _treat_fixed_variable_hess_coord!(fixed_handler::MakeParameter, cb::SparseCallback{T}, hess) where T
-    nnzh_orig = get_nnzh(cb.nlp)
+function _treat_fixed_variable_hess_coord!(fixed_handler::MakeParameter, cb::SparseCallback{T}, hess::AbstractVector{T}) where T
+    nnzh_orig = get_nnzh(cb.nlp)::Int
     fill!(@view(hess[fixed_handler.fixedh]), zero(T))
     fill!(@view(hess[nnzh_orig+1:end]), one(T))
 end

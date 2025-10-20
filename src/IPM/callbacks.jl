@@ -1,17 +1,16 @@
-function eval_f_wrapper(solver::AbstractMadNLPSolver, x::PrimalVector)
-    T = eltype(variable(x))
+function eval_f_wrapper(solver::AbstractMadNLPSolver, x::PrimalVector{T}) where T
     nlp = solver.nlp
     cnt = solver.cnt
     @trace(solver.logger,"Evaluating objective.")
     cnt.eval_function_time += @elapsed begin
-        sense = (get_minimize(nlp) ? one(T) : -one(T))
-        obj_val = sense * _eval_f_wrapper(solver.cb, variable(x))
+        sense = (get_minimize(nlp)::Bool ? one(T) : -one(T))
+        obj_val = sense * _eval_f_wrapper(solver.cb, variable(x))::T
     end
     cnt.obj_cnt += 1
     if cnt.obj_cnt == 1 && !is_valid(obj_val)
         throw(InvalidNumberException(:obj))
     end
-    return obj_val
+    return obj_val::T
 end
 
 function eval_grad_f_wrapper!(solver::AbstractMadNLPSolver, f::PrimalVector, x::PrimalVector)
@@ -35,7 +34,7 @@ function eval_grad_f_wrapper!(solver::AbstractMadNLPSolver, f::PrimalVector, x::
     return f
 end
 
-function eval_cons_wrapper!(solver::AbstractMadNLPSolver, c::AbstractVector{T}, x::PrimalVector{T}) where T
+function eval_cons_wrapper!(solver::AbstractMadNLPSolver, c::AbstractVector, x::PrimalVector)
     nlp = solver.nlp
     cnt = solver.cnt
     @trace(solver.logger, "Evaluating constraints.")
@@ -77,7 +76,7 @@ function eval_lag_hess_wrapper!(solver::AbstractMadNLPSolver, kkt::AbstractKKTSy
     cnt = solver.cnt
     @trace(solver.logger,"Evaluating Lagrangian Hessian.")
     hess = get_hessian(kkt)
-    scale = (get_minimize(Base.inferencebarrier(solver.nlp)) ? one(T) : -one(T)) * (is_resto ? zero(T) : one(T))
+    scale = (get_minimize(solver.nlp) ? one(T) : -one(T)) * (is_resto ? zero(T) : one(T))
     cnt.eval_function_time += @elapsed _eval_lag_hess_wrapper!(
         solver.cb,
         variable(x),
