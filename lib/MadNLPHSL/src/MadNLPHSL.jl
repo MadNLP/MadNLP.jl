@@ -31,8 +31,8 @@ import MadNLP:
     is_supported,
     default_options
 
-import HSL
 import HSL:
+    HSL,
     Mc68Control,
     Mc68Info,
     Ma77Control,
@@ -61,6 +61,14 @@ MadNLP.@setup_workload begin
                 MadNLP.madnlp(nlp; print_level=MadNLP.ERROR, linear_solver)
                 precompile(Tuple{typeof(MadNLP.madnlp), MadNLP.AbstractNLPModel{T, S} where S where T})
                 precompile(Tuple{typeof(MadNLP.default_options), Type{MadNLPHSL.Ma27Solver{T, INT} where INT where T}})
+                Base.@warn """
+Failed to precompile MadNLPHSL. This may be caused by the absence of installed HSL_jll.jl package.
+Please obtain HSL_jll.jl from https://licences.stfc.ac.uk/products/Software/HSL/libhsl, and
+
+] dev path/to/HSL_jll.jl
+"""
+                break
+>>>>>>> c5ff2d154c7828744119f68764b9a25d9d45c0b9
             end
         end
     end

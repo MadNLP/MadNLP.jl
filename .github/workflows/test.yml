@@ -98,6 +98,7 @@ jobs:
   # need to run one on cuda and one on amdgpu
   test-gpu:
     strategy:
+      fail-fast: false
       matrix:
         julia-version: ['1']
         gpu: [cuda, amdgpu]
