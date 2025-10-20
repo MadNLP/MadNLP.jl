@@ -11,7 +11,7 @@ function _compare_dense_with_sparse(
     inertia=MadNLP.InertiaBased,
 )
 
-    for (T,tol,atol) in [(Float32,1e-4,1e1), (Float64,1e-8,1e-6)]
+    for (T,tol,atol) in [(Float32,Float32(1e-4),Float32(1e1)), (Float64,1e-8,1e-6)]
 
         sparse_options = Dict{Symbol, Any}(
             :kkt_system=>MadNLP.SparseKKTSystem,
