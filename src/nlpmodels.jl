@@ -382,22 +382,25 @@ function create_callback(
     nnzh = get_nnzh(nlp)
 
     x0   = get_x0(nlp)
+    
+    jac_I = similar(x0, Int, nnzj)
+    jac_J = similar(x0, Int, nnzj)
+    hess_I = similar(x0, Int, nnzh)
+    hess_J = similar(x0, Int, nnzh)
+
     T = eltype(x0)
+    VT = typeof(x0)
+    VI = typeof(jac_I)
 
     con_buffer = similar(x0, m)     ; fill!(con_buffer, zero(T))
     grad_buffer = similar(x0, n)    ; fill!(grad_buffer, zero(T))
     jac_buffer = similar(x0, nnzj)  ; fill!(jac_buffer, zero(T))
     hess_buffer = similar(x0, nnzh) ; fill!(hess_buffer, zero(T))
 
-    jac_I = similar(x0, Int, nnzj)
-    jac_J = similar(x0, Int, nnzj)
-    hess_I = similar(x0, Int, nnzh)
-    hess_J = similar(x0, Int, nnzh)
-
     obj_scale = Ref(one(T))
     con_scale = similar(jac_buffer, m)    ; fill!(con_scale, one(T))
     jac_scale = similar(jac_buffer, nnzj) ; fill!(jac_scale, one(T))
-
+    
     if nnzj > 0
         jac_structure!(nlp, jac_I, jac_J)
     end
@@ -412,10 +415,6 @@ function create_callback(
         hess_buffer,
     )
     equality_handler = equality_treatment()
-
-    T = eltype(x0)
-    VT = typeof(x0)
-    VI = typeof(jac_I)
     
     return SparseCallback(
         nlp,
@@ -704,9 +703,9 @@ function _eval_lag_hess_wrapper!(
     cb::SparseCallback,
     x::AbstractVector,
     y::AbstractVector,
-    hess::AbstractVector;
-    obj_weight = one(eltype(x))
-    )
+    hess::AbstractVector{T};
+    obj_weight = one(T)
+    ) where T
     nnzh_orig = get_nnzh(cb.nlp)
 
     cb.con_buffer .= y .* cb.con_scale
@@ -743,9 +742,9 @@ function _eval_lag_hess_wrapper!(
     cb::SparseCallback,
     x::AbstractVector,
     y::AbstractVector,
-    hess::AbstractMatrix;
-    obj_weight = one(eltype(x))
-    )
+    hess::AbstractMatrix{T};
+    obj_weight = one(T)
+    ) where {T}
 
     hess_buffer = cb.hess_buffer
     _eval_lag_hess_wrapper!(cb, x, y, hess_buffer; obj_weight=obj_weight * cb.obj_scale[])
@@ -783,9 +782,9 @@ function _eval_lag_hess_wrapper!(
     cb::DenseCallback,
     x::AbstractVector,
     y::AbstractVector,
-    hess::AbstractMatrix;
-    obj_weight = one(eltype(x))
-    )
+    hess::AbstractMatrix{T};
+    obj_weight = one(T)
+    ) where T
 
     hess_dense!(
         cb.nlp, x, y, hess;
