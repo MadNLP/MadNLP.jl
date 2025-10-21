@@ -86,6 +86,7 @@ testset = [
         "SparseUnreducedKKTSystem",
         ()->MadNLP.Optimizer(
             kkt_system=MadNLP.SparseUnreducedKKTSystem,
+            linear_solver=UmfpackSolver,
             print_level=MadNLP.ERROR),
         []
     ],
@@ -93,6 +94,7 @@ testset = [
         "SparseUnreducedKKTSystem + InertiaFree",
         ()->MadNLP.Optimizer(
             inertia_correction_method=MadNLP.InertiaFree,
+            linear_solver=UmfpackSolver,
             kkt_system=MadNLP.SparseUnreducedKKTSystem,
             print_level=MadNLP.ERROR),
         []
@@ -235,10 +237,26 @@ end
     @test result.status == MadNLP.SOLVE_SUCCEEDED
 end
 
+@testset "Adaptive barrier" begin
+    nlp = MadNLPTests.HS15Model(; x0=[1.0, 1.0])
+    ref = madnlp(nlp; print_level = MadNLP.ERROR)
+    for barrier in [
+        MadNLP.LOQOUpdate(),
+        MadNLP.QualityFunctionUpdate(),
+        MadNLP.QualityFunctionUpdate(; globalization=false),
+    ]
+        results = madnlp(nlp; print_level = MadNLP.ERROR, barrier=barrier)
+        @test results.status == MadNLP.SOLVE_SUCCEEDED
+        @test results.objective ≈ ref.objective
+        @test results.solution ≈ ref.solution
+        @test results.multipliers ≈ ref.multipliers
+    end
+end
+
 @testset "Issue #430" begin
     # Test MadNLP is working with bound_relax_factor=0
     nlp = MadNLPTests.HS15Model()
-    solver = MadNLPSolver(nlp; bound_relax_factor=0.0)
+    solver = MadNLPSolver(nlp; bound_relax_factor=0.0, print_level=MadNLP.ERROR)
     stats = MadNLP.solve!(solver)
     @test stats.status == MadNLP.SOLVE_SUCCEEDED
 end
