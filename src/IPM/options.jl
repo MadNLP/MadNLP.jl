@@ -19,7 +19,6 @@ function set_options!(opt::AbstractOptions, options)
     return other_options
 end
 
-@nospecialize
 @kwdef mutable struct MadNLPOptions{T} <: AbstractOptions
     # Primary options
     tol::T
@@ -102,7 +101,6 @@ end
     barrier::AbstractBarrierUpdate{T} = MonotoneUpdate(tol, barrier_tol_factor)
     tau_min::T = 0.99
 end
-@specialize
 
 is_dense_callback(nlp) = hasmethod(MadNLP.jac_dense!, Tuple{typeof(nlp), AbstractVector, AbstractMatrix}) &&
     hasmethod(MadNLP.hess_dense!, Tuple{typeof(nlp), AbstractVector, AbstractVector, AbstractMatrix})

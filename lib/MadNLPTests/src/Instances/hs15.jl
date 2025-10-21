@@ -75,7 +75,7 @@ end
 
 function NLPModels.hess_structure!(nlp::HS15Model, I::AbstractVector{T}, J::AbstractVector{T}) where T
     copyto!(I, [1, 2, 2])
-    copyto!(J, [1, 1, 2]))
+    copyto!(J, [1, 1, 2])
     return I, J
 end
 
