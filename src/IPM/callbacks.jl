@@ -5,7 +5,7 @@ function eval_f_wrapper(solver::AbstractMadNLPSolver, x::PrimalVector)
     @trace(solver.logger,"Evaluating objective.")
     cnt.eval_function_time += @elapsed begin
         sense = (get_minimize(nlp) ? one(T) : -one(T))
-        obj_val = _eval_f_wrapper(solver.cb, variable(x))
+        obj_val = sense * _eval_f_wrapper(solver.cb, variable(x))::T
     end
     cnt.obj_cnt += 1
     if cnt.obj_cnt == 1 && !is_valid(obj_val)
