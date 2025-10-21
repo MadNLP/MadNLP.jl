@@ -30,18 +30,19 @@ function NLPModels.grad!(nlp::HS15Model, x::AbstractVector, g::AbstractVector)
     z = x[2] - x[1]^2
     g[1] = -400.0 * z * x[1] - 2.0 * (1.0 - x[1])
     g[2] = 200.0 * z
-    return
+    return g
 end
 
 function NLPModels.cons!(nlp::HS15Model, x::AbstractVector, c::AbstractVector)
     c[1] = x[1] * x[2]
     c[2] = x[1] + x[2]^2
-    return
+    return c
 end 
 
 function NLPModels.jac_structure!(nlp::HS15Model, I::AbstractVector{T}, J::AbstractVector{T}) where T
     copyto!(I, [1, 1, 2, 2])
     copyto!(J, [1, 2, 1, 2])
+    return I, J
 end
 
 function NLPModels.jac_coord!(nlp::HS15Model, x::AbstractVector, J::AbstractVector)
@@ -49,7 +50,7 @@ function NLPModels.jac_coord!(nlp::HS15Model, x::AbstractVector, J::AbstractVect
     J[2] = x[1]    # (1, 2)
     J[3] = 1.0     # (2, 1)
     J[4] = 2*x[2]  # (2, 2)
-    return 
+    return J
 end
 
 function NLPModels.jprod!(nlp::HS15Model, x::AbstractVector, v::AbstractVector, jv::AbstractVector)
@@ -74,7 +75,8 @@ end
 
 function NLPModels.hess_structure!(nlp::HS15Model, I::AbstractVector{T}, J::AbstractVector{T}) where T
     copyto!(I, [1, 2, 2])
-    copyto!(J, [1, 1, 2])
+    copyto!(J, [1, 1, 2]))
+    return I, J
 end
 
 function NLPModels.hess_coord!(nlp::HS15Model, x, y, H::AbstractVector; obj_weight=1.0)
