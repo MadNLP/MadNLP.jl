@@ -394,7 +394,7 @@ function restore!(solver::AbstractMadNLPSolver{T}) where T
         ))
 
         set_inf_compl!(solver, get_inf_compl(get_x_lr(solver),get_xl_r(solver),get_zl_r(solver),get_xu_r(solver),get_x_ur(solver),get_zu_r(solver),zero(T),sc))
-        inf_compl_mu = get_inf_compl(get_x_lr(solver),get_xl_r(solver),get_zl_r(solver),get_xu_r(solver),get_x_ur(solver),get_zu_r(solver),get_mu(solver),sc)
+        set_inf_compl_mu!(solver, get_inf_compl(get_x_lr(solver),get_xl_r(solver),get_zl_r(solver),get_xu_r(solver),get_x_ur(solver),get_zu_r(solver),get_mu(solver),sc))
         print_iter(solver)
 
         !get_opt(solver).hessian_constant && eval_lag_hess_wrapper!(solver,get_kkt(solver),get_x(solver),get_y(solver))
@@ -457,6 +457,7 @@ function robust!(solver::AbstractMadNLPSolver{T}) where T
 
         # without inertia correction,
         @trace(get_logger(solver),"Solving restoration phase primal-dual system.")
+        set_aug_RR!(get_kkt(solver), solver, RR)
         set_aug_rhs_RR!(solver, solver.kkt, RR, solver.opt.rho)
         inertia_correction!(solver.inertia_corrector, solver) || return RESTORATION_FAILED
         finish_aug_solve_RR!(
