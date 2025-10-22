@@ -1,55 +1,22 @@
-mutable struct RobustRestorer{T, VT}
-    obj_val_R::T
-    f_R::VT
-    x_ref::VT
-
-    theta_ref::T
-    D_R::VT
-    obj_val_R_trial::T
-
-    pp::VT
-    nn::VT
-    zp::VT
-    zn::VT
-
-    dpp::VT
-    dnn::VT
-    dzp::VT
-    dzn::VT
-
-    pp_trial::VT
-    nn_trial::VT
-
-    inf_pr_R::T
-    inf_du_R::T
-    inf_compl_R::T
-
-    mu_R::T
-    tau_R::T
-    zeta::T
-
-    filter::Vector{Tuple{T,T}}
-end
-
 function RobustRestorer(solver::AbstractMadNLPSolver{T}) where {T}
 
-    f_R = similar(solver.y, solver.n)
-    x_ref = similar(solver.y, solver.n)
-    D_R = similar(solver.y, solver.n)
-    pp = similar(solver.y, solver.m)
-    nn = similar(solver.y, solver.m)
-    pp_trial = similar(solver.y, solver.m)
-    nn_trial = similar(solver.y, solver.m)
+    f_R = similar(get_y(solver), get_n(solver))
+    x_ref = similar(get_y(solver), get_n(solver))
+    D_R = similar(get_y(solver), get_n(solver))
+    pp = similar(get_y(solver), get_m(solver))
+    nn = similar(get_y(solver), get_m(solver))
+    pp_trial = similar(get_y(solver), get_m(solver))
+    nn_trial = similar(get_y(solver), get_m(solver))
 
-    nn = similar(solver.y, solver.m)
-    zp = similar(solver.y, solver.m)
-    zn = similar(solver.y, solver.m)
-    dpp= similar(solver.y, solver.m)
-    dnn= similar(solver.y, solver.m)
-    dzp= similar(solver.y, solver.m)
-    dzn= similar(solver.y, solver.m)
-    pp_trial = similar(solver.y, solver.m)
-    nn_trial = similar(solver.y, solver.m)
+    nn = similar(get_y(solver), get_m(solver))
+    zp = similar(get_y(solver), get_m(solver))
+    zn = similar(get_y(solver), get_m(solver))
+    dpp= similar(get_y(solver), get_m(solver))
+    dnn= similar(get_y(solver), get_m(solver))
+    dzp= similar(get_y(solver), get_m(solver))
+    dzn= similar(get_y(solver), get_m(solver))
+    pp_trial = similar(get_y(solver), get_m(solver))
+    nn_trial = similar(get_y(solver), get_m(solver))
 
     return RobustRestorer(
         zero(T), 
@@ -64,49 +31,49 @@ function RobustRestorer(solver::AbstractMadNLPSolver{T}) where {T}
         dpp, dnn, dzp, dzn, 
         pp_trial, 
         nn_trial, 
-        zero(T), zero(T), zero(T), zero(T), zero(T), zero(T), 
+        zero(T), zero(T), zero(T), zero(T), zero(T), zero(T), zero(T),
         Tuple{T, T}[], 
     )
 end
 
 function initialize_robust_restorer!(solver::AbstractMadNLPSolver{T}) where T
-    @trace(solver.logger,"Initializing restoration phase variables.")
-    solver.RR == nothing && (solver.RR = RobustRestorer(solver))
-    RR = solver.RR
+    @trace(get_logger(solver),"Initializing restoration phase variables.")
+    get_RR(solver) == nothing && (set_RR!(solver, RobustRestorer(solver)))
+    RR = get_RR(solver)
 
-    copyto!(RR.x_ref, full(solver.x))
-    RR.theta_ref = get_theta(solver.c)
+    copyto!(RR.x_ref, full(get_x(solver)))
+    RR.theta_ref = get_theta(get_c(solver))
     RR.D_R .= min.(one(T), one(T) ./ abs.(RR.x_ref))
 
-    RR.mu_R = max(solver.mu, norm(solver.c, Inf))
-    RR.tau_R= max(solver.opt.tau_min,1-RR.mu_R)
+    RR.mu_R = max(get_mu(solver), norm(get_c(solver), Inf))
+    RR.tau_R= max(get_opt(solver).tau_min,1-RR.mu_R)
     RR.zeta = sqrt(RR.mu_R)
 
-    rho = solver.opt.rho
+    rho = get_opt(solver).rho
     mu = RR.mu_R
     RR.nn .=
-        (mu .- rho*solver.c)./2 ./rho .+
+        (mu .- rho*get_c(solver))./2 ./rho .+
         sqrt.(
-            ((mu.-rho*solver.c)./2 ./rho).^2 + mu.*solver.c./2 ./rho
+            ((mu.-rho*get_c(solver))./2 ./rho).^2 + mu.*get_c(solver)./2 ./rho
         )
-    RR.pp .= solver.c .+ RR.nn
+    RR.pp .= get_c(solver) .+ RR.nn
     RR.zp .= RR.mu_R ./ RR.pp
     RR.zn .= RR.mu_R ./ RR.nn
 
-    RR.obj_val_R = get_obj_val_R(RR.pp,RR.nn,RR.D_R,full(solver.x),RR.x_ref,solver.opt.rho,RR.zeta)
+    RR.obj_val_R = get_obj_val_R(RR.pp,RR.nn,RR.D_R,full(get_x(solver)),RR.x_ref,get_opt(solver).rho,RR.zeta)
     fill!(RR.f_R, zero(T))
     empty!(RR.filter)
-    push!(RR.filter, (solver.theta_max,-Inf))
+    push!(RR.filter, (get_theta_max(solver),-Inf))
 
-    fill!(solver.y, zero(T))
-    solver.zl_r .= min.(solver.opt.rho, solver.zl_r)
-    solver.zu_r .= min.(solver.opt.rho, solver.zu_r)
-    # fill!(solver.zl_r, one(T)) # Experimental
-    # fill!(solver.zu_r, one(T)) # Experimental
+    fill!(get_y(solver), zero(T))
+    get_zl_r(solver) .= min.(get_opt(solver).rho, get_zl_r(solver))
+    get_zu_r(solver) .= min.(get_opt(solver).rho, get_zu_r(solver))
+    # fill!(get_zl_r(solver), one(T)) # Experimental
+    # fill!(get_zu_r(solver), one(T)) # Experimental
     
-    solver.cnt.t = 0
+    get_cnt(solver).t = 0
 
     # misc
-    solver.del_w = zero(T)
+    set_del_w!(solver, zero(T))
 end
 

@@ -2,18 +2,18 @@
 # KKT system updates -------------------------------------------------------
 # Set diagonal
 function set_aug_diagonal!(kkt::AbstractKKTSystem{T}, solver::AbstractMadNLPSolver{T}) where T
-    x = full(solver.x)
-    xl = full(solver.xl)
-    xu = full(solver.xu)
-    zl = full(solver.zl)
-    zu = full(solver.zu)
+    x = full(get_x(solver))
+    xl = full(get_xl(solver))
+    xu = full(get_xu(solver))
+    zl = full(get_zl(solver))
+    zu = full(get_zu(solver))
 
     fill!(kkt.reg, zero(T))
     fill!(kkt.du_diag, zero(T))
-    kkt.l_diag .= solver.xl_r .- solver.x_lr   # (Xˡ - X)
-    kkt.u_diag .= solver.x_ur .- solver.xu_r   # (X - Xᵘ)
-    copyto!(kkt.l_lower, solver.zl_r)
-    copyto!(kkt.u_lower, solver.zu_r)
+    kkt.l_diag .= get_xl_r(solver) .- get_x_lr(solver)   # (Xˡ - X)
+    kkt.u_diag .= get_x_ur(solver) .- get_xu_r(solver)   # (X - Xᵘ)
+    copyto!(kkt.l_lower, get_zl_r(solver))
+    copyto!(kkt.u_lower, get_zu_r(solver))
 
     _set_aug_diagonal!(kkt)
     return
@@ -37,10 +37,10 @@ function set_aug_diagonal!(kkt::ScaledSparseKKTSystem{T}, solver::AbstractMadNLP
     fill!(kkt.reg, zero(T))
     fill!(kkt.du_diag, zero(T))
     # Ensure l_diag and u_diag have only non negative entries
-    kkt.l_diag .= solver.x_lr .- solver.xl_r   # (X - Xˡ)
-    kkt.u_diag .= solver.xu_r .- solver.x_ur   # (Xᵘ - X)
-    copyto!(kkt.l_lower, solver.zl_r)
-    copyto!(kkt.u_lower, solver.zu_r)
+    kkt.l_diag .= get_x_lr(solver) .- get_xl_r(solver)   # (X - Xˡ)
+    kkt.u_diag .= get_xu_r(solver) .- get_x_ur(solver)   # (Xᵘ - X)
+    copyto!(kkt.l_lower, get_zl_r(solver))
+    copyto!(kkt.u_lower, get_zu_r(solver))
     _set_aug_diagonal!(kkt)
 end
 
@@ -70,62 +70,62 @@ end
 
 # Robust restoration
 function set_aug_RR!(kkt::AbstractKKTSystem, solver::AbstractMadNLPSolver, RR::RobustRestorer)
-    x = full(solver.x)
-    xl = full(solver.xl)
-    xu = full(solver.xu)
-    zl = full(solver.zl)
-    zu = full(solver.zu)
+    x = full(get_x(solver))
+    xl = full(get_xl(solver))
+    xu = full(get_xu(solver))
+    zl = full(get_zl(solver))
+    zu = full(get_zu(solver))
     kkt.reg .= RR.zeta .* RR.D_R .^ 2
     kkt.du_diag .= .- RR.pp ./ RR.zp .- RR.nn ./ RR.zn
-    copyto!(kkt.l_lower, solver.zl_r)
-    copyto!(kkt.u_lower, solver.zu_r)
-    kkt.l_diag .= solver.xl_r .- solver.x_lr
-    kkt.u_diag .= solver.x_ur .- solver.xu_r
+    copyto!(kkt.l_lower, get_zl_r(solver))
+    copyto!(kkt.u_lower, get_zu_r(solver))
+    kkt.l_diag .= get_xl_r(solver) .- get_x_lr(solver)
+    kkt.u_diag .= get_x_ur(solver) .- get_xu_r(solver)
 
     _set_aug_diagonal!(kkt)
     return
 end
 
 function set_aug_RR!(kkt::ScaledSparseKKTSystem, solver::AbstractMadNLPSolver, RR::RobustRestorer)
-    x = full(solver.x)
-    xl = full(solver.xl)
-    xu = full(solver.xu)
-    zl = full(solver.zl)
-    zu = full(solver.zu)
+    x = full(get_x(solver))
+    xl = full(get_xl(solver))
+    xu = full(get_xu(solver))
+    zl = full(get_zl(solver))
+    zu = full(get_zu(solver))
     kkt.reg .= RR.zeta .* RR.D_R .^ 2
     kkt.du_diag .= .- RR.pp ./ RR.zp .- RR.nn ./ RR.zn
-    copyto!(kkt.l_lower, solver.zl_r)
-    copyto!(kkt.u_lower, solver.zu_r)
-    kkt.l_diag .= solver.x_lr .- solver.xl_r
-    kkt.u_diag .= solver.xu_r .- solver.x_ur
+    copyto!(kkt.l_lower, get_zl_r(solver))
+    copyto!(kkt.u_lower, get_zu_r(solver))
+    kkt.l_diag .= get_x_lr(solver) .- get_xl_r(solver)
+    kkt.u_diag .= get_xu_r(solver) .- get_x_ur(solver)
 
     _set_aug_diagonal!(kkt)
     return
 end
 
 function set_f_RR!(solver::AbstractMadNLPSolver, RR::RobustRestorer)
-    x = full(solver.x)
+    x = full(get_x(solver))
     RR.f_R .= RR.zeta .* RR.D_R .^ 2 .* (x .- RR.x_ref)
     return
 end
 
 # Set RHS
 function set_aug_rhs!(solver::AbstractMadNLPSolver, kkt::AbstractKKTSystem, c::AbstractVector, mu)
-    px = primal(solver.p)
-    x = primal(solver.x)
-    f = primal(solver.f)
-    xl = primal(solver.xl)
-    xu = primal(solver.xu)
-    zl = full(solver.zl)
-    zu = full(solver.zu)
-    py = dual(solver.p)
-    pzl = dual_lb(solver.p)
-    pzu = dual_ub(solver.p)
+    px = primal(get_p(solver))
+    x = primal(get_x(solver))
+    f = primal(get_f(solver))
+    xl = primal(get_xl(solver))
+    xu = primal(get_xu(solver))
+    zl = full(get_zl(solver))
+    zu = full(get_zu(solver))
+    py = dual(get_p(solver))
+    pzl = dual_lb(get_p(solver))
+    pzu = dual_ub(get_p(solver))
 
-    px .= .-f .+ zl .- zu .- solver.jacl
+    px .= .-f .+ zl .- zu .- get_jacl(solver)
     py .= .-c
-    pzl .= (solver.xl_r .- solver.x_lr) .* solver.zl_r .+ mu
-    pzu .= (solver.xu_r .- solver.x_ur) .* solver.zu_r .- mu
+    pzl .= (get_xl_r(solver) .- get_x_lr(solver)) .* get_zl_r(solver) .+ mu
+    pzu .= (get_xu_r(solver) .- get_x_ur(solver)) .* get_zu_r(solver) .- mu
     return
 end
 
@@ -133,26 +133,26 @@ end
 function set_aug_rhs_RR!(
     solver::AbstractMadNLPSolver, kkt::AbstractKKTSystem, RR::RobustRestorer, rho,
 )
-    x = full(solver.x)
-    xl = full(solver.xl)
-    xu = full(solver.xu)
-    zl = full(solver.zl)
-    zu = full(solver.zu)
+    x = full(get_x(solver))
+    xl = full(get_xl(solver))
+    xu = full(get_xu(solver))
+    zl = full(get_zl(solver))
+    zu = full(get_zu(solver))
 
-    px = primal(solver.p)
-    py = dual(solver.p)
-    pzl = dual_lb(solver.p)
-    pzu = dual_ub(solver.p)
+    px = primal(get_p(solver))
+    py = dual(get_p(solver))
+    pzl = dual_lb(get_p(solver))
+    pzu = dual_ub(get_p(solver))
 
     mu = RR.mu_R
 
-    px .= .- RR.f_R .+ zl .- zu .- solver.jacl
-    py .= .- solver.c .+ RR.pp .- RR.nn .+
-        (mu .- (rho .- solver.y) .* RR.pp) ./ RR.zp .-
-        (mu .- (rho .+ solver.y) .* RR.nn) ./ RR.zn
+    px .= .- RR.f_R .+ zl .- zu .- get_jacl(solver)
+    py .= .- get_c(solver) .+ RR.pp .- RR.nn .+
+        (mu .- (rho .- get_y(solver)) .* RR.pp) ./ RR.zp .-
+        (mu .- (rho .+ get_y(solver)) .* RR.nn) ./ RR.zn
 
-    pzl .= (solver.xl_r .- solver.x_lr) .* solver.zl_r .+ mu
-    pzu .= (solver.xu_r .- solver.x_ur) .* solver.zu_r .- mu
+    pzl .= (get_xl_r(solver) .- get_x_lr(solver)) .* get_zl_r(solver) .+ mu
+    pzu .= (get_xu_r(solver) .- get_x_ur(solver)) .* get_zu_r(solver) .- mu
 
     return
 end
@@ -218,14 +218,14 @@ function set_initial_bounds!(xl::AbstractVector{T}, xu::AbstractVector{T}, tol) 
 end
 
 function set_initial_rhs!(solver::AbstractMadNLPSolver{T}, kkt::AbstractKKTSystem) where T
-    f = primal(solver.f)
-    zl = primal(solver.zl)
-    zu = primal(solver.zu)
-    px = primal(solver.p)
+    f = primal(get_f(solver))
+    zl = primal(get_zl(solver))
+    zu = primal(get_zu(solver))
+    px = primal(get_p(solver))
     px .= .-f .+ zl .- zu
-    fill!(dual(solver.p), zero(T))
-    fill!(dual_lb(solver.p), zero(T))
-    fill!(dual_ub(solver.p), zero(T))
+    fill!(dual(get_p(solver)), zero(T))
+    fill!(dual_lb(get_p(solver)), zero(T))
+    fill!(dual_ub(get_p(solver)), zero(T))
     return
 end
 
@@ -235,16 +235,16 @@ function set_aug_rhs_ifr!(solver::AbstractMadNLPSolver{T}, kkt::AbstractKKTSyste
     fill!(dual_lb(p0), zero(T))
     fill!(dual_ub(p0), zero(T))
     wy = dual(p0)
-    wy .= .- solver.c
+    wy .= .- get_c(solver)
     return
 end
 
 function set_g_ifr!(solver::AbstractMadNLPSolver, g::AbstractArray)
-    f = full(solver.f)
-    x = full(solver.x)
-    xl = full(solver.xl)
-    xu = full(solver.xu)
-    g .= f .- solver.mu ./ (x .- xl) .+ solver.mu ./ (xu .- x) .+ solver.jacl
+    f = full(get_f(solver))
+    x = full(get_x(solver))
+    xl = full(get_xl(solver))
+    xu = full(get_xu(solver))
+    g .= f .- get_mu(solver) ./ (x .- xl) .+ get_mu(solver) ./ (xu .- x) .+ get_jacl(solver)
 end
 
 # Finish RR
@@ -784,14 +784,14 @@ function get_sc(zl_r, zu_r, s_max)
 end
 
 function get_mu(
-    mu,
+    mu::T,
     mu_min,
     mu_linear_decrease_factor,
     mu_superlinear_decrease_power,
     tol,
-)
+) where {T}
     # Warning: `a * tol` should be strictly less than 100 * mu_min, see issue #242
-    a = min(99.0 * mu_min / tol, 0.01)
+    a = min(T(99.0) * mu_min / tol, T(0.01))
     return max(
         mu_min,
         a * tol,
@@ -857,8 +857,8 @@ function is_filter_acceptable(filter, theta, varphi)
     return true
 end
 
-function is_barr_obj_rapid_increase(varphi, varphi_trial, obj_max_inc)
-    return (varphi_trial >= varphi) && (log10(varphi_trial-varphi) > obj_max_inc + max(1.0, log10(abs(varphi))))
+function is_barr_obj_rapid_increase(varphi::T, varphi_trial, obj_max_inc) where T
+    return (varphi_trial >= varphi) && (log10(varphi_trial-varphi) > obj_max_inc + max(one(T), log10(abs(varphi))))
 end
 
 function reset_bound_dual!(
@@ -922,3 +922,338 @@ function dual_inf_perturbation!(px, ind_llb, ind_uub, mu, kappa_d)
     px[ind_uub] .+= mu*kappa_d
 end
 
+# Sections of the regular IPM algorithm:
+function eval_for_next_iter!(solver::AbstractMadNLPSolver{T}) where {T}
+    if get_cnt(solver).k!=0
+        if !get_opt(solver).jacobian_constant
+            eval_jac_wrapper!(solver, get_kkt(solver), get_x(solver))
+        end
+        eval_grad_f_wrapper!(solver, get_f(solver),get_x(solver))
+    end
+
+    jtprod!(get_jacl(solver), get_kkt(solver), get_y(solver))
+    set_sd!(solver, get_sd(get_y(solver),get_zl_r(solver),get_zu_r(solver),T(get_opt(solver).s_max)))
+    set_sc!(solver, get_sc(get_zl_r(solver),get_zu_r(solver),T(get_opt(solver).s_max)))
+    set_inf_pr!(solver, get_inf_pr(get_c(solver)))
+    set_inf_du!(solver, get_inf_du(
+        full(get_f(solver)),
+        full(get_zl(solver)),
+        full(get_zu(solver)),
+        get_jacl(solver),
+        get_sd(solver),
+    ))
+    set_inf_compl!(solver, get_inf_compl(solver, get_sc(solver); mu=zero(T)))
+    set_inf_compl_mu!(solver, get_inf_compl(solver))
+end
+
+function evaluate_termination_criteria!(solver::AbstractMadNLPSolver)
+    @trace(get_logger(solver),"Evaluating termination criteria.")
+    get_inf_total(solver) <= get_opt(solver).tol && return SOLVE_SUCCEEDED
+    get_inf_total(solver) <= get_opt(solver).acceptable_tol ?
+        (get_cnt(solver).acceptable_cnt < get_opt(solver).acceptable_iter ?
+        get_cnt(solver).acceptable_cnt+=1 : return SOLVED_TO_ACCEPTABLE_LEVEL) : (get_cnt(solver).acceptable_cnt = 0)
+    get_inf_total(solver) >= get_opt(solver).diverging_iterates_tol && return DIVERGING_ITERATES
+    get_cnt(solver).k>=get_opt(solver).max_iter && return MAXIMUM_ITERATIONS_EXCEEDED
+    time()-get_cnt(solver).start_time>=get_opt(solver).max_wall_time && return MAXIMUM_WALLTIME_EXCEEDED
+
+    return REGULAR
+end
+
+function evaluate_hessian!(solver::AbstractMadNLPSolver)
+    @trace(get_logger(solver),"Evaluating the Hessian of the Lagrangian.")
+    if (get_cnt(solver).k!=0 && !get_opt(solver).hessian_constant)
+        eval_lag_hess_wrapper!(solver, get_kkt(solver), get_x(solver), get_y(solver))
+    end
+end
+
+function update_homotopy_parameters!(solver::AbstractMadNLPSolver)
+    @trace(get_logger(solver),"Updating the barrier parameter.")
+    update_barrier!(get_opt(solver).barrier, solver, get_sc(solver))
+end
+
+function compute_newton_step!(solver::AbstractMadNLPSolver)
+    @trace(get_logger(solver),"Computing the newton step.")
+    set_aug_diagonal!(get_kkt(solver),solver)
+    set_aug_rhs!(solver, get_kkt(solver), get_c(solver), get_mu(solver))
+    dual_inf_perturbation!(primal(get_p(solver)),get_ind_llb(solver),get_ind_uub(solver),get_mu(solver),get_opt(solver).kappa_d)
+
+    return inertia_correction!(get_inertia_corrector(solver), solver) ? REGULAR : ROBUST
+end
+
+function line_search!(solver::AbstractMadNLPSolver)
+    @trace(get_logger(solver),"Backtracking line search initiated.")
+    status = filter_line_search!(solver)
+    return status
+end
+
+function update_variables!(solver::AbstractMadNLPSolver)
+    @trace(get_logger(solver),"Updating primal-dual variables.")
+    copyto!(full(get_x(solver)), full(get_x_trial(solver)))
+    copyto!(get_c(solver), get_c_trial(solver))
+    set_obj_val!(solver, get_obj_val_trial(solver))
+    adjust_boundary!(get_x_lr(solver),get_xl_r(solver),get_x_ur(solver),get_xu_r(solver),get_mu(solver))
+
+    axpy!(get_alpha(solver),dual(get_d(solver)),get_y(solver))
+
+    get_zl_r(solver) .+= get_alpha_z(solver) .* dual_lb(get_d(solver))
+    get_zu_r(solver) .+= get_alpha_z(solver) .* dual_ub(get_d(solver))
+    reset_bound_dual!(
+        primal(get_zl(solver)),
+        primal(get_x(solver)),
+        primal(get_xl(solver)),
+        get_mu(solver),get_opt(solver).kappa_sigma,
+    )
+    reset_bound_dual!(
+        primal(get_zu(solver)),
+        primal(get_xu(solver)),
+        primal(get_x(solver)),
+        get_mu(solver),get_opt(solver).kappa_sigma,
+    )
+end
+
+# Sections of the robust restorer IPM algorithm
+function eval_for_next_iter_RR!(solver::AbstractMadNLPSolver{T}) where {T}
+    RR = get_RR(solver)
+    if get_cnt(solver).k!=0
+        if !get_opt(solver).jacobian_constant
+            eval_jac_wrapper!(solver, get_kkt(solver), get_x(solver))
+        end
+        eval_grad_f_wrapper!(solver, get_f(solver),get_x(solver))
+    end
+    jtprod!(get_jacl(solver), get_kkt(solver), get_y(solver))
+
+    # evaluate termination criteria
+    @trace(get_logger(solver),"Evaluating restoration phase termination criteria.")
+
+    set_sd!(solver, get_sd(get_y(solver),get_zl_r(solver),get_zu_r(solver),get_opt(solver).s_max))
+    set_sc!(solver, get_sc(get_zl_r(solver),get_zu_r(solver),get_opt(solver).s_max))
+    set_inf_pr!(solver, get_inf_pr(get_c(solver)))
+    set_inf_du!(solver, get_inf_du(
+        primal(get_f(solver)),
+        primal(get_zl(solver)),
+        primal(get_zu(solver)),
+        get_jacl(solver),
+        get_sd(solver),
+    ))
+    set_inf_compl!(solver, get_inf_compl(get_x_lr(solver),get_xl_r(solver),get_zl_r(solver),get_xu_r(solver),get_x_ur(solver),get_zu_r(solver),zero(T),get_sc(solver)))
+
+    # Robust restoration phase error
+    RR.inf_pr_R = get_inf_pr_R(get_c(solver),RR.pp,RR.nn)
+    RR.inf_du_R = get_inf_du_R(RR.f_R,get_y(solver),primal(get_zl(solver)),primal(get_zu(solver)),get_jacl(solver),RR.zp,RR.zn,get_opt(solver).rho,get_sd(solver))
+    RR.inf_compl_R = get_inf_compl_R(
+        get_x_lr(solver),get_xl_r(solver),get_zl_r(solver),get_xu_r(solver),get_x_ur(solver),get_zu_r(solver),RR.pp,RR.zp,RR.nn,RR.zn,zero(T),get_sc(solver))
+    RR.inf_compl_mu_R = get_inf_compl_R(
+        get_x_lr(solver),get_xl_r(solver),get_zl_r(solver),get_xu_r(solver),get_x_ur(solver),get_zu_r(solver),RR.pp,RR.zp,RR.nn,RR.zn,RR.mu_R,get_sc(solver))
+end
+
+function evaluate_termination_criteria_RR!(solver::AbstractMadNLPSolver)
+    RR = get_RR(solver)
+    (max(RR.inf_pr_R,RR.inf_du_R,RR.inf_compl_R) <= get_opt(solver).tol) && return INFEASIBLE_PROBLEM_DETECTED
+    (get_cnt(solver).k>=get_opt(solver).max_iter) && return MAXIMUM_ITERATIONS_EXCEEDED
+    (time()-get_cnt(solver).start_time>=get_opt(solver).max_wall_time) && return MAXIMUM_WALLTIME_EXCEEDED
+
+    return ROBUST
+end
+
+function update_homotopy_parameters_RR!(solver::AbstractMadNLPSolver)
+    RR = get_RR(solver)
+    @trace(get_logger(solver),"Updating restoration phase barrier parameter.")
+    _update_monotone_RR!(get_opt(solver).barrier, solver, get_sc(solver))
+end
+
+function compute_newton_step_RR!(solver::AbstractMadNLPSolver)
+    RR = get_RR(solver)
+    if !get_opt(solver).hessian_constant
+        eval_lag_hess_wrapper!(solver, get_kkt(solver), get_x(solver), get_y(solver); is_resto=true)
+    end
+    set_aug_RR!(get_kkt(solver), solver, RR)
+
+    # without inertia correction,
+    @trace(get_logger(solver),"Solving restoration phase primal-dual system.")
+    set_aug_rhs_RR!(solver, get_kkt(solver), RR, get_opt(solver).rho)
+
+    inertia_correction!(get_inertia_corrector(solver), solver) || return RESTORATION_FAILED
+
+    finish_aug_solve_RR!(
+        RR.dpp,RR.dnn,RR.dzp,RR.dzn,get_y(solver),dual(get_d(solver)),
+        RR.pp,RR.nn,RR.zp,RR.zn,RR.mu_R,get_opt(solver).rho
+    )
+    return ROBUST
+end
+
+function line_search_RR!(solver::AbstractMadNLPSolver)
+    @trace(get_logger(solver),"Backtracking line search initiated.")
+    status = filter_line_search_RR!(solver)
+    return status
+end
+
+function update_variables_RR!(solver::AbstractMadNLPSolver)
+    RR = get_RR(solver)
+    @trace(get_logger(solver),"Updating primal-dual variables.")
+    copyto!(full(get_x(solver)), full(get_x_trial(solver)))
+    copyto!(get_c(solver), get_c_trial(solver))
+    copyto!(RR.pp, RR.pp_trial)
+    copyto!(RR.nn, RR.nn_trial)
+
+    RR.obj_val_R=RR.obj_val_R_trial
+    set_f_RR!(solver,RR)
+
+    axpy!(get_alpha(solver), dual(get_d(solver)), get_y(solver))
+    axpy!(get_alpha_z(solver), RR.dzp,RR.zp)
+    axpy!(get_alpha_z(solver), RR.dzn,RR.zn)
+
+    get_zl_r(solver) .+= get_alpha_z(solver) .* dual_lb(get_d(solver))
+    get_zu_r(solver) .+= get_alpha_z(solver) .* dual_ub(get_d(solver))
+
+    reset_bound_dual!(
+        primal(get_zl(solver)),
+        primal(get_x(solver)),
+        primal(get_xl(solver)),
+        RR.mu_R, get_opt(solver).kappa_sigma,
+    )
+    reset_bound_dual!(
+        primal(get_zu(solver)),
+        primal(get_xu(solver)),
+        primal(get_x(solver)),
+        RR.mu_R, get_opt(solver).kappa_sigma,
+    )
+    reset_bound_dual!(RR.zp,RR.pp,RR.mu_R,get_opt(solver).kappa_sigma)
+    reset_bound_dual!(RR.zn,RR.nn,RR.mu_R,get_opt(solver).kappa_sigma)
+
+    adjust_boundary!(get_x_lr(solver),get_xl_r(solver),get_x_ur(solver),get_xu_r(solver),get_mu(solver))
+end
+
+function check_restoration_successful!(solver::AbstractMadNLPSolver)
+    RR = get_RR(solver)
+    @trace(get_logger(solver),"Checking if going back to regular phase.")
+    set_obj_val!(solver, eval_f_wrapper(solver, get_x(solver)))
+    eval_grad_f_wrapper!(solver, get_f(solver), get_x(solver))
+    theta = get_theta(get_c(solver))
+    varphi= get_varphi(get_obj_val(solver),get_x_lr(solver),get_xl_r(solver),get_xu_r(solver),get_x_ur(solver),get_mu(solver))
+
+    if is_filter_acceptable(get_filter(solver),theta,varphi) &&
+        theta <= get_opt(solver).required_infeasibility_reduction * RR.theta_ref
+        return REGULAR
+    else
+        return ROBUST
+    end
+end
+
+function return_from_restoration!(solver::AbstractMadNLPSolver{T}) where {T}
+    RR = get_RR(solver)
+    @trace(get_logger(solver),"Going back to the regular phase.")
+    set_initial_rhs!(solver, get_kkt(solver))
+    initialize!(get_kkt(solver))
+
+    factorize_wrapper!(solver)
+    solve_refine_wrapper!(
+        get_d(solver), solver, get_p(solver), get__w4(solver)
+    )
+    if norm(dual(get_d(solver)), T(Inf))>get_opt(solver).constr_mult_init_max
+        fill!(get_y(solver), zero(T))
+    else
+        copyto!(get_y(solver), dual(get_d(solver)))
+    end
+end
+
+# Sections of `restore!` heuristic.
+function initialize_restore!(solver::AbstractMadNLPSolver{T}) where T
+    set_del_w!(solver, zero(T))
+    # Backup the previous primal iterate
+    copyto!(primal(get__w1(solver)), full(get_x(solver)))
+    copyto!(dual(get__w1(solver)), get_y(solver))
+    copyto!(dual(get__w2(solver)), get_c(solver))
+    set_alpha_z!(solver, zero(T))
+    set_ftype!(solver, "R")
+
+    return nothing
+end
+
+function take_ftb_step!(solver::AbstractMadNLPSolver{T}) where T
+    alpha_max = get_alpha_max(
+        primal(get_x(solver)),
+        primal(get_xl(solver)),
+        primal(get_xu(solver)),
+        primal(get_d(solver)),
+        get_tau(solver),
+    )
+    set_alpha!(solver,min(
+        alpha_max,
+        get_alpha_z(get_zl_r(solver),get_zu_r(solver),dual_lb(get_d(solver)),dual_ub(get_d(solver)),get_tau(solver)),
+    ))
+
+    axpy!(get_alpha(solver), primal(get_d(solver)), full(get_x(solver)))
+    axpy!(get_alpha(solver), dual(get_d(solver)), get_y(solver))
+    get_zl_r(solver) .+= get_alpha(solver) .* dual_lb(get_d(solver))
+    get_zu_r(solver) .+= get_alpha(solver) .* dual_ub(get_d(solver))
+
+    return nothing
+end
+
+function evaluate_for_sufficient_decrease_restore!(solver::AbstractMadNLPSolver{T}) where T
+    eval_cons_wrapper!(solver,get_c(solver),get_x(solver))
+    eval_grad_f_wrapper!(solver,get_f(solver),get_x(solver))
+    set_obj_val!(solver, eval_f_wrapper(solver,get_x(solver)))
+
+    if !get_opt(solver).jacobian_constant
+        eval_jac_wrapper!(solver,get_kkt(solver),get_x(solver))
+    end
+
+    jtprod!(get_jacl(solver),get_kkt(solver),get_y(solver))
+
+    return nothing
+end
+
+function backtrack_restore!(solver::AbstractMadNLPSolver{T}) where T
+    copyto!(primal(get_x(solver)), primal(get__w1(solver)))
+    copyto!(get_y(solver), dual(get__w1(solver)))
+    copyto!(get_c(solver), dual(get__w2(solver))) # backup the previous primal iterate
+
+    return nothing
+end
+
+function evaluate_termination_criteria_restore!(solver::AbstractMadNLPSolver{T}) where T
+    theta = get_theta(get_c(solver))
+    varphi= get_varphi(get_obj_val(solver),get_x_lr(solver),get_xl_r(solver),get_xu_r(solver),get_x_ur(solver),get_mu(solver))
+
+    get_cnt(solver).k+=1
+
+    is_filter_acceptable(get_filter(solver),theta,varphi) ? (return REGULAR) : (get_cnt(solver).t+=1)
+    get_cnt(solver).k>=get_opt(solver).max_iter && return MAXIMUM_ITERATIONS_EXCEEDED
+    time()-get_cnt(solver).start_time>=get_opt(solver).max_wall_time && return MAXIMUM_WALLTIME_EXCEEDED
+
+    return RESTORE
+end
+
+function evaluate_for_next_iter_restore!(solver::AbstractMadNLPSolver{T}) where T
+    set_sd!(solver, get_sd(get_y(solver),get_zl_r(solver),get_zu_r(solver),get_opt(solver).s_max))
+    set_sc!(solver, get_sc(get_zl_r(solver),get_zu_r(solver),get_opt(solver).s_max))
+    set_inf_pr!(solver, get_inf_pr(get_c(solver)))
+    set_inf_du!(solver, get_inf_du(
+        primal(get_f(solver)),
+        primal(get_zl(solver)),
+        primal(get_zu(solver)),
+        get_jacl(solver),
+        get_sd(solver),
+    ))
+
+    set_inf_compl!(solver, get_inf_compl(get_x_lr(solver),get_xl_r(solver),get_zl_r(solver),get_xu_r(solver),get_x_ur(solver),get_zu_r(solver),zero(T),get_sc(solver)))
+    set_inf_compl_mu!(solver, get_inf_compl(get_x_lr(solver),get_xl_r(solver),get_zl_r(solver),get_xu_r(solver),get_x_ur(solver),get_zu_r(solver),get_mu(solver),get_sc(solver)))
+
+    return nothing
+end
+
+function compute_newton_step_restore!(solver::AbstractMadNLPSolver{T}) where T
+    if !get_opt(solver).hessian_constant
+        eval_lag_hess_wrapper!(solver,get_kkt(solver),get_x(solver),get_y(solver))
+    end
+
+    set_aug_diagonal!(get_kkt(solver),solver)
+    set_aug_rhs!(solver, get_kkt(solver), get_c(solver), get_mu(solver))
+
+    dual_inf_perturbation!(primal(get_p(solver)),get_ind_llb(solver),get_ind_uub(solver),get_mu(solver),get_opt(solver).kappa_d)
+    factorize_wrapper!(solver)
+    solve_refine_wrapper!(
+        get_d(solver), solver, get_p(solver), get__w4(solver)
+    )
+end

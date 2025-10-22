@@ -21,40 +21,40 @@ mutable struct MadNLPExecutionStats{T, VT} <: AbstractExecutionStats
 end
 
 MadNLPExecutionStats(solver::AbstractMadNLPSolver) =MadNLPExecutionStats(
-    solver.opt,
-    solver.status,
-    primal(solver.x)[1:get_nvar(solver.nlp)],
-    solver.obj_val / solver.cb.obj_scale[],
-    solver.c ./ solver.cb.con_scale,
-    solver.inf_du,
-    solver.inf_pr,
-    copy(solver.y),
-    primal(solver.zl)[1:get_nvar(solver.nlp)],
-    primal(solver.zu)[1:get_nvar(solver.nlp)],
+    get_opt(solver),
+    get_status(solver),
+    primal(get_x(solver))[1:get_nvar(get_nlp(solver))],
+    get_obj_val(solver) / get_cb(solver).obj_scale[],
+    get_c(solver) ./ get_cb(solver).con_scale,
+    get_inf_du(solver),
+    get_inf_pr(solver),
+    copy(get_y(solver)),
+    primal(get_zl(solver))[1:get_nvar(get_nlp(solver))],
+    primal(get_zu(solver))[1:get_nvar(get_nlp(solver))],
     0,
-    solver.cnt,
+    get_cnt(solver),
 )
 
 function update!(stats::MadNLPExecutionStats, solver::AbstractMadNLPSolver)
-    stats.status = solver.status
-    stats.solution .= @view(primal(solver.x)[1:get_nvar(solver.nlp)])
-    stats.multipliers .= (solver.y .* solver.cb.con_scale) ./ solver.cb.obj_scale[]
-    stats.multipliers_L .= @view(primal(solver.zl)[1:get_nvar(solver.nlp)]) ./ solver.cb.obj_scale[]
-    stats.multipliers_U .= @view(primal(solver.zu)[1:get_nvar(solver.nlp)]) ./ solver.cb.obj_scale[]
+    stats.status = get_status(solver)
+    stats.solution .= @view(primal(get_x(solver))[1:get_nvar(get_nlp(solver))])
+    stats.multipliers .= (get_y(solver) .* get_cb(solver).con_scale) ./ get_cb(solver).obj_scale[]
+    stats.multipliers_L .= @view(primal(get_zl(solver))[1:get_nvar(get_nlp(solver))]) ./ get_cb(solver).obj_scale[]
+    stats.multipliers_U .= @view(primal(get_zu(solver))[1:get_nvar(get_nlp(solver))]) ./ get_cb(solver).obj_scale[]
     # stats.solution .= min.(
     #     max.(
-    #         @view(primal(solver.x)[1:get_nvar(solver.nlp)]),
-    #         get_lvar(solver.nlp)
+    #         @view(primal(get_x(solver))[1:get_nvar(get_nlp(solver))]),
+    #         get_lvar(get_nlp(solver))
     #     ),
-    #     get_uvar(solver.nlp)
+    #     get_uvar(get_nlp(solver))
     # )
-    stats.objective = solver.obj_val / solver.cb.obj_scale[]
-    stats.constraints .= solver.c ./ solver.cb.con_scale .+ solver.rhs
-    stats.constraints[solver.ind_ineq] .+= slack(solver.x)
-    stats.dual_feas = solver.inf_du
-    stats.primal_feas = solver.inf_pr
-    update_z!(solver.cb, stats.multipliers_L, stats.multipliers_U, solver.jacl)
-    stats.iter = solver.cnt.k
+    stats.objective = get_obj_val(solver) / get_cb(solver).obj_scale[]
+    stats.constraints .= get_c(solver) ./ get_cb(solver).con_scale .+ get_rhs(solver)
+    stats.constraints[get_ind_ineq(solver)] .+= slack(get_x(solver))
+    stats.dual_feas = get_inf_du(solver)
+    stats.primal_feas = get_inf_pr(solver)
+    update_z!(get_cb(solver), stats.multipliers_L, stats.multipliers_U, get_jacl(solver))
+    stats.iter = get_cnt(solver).k
     return stats
 end
 
@@ -69,20 +69,20 @@ end
 struct NotEnoughDegreesOfFreedomException <: Exception end
 
 # Utilities
-has_constraints(solver) = solver.m != 0
+has_constraints(solver) = get_m(solver) != 0
 
 function get_vars_info(solver)
-    nlp = solver.nlp
+    nlp = get_nlp(solver)
 
     x_lb = get_lvar(nlp)
     x_ub = get_uvar(nlp)
-    num_fixed = length(solver.ind_fixed)
+    num_fixed = length(get_ind_fixed(solver))
     num_var = get_nvar(nlp) - num_fixed
-    num_llb_vars = length(solver.ind_llb)
+    num_llb_vars = length(get_ind_llb(solver))
 
     # TODO make this non-allocating
     num_lu_vars = sum((x_lb .!=-Inf) .& (x_ub .!= Inf)) - num_fixed
-    num_uub_vars = length(solver.ind_uub)
+    num_uub_vars = length(get_ind_uub(solver))
     return (
         n_free=num_var,
         n_fixed=num_fixed,
@@ -93,7 +93,7 @@ function get_vars_info(solver)
 end
 
 function get_cons_info(solver)
-    nlp = solver.nlp
+    nlp = get_nlp(solver)
 
     g_lb = get_lcon(nlp)
     g_ub = get_ucon(nlp)
@@ -116,88 +116,88 @@ end
 
 # Print functions -----------------------------------------------------------
 function print_init(solver::AbstractMadNLPSolver)
-    @notice(solver.logger,@sprintf("Number of nonzeros in constraint Jacobian............: %8i", get_nnzj(solver.nlp.meta)))
-    @notice(solver.logger,@sprintf("Number of nonzeros in Lagrangian Hessian.............: %8i\n", get_nnzh(solver.nlp.meta)))
+    @notice(get_logger(solver),@sprintf("Number of nonzeros in constraint Jacobian............: %8i", get_nnzj(get_nlp(solver).meta)))
+    @notice(get_logger(solver),@sprintf("Number of nonzeros in Lagrangian Hessian.............: %8i\n", get_nnzh(get_nlp(solver).meta)))
     var_info = get_vars_info(solver)
     con_info = get_cons_info(solver)
 
-    if get_nvar(solver.nlp) < con_info.n_eq
+    if get_nvar(get_nlp(solver)) < con_info.n_eq
         throw(NotEnoughDegreesOfFreedomException())
     end
 
-    @notice(solver.logger,@sprintf("Total number of variables............................: %8i",var_info.n_free))
-    @notice(solver.logger,@sprintf("                     variables with only lower bounds: %8i",var_info.n_only_lb))
-    @notice(solver.logger,@sprintf("                variables with lower and upper bounds: %8i",var_info.n_bounded))
-    @notice(solver.logger,@sprintf("                     variables with only upper bounds: %8i",var_info.n_only_ub))
-    @notice(solver.logger,@sprintf("Total number of equality constraints.................: %8i",con_info.n_eq))
-    @notice(solver.logger,@sprintf("Total number of inequality constraints...............: %8i",con_info.n_ineq))
-    @notice(solver.logger,@sprintf("        inequality constraints with only lower bounds: %8i",con_info.n_only_lb))
-    @notice(solver.logger,@sprintf("   inequality constraints with lower and upper bounds: %8i",con_info.n_bounded))
-    @notice(solver.logger,@sprintf("        inequality constraints with only upper bounds: %8i\n",con_info.n_only_ub))
+    @notice(get_logger(solver),@sprintf("Total number of variables............................: %8i",var_info.n_free))
+    @notice(get_logger(solver),@sprintf("                     variables with only lower bounds: %8i",var_info.n_only_lb))
+    @notice(get_logger(solver),@sprintf("                variables with lower and upper bounds: %8i",var_info.n_bounded))
+    @notice(get_logger(solver),@sprintf("                     variables with only upper bounds: %8i",var_info.n_only_ub))
+    @notice(get_logger(solver),@sprintf("Total number of equality constraints.................: %8i",con_info.n_eq))
+    @notice(get_logger(solver),@sprintf("Total number of inequality constraints...............: %8i",con_info.n_ineq))
+    @notice(get_logger(solver),@sprintf("        inequality constraints with only lower bounds: %8i",con_info.n_only_lb))
+    @notice(get_logger(solver),@sprintf("   inequality constraints with lower and upper bounds: %8i",con_info.n_bounded))
+    @notice(get_logger(solver),@sprintf("        inequality constraints with only upper bounds: %8i\n",con_info.n_only_ub))
     return
 end
 
 function print_iter(solver::AbstractMadNLPSolver; is_resto=false)
-    obj_scale = solver.cb.obj_scale[]
-    mod(solver.cnt.k,10)==0&& @info(solver.logger,@sprintf(
+    obj_scale = get_cb(solver).obj_scale[]
+    mod(get_cnt(solver).k,10)==0&& @info(get_logger(solver),@sprintf(
         "iter    objective    inf_pr   inf_du inf_compl lg(mu) lg(rg) alpha_pr ir ls"))
     if is_resto
-        RR = solver.RR::RobustRestorer
+        RR = get_RR(solver)::RobustRestorer
         inf_du = RR.inf_du_R
         inf_pr = RR.inf_pr_R
         inf_compl = RR.inf_compl_R
         mu = log10(RR.mu_R)
     else
-        inf_du = solver.inf_du
-        inf_pr = solver.inf_pr
-        inf_compl = solver.inf_compl
-        mu = log10(solver.mu)
+        inf_du = get_inf_du(solver)
+        inf_pr = get_inf_pr(solver)
+        inf_compl = get_inf_compl(solver)
+        mu = log10(get_mu(solver))
     end
-    @info(solver.logger,@sprintf(
+    @info(get_logger(solver),@sprintf(
         "%4i%s% 10.7e %6.2e %6.2e %7.2e %5.1f  %s  %6.2e %2i %2i%s",
-        solver.cnt.k,is_resto ? "r" : " ",solver.obj_val/obj_scale,
+        get_cnt(solver).k,is_resto ? "r" : " ",get_obj_val(solver)/obj_scale,
         inf_pr, inf_du, inf_compl, mu,
-        # solver.cnt.k == 0 ? 0. : norm(primal(solver.d),Inf),
-        solver.del_w == 0 ? "   - " : @sprintf("%5.1f",log(10,solver.del_w)),
-        solver.alpha,
-        solver.cnt.ir,
-        solver.cnt.l,
-        solver.ftype,))
+        # get_cnt(solver).k == 0 ? 0. : norm(primal(get_d(solver)),Inf),
+        get_del_w(solver) == 0 ? "   - " : @sprintf("%5.1f",log(10,get_del_w(solver))),
+        get_alpha(solver),
+        get_cnt(solver).ir,
+        get_cnt(solver).l,
+        get_ftype(solver),))
     return
 end
 
 function print_summary(solver::AbstractMadNLPSolver)
     # TODO inquire this from nlpmodel wrapper
-    obj_scale = solver.cb.obj_scale[]
-    solver.cnt.solver_time = solver.cnt.total_time-solver.cnt.linear_solver_time-solver.cnt.eval_function_time
+    obj_scale = get_cb(solver).obj_scale[]
+    get_cnt(solver).solver_time = get_cnt(solver).total_time-get_cnt(solver).linear_solver_time-get_cnt(solver).eval_function_time
 
-    @notice(solver.logger,"")
-    @notice(solver.logger,"Number of Iterations....: $(solver.cnt.k)\n")
-    @notice(solver.logger,"                                   (scaled)                 (unscaled)")
-    @notice(solver.logger,@sprintf("Objective...............:  % 1.16e   % 1.16e",solver.obj_val,solver.obj_val/obj_scale))
-    @notice(solver.logger,@sprintf("Dual infeasibility......:   %1.16e    %1.16e",solver.inf_du,solver.inf_du/obj_scale))
-    @notice(solver.logger,@sprintf("Constraint violation....:   %1.16e    %1.16e",norm(solver.c,Inf),solver.inf_pr))
-    @notice(solver.logger,@sprintf("Complementarity.........:   %1.16e    %1.16e",
-                                solver.inf_compl*obj_scale,solver.inf_compl))
-    @notice(solver.logger,@sprintf("Overall NLP error.......:   %1.16e    %1.16e\n",
-                                max(solver.inf_du*obj_scale,norm(solver.c,Inf),solver.inf_compl),
-                                max(solver.inf_du,solver.inf_pr,solver.inf_compl)))
+    @notice(get_logger(solver),"")
+    @notice(get_logger(solver),"Number of Iterations....: $(get_cnt(solver).k)\n")
+    @notice(get_logger(solver),"                                   (scaled)                 (unscaled)")
+    @notice(get_logger(solver),@sprintf("Objective...............:  % 1.16e   % 1.16e",get_obj_val(solver),get_obj_val(solver)/obj_scale))
+    @notice(get_logger(solver),@sprintf("Dual infeasibility......:   %1.16e    %1.16e",get_inf_du(solver),get_inf_du(solver)/obj_scale))
+    @notice(get_logger(solver),@sprintf("Constraint violation....:   %1.16e    %1.16e",norm(get_c(solver),Inf),get_inf_pr(solver)))
+    @notice(get_logger(solver),@sprintf("Complementarity.........:   %1.16e    %1.16e",
+                                get_inf_compl(solver)*obj_scale,get_inf_compl(solver)))
+    @notice(get_logger(solver),@sprintf("Overall NLP error.......:   %1.16e    %1.16e\n",
+                                max(get_inf_du(solver)*obj_scale,norm(get_c(solver),Inf),get_inf_compl(solver)),
+                                max(get_inf_du(solver),get_inf_pr(solver),get_inf_compl(solver))))
 
-    @notice(solver.logger,"Number of objective function evaluations              = $(solver.cnt.obj_cnt)")
-    @notice(solver.logger,"Number of objective gradient evaluations              = $(solver.cnt.obj_grad_cnt)")
-    @notice(solver.logger,"Number of constraint evaluations                      = $(solver.cnt.con_cnt)")
-    @notice(solver.logger,"Number of constraint Jacobian evaluations             = $(solver.cnt.con_jac_cnt)")
-    @notice(solver.logger,"Number of Lagrangian Hessian evaluations              = $(solver.cnt.lag_hess_cnt)\n")
-    @notice(solver.logger,@sprintf("Total wall secs in initialization                     = %6.3f",
-                                solver.cnt.init_time))
-    @notice(solver.logger,@sprintf("Total wall secs in linear solver                      = %6.3f",
-                                solver.cnt.linear_solver_time))
-    @notice(solver.logger,@sprintf("Total wall secs in NLP function evaluations           = %6.3f",
-                                solver.cnt.eval_function_time))
-    @notice(solver.logger,@sprintf("Total wall secs in solver (w/o init./fun./lin. alg.)  = %6.3f",
-                                solver.cnt.total_time - solver.cnt.init_time - solver.cnt.linear_solver_time - solver.cnt.eval_function_time))
-    @notice(solver.logger,@sprintf("Total wall secs                                       = %6.3f\n",
-                                solver.cnt.total_time))
+    @notice(get_logger(solver),"Number of objective function evaluations              = $(get_cnt(solver).obj_cnt)")
+    @notice(get_logger(solver),"Number of objective gradient evaluations              = $(get_cnt(solver).obj_grad_cnt)")
+    @notice(get_logger(solver),"Number of constraint evaluations                      = $(get_cnt(solver).con_cnt)")
+    @notice(get_logger(solver),"Number of constraint Jacobian evaluations             = $(get_cnt(solver).con_jac_cnt)")
+    @notice(get_logger(solver),"Number of Lagrangian Hessian evaluations              = $(get_cnt(solver).lag_hess_cnt)\n")
+    @notice(get_logger(solver),@sprintf("Total wall secs in initialization                     = %6.3f",
+                                get_cnt(solver).init_time))
+    @notice(get_logger(solver),@sprintf("Total wall secs in linear solver                      = %6.3f",
+                                get_cnt(solver).linear_solver_time))
+    @notice(get_logger(solver),@sprintf("Total wall secs in NLP function evaluations           = %6.3f",
+                                get_cnt(solver).eval_function_time))
+    @notice(get_logger(solver),@sprintf("Total wall secs in solver (w/o init./fun./lin. alg.)  = %6.3f",
+                                get_cnt(solver).total_time - get_cnt(solver).init_time - get_cnt(solver).linear_solver_time - get_cnt(solver).eval_function_time))
+    @notice(get_logger(solver),@sprintf("Total wall secs                                       = %6.3f\n",
+                                get_cnt(solver).total_time))
 end
 
 
@@ -205,11 +205,11 @@ function string(solver::AbstractMadNLPSolver)
     """
                 Interior point solver
 
-                number of variables......................: $(get_nvar(solver.nlp))
-                number of constraints....................: $(get_ncon(solver.nlp))
-                number of nonzeros in Lagrangian Hessian.: $(get_nnzh(solver.nlp.meta))
-                number of nonzeros in constraint Jacobian: $(get_nnzj(solver.nlp.meta))
-                status...................................: $(solver.status)
+                number of variables......................: $(get_nvar(get_nlp(solver)))
+                number of constraints....................: $(get_ncon(get_nlp(solver)))
+                number of nonzeros in Lagrangian Hessian.: $(get_nnzh(get_nlp(solver).meta))
+                number of nonzeros in constraint Jacobian: $(get_nnzj(get_nlp(solver).meta))
+                status...................................: $(get_status(solver))
                 """
 end
 print(io::IO,solver::AbstractMadNLPSolver) = print(io, string(solver))
