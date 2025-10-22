@@ -36,28 +36,6 @@ for (k, (attribute, type)) in enumerate(zip(fieldnames(MadNLPSolver), fieldtypes
         end
     end
 end
-# set_RR!(solver::AbstractMadNLPSolver, rhs) = solver.RR = rhs
-# set_n!(solver::AbstractMadNLPSolver, rhs::Int) = solver.n = rhs
-# set_m!(solver::AbstractMadNLPSolver, rhs::Int) = solver.m = rhs
-# set_nlb!(solver::AbstractMadNLPSolver, rhs::Int) = solver.nlb = rhs
-# set_nub!(solver::AbstractMadNLPSolver, rhs::Int) = solver.nub = rhs
-# set_status!(solver::AbstractMadNLPSolver, rhs::Status) = solver.status = rhs
-# set_mu!(solver::AbstractMadNLPSolver{T}, rhs::T) where{T} = solver.mu = rhs
-# set_obj_val!(solver::AbstractMadNLPSolver{T}, rhs::T) where {T} = solver.obj_val = rhs
-# set_obj_val_trial!(solver::AbstractMadNLPSolver{T}, rhs::T) where {T} = solver.obj_val_trial = rhs
-# set_inf_pr!(solver::AbstractMadNLPSolver{T}, rhs::T) where {T} = solver.inf_pr = rhs
-# set_inf_du!(solver::AbstractMadNLPSolver{T}, rhs::T) where {T} = solver.inf_du = rhs
-# set_inf_compl!(solver::AbstractMadNLPSolver{T}, rhs::T) where {T} = solver.inf_compl = rhs
-# set_inf_compl_mu!(solver::AbstractMadNLPSolver{T}, rhs::T) where {T} = solver.inf_compl_mu = rhs
-# set_theta_min!(solver::AbstractMadNLPSolver{T}, rhs::T) where {T} = solver.theta_min = rhs
-# set_theta_max!(solver::AbstractMadNLPSolver{T}, rhs::T) where {T} = solver.theta_max = rhs
-# set_tau!(solver::AbstractMadNLPSolver{T}, rhs::T) where {T} = solver.tau = rhs
-# set_alpha!(solver::AbstractMadNLPSolver{T}, rhs::T) where {T} = solver.alpha = rhs
-# set_alpha_z!(solver::AbstractMadNLPSolver{T}, rhs::T) where {T} = solver.alpha_z = rhs
-# set_ftype!(solver::AbstractMadNLPSolver, rhs::String) = solver.ftype = rhs
-# set_del_w!(solver::AbstractMadNLPSolver{T}, rhs::T) where {T} = solver.del_w = rhs
-# set_del_w_last!(solver::AbstractMadNLPSolver{T}, rhs::T) where {T} = solver.del_w_last = rhs
-# set_del_c!(solver::AbstractMadNLPSolver{T}, rhs::T) where {T} = solver.del_c = rhs
 
 # Computed quantities
 # TODO(@anton) I now think these would be useful to have, but which quantities are wrapped this way is a good question
