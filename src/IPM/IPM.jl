@@ -4,6 +4,7 @@
 abstract type AbstractMadNLPSolver{T} end
 
 include("types.jl")
+include("options.jl")
 
 mutable struct MadNLPSolver{
     T,
@@ -80,6 +81,7 @@ mutable struct MadNLPSolver{
     inf_pr::T
     inf_du::T
     inf_compl::T
+    inf_compl_mu::T
 
     theta_min::T
     theta_max::T
@@ -107,7 +109,6 @@ include("api.jl")
 include("restoration.jl")
 include("inertiacorrector.jl")
 include("barrier.jl")
-include("options.jl")
 
 
 """
@@ -225,7 +226,7 @@ function MadNLPSolver(nlp::AbstractNLPModel{T,VT}; kwargs...) where {T, VT}
         cb.ind_ineq, cb.ind_fixed, cb.ind_llb, cb.ind_uub,
         x_lr, x_ur, xl_r, xu_r, zl_r, zu_r, dx_lr, dx_ur, x_trial_lr, x_trial_ur,
         iterator,
-        zero(T), zero(T), zero(T), zero(T), zero(T), zero(T), zero(T), zero(T), zero(T),
+        zero(T), zero(T), zero(T), zero(T), zero(T), zero(T), zero(T), zero(T), zero(T), zero(T),
         " ",
         zero(T), zero(T), zero(T),
         Tuple{T, T}[],

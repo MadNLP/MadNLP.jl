@@ -456,7 +456,7 @@ function robust!(solver::AbstractMadNLPSolver{T}) where T
         end
 
         # without inertia correction,
-        @trace(_logger(solver),"Solving restoration phase primal-dual system.")
+        @trace(get_logger(solver),"Solving restoration phase primal-dual system.")
         set_aug_rhs_RR!(solver, solver.kkt, RR, solver.opt.rho)
         inertia_correction!(solver.inertia_corrector, solver) || return RESTORATION_FAILED
         finish_aug_solve_RR!(
