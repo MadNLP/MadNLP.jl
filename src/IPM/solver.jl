@@ -238,8 +238,8 @@ function regular!(solver::AbstractMadNLPSolver{T}) where T
 
         update_variables!(solver)
 
-        _cnt(solver).k+=1
-        @trace(_logger(solver),"Proceeding to the next interior point iteration.")
+        get_cnt(solver).k+=1
+        @trace(get_logger(solver),"Proceeding to the next interior point iteration.")
     end
 end
 
@@ -283,7 +283,7 @@ function restore!(solver::AbstractMadNLPSolver{T}) where T
             get_mu(solver),
         )
         # Check for sufficient decrease
-        if F_trial > _opt(solver).soft_resto_pderror_reduction_factor*F
+        if F_trial > get_opt(solver).soft_resto_pderror_reduction_factor*F
             # Sufficient decrease not observed, backing up and starting robust restorer.
             backtrack_restore!(solver)
             return ROBUST
@@ -328,8 +328,8 @@ function robust!(solver::AbstractMadNLPSolver{T}) where T
         update_variables_RR!(solver)
 
         # compeleted an iteration
-        _cnt(solver).k+=1
-        _cnt(solver).t+=1
+        get_cnt(solver).k+=1
+        get_cnt(solver).t+=1
         
         # check if going back to regular phase
         status = check_restoration_successful!(solver)
@@ -338,7 +338,7 @@ function robust!(solver::AbstractMadNLPSolver{T}) where T
             return REGULAR
         end
 
-        @trace(_logger(solver),"Proceeding to the next restoration phase iteration.")
+        @trace(get_logger(solver),"Proceeding to the next restoration phase iteration.")
     end
 end
 

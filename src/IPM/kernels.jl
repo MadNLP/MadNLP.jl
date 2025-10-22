@@ -923,7 +923,7 @@ function dual_inf_perturbation!(px, ind_llb, ind_uub, mu, kappa_d)
 end
 
 # Sections of the regular IPM algorithm:
-function eval_for_next_iter!(solver::AbstractMadNLPSolver)
+function eval_for_next_iter!(solver::AbstractMadNLPSolver{T}) where {T}
     if get_cnt(solver).k!=0
         if !get_opt(solver).jacobian_constant
             eval_jac_wrapper!(solver, get_kkt(solver), get_x(solver))
@@ -943,16 +943,16 @@ function eval_for_next_iter!(solver::AbstractMadNLPSolver)
         get_sd(solver),
     ))
     set_inf_compl!(solver, get_inf_compl(solver, get_sc(solver); mu=zero(T)))
-    set_inf_compl_mu!(get_inf_compl(solver))
+    set_inf_compl_mu!(solver, get_inf_compl(solver))
 end
 
 function evaluate_termination_criteria!(solver::AbstractMadNLPSolver)
     @trace(get_logger(solver),"Evaluating termination criteria.")
-    _inf_total(solver) <= get_opt(solver).tol && return SOLVE_SUCCEEDED
-    _inf_total(solver) <= get_opt(solver).acceptable_tol ?
+    get_inf_total(solver) <= get_opt(solver).tol && return SOLVE_SUCCEEDED
+    get_inf_total(solver) <= get_opt(solver).acceptable_tol ?
         (get_cnt(solver).acceptable_cnt < get_opt(solver).acceptable_iter ?
         get_cnt(solver).acceptable_cnt+=1 : return SOLVED_TO_ACCEPTABLE_LEVEL) : (get_cnt(solver).acceptable_cnt = 0)
-    _inf_total(solver) >= get_opt(solver).diverging_iterates_tol && return DIVERGING_ITERATES
+    get_inf_total(solver) >= get_opt(solver).diverging_iterates_tol && return DIVERGING_ITERATES
     get_cnt(solver).k>=get_opt(solver).max_iter && return MAXIMUM_ITERATIONS_EXCEEDED
     time()-get_cnt(solver).start_time>=get_opt(solver).max_wall_time && return MAXIMUM_WALLTIME_EXCEEDED
 
@@ -974,7 +974,7 @@ end
 function compute_newton_step!(solver::AbstractMadNLPSolver)
     @trace(get_logger(solver),"Computing the newton step.")
     set_aug_diagonal!(get_kkt(solver),solver)
-    set_aug_rhs!(solver, get_kkt(solver), get_c(solver))
+    set_aug_rhs!(solver, get_kkt(solver), get_c(solver), get_mu(solver))
     dual_inf_perturbation!(primal(get_p(solver)),get_ind_llb(solver),get_ind_uub(solver),get_mu(solver),get_opt(solver).kappa_d)
 
     return inertia_correction!(get_inertia_corrector(solver), solver) ? REGULAR : ROBUST
@@ -1012,7 +1012,7 @@ function update_variables!(solver::AbstractMadNLPSolver)
 end
 
 # Sections of the robust restorer IPM algorithm
-function eval_for_next_iter_RR!(solver::AbstractMadNLPSolver)
+function eval_for_next_iter_RR!(solver::AbstractMadNLPSolver{T}) where {T}
     RR = get_RR(solver)
     if get_cnt(solver).k!=0
         if !get_opt(solver).jacobian_constant
@@ -1025,15 +1025,15 @@ function eval_for_next_iter_RR!(solver::AbstractMadNLPSolver)
     # evaluate termination criteria
     @trace(get_logger(solver),"Evaluating restoration phase termination criteria.")
 
-    sd = get_sd(get_y(solver),get_zl_r(solver),get_zu_r(solver),get_opt(solver).s_max)
-    sc = get_sc(get_zl_r(solver),get_zu_r(solver),get_opt(solver).s_max)
+    set_sd!(solver, get_sd(get_y(solver),get_zl_r(solver),get_zu_r(solver),get_opt(solver).s_max))
+    set_sc!(solver, get_sc(get_zl_r(solver),get_zu_r(solver),get_opt(solver).s_max))
     set_inf_pr!(solver, get_inf_pr(get_c(solver)))
     set_inf_du!(solver, get_inf_du(
         primal(get_f(solver)),
         primal(get_zl(solver)),
         primal(get_zu(solver)),
         get_jacl(solver),
-        sd,
+        get_sd(solver),
     ))
     set_inf_compl!(solver, get_inf_compl(get_x_lr(solver),get_xl_r(solver),get_zl_r(solver),get_xu_r(solver),get_x_ur(solver),get_zu_r(solver),zero(T),get_sc(solver)))
 
@@ -1139,7 +1139,7 @@ function check_restoration_successful!(solver::AbstractMadNLPSolver)
     end
 end
 
-function return_from_restoration!(solver::AbstractMadNLPSolver) where {T}
+function return_from_restoration!(solver::AbstractMadNLPSolver{T}) where {T}
     RR = get_RR(solver)
     @trace(get_logger(solver),"Going back to the regular phase.")
     set_initial_rhs!(solver, get_kkt(solver))
@@ -1149,7 +1149,7 @@ function return_from_restoration!(solver::AbstractMadNLPSolver) where {T}
     solve_refine_wrapper!(
         get_d(solver), solver, get_p(solver), get__w4(solver)
     )
-    if norm(dual(get_d(solver)), Inf)>get_opt(solver).constr_mult_init_max
+    if norm(dual(get_d(solver)), T(Inf))>get_opt(solver).constr_mult_init_max
         fill!(get_y(solver), zero(T))
     else
         copyto!(get_y(solver), dual(get_d(solver)))
@@ -1249,7 +1249,7 @@ function compute_newton_step_restore!(solver::AbstractMadNLPSolver{T}) where T
     end
 
     set_aug_diagonal!(get_kkt(solver),solver)
-    set_aug_rhs!(solver, get_kkt(solver), get_c(solver))
+    set_aug_rhs!(solver, get_kkt(solver), get_c(solver), get_mu(solver))
 
     dual_inf_perturbation!(primal(get_p(solver)),get_ind_llb(solver),get_ind_uub(solver),get_mu(solver),get_opt(solver).kappa_d)
     factorize_wrapper!(solver)
