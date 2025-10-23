@@ -123,13 +123,7 @@ end
 get_tolerance(::Type{T},::Type{KKT}) where {T, KKT} = 10^round(log10(eps(T))/2)
 get_tolerance(::Type{T},::Type{SparseCondensedKKTSystem}) where T = 10^(round(log10(eps(T))/4))
 
-function default_sparse_solver(nlp::AbstractNLPModel)
-    if isdefined(Main, :MadNLPHSL)
-        Main.MadNLPHSL.Ma27Solver
-    else
-        MumpsSolver
-    end
-end
+default_sparse_solver(nlp::AbstractNLPModel) = MumpsSolver
 
 function check_option_sanity(options)
     is_kkt_dense = options.kkt_system <: AbstractDenseKKTSystem
