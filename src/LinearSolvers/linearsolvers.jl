@@ -1,16 +1,6 @@
-# MadNLP.jl
-# Created by Sungho Shin (sungho.shin@wisc.edu)
-
 #=
     LinearSolver's interface
 =#
-"""
-    AbstractLinearSolver
-
-Abstract type for linear solver targeting
-the resolution of the linear system ``Ax=b``.
-"""
-abstract type AbstractLinearSolver{T} end
 
 """
     introduce(::AbstractLinearSolver)

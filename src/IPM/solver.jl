@@ -7,20 +7,28 @@ as a [`MadNLPExecutionStats`](@ref).
 
 """
 function madnlp(model::AbstractNLPModel; kwargs...)
+    @nospecialize
     solver = MadNLPSolver(model;kwargs...)
     return solve!(solver)
 end
 
-solve!(nlp::AbstractNLPModel, solver::AbstractMadNLPSolver; kwargs...) = solve!(
+function solve!(nlp::AbstractNLPModel, solver::AbstractMadNLPSolver; kwargs...)
+    @nospecialize
+    solve!(
     nlp, solver, MadNLPExecutionStats(solver);
     kwargs...)
-solve!(solver::AbstractMadNLPSolver; kwargs...) = solve!(
+end
+
+function solve!(solver::AbstractMadNLPSolver; kwargs...)
+    
+    solve!(
     solver.nlp, solver;
     kwargs...)
+end
 
 
 function initialize!(solver::AbstractMadNLPSolver{T}) where T
-
+    
     nlp = solver.nlp
     opt = solver.opt
 
@@ -134,7 +142,8 @@ function solve!(
     zl = nothing, zu = nothing,
     kwargs...
         )
-
+    @nospecialize
+    
     if x != nothing
         full(solver.x)[1:get_nvar(nlp)] .= x
     end
@@ -217,6 +226,7 @@ color_status(status::Status) =
 
 
 function regular!(solver::AbstractMadNLPSolver{T}) where T
+    
     while true
         if (solver.cnt.k!=0 && !solver.opt.jacobian_constant)
             eval_jac_wrapper!(solver, solver.kkt, solver.x)
@@ -301,6 +311,7 @@ end
 
 
 function restore!(solver::AbstractMadNLPSolver{T}) where T
+    
     solver.del_w = 0
     # Backup the previous primal iterate
     copyto!(primal(solver._w1), full(solver.x))
@@ -413,6 +424,7 @@ function restore!(solver::AbstractMadNLPSolver{T}) where T
 end
 
 function robust!(solver::AbstractMadNLPSolver{T}) where T
+    
     initialize_robust_restorer!(solver)
     RR = solver.RR
     while true

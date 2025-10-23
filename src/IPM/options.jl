@@ -4,6 +4,8 @@ parse_option(::Type{Module},str::String) = eval(Symbol(str))
 parse_option(type::Type{T},i::Int64) where {T<:Enum} = type(i)
 
 function set_options!(opt::AbstractOptions, options)
+    @nospecialize
+    
     other_options = Dict{Symbol, Any}()
     for (key, val) in options
         if hasproperty(opt, key)
@@ -96,7 +98,7 @@ end
 
     # Barrier
     # mu_min by courtesy of Ipopt
-    barrier::AbstractBarrierUpdate{T} = MonotoneUpdate(tol, barrier_tol_factor)
+    barrier::AbstractBarrierUpdate{T} = MonotoneUpdate(T(tol), T(barrier_tol_factor))
     tau_min::T = 0.99
 end
 
@@ -105,13 +107,15 @@ is_dense_callback(nlp) = hasmethod(MadNLP.jac_dense!, Tuple{typeof(nlp), Abstrac
 
 # smart option presets
 function MadNLPOptions{T}(
-    nlp::AbstractNLPModel{T};
+    @nospecialize(nlp::AbstractNLPModel);
     dense_callback = MadNLP.is_dense_callback(nlp),
     callback = dense_callback ? DenseCallback : SparseCallback,
     kkt_system = dense_callback ? DenseCondensedKKTSystem : SparseKKTSystem,
     linear_solver = dense_callback ? LapackCPUSolver : default_sparse_solver(nlp),
     tol = get_tolerance(T,kkt_system)
-) where T
+    ) where T
+    
+    
     return MadNLPOptions{T}(
         tol = tol,
         callback = callback,
@@ -123,7 +127,7 @@ end
 get_tolerance(::Type{T},::Type{KKT}) where {T, KKT} = 10^round(log10(eps(T))/2)
 get_tolerance(::Type{T},::Type{SparseCondensedKKTSystem}) where T = 10^(round(log10(eps(T))/4))
 
-function default_sparse_solver(nlp::AbstractNLPModel)
+function default_sparse_solver(@nospecialize(nlp::AbstractNLPModel))
     if isdefined(Main, :MadNLPHSL)
         Main.MadNLPHSL.Ma27Solver
     else
@@ -132,6 +136,8 @@ function default_sparse_solver(nlp::AbstractNLPModel)
 end
 
 function check_option_sanity(options)
+    @nospecialize
+    
     is_kkt_dense = options.kkt_system <: AbstractDenseKKTSystem
     is_hess_approx_dense = options.hessian_approximation <: Union{BFGS, DampedBFGS}
     if input_type(options.linear_solver) == :csc && is_kkt_dense
@@ -152,6 +158,8 @@ function print_ignored_options(logger,option_dict)
 end
 
 function _get_primary_options(options)
+    @nospecialize
+    
     primary_opt = Dict{Symbol,Any}()
     remaining_opt = Dict{Symbol,Any}()
     for (k,v) in options
@@ -165,8 +173,10 @@ function _get_primary_options(options)
     return primary_opt, remaining_opt
 end
 
-function load_options(nlp::AbstractNLPModel{T,VT}; options...) where {T, VT}
-
+function load_options(nlp::AbstractNLPModel; options...)
+    @nospecialize
+    
+    T = eltype(get_x0(nlp))
     primary_opt, options = _get_primary_options(options)
 
     # Initiate interior-point options
@@ -210,4 +220,4 @@ end
 
 default options for `linear_solver` associated to the KKT system `kkt_system` and `nlp`.
 """
-default_options(nlp::AbstractNLPModel, kkt, linear_solver) = default_options(linear_solver)
+default_options(@nospecialize(nlp::AbstractNLPModel), kkt, linear_solver) = default_options(linear_solver)

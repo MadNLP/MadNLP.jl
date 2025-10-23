@@ -8,19 +8,28 @@ include("inertiacorrector.jl")
 include("barrier.jl")
 include("options.jl")
 
+"""
+    MadNLPSolver(nlp::AbstractNLPModel{T, VT}; options...) where {T, VT}
+
+Instantiate a new `MadNLPSolver` associated to the nonlinear program
+`nlp::AbstractNLPModel`. The options are passed as optional arguments.
+
+The constructor allocates all the memory required in the interior-point
+algorithm, so the main algorithm remains allocation free.
+
+"""
 mutable struct MadNLPSolver{
     T,
     VT <: AbstractVector{T},
     VI <: AbstractVector{Int},
     KKTSystem <: AbstractKKTSystem{T},
-    Model <: AbstractNLPModel{T,VT},
     CB <: AbstractCallback{T},
     Iterator <: AbstractIterator{T},
     IC <: AbstractInertiaCorrector,
     KKTVec <: AbstractKKTVector{T, VT}
     } <: AbstractMadNLPSolver{T}
 
-    nlp::Model
+    nlp::AbstractNLPModel{T,VT}
     cb::CB
     kkt::KKTSystem
 
@@ -102,140 +111,138 @@ mutable struct MadNLPSolver{
     RR::Union{Nothing,RobustRestorer{T}}
     status::Status
     output::Dict
-end
 
-"""
-    MadNLPSolver(nlp::AbstractNLPModel{T, VT}; options...) where {T, VT}
+    function MadNLPSolver(nlp::AbstractNLPModel; kwargs...)
+        @nospecialize
+        
+        x0 = get_x0(nlp)
+        T = eltype(x0)
+        VT = typeof(x0)
 
-Instantiate a new `MadNLPSolver` associated to the nonlinear program
-`nlp::AbstractNLPModel`. The options are passed as optional arguments.
+        options = load_options(nlp; kwargs...)
 
-The constructor allocates all the memory required in the interior-point
-algorithm, so the main algorithm remains allocation free.
+        ipm_opt = options.interior_point
+        logger = options.logger
+        @assert is_supported(ipm_opt.linear_solver, T)
 
-"""
-function MadNLPSolver(nlp::AbstractNLPModel{T,VT}; kwargs...) where {T, VT}
+        cnt = MadNLPCounters(start_time=time())
+        cb = create_callback(
+            ipm_opt.callback,
+            nlp;
+            fixed_variable_treatment=ipm_opt.fixed_variable_treatment,
+            equality_treatment=ipm_opt.equality_treatment,
+        )
 
-    options = load_options(nlp; kwargs...)
+        # generic options
+        ipm_opt.disable_garbage_collector &&
+            (GC.enable(false); @warn(logger,"Julia garbage collector is temporarily disabled"))
+        set_blas_num_threads(ipm_opt.blas_num_threads; permanent=true)
+        @trace(logger,"Initializing variables.")
 
-    ipm_opt = options.interior_point
-    logger = options.logger
-    @assert is_supported(ipm_opt.linear_solver, T)
+        ind_cons = get_index_constraints(
+            get_lvar(nlp), get_uvar(nlp),
+            get_lcon(nlp), get_ucon(nlp);
+            fixed_variable_treatment=ipm_opt.fixed_variable_treatment,
+            equality_treatment=ipm_opt.equality_treatment
+        )
 
-    cnt = MadNLPCounters(start_time=time())
-    cb = create_callback(
-        ipm_opt.callback,
-        nlp;
-        fixed_variable_treatment=ipm_opt.fixed_variable_treatment,
-        equality_treatment=ipm_opt.equality_treatment,
-    )
+        ind_lb = ind_cons.ind_lb
+        ind_ub = ind_cons.ind_ub
 
-    # generic options
-    ipm_opt.disable_garbage_collector &&
-        (GC.enable(false); @warn(logger,"Julia garbage collector is temporarily disabled"))
-    set_blas_num_threads(ipm_opt.blas_num_threads; permanent=true)
-    @trace(logger,"Initializing variables.")
+        ns = length(ind_cons.ind_ineq)
+        nx = get_nvar(nlp)
+        n = nx+ns
+        m = get_ncon(nlp)
+        nlb = length(ind_lb)
+        nub = length(ind_ub)
 
-    ind_cons = get_index_constraints(
-        get_lvar(nlp), get_uvar(nlp),
-        get_lcon(nlp), get_ucon(nlp);
-        fixed_variable_treatment=ipm_opt.fixed_variable_treatment,
-        equality_treatment=ipm_opt.equality_treatment
-    )
+        @trace(logger,"Initializing KKT system.")
+        kkt = create_kkt_system(
+            ipm_opt.kkt_system,
+            cb,
+            ind_cons,
+            ipm_opt.linear_solver;
+            hessian_approximation=ipm_opt.hessian_approximation,
+            opt_linear_solver=options.linear_solver,
+            qn_options=ipm_opt.quasi_newton_options,
+        )
 
-    ind_lb = ind_cons.ind_lb
-    ind_ub = ind_cons.ind_ub
+        @trace(logger,"Initializing iterative solver.")
+        iterator = ipm_opt.iterator(kkt; cnt = cnt, logger = logger, opt = options.iterative_refinement)
 
-    ns = length(ind_cons.ind_ineq)
-    nx = get_nvar(nlp)
-    n = nx+ns
-    m = get_ncon(nlp)
-    nlb = length(ind_lb)
-    nub = length(ind_ub)
+        x = PrimalVector(VT, nx, ns, ind_lb, ind_ub)
+        xl = PrimalVector(VT, nx, ns, ind_lb, ind_ub)
+        xu = PrimalVector(VT, nx, ns, ind_lb, ind_ub)
+        zl = PrimalVector(VT, nx, ns, ind_lb, ind_ub)
+        zu = PrimalVector(VT, nx, ns, ind_lb, ind_ub)
+        f = PrimalVector(VT, nx, ns, ind_lb, ind_ub)
+        x_trial = PrimalVector(VT, nx, ns, ind_lb, ind_ub)
 
-    @trace(logger,"Initializing KKT system.")
-    kkt = create_kkt_system(
-        ipm_opt.kkt_system,
-        cb,
-        ind_cons,
-        ipm_opt.linear_solver;
-        hessian_approximation=ipm_opt.hessian_approximation,
-        opt_linear_solver=options.linear_solver,
-        qn_options=ipm_opt.quasi_newton_options,
-    )
+        d = UnreducedKKTVector(VT, n, m, nlb, nub, ind_lb, ind_ub)
+        p = UnreducedKKTVector(VT, n, m, nlb, nub, ind_lb, ind_ub)
+        _w1 = UnreducedKKTVector(VT, n, m, nlb, nub, ind_lb, ind_ub)
+        _w2 = UnreducedKKTVector(VT, n, m, nlb, nub, ind_lb, ind_ub)
+        _w3 = UnreducedKKTVector(VT, n, m, nlb, nub, ind_lb, ind_ub)
+        _w4 = UnreducedKKTVector(VT, n, m, nlb, nub, ind_lb, ind_ub)
 
-    @trace(logger,"Initializing iterative solver.")
-    iterator = ipm_opt.iterator(kkt; cnt = cnt, logger = logger, opt = options.iterative_refinement)
+        jacl = VT(undef,n)
+        c_trial = VT(undef, m)
+        y = VT(undef, m)
+        c = VT(undef, m)
+        rhs = VT(undef, m)
 
-    x = PrimalVector(VT, nx, ns, ind_lb, ind_ub)
-    xl = PrimalVector(VT, nx, ns, ind_lb, ind_ub)
-    xu = PrimalVector(VT, nx, ns, ind_lb, ind_ub)
-    zl = PrimalVector(VT, nx, ns, ind_lb, ind_ub)
-    zu = PrimalVector(VT, nx, ns, ind_lb, ind_ub)
-    f = PrimalVector(VT, nx, ns, ind_lb, ind_ub)
-    x_trial = PrimalVector(VT, nx, ns, ind_lb, ind_ub)
+        c_slk = view(c,ind_cons.ind_ineq)
+        x_lr = view(full(x), ind_cons.ind_lb)
+        x_ur = view(full(x), ind_cons.ind_ub)
+        xl_r = view(full(xl), ind_cons.ind_lb)
+        xu_r = view(full(xu), ind_cons.ind_ub)
+        zl_r = view(full(zl), ind_cons.ind_lb)
+        zu_r = view(full(zu), ind_cons.ind_ub)
+        x_trial_lr = view(full(x_trial), ind_cons.ind_lb)
+        x_trial_ur = view(full(x_trial), ind_cons.ind_ub)
+        dx_lr = view(d.xp, ind_cons.ind_lb) # TODO
+        dx_ur = view(d.xp, ind_cons.ind_ub) # TODO
 
-    d = UnreducedKKTVector(VT, n, m, nlb, nub, ind_lb, ind_ub)
-    p = UnreducedKKTVector(VT, n, m, nlb, nub, ind_lb, ind_ub)
-    _w1 = UnreducedKKTVector(VT, n, m, nlb, nub, ind_lb, ind_ub)
-    _w2 = UnreducedKKTVector(VT, n, m, nlb, nub, ind_lb, ind_ub)
-    _w3 = UnreducedKKTVector(VT, n, m, nlb, nub, ind_lb, ind_ub)
-    _w4 = UnreducedKKTVector(VT, n, m, nlb, nub, ind_lb, ind_ub)
+        inertia_correction_method = if ipm_opt.inertia_correction_method == InertiaAuto
+            is_inertia(kkt.linear_solver)::Bool ? InertiaBased : InertiaFree
+        else
+            ipm_opt.inertia_correction_method
+        end
 
-    jacl = VT(undef,n)
-    c_trial = VT(undef, m)
-    y = VT(undef, m)
-    c = VT(undef, m)
-    rhs = VT(undef, m)
+        inertia_corrector = build_inertia_corrector(
+            inertia_correction_method,
+            VT,
+            n, m, nlb, nub, ind_lb, ind_ub
+        )
 
-    c_slk = view(c,ind_cons.ind_ineq)
-    x_lr = view(full(x), ind_cons.ind_lb)
-    x_ur = view(full(x), ind_cons.ind_ub)
-    xl_r = view(full(xl), ind_cons.ind_lb)
-    xu_r = view(full(xu), ind_cons.ind_ub)
-    zl_r = view(full(zl), ind_cons.ind_lb)
-    zu_r = view(full(zu), ind_cons.ind_ub)
-    x_trial_lr = view(full(x_trial), ind_cons.ind_lb)
-    x_trial_ur = view(full(x_trial), ind_cons.ind_ub)
-    dx_lr = view(d.xp, ind_cons.ind_lb) # TODO
-    dx_ur = view(d.xp, ind_cons.ind_ub) # TODO
+        cnt.init_time = time() - cnt.start_time
 
-    inertia_correction_method = if ipm_opt.inertia_correction_method == InertiaAuto
-        is_inertia(kkt.linear_solver)::Bool ? InertiaBased : InertiaFree
-    else
-        ipm_opt.inertia_correction_method
+        return new{
+            T, VT, typeof(ind_cons.ind_ineq), typeof(kkt), typeof(cb), typeof(iterator), typeof(inertia_corrector), typeof(d)
+        }(
+            nlp, cb, kkt,
+            ipm_opt, cnt, options.logger,
+            n, m, nlb, nub,
+            x, y, zl, zu, xl, xu,
+            zero(T), f, c,
+            jacl,
+            d, p,
+            _w1, _w2, _w3, _w4,
+            x_trial, c_trial, zero(T), c_slk, rhs,
+            ind_cons.ind_ineq, ind_cons.ind_fixed, ind_cons.ind_llb, ind_cons.ind_uub,
+            x_lr, x_ur, xl_r, xu_r, zl_r, zu_r, dx_lr, dx_ur, x_trial_lr, x_trial_ur,
+            iterator,
+            zero(T), zero(T), zero(T), zero(T), zero(T), zero(T), zero(T), zero(T), zero(T),
+            " ",
+            zero(T), zero(T), zero(T),
+            Tuple{T, T}[],
+            inertia_corrector, nothing,
+            INITIAL, Dict(),
+        )
+
     end
-
-    inertia_corrector = build_inertia_corrector(
-        inertia_correction_method,
-        VT,
-        n, m, nlb, nub, ind_lb, ind_ub
-    )
-
-    cnt.init_time = time() - cnt.start_time
-
-    return MadNLPSolver(
-        nlp, cb, kkt,
-        ipm_opt, cnt, options.logger,
-        n, m, nlb, nub,
-        x, y, zl, zu, xl, xu,
-        zero(T), f, c,
-        jacl,
-        d, p,
-        _w1, _w2, _w3, _w4,
-        x_trial, c_trial, zero(T), c_slk, rhs,
-        ind_cons.ind_ineq, ind_cons.ind_fixed, ind_cons.ind_llb, ind_cons.ind_uub,
-        x_lr, x_ur, xl_r, xu_r, zl_r, zu_r, dx_lr, dx_ur, x_trial_lr, x_trial_ur,
-        iterator,
-        zero(T), zero(T), zero(T), zero(T), zero(T), zero(T), zero(T), zero(T), zero(T),
-        " ",
-        zero(T), zero(T), zero(T),
-        Tuple{T, T}[],
-        inertia_corrector, nothing,
-        INITIAL, Dict(),
-    )
-
 end
+
 
 include("utils.jl")
 include("kernels.jl")

@@ -1,10 +1,11 @@
-function eval_f_wrapper(solver::AbstractMadNLPSolver, x::PrimalVector{T}) where T
+function eval_f_wrapper(solver::AbstractMadNLPSolver, x::PrimalVector)
+    T = eltype(variable(x))
     nlp = solver.nlp
     cnt = solver.cnt
     @trace(solver.logger,"Evaluating objective.")
     cnt.eval_function_time += @elapsed begin
         sense = (get_minimize(nlp) ? one(T) : -one(T))
-        obj_val = sense * _eval_f_wrapper(solver.cb, variable(x))
+        obj_val = sense * _eval_f_wrapper(solver.cb, variable(x))::T
     end
     cnt.obj_cnt += 1
     if cnt.obj_cnt == 1 && !is_valid(obj_val)
@@ -13,7 +14,8 @@ function eval_f_wrapper(solver::AbstractMadNLPSolver, x::PrimalVector{T}) where 
     return obj_val
 end
 
-function eval_grad_f_wrapper!(solver::AbstractMadNLPSolver, f::PrimalVector{T}, x::PrimalVector{T}) where T
+function eval_grad_f_wrapper!(solver::AbstractMadNLPSolver, f::PrimalVector, x::PrimalVector)
+    T= eltype(variable(x))
     nlp = solver.nlp
     cnt = solver.cnt
     @trace(solver.logger,"Evaluating objective gradient.")
@@ -33,7 +35,7 @@ function eval_grad_f_wrapper!(solver::AbstractMadNLPSolver, f::PrimalVector{T}, 
     return f
 end
 
-function eval_cons_wrapper!(solver::AbstractMadNLPSolver, c::AbstractVector{T}, x::PrimalVector{T}) where T
+function eval_cons_wrapper!(solver::AbstractMadNLPSolver, c::AbstractVector, x::PrimalVector)
     nlp = solver.nlp
     cnt = solver.cnt
     @trace(solver.logger, "Evaluating constraints.")
@@ -51,7 +53,7 @@ function eval_cons_wrapper!(solver::AbstractMadNLPSolver, c::AbstractVector{T}, 
     return c
 end
 
-function eval_jac_wrapper!(solver::AbstractMadNLPSolver, kkt::AbstractKKTSystem, x::PrimalVector{T}) where T
+function eval_jac_wrapper!(solver::AbstractMadNLPSolver, kkt::AbstractKKTSystem, x::PrimalVector)
     nlp = solver.nlp
     cnt = solver.cnt
     ns = length(solver.ind_ineq)
@@ -71,12 +73,12 @@ function eval_jac_wrapper!(solver::AbstractMadNLPSolver, kkt::AbstractKKTSystem,
     return jac
 end
 
-function eval_lag_hess_wrapper!(solver::AbstractMadNLPSolver, kkt::AbstractKKTSystem, x::PrimalVector{T},l::AbstractVector{T};is_resto=false) where T
-    nlp = solver.nlp
+function eval_lag_hess_wrapper!(solver::AbstractMadNLPSolver, kkt::AbstractKKTSystem, x::PrimalVector,l::AbstractVector;is_resto=false)
+    T = eltype(variable(x))
     cnt = solver.cnt
     @trace(solver.logger,"Evaluating Lagrangian Hessian.")
     hess = get_hessian(kkt)
-    scale = (get_minimize(nlp) ? one(T) : -one(T)) * (is_resto ? zero(T) : one(T))
+    scale = (get_minimize(solver.nlp) ? one(T) : -one(T)) * (is_resto ? zero(T) : one(T))
     cnt.eval_function_time += @elapsed _eval_lag_hess_wrapper!(
         solver.cb,
         variable(x),
@@ -118,7 +120,7 @@ function eval_lag_hess_wrapper!(
     x::PrimalVector{T},
     l::AbstractVector{T};
     is_resto=false,
-) where {T, VT, MT, QN<:ExactHessian}
+    ) where {T, VT, MT, QN<:ExactHessian}
     nlp = solver.nlp
     cnt = solver.cnt
     @trace(solver.logger,"Evaluating Lagrangian Hessian.")
