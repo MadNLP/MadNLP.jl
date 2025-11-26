@@ -3,6 +3,9 @@ function eval_f_wrapper(solver::AbstractMadNLPSolver, x::PrimalVector{T}) where 
     cnt = solver.cnt
     @trace(solver.logger,"Evaluating objective.")
     cnt.eval_function_time += @elapsed begin
+        # NOTE: we flip the objective here so the rest of MadNLP internals
+        # are the same, between min and max. when showing the objective value
+        # to the user (in MadNLPExecutionStats) we flip it back (#517).
         sense = (get_minimize(nlp) ? one(T) : -one(T))
         obj_val = sense * _eval_f_wrapper(solver.cb, variable(x))
     end
