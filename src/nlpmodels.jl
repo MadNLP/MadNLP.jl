@@ -196,6 +196,7 @@ struct SparseCallback{
     hess_J::VI
 
     obj_scale::Base.RefValue{T}
+    obj_sign::T
     con_scale::VT
     jac_scale::VT
 
@@ -227,6 +228,7 @@ struct DenseCallback{
     grad_buffer::VT
 
     obj_scale::Base.RefValue{T}
+    obj_sign::T
     con_scale::VT
 
     fixed_handler::FH
@@ -383,6 +385,7 @@ function create_callback(
         hess_I,
         hess_J,
         obj_scale,
+        get_minimize(nlp) ? one(T) : -one(T),
         con_scale,
         jac_scale,
         fixed_handler,
@@ -420,6 +423,7 @@ function create_callback(
         jac_buffer,
         grad_buffer,
         obj_scale,
+        get_minimize(nlp) ? one(T) : -one(T),
         con_scale,
         fixed_handler,
         equality_handler

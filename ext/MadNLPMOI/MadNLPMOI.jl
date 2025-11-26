@@ -1090,8 +1090,7 @@ MOI.get(model::Optimizer, ::MOI.SolveTimeSec) = model.solve_time
 
 function MOI.get(model::Optimizer, attr::MOI.ObjectiveValue)
     MOI.check_result_index_bounds(model, attr)
-    scale = (model.sense == MOI.MAX_SENSE) ? -1 : 1
-    return scale * model.result.objective
+    return model.result.objective
 end
 
 ### MOI.VariablePrimal

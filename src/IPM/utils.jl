@@ -24,7 +24,7 @@ MadNLPExecutionStats(solver::AbstractMadNLPSolver) =MadNLPExecutionStats(
     solver.opt,
     solver.status,
     primal(solver.x)[1:get_nvar(solver.nlp)],
-    solver.obj_val / solver.cb.obj_scale[],
+    solver.cb.obj_sign * solver.obj_val / solver.cb.obj_scale[],
     solver.c ./ solver.cb.con_scale,
     solver.inf_du,
     solver.inf_pr,
@@ -48,7 +48,7 @@ function update!(stats::MadNLPExecutionStats, solver::AbstractMadNLPSolver)
     #     ),
     #     get_uvar(solver.nlp)
     # )
-    stats.objective = solver.obj_val / solver.cb.obj_scale[]
+    stats.objective = solver.cb.obj_sign * solver.obj_val / solver.cb.obj_scale[]
     stats.constraints .= solver.c ./ solver.cb.con_scale .+ solver.rhs
     stats.constraints[solver.ind_ineq] .+= slack(solver.x)
     stats.dual_feas = solver.inf_du
