@@ -80,7 +80,6 @@ Once the model `nlp` loaded on the GPU, you can solve it using the function `mad
 ```@example gpu
 results = madnlp(nlp; linear_solver=CUDSSSolver)
 nothing
-
 ```
 
 When solving an optimization problem on the GPU, MadNLP proceeds to some automatic modifications. In order:
