@@ -6,7 +6,6 @@ CurrentModule = MadNLP
 ```@setup gpu
 using NLPModels
 using MadNLP
-
 ```
 
 MadNLP supports the solution of large-scale optimization problems
