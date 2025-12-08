@@ -27,7 +27,6 @@ We import the aforementioned packages as:
 using ExaModels
 using MadNLPGPU
 using CUDA
-
 ```
 
 !!! info
