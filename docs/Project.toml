@@ -11,5 +11,5 @@ NLPModels = "a4795742-8479-5a88-8948-cc11e1c8c1a6"
 Quadmath = "be4d8f0f-7fa4-5f49-b795-2f01399ab2dd"
 SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 
-[source]
+[sources]
 HybridKKT = { url = "https://github.com/MadNLP/HybridKKT.jl", rev = "master" }
