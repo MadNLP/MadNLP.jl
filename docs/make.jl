@@ -18,6 +18,7 @@ makedocs(
         "Quickstart" => "quickstart.md",
         "Options" => "options.md",
         "Tutorials" => [
+            "GPU acceleration" => "tutorials/gpu.md",
             "Multi-precision" => "tutorials/multiprecision.md",
             "Warm-start" => "tutorials/warmstart.md",
             "LBFGS" => "tutorials/lbfgs.md",
