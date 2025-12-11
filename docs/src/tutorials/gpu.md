@@ -89,7 +89,7 @@ When solving an optimization problem on the GPU, MadNLP proceeds to some automat
 4. The new condensed KKT system increases the ill-conditioning inherent to the interior-point method, amplifying the loss of accuracy when the iterates get close to a local solution. As a result, the termination tolerance `tol` is also increased to `1e-4` to recover convergence.
 
 As a result, the convergence observed can be significantly different than what we
-observe on the GPU. In particular, relaxing the parameter `bound_relax_factor` has a non-marginal impact
+observe on the CPU. In particular, relaxing the parameter `bound_relax_factor` has a non-marginal impact
 on the feasible set's geometry. You can limit the loss of accuracy by
 specifying explicitly the relaxation and tolerance parameters to MadNLP:
 ```@example gpu
@@ -102,6 +102,7 @@ results = madnlp(
 nothing
 ```
 Decreasing the tolerance `tol` too much is likely to cause some numerical issues inside the algorithm.
+In general, we recommend keeping the value of `bound_relax_factor` below `tol`.
 
 
 ## Solving the problem on the GPU with HyKKT
