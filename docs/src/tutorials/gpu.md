@@ -114,7 +114,7 @@ strategy is more accurate (it doesn't relax the equality constraints in the prob
 slightly slower (it computes the descent direction using a conjugate gradient at every IPM iterations).
 
 Once the package `HybridKKT` installed, the solution proceeds as
-```@example gpu
+```
 using HybridKKT
 
 results = madnlp(
