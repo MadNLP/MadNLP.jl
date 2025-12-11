@@ -95,11 +95,9 @@ end
     rho::T = 1000.
 
     # Barrier
-    mu_init::T = 1e-1
-    mu_min::T = min(1e-4, tol ) / (barrier_tol_factor + 1) # by courtesy of Ipopt
-    mu_superlinear_decrease_power::T = 1.5
+    # mu_min by courtesy of Ipopt
+    barrier::AbstractBarrierUpdate{T} = MonotoneUpdate(tol, barrier_tol_factor)
     tau_min::T = 0.99
-    mu_linear_decrease_factor::T = .2
 end
 
 is_dense_callback(nlp) = hasmethod(jac_dense!, Tuple{typeof(nlp), AbstractVector, AbstractMatrix}) &&
@@ -125,13 +123,7 @@ end
 get_tolerance(::Type{T},::Type{KKT}) where {T, KKT} = 10^round(log10(eps(T))/2)
 get_tolerance(::Type{T},::Type{SparseCondensedKKTSystem}) where T = 10^(round(log10(eps(T))/4))
 
-function default_sparse_solver(nlp::AbstractNLPModel)
-    if isdefined(Main, :MadNLPHSL)
-        Main.MadNLPHSL.Ma27Solver
-    else
-        MumpsSolver
-    end
-end
+default_sparse_solver(nlp::AbstractNLPModel) = MumpsSolver
 
 function check_option_sanity(options)
     is_kkt_dense = options.kkt_system <: AbstractDenseKKTSystem
@@ -176,7 +168,7 @@ function load_options(nlp::AbstractNLPModel{T,VT}; options...) where {T, VT}
     linear_solver_options = set_options!(opt_ipm, options)
     check_option_sanity(opt_ipm)
     # Initiate linear-solver options
-    opt_linear_solver = default_options(opt_ipm.linear_solver)
+    opt_linear_solver = default_options(nlp, opt_ipm.kkt_system, opt_ipm.linear_solver)
     iterator_options = set_options!(opt_linear_solver, linear_solver_options)
     # Initiate iterator options
     opt_iterator = default_options(opt_ipm.iterator, opt_ipm.tol)
@@ -202,3 +194,14 @@ function load_options(nlp::AbstractNLPModel{T,VT}; options...) where {T, VT}
     )
 end
 
+"""
+        default_options(
+                nlp::AbstractNLPModel,
+                kkt::Type,
+                linear_solver::Type;
+                iterator_options=Dict{Symbol,Any}(),
+        )
+
+default options for `linear_solver` associated to the KKT system `kkt_system` and `nlp`.
+"""
+default_options(nlp::AbstractNLPModel, kkt, linear_solver) = default_options(linear_solver)

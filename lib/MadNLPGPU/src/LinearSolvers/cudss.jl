@@ -6,7 +6,7 @@ import CUDSS
     cudss_ordering::ORDERING = DEFAULT_ORDERING
     cudss_perm::Vector{Cint} = Cint[]
     cudss_ir::Int = 0
-    cudss_ir_tol::Float64 = 1e-8  # currently ignored in cuDSS 0.6
+    cudss_ir_tol::Float64 = 1e-8  # currently ignored in cuDSS 0.7
     cudss_pivot_threshold::Float64 = 0.0
     cudss_pivot_epsilon::Float64 = 0.0
     cudss_matching_alg::String = "default"
@@ -18,6 +18,10 @@ import CUDSS
     cudss_hybrid_execute::Bool = false
     cudss_hybrid_memory::Bool = false
     cudss_hybrid_memory_limit::Int = 0
+    cudss_superpanels::Bool = true
+    cudss_schur::Bool = false
+    cudss_deterministic::Bool = false
+    cudss_device_indices::Vector{Cint} = Cint[]
 end
 
 function set_cudss_options!(solver::CUDSS.CudssSolver, opt::CudssSolverOptions)
@@ -26,7 +30,7 @@ function set_cudss_options!(solver::CUDSS.CudssSolver, opt::CudssSolverOptions)
         CUDSS.cudss_set(solver, "ir_tol", opt.cudss_ir_tol)
     end
     if opt.cudss_hybrid_memory
-        CUDSS.cudss_set(solver, "hybrid_mode", 1)
+        CUDSS.cudss_set(solver, "hybrid_memory_mode", 1)
         if opt.cudss_hybrid_memory_limit > 0
             CUDSS.cudss_set(solver, "hybrid_device_memory_limit", opt.cudss_hybrid_memory_limit)
         end
@@ -58,6 +62,20 @@ function set_cudss_options!(solver::CUDSS.CudssSolver, opt::CudssSolverOptions)
     if opt.cudss_solve_alg != "default"
         CUDSS.cudss_set(solver, "solve_alg", opt.cudss_solve_alg)
     end
+    if !opt.cudss_superpanels
+        CUDSS.cudss_set(solver, "use_superpanels", 0)
+    end
+    if opt.cudss_schur
+        CUDSS.cudss_set(solver, "schur_mode", 1)
+    end
+    if opt.cudss_deterministic
+        CUDSS.cudss_set(solver, "deterministic_mode", 1)
+    end
+    if !isempty(opt.cudss_device_indices)
+        cudss_device_count = length(opt.cudss_device_indices)
+        CUDSS.cudss_set(solver, "device_count", cudss_device_count)
+        CUDSS.cudss_set(solver, "device_indices", opt.cudss_device_indices)
+    end
 end
 
 mutable struct CUDSSSolver{T,V} <: MadNLP.AbstractLinearSolver{T}
@@ -66,7 +84,6 @@ mutable struct CUDSSSolver{T,V} <: MadNLP.AbstractLinearSolver{T}
     x_gpu::CUDSS.CudssMatrix{T}
     b_gpu::CUDSS.CudssMatrix{T}
     buffer::V
-    fresh_factorization::Bool
 
     opt::CudssSolverOptions
     logger::MadNLPLogger
@@ -87,8 +104,7 @@ function CUDSSSolver(
     (opt.cudss_algorithm == MadNLP.CHOLESKY) && (structure = "SPD")
     (opt.cudss_algorithm == MadNLP.LDL) && (structure = "S")
 
-    matrix = CUSPARSE.CuSparseMatrixCSR(csc.colPtr, csc.rowVal, csc.nzVal, csc.dims)
-    solver = CUDSS.CudssSolver(matrix, structure, view)
+    solver = CUDSS.CudssSolver(csc.colPtr, csc.rowVal, csc.nzVal, structure, view)
     set_cudss_options!(solver, opt)
 
     if opt.cudss_ordering != DEFAULT_ORDERING
@@ -117,29 +133,25 @@ function CUDSSSolver(
     # The phase "analysis" is "reordering" combined with "symbolic_factorization"
     x_gpu = CUDSS.CudssMatrix(T, n)
     b_gpu = CUDSS.CudssMatrix(T, n)
-    CUDSS.cudss("analysis", solver, x_gpu, b_gpu)
+    CUDSS.cudss("analysis", solver, x_gpu, b_gpu, asynchronous=true)
 
     # Allocate additional buffer for iterative refinement
     # Always allocate it to support dynamic updates to opt.cudss_ir
     buffer = CuVector{T}(undef, n)
 
-    # Indicates whether this is the first factorization or a refactorization
-    fresh_factorization = true
-
     return CUDSSSolver(
         solver, csc,
         x_gpu, b_gpu, buffer,
-        fresh_factorization, opt, logger,
+        opt, logger,
     )
 end
 
 function MadNLP.factorize!(M::CUDSSSolver)
-    CUDSS.cudss_set(M.inner.matrix, nonzeros(M.tril))
-    if M.fresh_factorization
-        CUDSS.cudss("factorization", M.inner, M.x_gpu, M.b_gpu)
-        M.fresh_factorization = false
+    CUDSS.cudss_update(M.inner.matrix, nonzeros(M.tril))
+    if M.inner.fresh_factorization
+        CUDSS.cudss("factorization", M.inner, M.x_gpu, M.b_gpu, asynchronous=true)
     else
-        CUDSS.cudss("refactorization", M.inner, M.x_gpu, M.b_gpu)
+        CUDSS.cudss("refactorization", M.inner, M.x_gpu, M.b_gpu, asynchronous=true)
     end
     if !M.opt.cudss_hybrid_memory && !M.opt.cudss_hybrid_execute
         CUDA.synchronize()
@@ -150,12 +162,12 @@ end
 function MadNLP.solve!(M::CUDSSSolver{T,V}, xb::V) where {T,V}
     if M.opt.cudss_ir > 0
         copyto!(M.buffer, xb)
-        CUDSS.cudss_set(M.b_gpu, M.buffer)
+        CUDSS.cudss_update(M.b_gpu, M.buffer)
     else
-        CUDSS.cudss_set(M.b_gpu, xb)
+        CUDSS.cudss_update(M.b_gpu, xb)
     end
-    CUDSS.cudss_set(M.x_gpu, xb)
-    CUDSS.cudss("solve", M.inner, M.x_gpu, M.b_gpu)
+    CUDSS.cudss_update(M.x_gpu, xb)
+    CUDSS.cudss("solve", M.inner, M.x_gpu, M.b_gpu, asynchronous=true)
     if !M.opt.cudss_hybrid_memory && !M.opt.cudss_hybrid_execute
         CUDA.synchronize()
     end
@@ -167,18 +179,28 @@ MadNLP.default_options(::Type{CUDSSSolver}) = CudssSolverOptions()
 MadNLP.is_inertia(M::CUDSSSolver) = true  # Uncomment if MadNLP.LU is supported -- (M.opt.cudss_algorithm ∈ (MadNLP.CHOLESKY, MadNLP.LDL))
 function inertia(M::CUDSSSolver)
     n = size(M.tril, 1)
+    info = CUDSS.cudss_get(M.inner, "info")
+
+    # cudss_set(M.inner, "diag", buffer)  # specify the vector to update in `cudss_get`
+    # cudss_get(M.inner, "diag")          # update the vector specified in `cudss_set`
+    #
+    # `buffer` contains the diagonal of the factorized matrix.
+
     if M.opt.cudss_algorithm == MadNLP.CHOLESKY
-        info = CUDSS.cudss_get(M.inner, "info")
         if info == 0
             return (n, 0, 0)
         else
-            return (n-2, 1, 1)
+            return (n-2, 1, 1) # if factorization fails, return a dummy inertia
         end
     elseif M.opt.cudss_algorithm == MadNLP.LDL
         # N.B.: cuDSS does not always return the correct inertia.
-        (k, l) = CUDSS.cudss_get(M.inner, "inertia")
-        @assert 0 ≤ k + l ≤ n
-        return (k, n - k - l, l)
+        if info == 0
+            (k, l) = CUDSS.cudss_get(M.inner, "inertia")
+            @assert 0 ≤ k + l ≤ n
+            return (k, n - k - l, l)
+        else
+            return (0, 1, n) # if factorization fails, return a dummy inertia
+        end
     else
         error(M.logger, "Unsupported cudss_algorithm")
     end

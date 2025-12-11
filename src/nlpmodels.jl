@@ -164,6 +164,7 @@ struct SparseCallback{
     hess_J::VI
 
     obj_scale::Base.RefValue{T}
+    obj_sign::T
     con_scale::VT
     jac_scale::VT
 
@@ -201,6 +202,7 @@ struct DenseCallback{
     grad_buffer::VT
 
     obj_scale::Base.RefValue{T}
+    obj_sign::T
     con_scale::VT
 
     fixed_handler::FH
@@ -490,6 +492,7 @@ function create_callback(
         hess_I,
         hess_J,
         obj_scale,
+        get_minimize(nlp) ? one(T) : -one(T),
         con_scale,
         jac_scale,
         fixed_handler,
@@ -553,6 +556,7 @@ function create_callback(
         con_buffer,
         grad_buffer,
         obj_scale,
+        get_minimize(nlp) ? one(T) : -one(T),
         con_scale,
         fixed_handler,
         equality_handler,
@@ -644,7 +648,7 @@ get_y0(cb::AbstractCallback) = get_y0(cb.nlp)
 get_lvar(cb::AbstractCallback) = get_lvar(cb.nlp)
 get_uvar(cb::AbstractCallback) = get_uvar(cb.nlp)
 # Getters to unpack solution
-unpack_obj(cb::AbstractCallback, obj_val) = obj_val ./ cb.obj_scale[]
+unpack_obj(cb::AbstractCallback, obj_val) = cb.obj_sign * obj_val ./ cb.obj_scale[]
 function unpack_cons!(c_full::AbstractVector, cb::AbstractCallback, c::AbstractVector)
     c_full .= c ./ cb.con_scale
 end

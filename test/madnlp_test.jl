@@ -94,6 +94,7 @@ testset = [
         "SparseUnreducedKKTSystem + InertiaFree",
         ()->MadNLP.Optimizer(
             inertia_correction_method=MadNLP.InertiaFree,
+            linear_solver=UmfpackSolver,
             kkt_system=MadNLP.SparseUnreducedKKTSystem,
             print_level=MadNLP.ERROR),
         []
@@ -227,7 +228,7 @@ end
     MadNLP.eval_lag_hess_wrapper!(solver, kkt, x, solver.y)
 
     n_allocs = @allocated MadNLP.eval_f_wrapper(solver, x)
-    @test n_allocs == 16 # objective is still allocating
+    @test n_allocs == 0
     n_allocs = @allocated MadNLP.eval_grad_f_wrapper!(solver, f, x)
     @test n_allocs == 0
     n_allocs = @allocated MadNLP.eval_cons_wrapper!(solver, c, x)
@@ -261,6 +262,22 @@ end
         kkt_system = MadNLP.SparseCondensedKKTSystem
     )
     @test result.status == MadNLP.SOLVE_SUCCEEDED
+end
+
+@testset "Adaptive barrier" begin
+    nlp = MadNLPTests.HS15Model(; x0=[1.0, 1.0])
+    ref = madnlp(nlp; print_level = MadNLP.ERROR)
+    for barrier in [
+        MadNLP.LOQOUpdate(),
+        MadNLP.QualityFunctionUpdate(),
+        MadNLP.QualityFunctionUpdate(; globalization=false),
+    ]
+        results = madnlp(nlp; print_level = MadNLP.ERROR, barrier=barrier)
+        @test results.status == MadNLP.SOLVE_SUCCEEDED
+        @test results.objective ≈ ref.objective
+        @test results.solution ≈ ref.solution
+        @test results.multipliers ≈ ref.multipliers
+    end
 end
 
 @testset "Issue #430" begin
