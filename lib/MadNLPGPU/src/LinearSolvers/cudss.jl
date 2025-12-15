@@ -133,12 +133,12 @@ function CUDSSSolver(
     # Check if we want to use the batch solver for matrices with a common sparsity pattern
     nbatch = solver.matrix.nbatch
     if nbatch > 1
-        CUDSS.cudss_set(solver, "ubatch_size", nbatch)
+        CUDSS.cudss_set(solver, "ubatch_size", nbatch=nbatch)
     end
 
     # The phase "analysis" is "reordering" combined with "symbolic_factorization"
-    x_gpu = CUDSS.CudssMatrix(T, n; nbatch)
-    b_gpu = CUDSS.CudssMatrix(T, n; nbatch)
+    x_gpu = CUDSS.CudssMatrix(T, n; nbatch=nbatch)
+    b_gpu = CUDSS.CudssMatrix(T, n; nbatch=nbatch)
     CUDSS.cudss("analysis", solver, x_gpu, b_gpu, asynchronous=true)
 
     # Allocate additional buffer for iterative refinement
