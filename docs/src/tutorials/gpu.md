@@ -84,7 +84,7 @@ nothing
 
 When solving an optimization problem on the GPU, MadNLP proceeds to some automatic modifications. In order:
 1. It increases the parameter `bound_relax_factor` to `1e-4`.
-2. It relaxes all the equality constraints ``g(x) = 0`` as a pair of inequality constraints ``-tau \leq g(x) \leq \tau``, with ``tau`` being equal to `bound_relax_factor`;
+2. It relaxes all the equality constraints ``g(x) = 0`` as a pair of inequality constraints ``-\tau \leq g(x) \leq \tau``, with ``tau`` being equal to `bound_relax_factor`;
 3. It reduces the KKT system down to sparse condensed system, exploiting the fact that the relaxed problem has only (potentially tight) inequality constraints. Up to a given primal regularization, the resulting KKT system is positive definite and can be factorized using a pivoting-free factorization routines (e.g. a Cholesky or an LDL' decompositions). This is the so-called *Lifted-KKT* formulation documented in [this article](https://arxiv.org/html/2405.14236v2).
 4. The new condensed KKT system increases the ill-conditioning inherent to the interior-point method, amplifying the loss of accuracy when the iterates get close to a local solution. As a result, the termination tolerance `tol` is also increased to `1e-4` to recover convergence.
 
