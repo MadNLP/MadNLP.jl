@@ -87,7 +87,7 @@ nothing
 We observe that MadNLP converges in 93 iterations. As expected, the number of Hessian
 evaluations is 0.
 
-## How to tune the options in LBGS?
+## How to tune the options in LBFGS?
 
 You can tune the LBFGS options by using the option `quasi_newton_options`.
 The option takes as input a `QuasiNewtonOptions` structure, with the following attributes
