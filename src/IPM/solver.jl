@@ -153,6 +153,12 @@ function solve!(
         set_options!(solver.opt, kwargs)
     end
 
+    # If the problem has no free variable, do nothing
+    if solver.n == 0
+        update!(stats, solver)
+        return stats
+    end
+
     try
         if solver.status == INITIAL
             @notice(solver.logger,"This is $(introduce()), running with $(introduce(solver.kkt.linear_solver))\n")

@@ -13,12 +13,10 @@ cb = MadNLP.create_callback(
     MadNLP.SparseCallback,
     nlp,
 )
-ind_cons = MadNLP.get_index_constraints(nlp)
 linear_solver = LapackCPUSolver
 kkt = MadNLP.create_kkt_system(
     MadNLP.SparseKKTSystem,
     cb,
-    ind_cons,
     linear_solver,
 )
 

@@ -10,7 +10,6 @@ using LinearAlgebra
 
     ind_lb = [2,3,4]
     ind_ub = [4,5,6]
-
     rhs = KKTVector(VT, n, m, nlb, nub, ind_lb, ind_ub)
     @test length(rhs) == length(MadNLP.full(rhs))
     @test MadNLP.number_primal(rhs) == length(MadNLP.primal(rhs)) == n
@@ -36,8 +35,6 @@ end
     linear_solver = MadNLP.LapackCPUSolver
 
     nlp = MadNLPTests.HS15Model()
-    ind_cons = MadNLP.get_index_constraints(nlp)
-
     cb = MadNLP.create_callback(
         Callback, nlp,
     )
@@ -45,7 +42,6 @@ end
     kkt = MadNLP.create_kkt_system(
         KKTSystem,
         cb,
-        ind_cons,
         linear_solver;
     )
     MadNLPTests.test_kkt_system(kkt, cb)
@@ -59,7 +55,6 @@ end
 ]
     linear_solver = MadNLP.LapackCPUSolver
     nlp = MadNLPTests.HS15Model()
-    ind_cons = MadNLP.get_index_constraints(nlp)
     cb = MadNLP.create_callback(Callback, nlp)
     # Define options for LBFGS
     p = 20
@@ -68,7 +63,6 @@ end
     kkt = MadNLP.create_kkt_system(
         KKTSystem,
         cb,
-        ind_cons,
         linear_solver;
         hessian_approximation=MadNLP.CompactLBFGS,
         qn_options=qn_options,

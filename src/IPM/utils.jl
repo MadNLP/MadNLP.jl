@@ -20,40 +20,45 @@ mutable struct MadNLPExecutionStats{T, VT} <: AbstractExecutionStats
     counters::MadNLPCounters
 end
 
-MadNLPExecutionStats(solver::AbstractMadNLPSolver) =MadNLPExecutionStats(
-    solver.opt,
-    solver.status,
-    primal(solver.x)[1:get_nvar(solver.nlp)],
-    solver.cb.obj_sign * solver.obj_val / solver.cb.obj_scale[],
-    solver.c ./ solver.cb.con_scale,
-    solver.inf_du,
-    solver.inf_pr,
-    copy(solver.y),
-    primal(solver.zl)[1:get_nvar(solver.nlp)],
-    primal(solver.zu)[1:get_nvar(solver.nlp)],
-    0,
-    solver.cnt,
-)
+function MadNLPExecutionStats(solver::MadNLPSolver{T, VT}) where {T, VT}
+    n, m = get_nvar(solver.nlp), get_ncon(solver.nlp)
+    x = similar(VT, n)
+    zl = similar(VT, n)
+    zu = similar(VT, n)
+    c = similar(VT, m)
+    unpack_cons!(c, solver.cb, solver.c)
+    unpack_x!(x, solver.cb, variable(solver.x))
+    unpack_z!(zl, solver.cb, variable(solver.zl))
+    unpack_z!(zu, solver.cb, variable(solver.zu))
+    return MadNLPExecutionStats(
+        solver.opt,
+        solver.status,
+        x,
+        unpack_obj(solver.cb, solver.obj_val),
+        c,
+        solver.inf_du,
+        solver.inf_pr,
+        copy(solver.y),
+        zl,
+        zu,
+        0,
+        solver.cnt,
+    )
+end
 
 function update!(stats::MadNLPExecutionStats, solver::AbstractMadNLPSolver)
     stats.status = solver.status
-    stats.solution .= @view(primal(solver.x)[1:get_nvar(solver.nlp)])
-    stats.multipliers .= (solver.y .* solver.cb.con_scale) ./ solver.cb.obj_scale[]
-    stats.multipliers_L .= @view(primal(solver.zl)[1:get_nvar(solver.nlp)]) ./ solver.cb.obj_scale[]
-    stats.multipliers_U .= @view(primal(solver.zu)[1:get_nvar(solver.nlp)]) ./ solver.cb.obj_scale[]
-    # stats.solution .= min.(
-    #     max.(
-    #         @view(primal(solver.x)[1:get_nvar(solver.nlp)]),
-    #         get_lvar(solver.nlp)
-    #     ),
-    #     get_uvar(solver.nlp)
-    # )
-    stats.objective = solver.cb.obj_sign * solver.obj_val / solver.cb.obj_scale[]
-    stats.constraints .= solver.c ./ solver.cb.con_scale .+ solver.rhs
+    unpack_x!(stats.solution, solver.cb, variable(solver.x))
+    unpack_y!(stats.multipliers, solver.cb, solver.y)
+    unpack_z!(stats.multipliers_L, solver.cb, variable(solver.zl))
+    unpack_z!(stats.multipliers_U, solver.cb, variable(solver.zu))
+    stats.objective = unpack_obj(solver.cb, solver.obj_val)
+    unpack_cons!(stats.constraints, solver.cb, solver.c)
+    stats.constraints .+= solver.rhs
     stats.constraints[solver.ind_ineq] .+= slack(solver.x)
     stats.dual_feas = solver.inf_du
     stats.primal_feas = solver.inf_pr
-    update_z!(solver.cb, stats.multipliers_L, stats.multipliers_U, solver.jacl)
+    update_z!(solver.cb, stats.solution, stats.multipliers, stats.multipliers_L, stats.multipliers_U, solver.jacl)
     stats.iter = solver.cnt.k
     return stats
 end

@@ -139,7 +139,6 @@ if VERSION >= v"1.10"
     )
 end
 
-
 for (name,optimizer_constructor,exclude) in testset
     test_madnlp(name,optimizer_constructor,exclude)
 end
@@ -163,6 +162,34 @@ end
     solver = MadNLP.MadNLPSolver(nlp; print_level=MadNLP.ERROR)
     MadNLP.solve!(solver; x=x0, y=y0, zl=zl, zu=zu)
     @test solver.status == MadNLP.SOLVE_SUCCEEDED
+end
+
+@testset "Fixed variables" begin
+    nlp = MadNLPTests.HS15Model()
+    solver = MadNLPSolver(nlp; print_level=MadNLP.ERROR)
+    MadNLP.solve!(solver)
+    @test isa(solver.cb.fixed_handler, MadNLP.NoFixedVariables)
+
+    # Fix first variable:
+    nlp.meta.lvar[1] = 0.5
+    solver_sparse = MadNLP.MadNLPSolver(nlp; callback=MadNLP.SparseCallback, print_level=MadNLP.ERROR)
+    sol_sparse = MadNLP.solve!(solver_sparse)
+    @test length(solver_sparse.ind_fixed) == 1
+    @test isa(solver_sparse.cb.fixed_handler, MadNLP.MakeParameter)
+    @test solver_sparse.n == 3 # fixed variables are removed
+
+    solver_dense = MadNLP.MadNLPSolver(nlp; callback=MadNLP.DenseCallback, print_level=MadNLP.ERROR)
+    sol_dense = MadNLP.solve!(solver_dense)
+    @test length(solver_dense.ind_fixed) == 1
+    @test isa(solver_dense.cb.fixed_handler, MadNLP.MakeParameter)
+    @test solver_dense.n == 4 # fixed variables are frozen
+
+    @test sol_dense.iter == sol_sparse.iter
+    @test sol_dense.objective == sol_sparse.objective
+    @test sol_dense.solution == sol_sparse.solution
+    @test sol_dense.multipliers == sol_sparse.multipliers
+    @test sol_dense.multipliers_L == sol_sparse.multipliers_L
+    @test sol_dense.multipliers_U == sol_sparse.multipliers_U
 end
 
 @testset "MadNLP warmstart" begin

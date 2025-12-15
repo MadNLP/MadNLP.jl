@@ -11,6 +11,7 @@ jobs:
   build:
     runs-on:
       - self-hosted
+      - cuda
     steps:
       - uses: actions/checkout@v2
       - uses: julia-actions/install-juliaup@v2

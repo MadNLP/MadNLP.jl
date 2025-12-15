@@ -904,19 +904,6 @@ function get_ftype(filter,theta,theta_trial,varphi,varphi_trial,switching_condit
     return " "
 end
 
-# fixed variable treatment ----------------------------------------------------
-function _get_fixed_variable_index(
-    mat::SparseMatrixCSC{Tv,Ti1}, ind_fixed::Vector{Ti2}
-) where {Tv,Ti1,Ti2}
-    fixed_aug_index = Int[]
-    for i in ind_fixed
-        append!(fixed_aug_index,append!(collect(mat.colptr[i]+1:mat.colptr[i+1]-1)))
-    end
-    append!(fixed_aug_index,setdiff!(Base._findin(mat.rowval,ind_fixed),mat.colptr))
-
-    return fixed_aug_index
-end
-
 function dual_inf_perturbation!(px, ind_llb, ind_uub, mu, kappa_d)
     px[ind_llb] .-= mu*kappa_d
     px[ind_uub] .+= mu*kappa_d

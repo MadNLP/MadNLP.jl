@@ -136,20 +136,13 @@ function MadNLPSolver(nlp::AbstractNLPModel{T,VT}; kwargs...) where {T, VT}
     set_blas_num_threads(ipm_opt.blas_num_threads; permanent=true)
     @trace(logger,"Initializing variables.")
 
-    ind_cons = get_index_constraints(
-        get_lvar(nlp), get_uvar(nlp),
-        get_lcon(nlp), get_ucon(nlp);
-        fixed_variable_treatment=ipm_opt.fixed_variable_treatment,
-        equality_treatment=ipm_opt.equality_treatment
-    )
+    ind_lb = cb.ind_lb
+    ind_ub = cb.ind_ub
 
-    ind_lb = ind_cons.ind_lb
-    ind_ub = ind_cons.ind_ub
-
-    ns = length(ind_cons.ind_ineq)
-    nx = get_nvar(nlp)
+    ns = length(cb.ind_ineq)
+    nx = n_variables(cb)
     n = nx+ns
-    m = get_ncon(nlp)
+    m = n_constraints(cb)
     nlb = length(ind_lb)
     nub = length(ind_ub)
 
@@ -157,7 +150,6 @@ function MadNLPSolver(nlp::AbstractNLPModel{T,VT}; kwargs...) where {T, VT}
     kkt = create_kkt_system(
         ipm_opt.kkt_system,
         cb,
-        ind_cons,
         ipm_opt.linear_solver;
         hessian_approximation=ipm_opt.hessian_approximation,
         opt_linear_solver=options.linear_solver,
@@ -188,17 +180,17 @@ function MadNLPSolver(nlp::AbstractNLPModel{T,VT}; kwargs...) where {T, VT}
     c = VT(undef, m)
     rhs = VT(undef, m)
 
-    c_slk = view(c,ind_cons.ind_ineq)
-    x_lr = view(full(x), ind_cons.ind_lb)
-    x_ur = view(full(x), ind_cons.ind_ub)
-    xl_r = view(full(xl), ind_cons.ind_lb)
-    xu_r = view(full(xu), ind_cons.ind_ub)
-    zl_r = view(full(zl), ind_cons.ind_lb)
-    zu_r = view(full(zu), ind_cons.ind_ub)
-    x_trial_lr = view(full(x_trial), ind_cons.ind_lb)
-    x_trial_ur = view(full(x_trial), ind_cons.ind_ub)
-    dx_lr = view(d.xp, ind_cons.ind_lb) # TODO
-    dx_ur = view(d.xp, ind_cons.ind_ub) # TODO
+    c_slk = view(c,cb.ind_ineq)
+    x_lr = view(full(x), cb.ind_lb)
+    x_ur = view(full(x), cb.ind_ub)
+    xl_r = view(full(xl), cb.ind_lb)
+    xu_r = view(full(xu), cb.ind_ub)
+    zl_r = view(full(zl), cb.ind_lb)
+    zu_r = view(full(zu), cb.ind_ub)
+    x_trial_lr = view(full(x_trial), cb.ind_lb)
+    x_trial_ur = view(full(x_trial), cb.ind_ub)
+    dx_lr = view(d.xp, cb.ind_lb) # TODO
+    dx_ur = view(d.xp, cb.ind_ub) # TODO
 
     inertia_correction_method = if ipm_opt.inertia_correction_method == InertiaAuto
         is_inertia(kkt.linear_solver)::Bool ? InertiaBased : InertiaFree
@@ -224,7 +216,7 @@ function MadNLPSolver(nlp::AbstractNLPModel{T,VT}; kwargs...) where {T, VT}
         d, p,
         _w1, _w2, _w3, _w4,
         x_trial, c_trial, zero(T), c_slk, rhs,
-        ind_cons.ind_ineq, ind_cons.ind_fixed, ind_cons.ind_llb, ind_cons.ind_uub,
+        cb.ind_ineq, cb.ind_fixed, cb.ind_llb, cb.ind_uub,
         x_lr, x_ur, xl_r, xu_r, zl_r, zu_r, dx_lr, dx_ur, x_trial_lr, x_trial_ur,
         iterator,
         zero(T), zero(T), zero(T), zero(T), zero(T), zero(T), zero(T), zero(T), zero(T),

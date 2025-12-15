@@ -100,8 +100,8 @@ end
     tau_min::T = 0.99
 end
 
-is_dense_callback(nlp) = hasmethod(MadNLP.jac_dense!, Tuple{typeof(nlp), AbstractVector, AbstractMatrix}) &&
-    hasmethod(MadNLP.hess_dense!, Tuple{typeof(nlp), AbstractVector, AbstractVector, AbstractMatrix})
+is_dense_callback(nlp) = hasmethod(jac_dense!, Tuple{typeof(nlp), AbstractVector, AbstractMatrix}) &&
+    hasmethod(hess_dense!, Tuple{typeof(nlp), AbstractVector, AbstractVector, AbstractMatrix})
 
 # smart option presets
 function MadNLPOptions{T}(
