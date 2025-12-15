@@ -130,14 +130,20 @@ function CUDSSSolver(
         CUDSS.cudss_set(solver, "user_perm", opt.cudss_perm)
     end
 
+    # Check if we want to use the batch solver for matrices with a common sparsity pattern
+    nbatch = solver.matrix.nbatch
+    if nbatch > 1
+        CUDSS.cudss_set(solver, "ubatch_size", nbatch)
+    end
+
     # The phase "analysis" is "reordering" combined with "symbolic_factorization"
-    x_gpu = CUDSS.CudssMatrix(T, n)
-    b_gpu = CUDSS.CudssMatrix(T, n)
+    x_gpu = CUDSS.CudssMatrix(T, n; nbatch)
+    b_gpu = CUDSS.CudssMatrix(T, n; nbatch)
     CUDSS.cudss("analysis", solver, x_gpu, b_gpu, asynchronous=true)
 
     # Allocate additional buffer for iterative refinement
     # Always allocate it to support dynamic updates to opt.cudss_ir
-    buffer = CuVector{T}(undef, n)
+    buffer = CuVector{T}(undef, n * nbatch)
 
     return CUDSSSolver(
         solver, csc,
@@ -176,8 +182,9 @@ end
 
 MadNLP.input_type(::Type{CUDSSSolver}) = :csc
 MadNLP.default_options(::Type{CUDSSSolver}) = CudssSolverOptions()
-MadNLP.is_inertia(M::CUDSSSolver) = true  # Uncomment if MadNLP.LU is supported -- (M.opt.cudss_algorithm ∈ (MadNLP.CHOLESKY, MadNLP.LDL))
+MadNLP.is_inertia(M::CUDSSSolver) = (M.inner.matrix.nbatch == 1)  # Uncomment if MadNLP.LU is supported -- (M.opt.cudss_algorithm ∈ (MadNLP.CHOLESKY, MadNLP.LDL))
 function inertia(M::CUDSSSolver)
+    @assert M.inner.matrix.nbatch == 1
     n = size(M.tril, 1)
     info = CUDSS.cudss_get(M.inner, "info")
 
