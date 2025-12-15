@@ -20,8 +20,9 @@ mutable struct MadNLPExecutionStats{T, VT} <: AbstractExecutionStats
     counters::MadNLPCounters
 end
 
-function MadNLPExecutionStats(solver::MadNLPSolver{T, VT}) where {T, VT}
+function MadNLPExecutionStats(solver::AbstractMadNLPSolver{T}) where {T}
     n, m = get_nvar(solver.nlp), get_ncon(solver.nlp)
+    VT = typeof(get_x0(solver.nlp))
     x = similar(VT, n)
     zl = similar(VT, n)
     zu = similar(VT, n)
