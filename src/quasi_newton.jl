@@ -338,7 +338,9 @@ end
 function _refresh_L!(qn::CompactLBFGS{T}) where {T}
     p = size(qn.Lk, 1)
     mul!(qn.Lk, qn.Sk', qn.Yk)
-    fill!(qn.Lk, zero(T))
+    @inbounds for i in 1:p, j in i:p
+        qn.Lk[i, j] = zero(T)
+    end
 end
 
 function _refresh_STS!(qn::CompactLBFGS{T}) where {T}
