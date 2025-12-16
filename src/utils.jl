@@ -50,6 +50,11 @@ end
 # Similarly, _ger! wraps ger! to dispatch on the data type.
 _ger!(alpha::Number, x::AbstractVector{T}, y::AbstractVector{T}, A::AbstractMatrix{T}) where T = BLAS.ger!(alpha, x, y, A)
 
+# Similarly, _trsm! wraps trsm! to dispatch on the data type.
+function _trsm!(side::Char, uplo::Char, transa::Char, diag::Char, alpha::T, A::AbstractMatrix{T}, B::AbstractMatrix{T}) where T
+    return BLAS.trsm!(side, uplo, transa, diag, alpha, A, B)
+end
+
 function symmetrize!(A::AbstractMatrix{T}) where T
     n, m = size(A)
     @assert n == m

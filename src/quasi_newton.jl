@@ -269,15 +269,15 @@ Base.size(qn::CompactLBFGS) = (size(qn.Sk, 1), qn.current_mem)
 
 function _resize!(qn::CompactLBFGS{T, VT, MT}) where {T, VT, MT}
     n, k = size(qn)
-    qn.Lk     = zeros(T, k, k)
-    qn.SdotS  = zeros(T, k, k)
-    qn.Mk     = zeros(T, k, k)
-    qn.Jk     = zeros(T, k, k)
-    qn.Tk     = zeros(T, 2*k, 2*k)
-    qn.DkLk   = zeros(T, k, k)
-    qn.U      = zeros(T, n, 2*k)
-    qn._w1    = zeros(T, k)
-    qn._w2    = zeros(T, 2*k)
+    qn.Lk    = fill!(MT(undef, k, k), zero(T))
+    qn.SdotS = fill!(MT(undef, k, k), zero(T))
+    qn.Mk    = fill!(MT(undef, k, k), zero(T))
+    qn.Jk    = fill!(MT(undef, k, k), zero(T))
+    qn.Tk    = fill!(MT(undef, 2*k, 2*k), zero(T))
+    qn.DkLk  = fill!(MT(undef, k, k), zero(T))
+    qn.U     = fill!(MT(undef, n, 2*k), zero(T))
+    qn._w1   = fill!(VT(undef, k), zero(T))
+    qn._w2   = fill!(VT(undef, 2*k), zero(T))
     return
 end
 
@@ -286,18 +286,25 @@ function _reset!(qn::CompactLBFGS{T, VT, MT}) where {T, VT, MT}
     qn.current_mem = 0
     qn.skipped_iter = 0
     fill!(qn.last_jv, zero(T))
-    qn.Dk  = zeros(T, 0)
-    qn.Sk  = zeros(T, n, 0)
-    qn.Yk  = zeros(T, n, 0)
+    qn.Dk = VT(undef, 0)
+    qn.Sk = MT(undef, n, 0)
+    qn.Yk = MT(undef, n, 0)
     _resize!(qn)
 end
 
 # augment / shift
-function _update_SY!(qn::CompactLBFGS, s, y)
+function _update_SY!(qn::CompactLBFGS, s::Vector, y::Vector)
     if qn.current_mem < qn.max_mem
         qn.current_mem += 1
-        qn.Sk = hcat(qn.Sk, s)
-        qn.Yk = hcat(qn.Yk, y)
+        n, k = size(qn)
+        vec_Sk = vec(qn.Sk)
+        vec_Yk = vec(qn.Yk)
+        resize!(vec_Sk, n*k)
+        resize!(vec_Yk, n*k)
+        qn.Sk = reshape(vec_Sk, n, k)
+        qn.Yk = reshape(vec_Yk, n, k)
+        view(qn.Sk, 1:n, k) .= s
+        view(qn.Yk, 1:n, k) .= y
         _resize!(qn)
     else
         n, k = size(qn)
@@ -314,7 +321,7 @@ function _update_SY!(qn::CompactLBFGS, s, y)
     end
 end
 
-function _refresh_D!(qn::CompactLBFGS, sk, yk)
+function _refresh_D!(qn::CompactLBFGS, sk::Vector, yk::Vector)
     k = qn.current_mem
     sTy = dot(sk, yk)
     if length(qn.Dk) < qn.max_mem
@@ -328,19 +335,17 @@ function _refresh_D!(qn::CompactLBFGS, sk, yk)
     end
 end
 
-function _refresh_L!(qn::CompactLBFGS{T, VT, MT}) where {T, VT, MT}
+function _refresh_L!(qn::CompactLBFGS{T}) where {T}
     p = size(qn.Lk, 1)
     mul!(qn.Lk, qn.Sk', qn.Yk)
-    @inbounds for i in 1:p, j in i:p
-        qn.Lk[i, j] = zero(T)
-    end
+    fill!(qn.Lk, zero(T))
 end
 
-function _refresh_STS!(qn::CompactLBFGS{T, VT, MT}) where {T, VT, MT}
+function _refresh_STS!(qn::CompactLBFGS{T}) where {T}
     mul!(qn.SdotS, qn.Sk', qn.Sk, one(T), zero(T))
 end
 
-function update!(qn::CompactLBFGS{T, VT, MT}, Bk, sk, yk) where {T, VT, MT}
+function update!(qn::CompactLBFGS{T}, Bk, sk, yk) where {T}
     norm_sk, norm_yk = norm(sk), norm(yk)
     # Skip update if vectors are too small or local curvature is negative.
     if ((norm_sk < T(100) * eps(T)) ||
@@ -386,7 +391,7 @@ function update!(qn::CompactLBFGS{T, VT, MT}, Bk, sk, yk) where {T, VT, MT}
     U1 = view(qn.U, :, 1:k)
     copyto!(U1, qn.Sk)                                # U₁ = Sₖ
     mul!(U1, qn.Yk, qn.DkLk, one(T), sigma)           # U₁ = σₖ Sₖ + Yₖ Dₖ⁻¹ Lₖ
-    BLAS.trsm!('R', 'U', 'N', 'N', one(T), qn.Jk, U1) # U₁ = Jₖ⁻ᵀ (σₖ Sₖ + Yₖ Dₖ⁻¹ Lₖ)
+    _trsm!('R', 'U', 'N', 'N', one(T), qn.Jk, U1)     # U₁ = Jₖ⁻ᵀ (σₖ Sₖ + Yₖ Dₖ⁻¹ Lₖ)
     U2 = view(qn.U, :, 1+k:2*k)
     δ .= .-one(T) ./ sqrt.(qn.Dk)                     # δ = 1 / √Dₖ
     U2 .= δ' .* qn.Yk                                 # U₂ = (1 / √Dₖ) * Yₖ

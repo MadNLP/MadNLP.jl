@@ -17,15 +17,15 @@ struct SparseKKTSystem{T, VT, MT, QN, LS, VI, VI32} <: AbstractReducedKKTSystem{
     l_lower::VT
     u_lower::VT
     # Augmented system
-    aug_raw::SparseMatrixCOO{T,Int32,VT, VI32}
+    aug_raw::SparseMatrixCOO{T, Int32, VT, VI32}
     aug_com::MT
     aug_csc_map::Union{Nothing, VI}
     # Hessian
-    hess_raw::SparseMatrixCOO{T,Int32,VT, VI32}
+    hess_raw::SparseMatrixCOO{T, Int32, VT, VI32}
     hess_com::MT
     hess_csc_map::Union{Nothing, VI}
     # Jacobian
-    jac_raw::SparseMatrixCOO{T,Int32,VT, VI32}
+    jac_raw::SparseMatrixCOO{T, Int32, VT, VI32}
     jac_com::MT
     jac_csc_map::Union{Nothing, VI}
     # LinearSolver
@@ -113,6 +113,7 @@ function create_kkt_system(
         Int32[jac_sparsity_J; n+1:n+n_slack],
         jac,
     )
+
     hess_raw = SparseMatrixCOO(
         n_tot, n_tot,
         hess_sparsity_I,
@@ -145,4 +146,3 @@ num_variables(kkt::SparseKKTSystem) = length(kkt.pr_diag)
 function build_kkt!(kkt::SparseKKTSystem)
     transfer!(kkt.aug_com, kkt.aug_raw, kkt.aug_csc_map)
 end
-
