@@ -42,7 +42,6 @@ end
 function MadNLP.create_kkt_system(
     ::Type{DiagonalHessianKKTSystem},
     cb::MadNLP.SparseCallback{T,VT},
-    ind_cons,
     linear_solver::Type;
     opt_linear_solver=MadNLP.default_options(linear_solver),
     hessian_approximation=MadNLP.ExactHessian,
@@ -52,12 +51,12 @@ function MadNLP.create_kkt_system(
     m = cb.ncon
 
     # ind_cons stores the indexes of all constraints
-    n_slack = length(ind_cons.ind_ineq)
+    n_slack = length(cb.ind_ineq)
     n_tot = n + n_slack
 
-    nlb = length(ind_cons.ind_lb)
-    nub = length(ind_cons.ind_ub)
-    ind_ineq = ind_cons.ind_ineq
+    nlb = length(cb.ind_lb)
+    nub = length(cb.ind_ub)
+    ind_ineq = cb.ind_ineq
 
     #=
         Import Jacobian's sparsity pattern
@@ -149,7 +148,7 @@ function MadNLP.create_kkt_system(
         jac_raw, jac_com, jac_csc_map,
         _linear_solver,
         n, n_slack, n_tot,
-        ind_ineq, ind_cons.ind_lb, ind_cons.ind_ub,
+        ind_ineq, cb.ind_lb, cb.ind_ub,
         quasi_newton,
     )
 end
