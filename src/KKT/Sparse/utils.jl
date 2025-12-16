@@ -18,8 +18,10 @@ end
 # NB. Quasi-Newton methods require only the sparsity pattern
 #     of the diagonal term to store the term ξ I.
 function build_hessian_structure(cb::SparseCallback, ::Type{<:AbstractQuasiNewton})
-    hess_I = collect(Int32, 1:cb.nvar)
-    hess_J = collect(Int32, 1:cb.nvar)
+    hess_I = create_array(cb, Int32, cb.nvar)
+    hess_J = create_array(cb, Int32, cb.nvar)
+    hess_I .= 1:cb.nvar
+    hess_J .= 1:cb.nvar
     return hess_I, hess_J
 end
 
