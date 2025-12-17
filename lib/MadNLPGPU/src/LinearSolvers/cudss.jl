@@ -133,7 +133,7 @@ function CUDSSSolver(
     # Check if we want to use the batch solver for matrices with a common sparsity pattern
     nbatch = solver.matrix.nbatch
     if nbatch > 1
-        CUDSS.cudss_set(solver, "ubatch_size", nbatch=nbatch)
+        CUDSS.cudss_set(solver, "ubatch_size", nbatch)
     end
 
     # The phase "analysis" is "reordering" combined with "symbolic_factorization"
