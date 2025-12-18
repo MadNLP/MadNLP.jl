@@ -22,7 +22,7 @@ function __init__()
         BLAS.lbt_forward(OpenBLAS32_jll.libopenblas_path)
     end
 end
-using PrecompileTools: @setup_workload, @compile_workload   
+using PrecompileTools: @setup_workload, @compile_workload
 
 # Version info
 version() = string(pkgversion(@__MODULE__))
@@ -31,10 +31,11 @@ introduce() = "\033[34mMad\033[31mN\033[32mL\033[35mP\033[0m version v$(version(
 include("enums.jl")
 include("utils.jl")
 include("matrixtools.jl")
-include("nlpmodels.jl")
+include(joinpath("Callbacks", "nlpmodels.jl"))
+include(joinpath("Callbacks", "wrappers.jl"))
 include("quasi_newton.jl")
 include(joinpath("KKT", "KKTsystem.jl"))
-include(joinpath("LinearSolvers","linearsolvers.jl"))
+include(joinpath("LinearSolvers", "linearsolvers.jl"))
 include(joinpath("IPM", "IPM.jl"))
 include("extension_templates.jl")
 include("precompile.jl")

@@ -124,7 +124,7 @@ function infeasible(optimizer_constructor::Function; Arr = Array)
         @constraint(m,x==0.)
         @objective(m,Min,x^2)
 
-        nlp = SparseWrapperModel(
+        nlp = MadNLP.SparseWrapperModel(
             Arr,
             NLPModelsJuMP.MathOptNLPModel(m)
         )
@@ -141,7 +141,7 @@ function unbounded(optimizer_constructor::Function; Arr = Array)
         @variable(m,x,start=1)
         @objective(m,Max,x^2)
 
-        nlp = SparseWrapperModel(
+        nlp = MadNLP.SparseWrapperModel(
             Arr,
             NLPModelsJuMP.MathOptNLPModel(m)
         )
@@ -164,7 +164,7 @@ function lootsma(optimizer_constructor::Function; Arr = Array)
         @objective(m,Min,x[1]^3 + 11. *x[1] - par*sqrt(x[1])  +x[3] )
 
 
-        nlp = SparseWrapperModel(
+        nlp = MadNLP.SparseWrapperModel(
             Arr,
             NLPModelsJuMP.MathOptNLPModel(m)
         )
@@ -320,7 +320,7 @@ function eigmina(optimizer_constructor::Function; Arr = Array)
         @constraint(m, x[100]*x[101] - 100*x[100] == 0)
         @objective(m, Min, x[101])
 
-        nlp = SparseWrapperModel(
+        nlp = MadNLP.SparseWrapperModel(
             Arr,
             NLPModelsJuMP.MathOptNLPModel(m)
         )
@@ -341,7 +341,7 @@ function lp_examodels_issue75(optimizer_constructor::Function; Arr = Array)
         @constraint(m, c1, 6x + 8y >= 100)
         @constraint(m, c2, 7x + 12y >= 120)
 
-        nlp = SparseWrapperModel(
+        nlp = MadNLP.SparseWrapperModel(
             Arr,
             NLPModelsJuMP.MathOptNLPModel(m)
         )
@@ -356,6 +356,5 @@ include("Instances/dummy_qp.jl")
 include("Instances/hs15.jl")
 include("Instances/hs15nohessian.jl")
 include("Instances/nls.jl")
-include("wrapper.jl")
 
 end # module
