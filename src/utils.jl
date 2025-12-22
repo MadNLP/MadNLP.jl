@@ -44,7 +44,7 @@ end
 
 # BLAS
 # _ger! wraps ger! to dispatch on the data type.
-_ger!(alpha::Number, x::AbstractVector{T}, y::AbstractVector{T}, A::AbstractMatrix{T}) where T = BLAS.ger!(alpha, x, y, A)
+_ger!(alpha::T, x::AbstractVector{T}, y::AbstractVector{T}, A::AbstractMatrix{T}) where T = BLAS.ger!(alpha, x, y, A)
 
 # Similarly, _syr! wraps syr! to dispatch on the data type.
 _syr!(uplo::Char, alpha::T, x::AbstractVector{T}, A::AbstractMatrix{T}) where T = BLAS.syr!(uplo, alpha, x, A)
