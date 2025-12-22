@@ -92,4 +92,4 @@ MadNLP._symv!(uplo::Char, alpha::T, A::CuMatrix{T}, x::CuVector{T}, beta::T, y::
     MadNLP._syrk!
 =#
 
-MadNLP._syrk!(uplo::Char, trans::Char, alpha::T, A::CuMatrix{T}, beta::T, C::CuMatrix{T}) = CUBLAS.syrk!(uplo, trans, alpha, A, beta, C)
+MadNLP._syrk!(uplo::Char, trans::Char, alpha::T, A::CuMatrix{T}, beta::T, C::CuMatrix{T}) where T = CUBLAS.syrk!(uplo, trans, alpha, A, beta, C)
