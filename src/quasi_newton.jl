@@ -112,11 +112,11 @@ function update!(qn::BFGS{T, VT}, Bk::AbstractMatrix, sk::AbstractVector, yk::Ab
         qn.is_instantiated[] = true
     end
     # BFGS update
-    mul!(qn.bsk, Bk, sk)
+    _symv!('L', one(T), Bk, sk, zero(T), qn.bsk)
     alpha1 = one(T) / dot(sk, qn.bsk)
     alpha2 = one(T) / yksk
-    _ger!(-alpha1, qn.bsk, qn.bsk, Bk)  # Bk = Bk - alpha1 * bsk * bsk'
-    _ger!(alpha2, yk, yk, Bk)           # Bk = Bk + alpha2 * yk * yk'
+    _syr!('L', -alpha1, qn.bsk, Bk)  # Bk = Bk - alpha1 * bsk * bsk'
+    _syr!('L', alpha2, yk, Bk)       # Bk = Bk + alpha2 * yk * yk'
     return true
 end
 
@@ -160,7 +160,7 @@ function update!(qn::DampedBFGS{T, VT}, Bk::AbstractMatrix, sk::AbstractVector, 
         qn.is_instantiated[] = true
     end
 
-    mul!(qn.bsk, Bk, sk)
+    _symv!('L', one(T), Bk, sk, zero(T), qn.bsk)
     sBs = dot(sk, qn.bsk)
 
     # Procedure 18.2 (Nocedal & Wright, page 537)
@@ -177,8 +177,8 @@ function update!(qn::DampedBFGS{T, VT}, Bk::AbstractMatrix, sk::AbstractVector, 
     alpha1 = one(T) / sBs
     alpha2 = one(T) / dot(qn.rk, qn.sk)
 
-    _ger!(-alpha1, qn.bsk, qn.bsk, Bk)
-    _ger!(alpha2, qn.rk, qn.rk, Bk)
+    _syr!('L', -alpha1, qn.bsk, Bk)
+    _syr!('L', alpha2, qn.rk, Bk)
     return true
 end
 

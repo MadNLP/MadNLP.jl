@@ -267,7 +267,7 @@ function mul!(w::AbstractKKTVector{T}, kkt::AbstractDenseKKTSystem, x::AbstractK
     xy = dual(x)
     xz = @view(dual(x)[kkt.ind_ineq])
 
-    symul!(wx, kkt.hess, xx, alpha, beta)
+    _symv!('L', alpha, kkt.hess, xx, beta, wx)
     if m > 0  # otherwise, CUDA causes an error
         mul!(wx, kkt.jac', dual(x), alpha, one(T))
         mul!(wy, kkt.jac,  xx, alpha, beta)
