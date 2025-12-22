@@ -69,3 +69,27 @@ if VERSION > v"1.11" # See https://github.com/JuliaGPU/CUDA.jl/issues/2811. norm
     end
     my1norm(x) = mapreduce(abs, +, x)
 end
+
+#=
+    MadNLP._ger!
+=#
+
+MadNLP._ger!(alpha::T, x::CuVector{T}, y::CuVector{T}, A::CuMatrix{T}) where T = CUBLAS.ger!(alpha, x, y, A)
+
+#=
+    MadNLP._syr!
+=#
+
+MadNLP._syr!(uplo::Char, alpha::T, x::CuVector{T}, A::CuMatrix{T}) where T = CUBLAS.syr!(uplo, alpha, x, A)
+
+#=
+    MadNLP._symv!
+=#
+
+MadNLP._symv!(uplo::Char, alpha::T, A::CuMatrix{T}, x::CuVector{T}, beta::T, y::CuVector{T}) where T = CUBLAS.symv!(uplo, alpha, A, x, beta, y)
+
+#=
+    MadNLP._syrk!
+=#
+
+MadNLP._syrk!(uplo::Char, trans::Char, alpha::T, A::CuMatrix{T}, beta::T, C::CuMatrix{T}) = CUBLAS.syrk!(uplo, trans, alpha, A, beta, C)
