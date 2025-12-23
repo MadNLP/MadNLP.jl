@@ -349,10 +349,9 @@ function _refresh_D!(qn::CompactLBFGS, sk::Vector, yk::Vector)
     end
 end
 
-function _refresh_L!(qn::CompactLBFGS{T}) where {T}
+function _refresh_L!(qn::CompactLBFGS)
     p = size(qn.Lk, 1)
     n, _ = size(qn)
-    mul!(qn.Lk, qn.Sk', qn.Yk)
     @inbounds for i in 1:p-1, j in i:p-1
         qn.Lk[i, j] = qn.Lk[i+1, j+1]
     end
