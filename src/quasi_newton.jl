@@ -47,8 +47,20 @@ function init! end
 
 curvature(::Val{SCALAR1}, sk, yk) = dot(yk, sk) / dot(sk, sk)
 curvature(::Val{SCALAR2}, sk, yk) = dot(yk, yk) / dot(sk, yk)
-curvature(::Val{SCALAR3}, sk, yk) = 0.5 * (curvature(Val(SCALAR1), sk, yk) + curvature(Val(SCALAR2), sk, yk))
-curvature(::Val{SCALAR4}, sk, yk) = sqrt(curvature(Val(SCALAR1), sk, yk) * curvature(Val(SCALAR2), sk, yk))
+function curvature(::Val{SCALAR3}, sk, yk)
+    # 0.5 * (curvature(Val(SCALAR1), sk, yk) + curvature(Val(SCALAR2), sk, yk))
+    sᵀy = dot(sk, yk)
+    sᵀs = dot(sk, sk)
+    yᵀy = dot(yk, yk)
+    return ((sᵀy / sᵀs) + (yᵀy / sᵀy)) / 2
+end
+function curvature(::Val{SCALAR4}, sk, yk)
+    # sqrt(curvature(Val(SCALAR1), sk, yk) * curvature(Val(SCALAR2), sk, yk))
+    sᵀy = dot(sk, yk)
+    sᵀs = dot(sk, sk)
+    yᵀy = dot(yk, yk)
+    return sqrt((sᵀy / sᵀs) * (yᵀy / sᵀy))
+end
 
 @kwdef mutable struct QuasiNewtonOptions{T} <: AbstractOptions
     init_strategy::BFGSInitStrategy = SCALAR1
@@ -57,7 +69,6 @@ curvature(::Val{SCALAR4}, sk, yk) = sqrt(curvature(Val(SCALAR1), sk, yk) * curva
     sigma_min::T = 1e-8
     sigma_max::T = 1e+8
 end
-
 
 """
     BFGS{T, VT} <: AbstractQuasiNewton{T, VT}
@@ -344,7 +355,7 @@ function _refresh_L!(qn::CompactLBFGS{T}) where {T}
 end
 
 function _refresh_STS!(qn::CompactLBFGS{T}) where {T}
-    mul!(qn.SdotS, qn.Sk', qn.Sk, one(T), zero(T))
+    _syrk!('L', 'T', one(T), qn.Sk, zero(T), qn.SdotS)
 end
 
 function update!(qn::CompactLBFGS{T}, Bk, sk, yk) where {T}
@@ -378,25 +389,25 @@ function update!(qn::CompactLBFGS{T}, Bk, sk, yk) where {T}
     # Step 1: σₖ I
     sigma = curvature(Val(qn.init_strategy), sk, yk)  # σₖ
     sigma = clamp(sigma, qn.sigma_min, qn.sigma_max)
-    Bk .= sigma                                       # Hₖ .= σₖ I (diagonal Hessian approx.)
+    Bk .= sigma * I                                   # Hₖ .= σₖ I (diagonal Hessian approx.)
 
     # Step 2: Mₖ = σₖ Sₖᵀ Sₖ + Lₖ Dₖ⁻¹ Lₖᵀ
-    qn.DkLk .= (one(T) ./ qn.Dk) .* qn.Lk'            # DₖLₖ = Dₖ⁻¹ Lₖᵀ
-    qn.Mk .= qn.SdotS                                 # Mₖ = Sₖᵀ Sₖ
-    mul!(qn.Mk, qn.Lk, qn.DkLk, one(T), sigma)        # Mₖ = σₖ Sₖᵀ Sₖ + Lₖ Dₖ⁻¹ Lₖᵀ
-    symmetrize!(qn.Mk)
+    δ .= one(T) ./ sqrt.(qn.Dk)                         # δₖ = 1 / √Dₖ
+    qn.DkLk .= qn.Lk .* δ                               # Compute Lₖ * (1 / √Dₖ)
+    qn.Mk .= qn.SdotS                                   # Mₖ = Sₖᵀ Sₖ
+    _syrk!('L', 'N', one(T), qn.DkLk, sigma, qn.SdotS)  # Mₖ = σₖ Sₖᵀ Sₖ + Lₖ Dₖ⁻¹ Lₖᵀ
 
     copyto!(qn.Jk, qn.Mk)
     cholesky!(qn.Jk)                                  # Mₖ = Jₖᵀ Jₖ (factorization)
 
     # Step 3: Nₖ = [U₁ U₂]
     U1 = view(qn.U, :, 1:k)
-    copyto!(U1, qn.Sk)                                # U₁ = Sₖ
-    mul!(U1, qn.Yk, qn.DkLk, one(T), sigma)           # U₁ = σₖ Sₖ + Yₖ Dₖ⁻¹ Lₖ
-    _trsm!('R', 'U', 'N', 'N', one(T), qn.Jk, U1)     # U₁ = Jₖ⁻ᵀ (σₖ Sₖ + Yₖ Dₖ⁻¹ Lₖ)
-    U2 = view(qn.U, :, 1+k:2*k)
-    δ .= .-one(T) ./ sqrt.(qn.Dk)                     # δ = 1 / √Dₖ
-    U2 .= δ' .* qn.Yk                                 # U₂ = (1 / √Dₖ) * Yₖ
+    U2 = view(qn.U, :, k+1:2*k)
+    U2 .= -δ .* qn.Yk                              # U₂ = -(1 / √Dₖ) * Yₖ
+    copyto!(U1, qn.Sk)                             # U₁ = Sₖ
+    mul!(U1, U2, qn.DkLk, -one(T), sigma)          # U₁ = σₖ Sₖ + Yₖ Dₖ⁻¹ Lₖ
+    _trsm!('R', 'U', 'N', 'N', one(T), qn.Jk, U1)  # U₁ = Jₖ⁻ᵀ (σₖ Sₖ + Yₖ Dₖ⁻¹ Lₖ)
+
     return true
 end
 
