@@ -21,7 +21,7 @@ import MadNLP:
     AbstractOptions, AbstractLinearSolver, AbstractNLPModel, set_options!,
     SymbolicException,FactorizationException,SolveException,InertiaException,
     introduce, factorize!, solve!, improve!, is_inertia, inertia, tril_to_full!,
-    LapackOptions, input_type, is_supported, default_options, symul!
+    LapackOptions, input_type, is_supported, default_options
 
 # AMD and Metis
 import AMD, Metis
@@ -31,6 +31,7 @@ include("KKT/kernels_dense.jl")
 include("KKT/kernels_sparse.jl")
 include("KKT/cuda_dense.jl")
 include("KKT/cuda_sparse.jl")
+include("KKT/cuda_qn.jl")
 include("LinearSolvers/lapackgpu.jl")
 include("LinearSolvers/cusolver.jl")
 include("LinearSolvers/cudss.jl")
