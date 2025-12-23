@@ -64,6 +64,19 @@ function _trsm!(side::Char, uplo::Char, transa::Char, diag::Char, alpha::T, A::A
     return BLAS.trsm!(side, uplo, transa, diag, alpha, A, B)
 end
 
+# Similarly, _dgmm! wraps dgmm! to dispatch on the data type.
+function _dgmm!(side::Char, A::AbstractMatrix{T}, x::AbstractVector{T}, B::AbstractMatrix{T}) where T
+    if side == 'L'
+        copyto!(B, A)
+        lmul!(Diagonal(x), B)
+    elseif side == 'R'
+        copyto!(B, A)
+        rmul!(B, Diagonal(x))
+    else
+        error("Unsupported side = $side.")
+    end
+end
+
 const blas_num_threads = Ref{Int}(1)
 function set_blas_num_threads(n::Integer;permanent::Bool=false)
     permanent && (blas_num_threads[]=n)
