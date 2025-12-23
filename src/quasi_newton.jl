@@ -232,7 +232,8 @@ mutable struct CompactLBFGS{T, VT <: AbstractVector{T}, MT <: AbstractMatrix{T}}
     Jk::MT       # p x p
     SdotS::MT    # p x p
     DkLk::MT     # p x p
-    U::MT        # n x 2p
+    U::MT        # n x p
+    V::MT        # n x p
     V1::MT       # m x 2p
     V2::MT       # m x 2p
     Dk::VT       # p
@@ -270,6 +271,7 @@ function create_quasi_newton(
         fill!(create_array(cb, 0, 0), zero(T)),
         fill!(create_array(cb, 0, 0), zero(T)),
         fill!(create_array(cb, 0, 0), zero(T)),
+        fill!(create_array(cb, 0, 0), zero(T)),
         fill!(create_array(cb, 0), zero(T)),
         fill!(create_array(cb, 0), zero(T)),
         fill!(create_array(cb, 0), zero(T)),
@@ -286,7 +288,8 @@ function _resize!(qn::CompactLBFGS{T, VT, MT}) where {T, VT, MT}
     qn.Jk    = fill!(MT(undef, k, k), zero(T))
     qn.Tk    = fill!(MT(undef, 2*k, 2*k), zero(T))
     qn.DkLk  = fill!(MT(undef, k, k), zero(T))
-    qn.U     = fill!(MT(undef, n, 2*k), zero(T))
+    qn.U     = fill!(MT(undef, n, k), zero(T))
+    qn.V     = fill!(MT(undef, n, k), zero(T))
     qn._w1   = fill!(VT(undef, k), zero(T))
     qn._w2   = fill!(VT(undef, 2*k), zero(T))
     return
@@ -382,14 +385,11 @@ function update!(qn::CompactLBFGS{T}, Bk, sk, yk) where {T}
     k = qn.current_mem
     δ = qn._w1
 
-    # Compute compact representation Bₖ = σₖ I + Uₖ Vₖᵀ
-    #       Uₖ = [ U₁ ]     Vₖ = [ -U₁ ]
-    #            [ U₂ ]          [  U₂ ]
-
+    # Compute compact representation Bₖ = σₖI -UₖUₖᵀ + VₖVₖᵀ
     # Step 1: σₖ I
-    sigma = curvature(Val(qn.init_strategy), sk, yk)  # σₖ
+    sigma = curvature(Val(qn.init_strategy), sk, yk)    # σₖ
     sigma = clamp(sigma, qn.sigma_min, qn.sigma_max)
-    Bk .= sigma * I                                   # Hₖ .= σₖ I (diagonal Hessian approx.)
+    Bk[diagind(Bk)] .= sigma                            # Hₖ .= σₖI (diagonal Hessian approx.)
 
     # Step 2: Mₖ = σₖ Sₖᵀ Sₖ + Lₖ Dₖ⁻¹ Lₖᵀ
     δ .= one(T) ./ sqrt.(qn.Dk)                         # δₖ = 1 / √Dₖ
@@ -398,15 +398,13 @@ function update!(qn::CompactLBFGS{T}, Bk, sk, yk) where {T}
     _syrk!('L', 'N', one(T), qn.DkLk, sigma, qn.SdotS)  # Mₖ = σₖ Sₖᵀ Sₖ + Lₖ Dₖ⁻¹ Lₖᵀ
 
     copyto!(qn.Jk, qn.Mk)
-    cholesky!(qn.Jk)                                  # Mₖ = Jₖᵀ Jₖ (factorization)
+    cholesky!(qn.Jk)                                    # Mₖ = Jₖᵀ Jₖ (factorization)
 
-    # Step 3: Nₖ = [U₁ U₂]
-    U1 = view(qn.U, :, 1:k)
-    U2 = view(qn.U, :, k+1:2*k)
-    U2 .= -δ .* qn.Yk                              # U₂ = -(1 / √Dₖ) * Yₖ
-    copyto!(U1, qn.Sk)                             # U₁ = Sₖ
-    mul!(U1, U2, qn.DkLk, -one(T), sigma)          # U₁ = σₖ Sₖ + Yₖ Dₖ⁻¹ Lₖ
-    _trsm!('R', 'U', 'N', 'N', one(T), qn.Jk, U1)  # U₁ = Jₖ⁻ᵀ (σₖ Sₖ + Yₖ Dₖ⁻¹ Lₖ)
+    # Step 3: Update Uₖ and Vₖ
+    qn.V .= qn.Yk .* δ                                  # Vₖ = Yₖ * (1 / √Dₖ)
+    copyto!(qn.U, qn.Sk)                                # Uₖ = Sₖ
+    mul!(qn.U, qn.V, qn.DkLk, one(T), sigma)            # Uₖ = σₖ Sₖ + Yₖ Dₖ⁻¹ Lₖ
+    _trsm!('R', 'U', 'N', 'N', one(T), qn.Jk, qn.U)     # Uₖ = Jₖ⁻ᵀ (σₖ Sₖ + Yₖ Dₖ⁻¹ Lₖ)
 
     return true
 end

@@ -64,16 +64,6 @@ function _trsm!(side::Char, uplo::Char, transa::Char, diag::Char, alpha::T, A::A
     return BLAS.trsm!(side, uplo, transa, diag, alpha, A, B)
 end
 
-function symmetrize!(A::AbstractMatrix{T}) where T
-    n, m = size(A)
-    @assert n == m
-    @inbounds for i in 1:n, j=i+1:n
-        aij = T(0.5) * (A[i, j] + A[j, i])
-        A[i, j] = aij
-        A[j, i] = aij
-    end
-end
-
 const blas_num_threads = Ref{Int}(1)
 function set_blas_num_threads(n::Integer;permanent::Bool=false)
     permanent && (blas_num_threads[]=n)
