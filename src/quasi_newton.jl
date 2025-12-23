@@ -393,9 +393,9 @@ function update!(qn::CompactLBFGS{T}, Bk, sk, yk) where {T}
 
     # Step 2: Mₖ = σₖ Sₖᵀ Sₖ + Lₖ Dₖ⁻¹ Lₖᵀ
     δ .= one(T) ./ sqrt.(qn.Dk)                         # δₖ = 1 / √Dₖ
-    qn.DkLk .= qn.Lk .* δ                               # Compute Lₖ * (1 / √Dₖ)
+    qn.DkLk .= δ .* qn.Lk                               # Compute (1 / √Dₖ) * Lₖᵀ
     qn.Mk .= qn.SdotS                                   # Mₖ = Sₖᵀ Sₖ
-    _syrk!('L', 'N', one(T), qn.DkLk, sigma, qn.SdotS)  # Mₖ = σₖ Sₖᵀ Sₖ + Lₖ Dₖ⁻¹ Lₖᵀ
+    _syrk!('L', 'T', one(T), qn.DkLk, sigma, qn.SdotS)  # Mₖ = σₖ Sₖᵀ Sₖ + Lₖ Dₖ⁻¹ Lₖᵀ
 
     copyto!(qn.Jk, qn.Mk)
     cholesky!(qn.Jk)                                    # Mₖ = Jₖᵀ Jₖ (factorization)
@@ -403,8 +403,8 @@ function update!(qn::CompactLBFGS{T}, Bk, sk, yk) where {T}
     # Step 3: Update Uₖ and Vₖ
     qn.V .= qn.Yk .* δ                                  # Vₖ = Yₖ * (1 / √Dₖ)
     copyto!(qn.U, qn.Sk)                                # Uₖ = Sₖ
-    mul!(qn.U, qn.V, qn.DkLk, one(T), sigma)            # Uₖ = σₖ Sₖ + Yₖ Dₖ⁻¹ Lₖ
-    _trsm!('R', 'U', 'N', 'N', one(T), qn.Jk, qn.U)     # Uₖ = Jₖ⁻ᵀ (σₖ Sₖ + Yₖ Dₖ⁻¹ Lₖ)
+    mul!(qn.U, qn.V, qn.DkLk, one(T), sigma)            # Uₖ = σₖ Sₖ + Yₖ Dₖ⁻¹ Lₖᵀ
+    _trsm!('R', 'U', 'N', 'N', one(T), qn.Jk, qn.U)     # Uₖ = (σₖ Sₖ + Yₖ Dₖ⁻¹ Lₖᵀ) Jₖ⁻ᵀ
 
     return true
 end
