@@ -288,3 +288,33 @@ end
     @test stats.status == MadNLP.SOLVE_SUCCEEDED
 end
 
+struct CallbackTestModel{M <: NLPModels.AbstractNLPModel} <: NLPModels.AbstractNLPModel{Float64, Vector{Float64}}
+    inner::M
+    meta::NLPModels.NLPModelMeta{Float64, Vector{Float64}}
+    counters::NLPModels.Counters
+    counter::Base.RefValue{Int}
+end
+
+NLPModels.obj(m::CallbackTestModel, x::AbstractVector) = NLPModels.obj(m.inner, x)
+NLPModels.grad!(m::CallbackTestModel, x::AbstractVector, g::AbstractVector) = NLPModels.grad!(m.inner, x, g)
+NLPModels.cons!(m::CallbackTestModel, x::AbstractVector, c::AbstractVector) = NLPModels.cons!(m.inner, x, c)
+NLPModels.jac_structure!(m::CallbackTestModel, I::AbstractVector, J::AbstractVector) = NLPModels.jac_structure!(m.inner, I, J)
+NLPModels.jac_coord!(m::CallbackTestModel, x::AbstractVector, jac::AbstractVector) = NLPModels.jac_coord!(m.inner, x, jac)
+NLPModels.hess_structure!(m::CallbackTestModel, I::AbstractVector, J::AbstractVector) = NLPModels.hess_structure!(m.inner, I, J)
+NLPModels.hess_coord!(m::CallbackTestModel, x::AbstractVector, y::AbstractVector, hess::AbstractVector; obj_weight = 1.0) =
+    NLPModels.hess_coord!(m.inner, x, y, hess; obj_weight = obj_weight)
+
+function MadNLP.user_callback_termination(nlp::CallbackTestModel, solver::MadNLP.AbstractMadNLPSolver)
+    nlp.counter[] += 1
+    return solver.cnt.k > 3
+end
+
+@testset "User-defined callback termination" begin
+    inner = MadNLPTests.HS15Model()
+    nlp = CallbackTestModel(inner, inner.meta, NLPModels.Counters(), Ref(0))
+    solver = MadNLPSolver(nlp; print_level = MadNLP.ERROR)
+    stats = MadNLP.solve!(solver)
+    @test stats.status == MadNLP.USER_REQUESTED_STOP
+    @test solver.cnt.k == 4
+    @test nlp.counter[] == 5
+end

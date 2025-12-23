@@ -245,6 +245,7 @@ function regular!(solver::AbstractMadNLPSolver{T}) where T
 
         # evaluate termination criteria
         @trace(solver.logger,"Evaluating termination criteria.")
+        user_callback_termination(solver.nlp, solver) && return USER_REQUESTED_STOP
         max(solver.inf_pr,solver.inf_du,solver.inf_compl) <= solver.opt.tol && return SOLVE_SUCCEEDED
         max(solver.inf_pr,solver.inf_du,solver.inf_compl) <= solver.opt.acceptable_tol ?
             (solver.cnt.acceptable_cnt < solver.opt.acceptable_iter ?
@@ -305,6 +306,12 @@ function regular!(solver::AbstractMadNLPSolver{T}) where T
     end
 end
 
+"""
+    user_callback_termination(::AbstractNLPModel, solver::AbstractMadNLPSolver)
+
+Callback function for user-defined termination criteria. The function should return a boolean value indicating whether the solver should terminate.
+"""
+user_callback_termination(::AbstractNLPModel, solver::AbstractMadNLPSolver) = false
 
 function restore!(solver::AbstractMadNLPSolver{T}) where T
     solver.del_w = 0
