@@ -117,3 +117,38 @@ end
         dest[i_+n, i_+n] = du_diag[is]
     end
 end
+
+#=
+    MadNLP.symmetrize!
+=#
+
+@kernel function symmetrize_kernel!(A)
+    i, j = @index(Global, NTuple)
+    @inbounds if i < j
+        aij = (A[i, j] + A[j, i]) / 2
+        A[i, j] = aij
+        A[j, i] = aij
+    end
+end
+
+#=
+    MadNLP._update_SY!
+=#
+
+@kernel function _update_SY_kernel!(k, SY)
+    i = @index(Global)
+    @inbounds for j = 1:k-1
+        SY[i, j] = SY[i, j+1]
+    end
+end
+
+#=
+    MadNLP._refresh_L!
+=#
+@kernel function _refresh_L_kernel!(Lk)
+    i, j = @index(Global, NTuple)
+    T = eltype(Lk)
+    @inbounds if i < j
+        Lk[i,j] = zero(T)
+    end
+end

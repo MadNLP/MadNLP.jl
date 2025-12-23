@@ -85,3 +85,9 @@ MadNLP._symv!(uplo::Char, alpha::T, A::ROCMatrix{T}, x::ROCVector{T}, beta::T, y
 =#
 
 MadNLP._syrk!(uplo::Char, trans::Char, alpha::T, A::ROCMatrix{T}, beta::T, C::ROCMatrix{T}) where T = rocBLAS.syrk!(uplo, trans, alpha, A, beta, C)
+
+#=
+    MadNLP._trsm!
+=#
+
+MadNLP._trsm!(side::Char, uplo::Char, transa::Char, diag::Char, alpha::T, A::ROCMatrix{T}, B::ROCMatrix{T}) where T = rocBLAS.trsm!(side, uplo, transa, diag, alpha, A, B)
