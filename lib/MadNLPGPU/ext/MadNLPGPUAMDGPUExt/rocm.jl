@@ -91,3 +91,9 @@ MadNLP._syrk!(uplo::Char, trans::Char, alpha::T, A::ROCMatrix{T}, beta::T, C::RO
 =#
 
 MadNLP._trsm!(side::Char, uplo::Char, transa::Char, diag::Char, alpha::T, A::ROCMatrix{T}, B::ROCMatrix{T}) where T = rocBLAS.trsm!(side, uplo, transa, diag, alpha, A, B)
+
+#=
+    MadNLP._dgmm!
+=#
+
+MadNLP._dgmm!(side::Char, A::ROCMatrix{T}, x::ROCVector{T}, B::ROCMatrix{T}) where T = rocBLAS.dgmm!(side, A, x, B)

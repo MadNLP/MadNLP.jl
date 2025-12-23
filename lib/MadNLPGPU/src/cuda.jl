@@ -99,3 +99,9 @@ MadNLP._syrk!(uplo::Char, trans::Char, alpha::T, A::CuMatrix{T}, beta::T, C::CuM
 =#
 
 MadNLP._trsm!(side::Char, uplo::Char, transa::Char, diag::Char, alpha::T, A::CuMatrix{T}, B::CuMatrix{T}) where T = CUBLAS.trsm!(side, uplo, transa, diag, alpha, A, B)
+
+#=
+    MadNLP._dgmm!
+=#
+
+MadNLP._dgmm!(side::Char, A::CuMatrix{T}, x::CuVector{T}, B::CuMatrix{T}) where T = CUBLAS.dgmm!(side, A, x, B)
