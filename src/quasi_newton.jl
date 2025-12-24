@@ -401,7 +401,7 @@ function update!(qn::CompactLBFGS{T}, Bk, sk, yk) where {T}
     _syrk!('L', 'T', one(T), qn.DkLk, sigma, qn.SdotS)  # Mₖ = σₖ Sₖᵀ Sₖ + Lₖ Dₖ⁻¹ Lₖᵀ
 
     copyto!(qn.Jk, qn.Mk)
-    cholesky!(qn.Jk)                                    # Mₖ = Jₖᵀ Jₖ (factorization)
+    cholesky!(Symmetric(qn.Jk, :L))                     # Mₖ = Jₖ Jₖᵀ (factorization)
 
     # Step 3: Update Uₖ and Vₖ
     _dgmm!('R', qn.Yk, δ, qn.V)                         # Vₖ = Yₖ * (1 / √Dₖ)
