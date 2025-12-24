@@ -392,7 +392,7 @@ function update!(qn::CompactLBFGS{T}, Bk, sk, yk) where {T}
     # Step 1: σₖ I
     sigma = curvature(Val(qn.init_strategy), sk, yk)    # σₖ
     sigma = clamp(sigma, qn.sigma_min, qn.sigma_max)
-    Bk[diagind(Bk)] .= sigma                            # Hₖ .= σₖI (diagonal Hessian approx.)
+    Bk .= sigma                                         # Hₖ .= σₖI (diagonal Hessian approx.)
 
     # Step 2: Mₖ = σₖ Sₖᵀ Sₖ + Lₖ Dₖ⁻¹ Lₖᵀ
     δ .= one(T) ./ sqrt.(qn.Dk)                         # δₖ = 1 / √Dₖ
