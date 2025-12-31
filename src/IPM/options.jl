@@ -54,6 +54,8 @@ end
     quasi_newton_options::QuasiNewtonOptions{T} = QuasiNewtonOptions{T}()
     inertia_correction_method::Type = InertiaAuto
     inertia_free_tol::T = 0.
+    default_primal_regularization::T = 0.
+    default_dual_regularization::T = 0.
 
     # initialization options
     dual_initialized::Bool = false

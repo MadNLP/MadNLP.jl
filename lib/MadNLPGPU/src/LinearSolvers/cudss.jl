@@ -8,19 +8,19 @@ import CUDSS
     cudss_ir::Int = 0
     cudss_ir_tol::Float64 = 1e-8  # currently ignored in cuDSS 0.7
     cudss_pivot_threshold::Float64 = 0.0
-    cudss_pivot_epsilon::Float64 = 0.0
+    cudss_pivot_epsilon::Float64 = 1e-13
     cudss_matching_alg::String = "default"
     cudss_reordering_alg::String = "default"
     cudss_factorization_alg::String = "default"
     cudss_solve_alg::String = "default"
     cudss_matching::Bool = false
-    cudss_pivoting::Bool = true
+    cudss_pivoting::Bool = false
     cudss_hybrid_execute::Bool = false
     cudss_hybrid_memory::Bool = false
     cudss_hybrid_memory_limit::Int = 0
     cudss_superpanels::Bool = true
     cudss_schur::Bool = false
-    cudss_deterministic::Bool = false
+    cudss_deterministic::Bool = true
     cudss_device_indices::Vector{Cint} = Cint[]
 end
 
@@ -180,7 +180,7 @@ function MadNLP.solve!(M::CUDSSSolver{T,V}, xb::V) where {T,V}
     return xb
 end
 
-MadNLP.input_type(::Type{CUDSSSolver}) = :csc
+MadNLP.input_type(::Type{CUDSSSolver}) = :csc 
 MadNLP.default_options(::Type{CUDSSSolver}) = CudssSolverOptions()
 MadNLP.is_inertia(M::CUDSSSolver) = (M.inner.matrix.nbatch == 1)  # Uncomment if MadNLP.LU is supported -- (M.opt.cudss_algorithm ∈ (MadNLP.CHOLESKY, MadNLP.LDL))
 function inertia(M::CUDSSSolver)
