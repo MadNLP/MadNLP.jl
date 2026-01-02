@@ -5,7 +5,6 @@ REV2 = ARGS[2]
 
 @info "Loading results for revision $rev"
 
-
 for class in ["opf", "cops", "cutest"]
     for backend in ["cpu", "gpu"]
         

@@ -1,19 +1,13 @@
-using Distributed
+import Pkg
+
+MADNLP_GIT_HASH = ARGS[1]
+Pkg.add(name="MadNLPHSL", rev="$MADNLP_GIT_HASH")
+Pkg.add(name="MadNLPGPU", rev="$MADNLP_GIT_HASH")
 
 @everywhere begin
-    using Pkg, JLD2, Logging, HSL_jll, ExaModels
-    include("opf.jl")
-    include("cops.jl")
-    include("cutest.jl")
+    using MadNLPBenchmark, Distributed, MadNLPHSL, MadNLPGPU, CUDA
+    CUDA.device!(mod(myid(), CUDA.ndevices()))
 end
-
-include("setup.jl")
-
-@everywhere begin
-    using MadNLPHSL
-end
-
-include("common.jl")
 
 # CUTEST CPU benchmark
 run_benchmark(
@@ -42,11 +36,6 @@ run_benchmark(
     m -> madnlp(m; linear_solver=Ma27Solver, max_wall_time=900.0),
     (case, result) -> (; case=case, stats=result.counter)
 )
-
-@everywhere begin
-    using MadNLPGPU, CUDA
-    CUDA.device!(mod(myid(), CUDA.ndevices()))
-end
 
 # CUTEST GPU benchmark
 run_benchmark(
