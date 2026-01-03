@@ -64,13 +64,16 @@ function _trsm!(side::Char, uplo::Char, transa::Char, diag::Char, alpha::T, A::A
     return BLAS.trsm!(side, uplo, transa, diag, alpha, A, B)
 end
 
-function symmetrize!(A::AbstractMatrix{T}) where T
-    n, m = size(A)
-    @assert n == m
-    @inbounds for i in 1:n, j=i+1:n
-        aij = T(0.5) * (A[i, j] + A[j, i])
-        A[i, j] = aij
-        A[j, i] = aij
+# Similarly, _dgmm! wraps dgmm! to dispatch on the data type.
+function _dgmm!(side::Char, A::AbstractMatrix{T}, x::AbstractVector{T}, B::AbstractMatrix{T}) where T
+    if side == 'L'
+        copyto!(B, A)
+        lmul!(Diagonal(x), B)
+    elseif side == 'R'
+        copyto!(B, A)
+        rmul!(B, Diagonal(x))
+    else
+        error("Unsupported side = $side.")
     end
 end
 
