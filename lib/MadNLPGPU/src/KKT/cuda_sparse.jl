@@ -52,7 +52,7 @@ function MadNLP.mul!(
             kkt.ext.diag_map_fr;
             ndrange = length(kkt.ext.diag_map_to),
         )
-        synchronize(backend)
+        # synchronize(backend)
     end
 
     MadNLP.mul!(wz, kkt.jt_csc', xx, alpha, one(T))
@@ -94,7 +94,7 @@ function MadNLP.mul_hess_blk!(
             kkt.ext.diag_map_fr;
             ndrange = length(kkt.ext.diag_map_to),
         )
-        synchronize(backend)
+        # synchronize(backend)
     end
 
     fill!(@view(wx[n+1:end]), 0)
@@ -231,7 +231,7 @@ function MadNLP._set_colptr!(colptr::CuVector, ptr2, sym2, guide)
             guide;
             ndrange = length(ptr2) - 1,
         )
-        synchronize(backend)
+        # synchronize(backend)
     end
     return
 end
@@ -245,7 +245,7 @@ function MadNLP.tril_to_full!(dense::CuMatrix{T}) where {T}
     n = size(dense, 1)
     backend = CUDABackend()
     _tril_to_full_kernel!(backend)(dense; ndrange = div(n^2 + n, 2))
-    synchronize(backend)
+    # synchronize(backend)
     return
 end
 
@@ -257,7 +257,7 @@ function MadNLP.force_lower_triangular!(I::CuVector{T}, J) where {T}
     if !isempty(I)
         backend = CUDABackend()
         _force_lower_triangular_kernel!(backend)(I, J; ndrange = length(I))
-        synchronize(backend)
+        # synchronize(backend)
     end
     return
 end
@@ -288,7 +288,7 @@ function MadNLP.coo_to_csc(
             coord_csc,
             ndrange = length(coord_csc),
         )
-        synchronize(backend)
+        # synchronize(backend)
     else
         fill!(colptr, one(Int))
     end
@@ -306,7 +306,7 @@ function MadNLP.coo_to_csc(
             coord,
             ndrange = length(mapptr) - 1,
         )
-        synchronize(backend)
+        # synchronize(backend)
     end
 
     return csc, cscmap
@@ -328,7 +328,7 @@ function MadNLP.build_condensed_aug_coord!(
             kkt.hess_com.nzVal;
             ndrange = length(kkt.hptr),
         )
-        synchronize(backend)
+        # synchronize(backend)
     end
     if length(kkt.dptr) > 0
         _transfer_hessian_kernel!(backend)(
@@ -337,7 +337,7 @@ function MadNLP.build_condensed_aug_coord!(
             kkt.pr_diag;
             ndrange = length(kkt.dptr),
         )
-        synchronize(backend)
+        # synchronize(backend)
     end
     if length(kkt.ext.jptrptr) > 1 # otherwise error is thrown
         _transfer_jtsj_kernel!(backend)(
@@ -348,7 +348,7 @@ function MadNLP.build_condensed_aug_coord!(
             kkt.diag_buffer;
             ndrange = length(kkt.ext.jptrptr) - 1,
         )
-        synchronize(backend)
+        # synchronize(backend)
     end
     return
 end
@@ -370,7 +370,7 @@ function MadNLP.compress_hessian!(
             kkt.hess_raw.V;
             ndrange = length(kkt.ext.hess_com_ptrptr) - 1,
         )
-        synchronize(backend)
+        # synchronize(backend)
     end
     return
 end
@@ -388,7 +388,7 @@ function MadNLP.compress_jacobian!(
             kkt.jt_coo.V;
             ndrange = length(kkt.ext.jt_csc_ptrptr) - 1,
         )
-        synchronize(backend)
+        # synchronize(backend)
     end
     return
 end
@@ -416,7 +416,7 @@ function MadNLP._set_con_scale_sparse!(
             jac_buffer;
             ndrange = length(ptr) - 1,
         )
-        synchronize(backend)
+        # synchronize(backend)
     end
     return
 end
@@ -439,7 +439,7 @@ function MadNLP._build_condensed_aug_symbolic_hess(
             H.rowVal;
             ndrange = size(H, 2),
         )
-        synchronize(backend)
+        # synchronize(backend)
     end
     return
 end
@@ -469,7 +469,7 @@ function MadNLP._build_condensed_aug_symbolic_jt(
             offsets;
             ndrange = size(Jt, 2),
         )
-        synchronize(backend)
+        # synchronize(backend)
     end
     return
 end
@@ -490,6 +490,6 @@ function MadNLP._build_scale_augmented_system_coo!(dest, src, scaling::CuArray, 
         m;
         ndrange = nnz(src),
     )
-    synchronize(backend)
+    # synchronize(backend)
     return
 end

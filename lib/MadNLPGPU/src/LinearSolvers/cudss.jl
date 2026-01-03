@@ -20,7 +20,7 @@ import CUDSS
     cudss_hybrid_memory_limit::Int = 0
     cudss_superpanels::Bool = true
     cudss_schur::Bool = false
-    cudss_deterministic::Bool = true
+    cudss_deterministic::Bool = false
     cudss_device_indices::Vector{Cint} = Cint[]
 end
 
