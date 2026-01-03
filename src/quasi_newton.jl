@@ -227,15 +227,15 @@ mutable struct CompactLBFGS{T, VT <: AbstractVector{T}, MT <: AbstractMatrix{T}}
     Sk::MT       # n x p
     Yk::MT       # n x p
     Lk::MT       # p x p
-    Mk::MT       # p x p (for Cholesky factorization Mₖ = Jₖᵀ Jₖ)
+    Mk::MT       # p x p (for Cholesky factorization Mₖ = Jₖ Jₖᵀ)
     Tk::MT       # 2p x 2p
     Jk::MT       # p x p
     SdotS::MT    # p x p
     DkLk::MT     # p x p
     U::MT        # n x p
     V::MT        # n x p
-    V1::MT       # m x 2p
-    V2::MT       # m x 2p
+    E::MT        # (n+m) x 2p
+    H::MT        # (n+m) x 2p
     Dk::VT       # p
     _w1::VT
     _w2::VT
@@ -425,7 +425,6 @@ function init!(qn::CompactLBFGS{T}, Bk::AbstractVector{T}, g0::AbstractVector{T}
     Bk .= (T(2) * rho0 * qn.init_value)
     return
 end
-
 
 struct ExactHessian{T, VT} <: AbstractHessian{T, VT} end
 create_quasi_newton(::Type{ExactHessian}, cb::AbstractCallback{T,VT}, n; options...) where {T,VT} = ExactHessian{T, VT}()
