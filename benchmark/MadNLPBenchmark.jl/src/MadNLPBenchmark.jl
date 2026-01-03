@@ -76,43 +76,6 @@ const CUTEST_CASES = setdiff(
     ]
 )
 
-function __init__()
-    try
-        @info "Testing CUTEst model loading..."
-        m = CUTEstModel(CUTEst.select_sif_problems()[end]; decode = false)
-    catch e
-        @info "CUTEst models could not be loaded. Decoding all CUTEst problems..."
-        for (i, instance) in enumerate(CUTEst.select_sif_problems())
-            try
-                m=CUTEstModel(instance; decode = false)
-                @debug "Model $i-th $(instance) loaded successfully."
-                finalize(m)
-            catch e
-                CUTEst.sifdecoder(instance)
-                CUTEst.build_libsif(instance)
-                m=CUTEstModel(instance; decode = false)
-                finalize(m)
-                @info "Model $i-th $(instance) decoded and loaded successfully."
-            end
-        end
-    end
-end
-
-function run_benchmark(name, model, cases, solver, analyzer; wks=workers(), finalizer=m -> nothing)
-    results = []
-    pmap(WorkerPool(wks), cases) do case
-        @info "Running $(name) $case"
-        m = model(case)
-        @info "$case: first run"
-        solver(m)
-        @info "$case: second run"
-        result = solver(m)
-        @info "$case: completed"
-        finalizer(m)
-    end
-    JLD2.@save "$name.jld2" name results
-end
-
 export run_benchmark, OPF_CASES, COPS_CASES, CUTEST_CASES
 
 end # module

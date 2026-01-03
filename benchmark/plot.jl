@@ -3,13 +3,11 @@ using Plots, BenchmarkProfiles, JLD2
 REV1 = ARGS[1]
 REV2 = ARGS[2]
 
-@info "Loading results for revision $rev"
-
-for class in ["opf", "cops", "cutest"]
-    for backend in ["cpu", "gpu"]
+for class in ["opf"] #, "cops", "cutest"]
+    for backend in ["gpu"] #, "cpu"]
         
-        @load "$(REV1)_$(class)_$(backend).jld2" results1
-        @load "$(REV2)_$(class)_$(backend).jld2" results2
+        results1 = (@load "$(REV1)_$(class)_$(backend).jld2" results)[:results]
+        results2 = (@load "$(REV2)_$(class)_$(backend).jld2" results)[:results]
 
         for metric in [:total_time]
             plt = performance_profile(
