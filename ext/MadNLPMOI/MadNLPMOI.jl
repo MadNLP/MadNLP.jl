@@ -1151,7 +1151,7 @@ function MOI.get(
     MOI.check_result_index_bounds(model, attr)
     MOI.throw_if_not_valid(model, ci)
     s = -1.0
-    return s * model.result.multipliers[ci.value]
+    return s * model.result.multipliers[row(model, ci)]
 end
 
 function MOI.get(
