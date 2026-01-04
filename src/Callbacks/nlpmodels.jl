@@ -875,6 +875,9 @@ function _eval_lag_hess_wrapper!(
     @inbounds @simd for k in 1:length(cb.hess_I)
         i, j = cb.hess_I[k], cb.hess_J[k]
         hess[i, j] += hess_buffer[k]
+        if i != j
+            hess[j, i] += hess_buffer[k]
+        end
     end
     return hess
 end
