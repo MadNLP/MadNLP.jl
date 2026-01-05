@@ -118,10 +118,11 @@ function solve!(
             Tk[i+p,i+p] = one(T)
         end
         mul!(Tk, qn.E', qn.H, one(T), one(T))  # Tₖ = (P + Eᵀ C⁻¹ E)
-        F = bunchkaufman(Symmetric(Tk, :L))    # Tₖ⁻¹
+
+        F, ipiv, info = LAPACK.sytrf!('L', Tk) # Tₖ⁻¹
 
         mul!(xr, qn.E', w_)                    # xᵣ = Eᵀ C⁻¹ b
-        ldiv!(F, xr)                           # xᵣ = (P + Eᵀ C⁻¹ E)⁻¹ Eᵀ C⁻¹ b
+        LAPACK.sytrs!('L', F, ipiv, xr)        # xᵣ = (P + Eᵀ C⁻¹ E)⁻¹ Eᵀ C⁻¹ b
         mul!(w_, qn.H, xr, -one(T), one(T))    # x = x - C⁻¹ E xᵣ
     end
 
