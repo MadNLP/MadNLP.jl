@@ -3,18 +3,6 @@
 ######################################################################
 
 #=
-    MadNLP.symul!
-=#
-
-MadNLP.symul!(y, A, x::CuVector{T}, α = one(T), β = zero(T)) where T = CUBLAS.symv!('L', T(α), A, x, T(β), y)
-
-#=
-    MadNLP._ger!
-=#
-
-MadNLP._ger!(alpha::Number, x::CuVector{T}, y::CuVector{T}, A::CuMatrix{T}) where T = CUBLAS.ger!(alpha, x, y, A)
-
-#=
     MadNLP._madnlp_unsafe_wrap
 =#
 
