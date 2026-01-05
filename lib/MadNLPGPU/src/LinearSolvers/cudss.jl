@@ -159,9 +159,6 @@ function MadNLP.factorize!(M::CUDSSSolver)
     else
         CUDSS.cudss("refactorization", M.inner, M.x_gpu, M.b_gpu, asynchronous=true)
     end
-    if !M.opt.cudss_hybrid_memory && !M.opt.cudss_hybrid_execute
-        CUDA.synchronize()
-    end
     return M
 end
 
@@ -174,9 +171,6 @@ function MadNLP.solve!(M::CUDSSSolver{T,V}, xb::V) where {T,V}
     end
     CUDSS.cudss_update(M.x_gpu, xb)
     CUDSS.cudss("solve", M.inner, M.x_gpu, M.b_gpu, asynchronous=true)
-    if !M.opt.cudss_hybrid_memory && !M.opt.cudss_hybrid_execute
-        CUDA.synchronize()
-    end
     return xb
 end
 
