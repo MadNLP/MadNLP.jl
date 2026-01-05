@@ -17,7 +17,8 @@ mutable struct MadNLPSolver{
     CB <: AbstractCallback{T},
     Iterator <: AbstractIterator{T},
     IC <: AbstractInertiaCorrector,
-    KKTVec <: AbstractKKTVector{T, VT}
+    KKTVec <: AbstractKKTVector{T, VT},
+    ICB
     } <: AbstractMadNLPSolver{T}
 
     nlp::Model
@@ -100,6 +101,7 @@ mutable struct MadNLPSolver{
 
     inertia_corrector::IC
     RR::Union{Nothing,RobustRestorer{T}}
+    intermediate_callback::ICB
     status::Status
     output::Dict
 end
@@ -224,6 +226,7 @@ function MadNLPSolver(nlp::AbstractNLPModel{T,VT}; kwargs...) where {T, VT}
         zero(T), zero(T), zero(T),
         Tuple{T, T}[],
         inertia_corrector, nothing,
+        options.intermediate_callback,
         INITIAL, Dict(),
     )
 
@@ -235,4 +238,3 @@ include("callbacks.jl")
 include("factorization.jl")
 include("line_search.jl")
 include("solver.jl")
-

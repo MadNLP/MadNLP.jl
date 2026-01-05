@@ -245,7 +245,7 @@ function regular!(solver::AbstractMadNLPSolver{T}) where T
 
         # evaluate termination criteria
         @trace(solver.logger,"Evaluating termination criteria.")
-        user_callback_termination(solver.nlp, solver) && return USER_REQUESTED_STOP
+        solver.intermediate_callback(solver, :regular) && return USER_REQUESTED_STOP
         max(solver.inf_pr,solver.inf_du,solver.inf_compl) <= solver.opt.tol && return SOLVE_SUCCEEDED
         max(solver.inf_pr,solver.inf_du,solver.inf_compl) <= solver.opt.acceptable_tol ?
             (solver.cnt.acceptable_cnt < solver.opt.acceptable_iter ?
@@ -305,13 +305,6 @@ function regular!(solver::AbstractMadNLPSolver{T}) where T
         @trace(solver.logger,"Proceeding to the next interior point iteration.")
     end
 end
-
-"""
-    user_callback_termination(::AbstractNLPModel, solver::AbstractMadNLPSolver)
-
-Callback function for user-defined termination criteria. The function should return a boolean value indicating whether the solver should terminate.
-"""
-user_callback_termination(::AbstractNLPModel, solver::AbstractMadNLPSolver) = false
 
 function restore!(solver::AbstractMadNLPSolver{T}) where T
     solver.del_w = 0
@@ -390,6 +383,7 @@ function restore!(solver::AbstractMadNLPSolver{T}) where T
         varphi= get_varphi(solver.obj_val,solver.x_lr,solver.xl_r,solver.xu_r,solver.x_ur,solver.mu)
 
         solver.cnt.k+=1
+        solver.intermediate_callback(solver, :restore) && return USER_REQUESTED_STOP
 
         is_filter_acceptable(solver.filter,theta,varphi) ? (return REGULAR) : (solver.cnt.t+=1)
         solver.cnt.k>=solver.opt.max_iter && return MAXIMUM_ITERATIONS_EXCEEDED
@@ -455,6 +449,7 @@ function robust!(solver::AbstractMadNLPSolver{T}) where T
             solver.x_lr,solver.xl_r,solver.zl_r,solver.xu_r,solver.x_ur,solver.zu_r,RR.pp,RR.zp,RR.nn,RR.zn,zero(T),sc)
 
         print_iter(solver;is_resto=true)
+        solver.intermediate_callback(solver, :robust) && return USER_REQUESTED_STOP
 
         max(RR.inf_pr_R,RR.inf_du_R,RR.inf_compl_R) <= solver.opt.tol && return INFEASIBLE_PROBLEM_DETECTED
         solver.cnt.k>=solver.opt.max_iter && return MAXIMUM_ITERATIONS_EXCEEDED
