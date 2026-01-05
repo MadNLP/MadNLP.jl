@@ -3,24 +3,6 @@
 ######################################################################
 
 #=
-    MadNLP._symv!, MadNLP._syr!
-=#
-
-function MadNLP._symv!(uplo::Char, alpha::T, A::AbstractMatrix{T}, x::ROCVector{T}, beta::T, y::AbstractVector{T}) where T
-    return rocBLAS.symv!(uplo, T(alpha), A, x, T(beta), y)
-end
-
-function MadNLP._syr!(uplo::Char, alpha::T, x::ROCVector{T}, A::AbstractMatrix{T}) where T
-    return rocBLAS.syr!(uplo, T(alpha), x, A)
-end
-
-#=
-    MadNLP._ger!
-=#
-
-MadNLP._ger!(alpha::Number, x::ROCVector{T}, y::ROCVector{T}, A::ROCMatrix{T}) where T = rocBLAS.ger!(alpha, x, y, A)
-
-#=
     MadNLP._madnlp_unsafe_wrap
 =#
 

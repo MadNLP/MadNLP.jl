@@ -4,8 +4,10 @@ using Test, CUDA, AMDGPU, MadNLP, MadNLPGPU, MadNLPTests
     include("madnlpgpu_test.jl")
     if CUDA.functional()
         include("densekkt_cuda.jl")
+        include("sparsekkt_cuda.jl")
     end
     if AMDGPU.functional()
         include("densekkt_rocm.jl")
+        include("sparsekkt_rocm.jl")
     end
 end

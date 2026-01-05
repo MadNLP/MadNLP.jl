@@ -19,6 +19,7 @@ end
 
 include("rocm_dense.jl")
 include("rocm_sparse.jl")
+include("rocm_qn.jl")
 include("rocsolver.jl")
 include("rocm.jl")
 

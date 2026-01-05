@@ -3,24 +3,6 @@
 ######################################################################
 
 #=
-    MadNLP._symv!, MadNLP._syr!
-=#
-
-function MadNLP._symv!(uplo::Char, alpha::T, A::AbstractMatrix{T}, x::CuVector{T}, beta::T, y::AbstractVector{T}) where T
-    return CUBLAS.symv!(uplo, T(alpha), A, x, T(beta), y)
-end
-
-function MadNLP._syr!(uplo::Char, alpha::T, x::CuVector{T}, A::AbstractMatrix{T}) where T
-    return CUBLAS.syr!(uplo, T(alpha), x, A)
-end
-
-#=
-    MadNLP._ger!
-=#
-
-MadNLP._ger!(alpha::Number, x::CuVector{T}, y::CuVector{T}, A::CuMatrix{T}) where T = CUBLAS.ger!(alpha, x, y, A)
-
-#=
     MadNLP._madnlp_unsafe_wrap
 =#
 
