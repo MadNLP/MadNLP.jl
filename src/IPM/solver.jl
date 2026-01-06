@@ -71,7 +71,11 @@ function initialize!(solver::AbstractMadNLPSolver{T}) where T
     # Initializing
     solver.obj_val = eval_f_wrapper(solver, solver.x)
     eval_cons_wrapper!(solver, solver.c, solver.x)
-    eval_lag_hess_wrapper!(solver, solver.kkt, solver.x, solver.y)
+    if solver.nlp.meta.ncon == 0
+        eval_lag_hess_wrapper!(solver, solver.kkt, solver.x)
+    else
+        eval_lag_hess_wrapper!(solver, solver.kkt, solver.x, solver.y)
+    end
 
     theta = get_theta(solver.c)
     solver.theta_max = 1e4*max(1,theta)
@@ -112,7 +116,11 @@ function reinitialize!(solver::AbstractMadNLPSolver)
     eval_grad_f_wrapper!(solver, solver.f, solver.x)
     eval_cons_wrapper!(solver, solver.c, solver.x)
     eval_jac_wrapper!(solver, solver.kkt, solver.x)
-    eval_lag_hess_wrapper!(solver, solver.kkt, solver.x, solver.y)
+    if solver.nlp.meta.ncon == 0
+        eval_lag_hess_wrapper!(solver, solver.kkt, solver.x)
+    else
+        eval_lag_hess_wrapper!(solver, solver.kkt, solver.x, solver.y)
+    end
 
     theta = get_theta(solver.c)
     solver.theta_max=1e4*max(1,theta)
@@ -255,7 +263,11 @@ function regular!(solver::AbstractMadNLPSolver{T}) where T
 
         # evaluate Hessian
         if (solver.cnt.k!=0 && !solver.opt.hessian_constant)
-            eval_lag_hess_wrapper!(solver, solver.kkt, solver.x, solver.y)
+            if solver.nlp.meta.ncon == 0
+                eval_lag_hess_wrapper!(solver, solver.kkt, solver.x)
+            else
+                eval_lag_hess_wrapper!(solver, solver.kkt, solver.x, solver.y)
+            end
         end
 
         # update the barrier parameter
@@ -404,7 +416,13 @@ function restore!(solver::AbstractMadNLPSolver{T}) where T
         inf_compl_mu = get_inf_compl(solver.x_lr,solver.xl_r,solver.zl_r,solver.xu_r,solver.x_ur,solver.zu_r,solver.mu,sc)
         print_iter(solver)
 
-        !solver.opt.hessian_constant && eval_lag_hess_wrapper!(solver,solver.kkt,solver.x,solver.y)
+        if !solver.opt.hessian_constant
+            if solver.nlp.meta.ncon == 0
+                eval_lag_hess_wrapper!(solver, solver.kkt, solver.x)
+            else
+                eval_lag_hess_wrapper!(solver, solver.kkt, solver.x, solver.y)
+            end
+        end
         set_aug_diagonal!(solver.kkt,solver)
         set_aug_rhs!(solver, solver.kkt, solver.c, solver.mu)
 
@@ -459,7 +477,11 @@ function robust!(solver::AbstractMadNLPSolver{T}) where T
 
         # compute the Newton step
         if !solver.opt.hessian_constant
-            eval_lag_hess_wrapper!(solver, solver.kkt, solver.x, solver.y; is_resto=true)
+            if solver.nlp.meta.ncon == 0
+                eval_lag_hess_wrapper!(solver, solver.kkt, solver.x; is_resto=true)
+            else
+                eval_lag_hess_wrapper!(solver, solver.kkt, solver.x, solver.y; is_resto=true)
+            end
         end
 
         @trace(solver.logger,"Solving restoration phase primal-dual system.")
