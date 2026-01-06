@@ -846,6 +846,41 @@ end
 function _eval_lag_hess_wrapper!(
     cb::SparseCallback{T, VT, VI, NLP, FH},
     x::AbstractVector,
+    hess::AbstractVector;
+    obj_weight = 1.0,
+) where {T, VT, VI, NLP, FH}
+    nnzh_orig = get_nnzh(cb.nlp.meta)
+    NLPModels.hess_coord!(
+        cb.nlp,
+        x,
+        view(hess, 1:nnzh_orig);
+        obj_weight = obj_weight * cb.obj_scale[],
+    )
+    return hess
+end
+
+function _eval_lag_hess_wrapper!(
+    cb::SparseCallback{T},
+    x::AbstractVector,
+    hess::AbstractMatrix;
+    obj_weight = one(T),
+) where {T}
+    hess_buffer = view(cb.hess_buffer, 1:cb.nnzh)
+    _eval_lag_hess_wrapper!(cb, x, hess_buffer; obj_weight = obj_weight * cb.obj_scale[])
+    fill!(hess, zero(T))
+    @inbounds @simd for k in 1:length(cb.hess_I)
+        i, j = cb.hess_I[k], cb.hess_J[k]
+        hess[i, j] += hess_buffer[k]
+        if i != j
+            hess[j, i] += hess_buffer[k]
+        end
+    end
+    return hess
+end
+
+function _eval_lag_hess_wrapper!(
+    cb::SparseCallback{T, VT, VI, NLP, FH},
+    x::AbstractVector,
     y::AbstractVector,
     hess::AbstractVector;
     obj_weight = 1.0,
