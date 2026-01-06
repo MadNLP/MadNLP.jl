@@ -22,6 +22,7 @@ import CUDSS
     cudss_schur::Bool = false
     cudss_deterministic::Bool = false
     cudss_device_indices::Vector{Cint} = Cint[]
+    cudss_asynchronous::Bool = false
 end
 
 function set_cudss_options!(solver::CUDSS.CudssSolver, opt::CudssSolverOptions)
@@ -139,7 +140,7 @@ function CUDSSSolver(
     # The phase "analysis" is "reordering" combined with "symbolic_factorization"
     x_gpu = CUDSS.CudssMatrix(T, n; nbatch=nbatch)
     b_gpu = CUDSS.CudssMatrix(T, n; nbatch=nbatch)
-    CUDSS.cudss("analysis", solver, x_gpu, b_gpu, asynchronous=true)
+    CUDSS.cudss("analysis", solver, x_gpu, b_gpu, asynchronous=opt.cudss_aysnchronous)
 
     # Allocate additional buffer for iterative refinement
     # Always allocate it to support dynamic updates to opt.cudss_ir
@@ -155,22 +156,22 @@ end
 function MadNLP.factorize!(M::CUDSSSolver)
     CUDSS.cudss_update(M.inner.matrix, nonzeros(M.tril))
     if M.inner.fresh_factorization
-        CUDSS.cudss("factorization", M.inner, M.x_gpu, M.b_gpu, asynchronous=false)
+        CUDSS.cudss("factorization", M.inner, M.x_gpu, M.b_gpu, asynchronous=M.opt.cudss_aysnchronous)
     else
-        CUDSS.cudss("refactorization", M.inner, M.x_gpu, M.b_gpu, asynchronous=false)
+        CUDSS.cudss("refactorization", M.inner, M.x_gpu, M.b_gpu, asynchronous=M.opt.cudss_aysnchronous)
     end
     return M
 end
 
 function MadNLP.solve!(M::CUDSSSolver{T,V}, xb::V) where {T,V}
-    if M.opt.cudss_ir > 0
+    if M.M.opt.cudss_ir > 0
         copyto!(M.buffer, xb)
         CUDSS.cudss_update(M.b_gpu, M.buffer)
     else
         CUDSS.cudss_update(M.b_gpu, xb)
     end
     CUDSS.cudss_update(M.x_gpu, xb)
-    CUDSS.cudss("solve", M.inner, M.x_gpu, M.b_gpu, asynchronous=false)
+    CUDSS.cudss("solve", M.inner, M.x_gpu, M.b_gpu, asynchronous=M.opt.cudss_aysnchronous)
     return xb
 end
 
