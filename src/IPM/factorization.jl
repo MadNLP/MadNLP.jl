@@ -86,33 +86,44 @@ function solve!(
     reduce_rhs!(kkt, w)
 
     # Resize arrays with correct dimension
-    if size(qn.V1) != (nn, 2*p)
-        qn.V1 = zeros(nn, 2*p)
-        qn.V2 = zeros(nn, 2*p)
+    if size(qn.E) != (nn, 2*p)
+        qn.E = zeros(nn, 2*p)
+        qn.H = zeros(nn, 2*p)
     else
-        fill!(qn.V1, zero(T))
-        fill!(qn.V2, zero(T))
+        fill!(qn.E, zero(T))
+        fill!(qn.H, zero(T))
     end
 
     # Solve LBFGS system with Sherman-Morrison-Woodbury formula
-    # (C + U Vᵀ)⁻¹ = C⁻¹ - C⁻¹ U (I + Vᵀ C⁻¹ U) Vᵀ C⁻¹
+    # (C + E P Eᵀ)⁻¹ = C⁻¹ - C⁻¹ E (P + Eᵀ C⁻¹ E) Eᵀ C⁻¹
+    #
+    # P = [ -Iₚ  0  ] (size 2p × 2p) and E = [ U  V ] (size (n+m) × 2p)
+    #     [  0   Iₚ ]                        [ 0  0 ]
 
     # Solve linear system without low-rank part
-    solve!(kkt.linear_solver, w_)
+    solve!(kkt.linear_solver, w_)  # w_ stores the solution of Cx = b
 
     # Add low-rank correction
     if p > 0
-        _init_lbfgs_factors!(qn.V1, qn.V2, qn.U, n, p)
+        @inbounds for i in 1:n, j in 1:p
+            qn.E[i, j] = qn.U[i, j]
+            qn.E[i, j+p] = qn.V[i, j]
+        end
+        copyto!(qn.H, qn.E)
 
-        multi_solve!(kkt.linear_solver, qn.V2)      # V2 = C⁻¹ U
+        multi_solve!(kkt.linear_solver, qn.H)  # H = C⁻¹ E
 
-        Tk[diagind(Tk)] .= one(T)                   # Tₖ = I
-        mul!(Tk, qn.V1', qn.V2, one(T), one(T))     # Tₖ = (I + Vᵀ C⁻¹ U)
-        J1 = qr(Tk)                                 # Tₖ⁻¹
+        for i = 1:p
+            Tk[i,i] = -one(T)                  # Tₖ = P
+            Tk[i+p,i+p] = one(T)
+        end
+        mul!(Tk, qn.E', qn.H, one(T), one(T))  # Tₖ = (P + Eᵀ C⁻¹ E)
 
-        mul!(xr, qn.V1', w_)                        # xᵣ = Vᵀ C⁻¹ b
-        ldiv!(J1, xr)                               # xᵣ = (I + Vᵀ C⁻¹ U)⁻¹ Vᵀ C⁻¹ b
-        mul!(w_, qn.V2, xr, -one(T), one(T))        # x = x - C⁻¹ U xᵣ
+        F, ipiv, info = LAPACK.sytrf!('L', Tk) # Tₖ⁻¹
+
+        mul!(xr, qn.E', w_)                    # xᵣ = Eᵀ C⁻¹ b
+        LAPACK.sytrs!('L', F, ipiv, xr)        # xᵣ = (P + Eᵀ C⁻¹ E)⁻¹ Eᵀ C⁻¹ b
+        mul!(w_, qn.H, xr, -one(T), one(T))    # x = x - C⁻¹ E xᵣ
     end
 
     finish_aug_solve!(kkt, w)
@@ -215,17 +226,21 @@ function mul!(w::AbstractKKTVector{T}, kkt::Union{SparseKKTSystem{T,VT,MT,QN},Sp
     nn = length(primal_dual(w))
     # Load buffers (size: 2p)
     vx = qn._w2
-    # Reset V1 and V2
-    fill!(qn.V1, zero(T))
-    fill!(qn.V2, zero(T))
-    _init_lbfgs_factors!(qn.V1, qn.V2, qn.U, n, p)
-    # Upper-left block is C = ξ I + U Vᵀ
+    # Reset E
+    fill!(qn.E, zero(T))
+    @inbounds for i in 1:n, j in 1:p
+        qn.E[i, j] = qn.U[i, j]
+        qn.E[i, j+p] = qn.V[i, j]
+    end
+    # Upper-left block is B = ξI - UUᵀ + VVᵀ
     mul!(primal(w), Symmetric(kkt.hess_com, :L), primal(x), alpha, beta)
     mul!(primal(w), kkt.jac_com', dual(x), alpha, one(T))
     mul!(dual(w), kkt.jac_com,  primal(x), alpha, beta)
-    # Add (U Vᵀ) x contribution
-    mul!(vx, qn.V2', primal_dual(x))
-    mul!(primal_dual(w), qn.V1, vx, alpha, one(T))
+    mul!(vx, qn.E', primal_dual(x))
+    @inbounds for k in 1:p
+        vx[k] = -vx[k]
+    end
+    mul!(primal_dual(w), qn.E, vx, alpha, one(T))
 
     _kktmul!(w,x,kkt.reg,kkt.du_diag,kkt.l_lower,kkt.u_lower,kkt.l_diag,kkt.u_diag, alpha, beta)
 end
@@ -302,14 +317,3 @@ function mul_hess_blk!(wx, kkt::SparseUnreducedKKTSystem, t)
     wx[ind_lb] .-= @view(t[ind_lb]) .* (kkt.l_lower ./ kkt.l_diag)
     wx[ind_ub] .-= @view(t[ind_ub]) .* (kkt.u_lower ./ kkt.u_diag)
 end
-
-# Set V1 = [U₁   U₂]   ,   V2 = [-U₁   U₂]
-function _init_lbfgs_factors!(V1, V2, U, n, p)
-    @inbounds for i in 1:n, j in 1:p
-        V1[i, j] = U[i, j]
-        V2[i, j] = -U[i, j]
-        V1[i, j+p] = U[i, j+p]
-        V2[i, j+p] = U[i, j+p]
-    end
-end
-
