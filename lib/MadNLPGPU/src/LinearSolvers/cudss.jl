@@ -155,9 +155,9 @@ end
 function MadNLP.factorize!(M::CUDSSSolver)
     CUDSS.cudss_update(M.inner.matrix, nonzeros(M.tril))
     if M.inner.fresh_factorization
-        CUDSS.cudss("factorization", M.inner, M.x_gpu, M.b_gpu, asynchronous=true)
+        CUDSS.cudss("factorization", M.inner, M.x_gpu, M.b_gpu, asynchronous=false)
     else
-        CUDSS.cudss("refactorization", M.inner, M.x_gpu, M.b_gpu, asynchronous=true)
+        CUDSS.cudss("refactorization", M.inner, M.x_gpu, M.b_gpu, asynchronous=false)
     end
     return M
 end
@@ -170,7 +170,7 @@ function MadNLP.solve!(M::CUDSSSolver{T,V}, xb::V) where {T,V}
         CUDSS.cudss_update(M.b_gpu, xb)
     end
     CUDSS.cudss_update(M.x_gpu, xb)
-    CUDSS.cudss("solve", M.inner, M.x_gpu, M.b_gpu, asynchronous=true)
+    CUDSS.cudss("solve", M.inner, M.x_gpu, M.b_gpu, asynchronous=false)
     return xb
 end
 
