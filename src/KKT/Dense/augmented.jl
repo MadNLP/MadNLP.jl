@@ -95,8 +95,8 @@ end
 
 num_variables(kkt::DenseKKTSystem) = length(kkt.pr_diag)
 
-function mul!(y::AbstractVector, kkt::DenseKKTSystem, x::AbstractVector)
-    symul!(y, kkt.aug_com, x)
+function mul!(y::AbstractVector, kkt::DenseKKTSystem{T}, x::AbstractVector) where T
+    _symv!('L', one(T), kkt.aug_com, x, zero(T), y)
 end
 
 # Special getters for Jacobian
