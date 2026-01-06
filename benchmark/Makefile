@@ -13,23 +13,20 @@ REV2_SHA := $(shell git rev-parse --short=7 $(REV2))
 OUT1 := $(REV1_SHA)_cutest_cpu.jld2 \
 	$(REV1_SHA)_cops_cpu.jld2 \
 	$(REV1_SHA)_opf_cpu.jld2 \
-	$(REV1_SHA)_cutest_gpu.jld2 \
 	$(REV1_SHA)_cops_gpu.jld2 \
 	$(REV1_SHA)_opf_gpu.jld2
 
 OUT2 := $(REV2_SHA)_cutest_cpu.jld2 \
 	$(REV2_SHA)_cops_cpu.jld2 \
 	$(REV2_SHA)_opf_cpu.jld2 \
-	$(REV2_SHA)_cutest_gpu.jld2 \
 	$(REV2_SHA)_cops_gpu.jld2 \
 	$(REV2_SHA)_opf_gpu.jld2
 
-PDF  := $(REV1_SHA)_$(REV2_SHA)_cutest_gpu.pdf \
-	$(REV1_SHA)_$(REV2_SHA)_cops_gpu.pdf \
-	$(REV1_SHA)_$(REV2_SHA)_opf_gpu.pdf \
-	$(REV1_SHA)_$(REV2_SHA)_cutest_cpu.pdf \
-	$(REV1_SHA)_$(REV2_SHA)_cops_cpu.pdf \
-	$(REV1_SHA)_$(REV2_SHA)_opf_cpu.pdf
+PDF  := $(REV1_SHA)_$(REV2_SHA)_total_time_cops_gpu.pdf \
+	$(REV1_SHA)_$(REV2_SHA)_total_time_opf_gpu.pdf \
+	$(REV1_SHA)_$(REV2_SHA)_total_time_cutest_cpu.pdf \
+	$(REV1_SHA)_$(REV2_SHA)_total_time_cops_cpu.pdf \
+	$(REV1_SHA)_$(REV2_SHA)_total_time_opf_cpu.pdf
 
 .PHONY: all fetch instantiate bench1 bench2 plot clean test1
 
@@ -42,32 +39,34 @@ fetch:
 	  echo "No 'origin' remote; skipping fetch"; \
 	fi
 
-instantiate:
-	$(JULIA) --project -e 'import Pkg; Pkg.instantiate()'
-
-test1:
-
-bench1: fetch instantiate
+bench1: fetch
+	@echo "Instantiating packages for REV1=$(REV1) [$(REV1_SHA)]"
+	$(JULIA) --project -e 'import Pkg; Pkg.instantiate(); Pkg.add(name="MadNLP", rev="$(REV1_SHA)"); Pkg.add(name="MadNLPHSL", rev="$(REV1_SHA)"); Pkg.add(name="MadNLPGPU", rev="$(REV1_SHA)")'
 	@echo "Running benchmark for REV1=$(REV1) [$(REV1_SHA)] with NPROCS=$(NPROCS)"
 	$(JULIA) --project -p $(NPROCS) runbenchmark.jl $(REV1_SHA)
 	@for f in $(OUT1); do \
 	  test -f "$$f" || { echo "Missing: $$f"; exit 1; }; \
 	done
 
-bench2: fetch instantiate
+bench2: fetch
+	@echo "Instantiating packages for REV2=$(REV2) [$(REV2_SHA)]"
+	$(JULIA) --project -e 'import Pkg; Pkg.instantiate(); Pkg.add(name="MadNLP", rev="$(REV2_SHA)"); Pkg.add(name="MadNLPHSL", rev="$(REV2_SHA)"); Pkg.add(name="MadNLPGPU", rev="$(REV2_SHA)")'
 	@echo "Running benchmark for REV2=$(REV2) [$(REV2_SHA)] with NPROCS=$(NPROCS)"
 	$(JULIA) --project -p $(NPROCS) runbenchmark.jl $(REV2_SHA)
 	@for f in $(OUT2); do \
 	  test -f "$$f" || { echo "Missing: $$f"; exit 1; }; \
 	done
 
-plot: bench1 bench2
-	@echo "Plotting $(REV1_SHA) vs $(REV2_SHA)"
+# plot: bench1 bench2
+plot:
+	@echo "Generating plots for REV1=$(REV1_SHA) and REV2=$(REV2_SHA)"
 	$(JULIA) --project plot.jl $(REV1_SHA) $(REV2_SHA)
-	@test -f "$(PDF)" || (echo "Expected plot missing: $(PDF)"; exit 1)
+	@for f in $(PDF); do \
+	  test -f "$$f" || { echo "Missing plot: $$f"; exit 1; }; \
+	done
 
 $(PDF): plot
 	@echo "Done: $(PDF)"
 
-clean:
-	rm -f *_cutest_gpu.jld2 *_cutest_gpu.pdf
+clean: 
+	rm -f *.jld2 *.pdf

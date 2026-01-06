@@ -1,9 +1,6 @@
 using Pkg, Distributed, JLD2, Logging
 
 MADNLP_GIT_HASH = ARGS[1]
-Pkg.add(name="MadNLP", rev="$MADNLP_GIT_HASH")
-Pkg.add(name="MadNLPHSL", rev="$MADNLP_GIT_HASH")
-Pkg.add(name="MadNLPGPU", rev="$MADNLP_GIT_HASH")
 
 @everywhere begin
     using ExaModelsPower, COPSBenchmark, CUTEst, ExaModels
@@ -14,7 +11,7 @@ Pkg.add(name="MadNLPGPU", rev="$MADNLP_GIT_HASH")
         if result == nothing
             return(; case=string(case), status=MadNLP.INTERNAL_ERROR, total_time=Inf, total_iter=0)
         else
-            return (; case=string(case), status=result.status, total_time=result.counters.total_time, total_iter=result.counters.k)
+            return (; case=string(case), status=Int(result.status), total_time=result.counters.total_time, total_iter=result.counters.k)
         end
     end
 end
@@ -27,21 +24,13 @@ function run_benchmark(name, model, cases, solver, analyzer; wks=workers(), fina
 
         result = nothing
         try 
-            GC.gc()
-            GC.enable(false)
             first_run_time = @timed begin
                 result = solver(m)
             end
-            GC.enable(true)
-            GC.gc()
             
             if first_run_time.compile_time + first_run_time.recompile_time > 0
                 @info "$case: running again to avoid compilation time effects"
-                GC.gc()
-                GC.enable(false)
                 result = solver(m)
-                GC.enable(true)
-                GC.gc()
             end
         catch e
             @info "$case: solver failed with error $e"
@@ -166,34 +155,34 @@ run_benchmark(
     finalizer = m -> finalize(m)
 )
 
-# OPF CPU benchmark
-run_benchmark(
-    "$(MADNLP_GIT_HASH)_opf_cpu",
-    case -> opf_model(case)[1],
-    OPF_CASES,
-    m -> madnlp(m; linear_solver=Ma27Solver, max_wall_time=900.0, rethrow_error =false),
-    standard_analyzer
-)
+# # OPF CPU benchmark
+# run_benchmark(
+#     "$(MADNLP_GIT_HASH)_opf_cpu",
+#     case -> opf_model(case)[1],
+#     OPF_CASES,
+#     m -> madnlp(m; linear_solver=Ma27Solver, max_wall_time=900.0, rethrow_error =false),
+#     standard_analyzer
+# )
 
-# COPS CPU benchmark
-run_benchmark(
-    "$(MADNLP_GIT_HASH)_cops_cpu",
-    ((model,args),) -> model(args..., COPSBenchmark.ExaModelsBackend()),
-    COPS_CASES,
-    m -> madnlp(m; linear_solver=Ma57Solver, ma57_automatic_scaling=true, max_wall_time=900.0, rethrow_error =false),
-    standard_analyzer
-)
+# # COPS CPU benchmark
+# run_benchmark(
+#     "$(MADNLP_GIT_HASH)_cops_cpu",
+#     ((model,args),) -> model(args..., COPSBenchmark.ExaModelsBackend()),
+#     COPS_CASES,
+#     m -> madnlp(m; linear_solver=Ma57Solver, ma57_automatic_scaling=true, max_wall_time=900.0, rethrow_error =false),
+#     standard_analyzer
+# )
 
-# CUTEST GPU benchmark
-run_benchmark(
-    "$(MADNLP_GIT_HASH)_cutest_gpu",
-    case -> WrapperNLPModel(typeof(CUDA.zeros(Float64,0)), CUTEstModel(case; decode = false)),
-    CUTEST_CASES,
-    m -> madnlp(m; tol = 1e-8, max_wall_time=900.0, rethrow_error =false),
-    standard_analyzer;
-    wks = workers()[1:CUDA.ndevices()],
-    finalizer = m -> finalize(m.inner)
-)
+# # CUTEST GPU benchmark
+# run_benchmark(
+#     "$(MADNLP_GIT_HASH)_cutest_gpu",
+#     case -> WrapperNLPModel(typeof(CUDA.zeros(Float64,0)), CUTEstModel(case; decode = false)),
+#     CUTEST_CASES,
+#     m -> madnlp(m; tol = 1e-8, max_wall_time=900.0, rethrow_error =false),
+#     standard_analyzer;
+#     wks = workers()[1:CUDA.ndevices()],
+#     finalizer = m -> finalize(m.inner)
+# )
 
 # OPF GPU benchmark
 run_benchmark(
