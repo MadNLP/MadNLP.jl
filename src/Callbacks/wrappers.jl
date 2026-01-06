@@ -178,6 +178,18 @@ end
 function NLPModels.hess_coord!(
     m::M,
     x::AbstractVector,
+    hess::AbstractVector;
+    obj_weight = one(eltype(x))
+) where {M <: SparseWrapperModel}
+    copyto!(m.x, x)
+    NLPModels.hess_coord!(m.inner, m.x, m.hess; obj_weight=obj_weight)
+    copyto!(hess, m.hess)
+    return
+end
+
+function NLPModels.hess_coord!(
+    m::M,
+    x::AbstractVector,
     y::AbstractVector,
     hess::AbstractVector;
     obj_weight = one(eltype(x))
@@ -213,4 +225,3 @@ function hess_dense!(
     copyto!(hess, m.hess)
     return
 end
-
