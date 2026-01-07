@@ -688,7 +688,7 @@ function unpack_x!(x_full, cb::SparseCallback{T, VT, VI, NLP, FH}, x) where {T, 
 end
 function unpack_z!(z_full, cb::SparseCallback{T, VT, VI, NLP, FH}, z) where {T, VT, VI, NLP, FH<:MakeParameter}
     free = cb.fixed_handler.free
-    z_full[free] .= z
+    z_full[free] .= z ./ cb.obj_scale[]
 end
 
 
