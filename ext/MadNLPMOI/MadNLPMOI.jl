@@ -16,12 +16,15 @@ _is_parameter(term::MOI.ScalarQuadraticTerm) = _is_parameter(term.variable_1) ||
 mutable struct _VectorNonlinearOracleCache
     set::MOI.VectorNonlinearOracle{Float64}
     x::Vector{Float64}
+    nzJ::Vector{Float64}
+    start::Union{Nothing,Vector{Float64}}
     eval_f_timer::Float64
     eval_jacobian_timer::Float64
     eval_hessian_lagrangian_timer::Float64
 
     function _VectorNonlinearOracleCache(set::MOI.VectorNonlinearOracle{Float64})
-        return new(set, zeros(set.input_dimension), 0.0, 0.0, 0.0)
+        nnzj = length(set.jacobian_structure)
+        return new(set, zeros(set.input_dimension), zeros(nnzj), nothing, 0.0, 0.0, 0.0)
     end
 end
 
@@ -58,6 +61,12 @@ mutable struct Optimizer <: MOI.AbstractOptimizer
     nlp_model::Union{Nothing,MOI.Nonlinear.Model}
     ad_backend::MOI.Nonlinear.AbstractAutomaticDifferentiation
     vector_nonlinear_oracle_constraints::Vector{Tuple{MOI.VectorOfVariables,_VectorNonlinearOracleCache}}
+
+    needs_new_inner::Bool
+    hess_available::Bool
+    jprod_available::Bool
+    jtprod_available::Bool
+    hprod_available::Bool
 end
 
 function MadNLP.Optimizer(; kwargs...)
@@ -89,6 +98,11 @@ function MadNLP.Optimizer(; kwargs...)
         nothing,
         MOI.Nonlinear.SparseReverseMode(),
         Tuple{MOI.VectorOfVariables,_VectorNonlinearOracleCache}[],
+        true,
+        false,
+        false,
+        false,
+        false,
     )
 end
 
@@ -143,6 +157,11 @@ function MOI.empty!(model::Optimizer)
     model.nlp_model = nothing
     # SKIP: model.ad_backend
     empty!(model.vector_nonlinear_oracle_constraints)
+    model.needs_new_inner = true
+    model.hess_available = false
+    model.jprod_available = false
+    model.jtprod_available = false
+    model.hprod_available = false
     return
 end
 
@@ -330,7 +349,8 @@ end
 
 function MOI.get(model::Optimizer, p::MOI.RawOptimizerAttribute)
     if !haskey(model.options, p.name)
-        error("RawParameter with name $(p.name) is not set.")
+        msg = "RawOptimizerAttribute with name $(p.name) is not set."
+        throw(MOI.GetAttributeNotAllowed(p, msg))
     end
     return model.options[p.name]
 end
@@ -1170,22 +1190,49 @@ function MOI.eval_hessian_lagrangian(model::Optimizer, H, x, σ, μ)
 end
 
 function MOI.eval_constraint_jacobian_product(model::Optimizer, Jv, x, v)
-    @assert isempty(model.vector_nonlinear_oracle_constraints)
     fill!(Jv, 0.0)
     qp_offset = length(model.qp_data)
-    Jv_nlp = view(Jv, (qp_offset+1):length(Jv))
+    Jv_nlp = view(Jv, (qp_offset+1):...)
     MOI.eval_constraint_jacobian_product(model.nlp_data.evaluator, Jv_nlp, x, v)
     MOI.eval_constraint_jacobian_product(model.Jv_data, y, x, v)
+    row_offset = ...
+    for (f, s) in model.vector_nonlinear_oracle_constraints
+      for i = 1:s.set.input_dimension
+        s.x[i] = x[f.variables[i].value]
+      end
+      s.set.eval_jacobian(s.nzJ, s.x)
+      k = 0
+      for (r, c) in s.set.jacobian_structure
+        k += 1
+        row = row_offset + r
+        col = f.variables[c].value
+        Jv[row] += s.nzJ[k] * v[col]
+      end
+      row_offset += s.set.output_dimension
     return
 end
 
 function MOI.eval_constraint_jacobian_transpose_product(model::Optimizer, Jtv, x, v)
-    @assert isempty(model.vector_nonlinear_oracle_constraints)
     fill!(Jtv, 0.0)
     qp_offset = length(model.qp_data)
-    v_nlp = view(v, (qp_offset+1):length(v))
+    v_nlp = view(v, (qp_offset+1):...)
     MOI.eval_constraint_jacobian_transpose_product(model.nlp_data.evaluator, Jtv, x, v_nlp)
     MOI.eval_constraint_jacobian_transpose_product(model.qp_data, Jtv, x, v)
+    row_offset = ...
+    for (f, s) in model.vector_nonlinear_oracle_constraints
+      for i = 1:s.set.input_dimension
+        s.x[i] = x[f.variables[i].value]
+      end
+      s.set.eval_jacobian(s.nzJ, s.x)
+      k = 0
+      for (r, c) in s.set.jacobian_structure
+        k += 1
+        row = row_offset + r
+        col = f.variables[c].value
+        Jtv[col] += s.nzJ[k] * v[row]
+      end
+      row_offset += s.set.output_dimension
+    end
     return
 end
 
@@ -1258,18 +1305,20 @@ function NLPModels.hprod!(nlp::MOIModel, x::AbstractVector{Float64}, l::Abstract
 end
 
 function NLPModels.hess_structure!(nlp::MOIModel, I::AbstractVector{T}, J::AbstractVector{T}) where T
-    @assert length(I) == length(J) == length(MOI.hessian_lagrangian_structure(nlp.model))
+    sparsity_pattern_hessian = MOI.hessian_lagrangian_structure(nlp.model)
+    @assert length(I) == length(J) == length(sparsity_pattern_hessian)
     cnt = 1
-    for (row, col) in  MOI.hessian_lagrangian_structure(nlp.model)
+    for (row, col) in sparsity_pattern_hessian
         I[cnt], J[cnt] = row, col
         cnt += 1
     end
 end
 
 function NLPModels.jac_structure!(nlp::MOIModel, I::AbstractVector{T}, J::AbstractVector{T}) where T
-    @assert length(I) == length(J) == length(MOI.jacobian_structure(nlp.model))
+    sparsity_pattern_jacobian = MOI.jacobian_structure(nlp.model)
+    @assert length(I) == length(J) == length(sparsity_pattern_jacobian)
     cnt = 1
-    for (row, col) in  MOI.jacobian_structure(nlp.model)
+    for (row, col) in sparsity_pattern_jacobian
         I[cnt], J[cnt] = row, col
         cnt += 1
     end
@@ -1303,7 +1352,7 @@ function _setup_model(model::Optimizer)
             break
         end
     end
-    is_nlp = has_nlp_constraints || has_nlp_objective
+
     # Initialize evaluator using model's structure.
     init_feat = [:Grad]
     if has_hessian
@@ -1319,6 +1368,11 @@ function _setup_model(model::Optimizer)
         push!(init_feat, :JacVec)
     end
     MOI.initialize(model.nlp_data.evaluator, init_feat)
+
+    model.hess_available = has_hessian
+    model.jprod_available = has_jacobian_operator
+    model.jtprod_available = has_jacobian_operator
+    model.hprod_available = has_hessian_operator && !has_oracle
 
     # Initial variable
     nvar = length(vars)
@@ -1381,22 +1435,11 @@ function _setup_model(model::Optimizer)
             nnzj = nnzj,
             nnzh = nnzh,
             minimize = model.sense == MOI.MIN_SENSE,
-            islp = !is_nlp
+            islp = !has_quadratic_constraints && !has_nlp_constraints && !has_nlp_objective
         ),
         model,
         NLPModels.Counters(),
     )
-    return
-end
-
-function copy_parameters(model::Optimizer)
-    if model.nlp_model === nothing
-        return
-    end
-    empty!(model.qp_data.parameters)
-    for (p, index) in model.parameters
-        model.qp_data.parameters[p.value] = model.nlp_model[index]
-    end
     return
 end
 
@@ -1407,7 +1450,14 @@ function MOI.optimize!(model::Optimizer)
     if model.invalid_model
         return
     end
-    copy_parameters(model)
+
+    if model.nlp_model !== nothing
+        empty!(model.qp_data.parameters)
+        for (p, index) in model.parameters
+            model.qp_data.parameters[p.value] = model.nlp_model[index]
+        end
+    end
+
     if model.silent
         model.options[:print_level] = MadNLP.ERROR
     end
