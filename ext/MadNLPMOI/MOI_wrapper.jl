@@ -50,6 +50,16 @@ mutable struct Optimizer <: MOI.AbstractOptimizer
     nlp_model::Union{Nothing,MOI.Nonlinear.Model}
     ad_backend::MOI.Nonlinear.AbstractAutomaticDifferentiation
     vector_nonlinear_oracle_constraints::Vector{Tuple{MOI.VectorOfVariables,_VectorNonlinearOracleCache}}
+
+    jrows::Vector{Int}
+    jcols::Vector{Int}
+    hrows::Vector{Int}
+    hcols::Vector{Int}
+    needs_new_nlp::Bool
+    islp::Bool
+    has_nlp_constraints::Bool
+    hess_available::Bool
+    hprod_available::Bool
 end
 
 function Optimizer(; kwargs...)
@@ -81,6 +91,15 @@ function Optimizer(; kwargs...)
         nothing,
         MOI.Nonlinear.SparseReverseMode(),
         Tuple{MOI.VectorOfVariables,_VectorNonlinearOracleCache}[],
+        Int[],
+        Int[],
+        Int[],
+        Int[],
+        true,
+        false,
+        false,
+        false,
+        false,
     )
 end
 
@@ -135,6 +154,15 @@ function MOI.empty!(model::Optimizer)
     model.nlp_model = nothing
     # SKIP: model.ad_backend
     empty!(model.vector_nonlinear_oracle_constraints)
+    model.jrows = Int[]
+    model.jcols = Int[]
+    model.hrows = Int[]
+    model.hcols = Int[]
+    model.needs_new_nlp = true
+    model.islp = false
+    model.has_nlp_constraints = false
+    model.hess_available = false
+    model.hprod_available = false
     return
 end
 
@@ -400,7 +428,7 @@ function MOI.set(
     set::S,
 ) where {S<:_SETS}
     MOI.set(model.variables, MOI.ConstraintSet(), ci, set)
-    model.solver = nothing
+    model.needs_new_nlp = true
     return
 end
 
@@ -479,7 +507,7 @@ function MOI.set(
     S<:_SETS,
 }
     MOI.set(model.qp_data, MOI.ConstraintSet(), ci, set)
-    model.solver = nothing
+    model.needs_new_nlp = true
     return
 end
 
@@ -620,7 +648,7 @@ function MOI.set(
     index = MOI.Nonlinear.ConstraintIndex(ci.value)
     func = model.nlp_model[index].expression
     model.nlp_model.constraints[index] = MOI.Nonlinear.Constraint(func, set)
-    model.solver = nothing
+    model.needs_new_nlp = true
     return
 end
 
@@ -978,7 +1006,7 @@ function MOI.set(
     sense::MOI.OptimizationSense,
 )
     model.sense = sense
-    model.solver = nothing
+    model.needs_new_nlp = true
     return
 end
 
@@ -1016,7 +1044,7 @@ function MOI.get(
         MOI.ScalarQuadraticFunction{Float64},
     },
 }
-    return MOI.get(model.qp_data, attr)
+    return convert(F, MOI.get(model.qp_data, attr))
 end
 
 function MOI.set(
@@ -1325,23 +1353,17 @@ function NLPModels.hprod!(nlp::MOIModel, x::AbstractVector{Float64}, l::Abstract
 end
 
 function NLPModels.hess_structure!(nlp::MOIModel, I::AbstractVector{T}, J::AbstractVector{T}) where T
-    sparsity_pattern_hessian = MOI.hessian_lagrangian_structure(nlp.model)
-    @assert length(I) == length(J) == length(sparsity_pattern_hessian)
-    cnt = 1
-    for (row, col) in sparsity_pattern_hessian
-        I[cnt], J[cnt] = row, col
-        cnt += 1
-    end
+    @assert length(I) == length(J) == length(nlp.model.hrows) == length(nlp.model.hcols)
+    copyto!(I, nlp.model.hrows)
+    copyto!(J, nlp.model.hcols)
+    return
 end
 
 function NLPModels.jac_structure!(nlp::MOIModel, I::AbstractVector{T}, J::AbstractVector{T}) where T
-    sparsity_pattern_jacobian = MOI.jacobian_structure(nlp.model)
-    @assert length(I) == length(J) == length(sparsity_pattern_jacobian)
-    cnt = 1
-    for (row, col) in sparsity_pattern_jacobian
-        I[cnt], J[cnt] = row, col
-        cnt += 1
-    end
+    @assert length(I) == length(J) == length(nlp.model.jrows) == length(nlp.model.jcols)
+    copyto!(I, nlp.model.jrows)
+    copyto!(J, nlp.model.jcols)
+    return
 end
 
 ### MOI.optimize!
@@ -1373,6 +1395,11 @@ function _setup_model(model::Optimizer)
         end
     end
 
+    model.islp = !has_quadratic_constraints && !has_nlp_constraints && !has_nlp_objective
+    model.has_nlp_constraints = has_nlp_constraints
+    model.hess_available = has_hessian
+    model.hprod_available = has_hessian_operator && !has_oracle
+
     # Initialize evaluator using model's structure.
     init_feat = [:Grad]
     if has_hessian
@@ -1389,8 +1416,42 @@ function _setup_model(model::Optimizer)
     end
     MOI.initialize(model.nlp_data.evaluator, init_feat)
 
+    # Sparsity
+    jacobian_sparsity = MOI.jacobian_structure(model)
+    nnzj = length(jacobian_sparsity)
+    jrows = Vector{Int}(undef, nnzj)
+    jcols = Vector{Int}(undef, nnzj)
+    for k in 1:nnzj
+        jrows[k], jcols[k] = jacobian_sparsity[k]
+    end
+    model.jrows = jrows
+    model.jcols = jcols
+
+    hessian_sparsity = has_hessian ? MOI.hessian_lagrangian_structure(model) : Tuple{Int,Int}[]
+    nnzh = length(hessian_sparsity)
+    hrows = Vector{Int}(undef, nnzh)
+    hcols = Vector{Int}(undef, nnzh)
+    for k in 1:nnzh
+        hrows[k], hcols[k] = hessian_sparsity[k]
+    end
+    model.hrows = hrows
+    model.hcols = hcols
+
+    model.needs_new_nlp = true
+    return
+end
+
+function _setup_nlp(model::Optimizer)
+    if !model.needs_new_nlp
+        return model.nlp
+    end
+
+    # Number of nonzeros for the jacobian and hessian of the Lagrangian
+    nnzj = length(model.jrows)
+    nnzh = length(model.hrows)
+
     # Initial variable
-    nvar = length(vars)
+    nvar = length(model.variables.lower)
     x0 = zeros(Float64, nvar)
     for i in 1:length(model.variable_primal_start)
         x0[i] = if model.variable_primal_start[i] !== nothing
@@ -1411,16 +1472,6 @@ function _setup_model(model::Optimizer)
         push!(g_U, bound.upper)
     end
     ncon = length(g_L)
-
-    # Sparsity
-    jacobian_sparsity = MOI.jacobian_structure(model)
-    hessian_sparsity = if has_hessian
-        MOI.hessian_lagrangian_structure(model)
-    else
-        Tuple{Int,Int}[]
-    end
-    nnzh = length(hessian_sparsity)
-    nnzj = length(jacobian_sparsity)
 
     # Dual multipliers
     y0 = zeros(Float64, ncon)
@@ -1462,16 +1513,20 @@ function _setup_model(model::Optimizer)
             nnzj = nnzj,
             nnzh = nnzh,
             minimize = model.sense == MOI.MIN_SENSE,
-            islp = !has_quadratic_constraints && !has_nlp_constraints && !has_nlp_objective
+            islp = model.islp,
+            hess_available = model.hess_available,
+            hprod_available = model.hprod_available,
         ),
         model,
         NLPModels.Counters(),
     )
-    return
+
+    model.needs_new_nlp = false
+    return model.nlp
 end
 
 function MOI.optimize!(model::Optimizer)
-    if model.solver == nothing
+    if model.solver === nothing
         _setup_model(model)
     end
     if model.invalid_model
@@ -1485,27 +1540,18 @@ function MOI.optimize!(model::Optimizer)
         end
     end
 
+    _setup_nlp(model)
+
     if model.silent
         model.options[:print_level] = MadNLP.ERROR
     end
     options = copy(model.options)
     # Specific options depending on problem's structure.
-    # 1/ Switch to LBFGS if the Hessian is not specified.
-    has_hessian = :Hess in MOI.features_available(model.nlp_data.evaluator)
-    for (_, s) in model.vector_nonlinear_oracle_constraints
-        if s.set.eval_hessian_lagrangian === nothing
-            has_hessian = false
-        end
-    end
-    if !has_hessian
+    if !model.hess_available
         options[:hessian_approximation] = MadNLP.CompactLBFGS
     end
-    # 2/ Set Jacobian to constant if all constraints are linear.
-    has_nlp_constraints =
-        any(isequal(_kFunctionTypeScalarQuadratic), model.qp_data.function_type) ||
-        !isempty(model.nlp_data.constraint_bounds) ||
-        !isempty(model.vector_nonlinear_oracle_constraints)
-    if !has_nlp_constraints
+    # Set Jacobian to constant if all constraints are linear.
+    if !model.has_nlp_constraints
         options[:jacobian_constant] = true
     end
     # Clear timers
