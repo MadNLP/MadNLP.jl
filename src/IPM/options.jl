@@ -17,7 +17,7 @@ function set_options!(opt::AbstractOptions, options)
     return other_options
 end
 
-@kwdef mutable struct MadNLPOptions{T} <: AbstractOptions
+@kwdef mutable struct MadNLPOptions{T, ICB} <: AbstractOptions
     # Primary options
     tol::T
     callback::Type
@@ -29,6 +29,7 @@ end
     disable_garbage_collector::Bool = false
     blas_num_threads::Int = 1
     iterator::Type = RichardsonIterator
+    intermediate_callback::ICB
 
     # Output options
     output_file::String = ""
@@ -106,17 +107,19 @@ is_dense_callback(nlp) = hasmethod(jac_dense!, Tuple{typeof(nlp), AbstractVector
 # smart option presets
 function MadNLPOptions{T}(
     nlp::AbstractNLPModel{T};
+    intermediate_callback::ICB = (solver, mode) -> false,
     dense_callback = MadNLP.is_dense_callback(nlp),
     callback = dense_callback ? DenseCallback : SparseCallback,
     kkt_system = dense_callback ? DenseCondensedKKTSystem : SparseKKTSystem,
     linear_solver = dense_callback ? LapackCPUSolver : default_sparse_solver(nlp),
     tol = get_tolerance(T,kkt_system)
-) where T
-    return MadNLPOptions{T}(
+) where {T, ICB}
+    return MadNLPOptions{T, ICB}(
         tol = tol,
         callback = callback,
         kkt_system = kkt_system,
         linear_solver = linear_solver,
+        intermediate_callback = intermediate_callback,
     )
 end
 
@@ -149,7 +152,7 @@ function _get_primary_options(options)
     primary_opt = Dict{Symbol,Any}()
     remaining_opt = Dict{Symbol,Any}()
     for (k,v) in options
-        if k in [:tol, :linear_solver, :callback, :kkt_system]
+        if k in [:tol, :linear_solver, :callback, :kkt_system, :intermediate_callback]
             primary_opt[k] = v
         else
             remaining_opt[k] = v
@@ -191,6 +194,7 @@ function load_options(nlp::AbstractNLPModel{T,VT}; options...) where {T, VT}
         linear_solver=opt_linear_solver,
         iterative_refinement=opt_iterator,
         logger=logger,
+        intermediate_callback=opt_ipm.intermediate_callback,
     )
 end
 

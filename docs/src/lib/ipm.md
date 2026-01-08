@@ -19,5 +19,7 @@ nonlinear program with MadNLP's interior-point algorithm.
 
 ```@docs
 MadNLPSolver
-
 ```
+
+Users can also define a termination criteria by using the `intermediate_callback` solver option.
+Besides termination, this is also useful for accessing the internal state of the solver and custom logging.
