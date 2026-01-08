@@ -118,8 +118,10 @@ function reinitialize!(solver::AbstractMadNLPSolver)
 end
 
 # major loops ---------------------------------------------------------
+solve!(solver::AbstractMadNLPSolver; kwargs...) = solve!(solver, MadNLPExecutionStats(solver); kwargs...)
 function solve!(
-    solver::AbstractMadNLPSolver;
+    solver::AbstractMadNLPSolver,
+    stats::MadNLPExecutionStats;
     kwargs...
 )
     stats = MadNLPExecutionStats(solver)
