@@ -16,12 +16,13 @@ _is_parameter(term::MOI.ScalarQuadraticTerm) = _is_parameter(term.variable_1) ||
 mutable struct _VectorNonlinearOracleCache
     set::MOI.VectorNonlinearOracle{Float64}
     x::Vector{Float64}
+    start::Union{Nothing,Vector{Float64}}
     eval_f_timer::Float64
     eval_jacobian_timer::Float64
     eval_hessian_lagrangian_timer::Float64
 
     function _VectorNonlinearOracleCache(set::MOI.VectorNonlinearOracle{Float64})
-        return new(set, zeros(set.input_dimension), 0.0, 0.0, 0.0)
+        return new(set, zeros(set.input_dimension), nothing, 0.0, 0.0, 0.0)
     end
 end
 
@@ -330,7 +331,8 @@ end
 
 function MOI.get(model::Optimizer, p::MOI.RawOptimizerAttribute)
     if !haskey(model.options, p.name)
-        error("RawParameter with name $(p.name) is not set.")
+        msg = "RawOptimizerAttribute with name $(p.name) is not set."
+        throw(MOI.GetAttributeNotAllowed(p, msg))
     end
     return model.options[p.name]
 end
@@ -762,8 +764,35 @@ function MOI.get(
     MOI.check_result_index_bounds(model, attr)
     MOI.throw_if_not_valid(model, ci)
     sign = -_dual_multiplier(model)
-    println(model.result.multipliers)
     return sign * model.result.multipliers[row(model, ci)]
+end
+
+function MOI.supports(
+    ::Optimizer,
+    ::MOI.LagrangeMultiplierStart,
+    ::Type{MOI.ConstraintIndex{F,S}},
+) where {F<:MOI.VectorOfVariables,S<:MOI.VectorNonlinearOracle{Float64}}
+    return true
+end
+
+function MOI.get(
+    model::Optimizer,
+    attr::MOI.LagrangeMultiplierStart,
+    ci::MOI.ConstraintIndex{F,S},
+) where {F<:MOI.VectorOfVariables,S<:MOI.VectorNonlinearOracle{Float64}}
+    _, cache = model.vector_nonlinear_oracle_constraints[ci.value]
+    return cache.start
+end
+
+function MOI.set(
+    model::Optimizer,
+    attr::MOI.LagrangeMultiplierStart,
+    ci::MOI.ConstraintIndex{F,S},
+    start::Union{Nothing,Vector{Float64}},
+) where {F<:MOI.VectorOfVariables,S<:MOI.VectorNonlinearOracle{Float64}}
+    _, cache = model.vector_nonlinear_oracle_constraints[ci.value]
+    cache.start = start
+    return
 end
 
 ### UserDefinedFunction
@@ -1305,18 +1334,20 @@ function NLPModels.hprod!(nlp::MOIModel, x::AbstractVector{Float64}, l::Abstract
 end
 
 function NLPModels.hess_structure!(nlp::MOIModel, I::AbstractVector{T}, J::AbstractVector{T}) where T
-    @assert length(I) == length(J) == length(MOI.hessian_lagrangian_structure(nlp.model))
+    sparsity_pattern_hessian = MOI.hessian_lagrangian_structure(nlp.model)
+    @assert length(I) == length(J) == length(sparsity_pattern_hessian)
     cnt = 1
-    for (row, col) in  MOI.hessian_lagrangian_structure(nlp.model)
+    for (row, col) in sparsity_pattern_hessian
         I[cnt], J[cnt] = row, col
         cnt += 1
     end
 end
 
 function NLPModels.jac_structure!(nlp::MOIModel, I::AbstractVector{T}, J::AbstractVector{T}) where T
-    @assert length(I) == length(J) == length(MOI.jacobian_structure(nlp.model))
+    sparsity_pattern_jacobian = MOI.jacobian_structure(nlp.model)
+    @assert length(I) == length(J) == length(sparsity_pattern_jacobian)
     cnt = 1
-    for (row, col) in  MOI.jacobian_structure(nlp.model)
+    for (row, col) in sparsity_pattern_jacobian
         I[cnt], J[cnt] = row, col
         cnt += 1
     end
@@ -1350,7 +1381,7 @@ function _setup_model(model::Optimizer)
             break
         end
     end
-    is_nlp = has_nlp_constraints || has_nlp_objective
+
     # Initialize evaluator using model's structure.
     init_feat = [:Grad]
     if has_hessian
@@ -1407,7 +1438,19 @@ function _setup_model(model::Optimizer)
     end
     offset = length(model.qp_data.mult_g)
     if model.nlp_dual_start === nothing
-        y0[(offset+1):end] .= 0.0
+        # First there is VectorNonlinearOracle...
+        for (_, cache) in model.vector_nonlinear_oracle_constraints
+            if cache.start !== nothing
+                for i in 1:cache.set.output_dimension
+                    y0[offset+i] = _dual_start(model, cache.start[i], -1)
+                end
+            end
+            offset += cache.set.output_dimension
+        end
+        # ...then come the ScalarNonlinearFunctions
+        for (key, val) in model.mult_g_nlp
+            y0[offset+key.value] = _dual_start(model, val, -1)
+        end
     else
         for (i, start) in enumerate(model.nlp_dual_start::Vector{Float64})
             y0[offset+i] = _dual_start(model, start, -1)
@@ -1428,22 +1471,11 @@ function _setup_model(model::Optimizer)
             nnzj = nnzj,
             nnzh = nnzh,
             minimize = model.sense == MOI.MIN_SENSE,
-            islp = !is_nlp
+            islp = !has_quadratic_constraints && !has_nlp_constraints && !has_nlp_objective
         ),
         model,
         NLPModels.Counters(),
     )
-    return
-end
-
-function copy_parameters(model::Optimizer)
-    if model.nlp_model === nothing
-        return
-    end
-    empty!(model.qp_data.parameters)
-    for (p, index) in model.parameters
-        model.qp_data.parameters[p.value] = model.nlp_model[index]
-    end
     return
 end
 
@@ -1454,7 +1486,14 @@ function MOI.optimize!(model::Optimizer)
     if model.invalid_model
         return
     end
-    copy_parameters(model)
+
+    if model.nlp_model !== nothing
+        empty!(model.qp_data.parameters)
+        for (p, index) in model.parameters
+            model.qp_data.parameters[p.value] = model.nlp_model[index]
+        end
+    end
+
     if model.silent
         model.options[:print_level] = MadNLP.ERROR
     end
