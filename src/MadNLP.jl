@@ -37,7 +37,8 @@ include("quasi_newton.jl")
 include(joinpath("KKT", "KKTsystem.jl"))
 include(joinpath("LinearSolvers", "linearsolvers.jl"))
 include(joinpath("IPM", "IPM.jl"))
-include("extension_templates.jl")
 include("precompile.jl")
+
+global Optimizer
 
 end # end module
