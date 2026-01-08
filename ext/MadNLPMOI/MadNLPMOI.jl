@@ -737,19 +737,34 @@ function MOI.get(
     return MOI.get.(model, MOI.VariablePrimal(attr.result_index), f.variables)
 end
 
-# function MOI.get(
-#     model::Optimizer,
-#     attr::MOI.ConstraintDual,
-#     ci::MOI.ConstraintIndex{F,S},
-# ) where {F<:MOI.VectorOfVariables,S<:MOI.VectorNonlinearOracle{Float64}}
-#     MOI.check_result_index_bounds(model, attr)
-#     MOI.throw_if_not_valid(model, ci)
-#     sign = -_dual_multiplier(model)
-#     f, s = model.vector_nonlinear_oracle_constraints[ci.value]
-#     dual = zeros(MOI.dimension(s.set))
-#     # ...
-#     return dual
-# end
+function MOI.get(
+    model::Optimizer,
+    attr::MOI.ConstraintDual,
+    ci::MOI.ConstraintIndex{F,S},
+) where {F<:MOI.VectorOfVariables,S<:MOI.VectorNonlinearOracle{Float64}}
+    MOI.check_result_index_bounds(model, attr)
+    MOI.throw_if_not_valid(model, ci)
+    sign = -_dual_multiplier(model)
+    f, s = model.vector_nonlinear_oracle_constraints[ci.value]
+    λ = model.result.multipliers[row(model, ci)]
+    λ .*= sign
+    dual = zeros(MOI.dimension(s.set))
+    # dual = λ' * J(x)
+    _eval_constraint_transpose_jacobian_product(dual, model.result.solution, f, s, λ)
+    return dual
+end
+
+function MOI.get(
+    model::Optimizer,
+    attr::MOI.LagrangeMultiplier,
+    ci::MOI.ConstraintIndex{F,S},
+) where {F<:MOI.VectorOfVariables,S<:MOI.VectorNonlinearOracle{Float64}}
+    MOI.check_result_index_bounds(model, attr)
+    MOI.throw_if_not_valid(model, ci)
+    sign = -_dual_multiplier(model)
+    println(model.result.multipliers)
+    return sign * model.result.multipliers[row(model, ci)]
+end
 
 ### UserDefinedFunction
 
@@ -1113,6 +1128,58 @@ function MOI.eval_constraint_jacobian(model::Optimizer, values, x)
     return
 end
 
+# N.B.: VectorNonlinearOracle does not support transposed-Jacobian
+# vector-product by default. This function uses the original Jacobian when
+# we have to compute the product in MadNLP. This can be slow on large-scale
+# instances.
+function _eval_constraint_transpose_jacobian_product(
+    values::AbstractVector,
+    x::AbstractVector,
+    f::MOI.VectorOfVariables,
+    s::_VectorNonlinearOracleCache,
+    v::AbstractVector,
+)
+    J = Tuple{Int,Int}[]
+    _jacobian_structure(J, 0, f, s)
+    J_val = zeros(length(J))
+    _eval_constraint_jacobian(J_val, 0, x, f, s)
+    col_to_index = Dict(x.value => j for (j, x) in enumerate(f.variables))
+    for ((row, col), J_rc) in zip(J, J_val)
+        values[col_to_index[col]] += J_rc * v[row]
+    end
+    return
+end
+
+function MOI.eval_constraint_jacobian_transpose_product(model::Optimizer, Jtv, x, v)
+    fill!(Jtv, 0.0)
+    offset = length(model.qp_data)
+    v_qp = view(v, 1:offset)
+    # Evaluate jtprod for linear-quadratic part of the model.
+    MOI.eval_constraint_jacobian_transpose_product(model.qp_data, Jtv, x, v_qp)
+    # Evaluate jtprod for all VectorNonlinearOracle.
+    for (f, s) in model.vector_nonlinear_oracle_constraints
+        m = s.set.output_dimension
+        v_noc = view(v, offset+1:offset+m)
+        _eval_constraint_transpose_jacobian_product(Jtv, x, f, s, v_noc)
+        offset += m
+    end
+    # Evaluate jtprod for remaining nonlinear expressions.
+    v_nlp = view(v, (offset+1):length(v))
+    MOI.eval_constraint_jacobian_transpose_product(model.nlp_data.evaluator, Jtv, x, v_nlp)
+    return
+end
+
+function MOI.eval_constraint_jacobian_product(model::Optimizer, Jv, x, v)
+    @assert isempty(model.vector_nonlinear_oracle_constraints)
+    fill!(Jv, 0.0)
+    qp_offset = length(model.qp_data)
+    Jv_qp = view(Jv, 1:qp_offset)
+    Jv_nlp = view(Jv, (qp_offset+1):length(Jv))
+    MOI.eval_constraint_jacobian_product(model.nlp_data.evaluator, Jv_nlp, x, v)
+    MOI.eval_constraint_jacobian_product(model.qp_data, Jv_qp, x, v)
+    return
+end
+
 ### Eval_H_CB
 
 function _hessian_lagrangian_structure(
@@ -1166,26 +1233,6 @@ function MOI.eval_hessian_lagrangian(model::Optimizer, H, x, σ, μ)
     H_nlp = view(H, (offset+1):length(H))
     μ_nlp = view(μ, (μ_offset+1):length(μ))
     MOI.eval_hessian_lagrangian(model.nlp_data.evaluator, H_nlp, x, σ, μ_nlp)
-    return
-end
-
-function MOI.eval_constraint_jacobian_product(model::Optimizer, Jv, x, v)
-    @assert isempty(model.vector_nonlinear_oracle_constraints)
-    fill!(Jv, 0.0)
-    qp_offset = length(model.qp_data)
-    Jv_nlp = view(Jv, (qp_offset+1):length(Jv))
-    MOI.eval_constraint_jacobian_product(model.nlp_data.evaluator, Jv_nlp, x, v)
-    MOI.eval_constraint_jacobian_product(model.Jv_data, y, x, v)
-    return
-end
-
-function MOI.eval_constraint_jacobian_transpose_product(model::Optimizer, Jtv, x, v)
-    @assert isempty(model.vector_nonlinear_oracle_constraints)
-    fill!(Jtv, 0.0)
-    qp_offset = length(model.qp_data)
-    v_nlp = view(v, (qp_offset+1):length(v))
-    MOI.eval_constraint_jacobian_transpose_product(model.nlp_data.evaluator, Jtv, x, v_nlp)
-    MOI.eval_constraint_jacobian_transpose_product(model.qp_data, Jtv, x, v)
     return
 end
 
@@ -1415,13 +1462,19 @@ function MOI.optimize!(model::Optimizer)
     # Specific options depending on problem's structure.
     # 1/ Switch to LBFGS if the Hessian is not specified.
     has_hessian = :Hess in MOI.features_available(model.nlp_data.evaluator)
+    for (_, s) in model.vector_nonlinear_oracle_constraints
+        if s.set.eval_hessian_lagrangian === nothing
+            has_hessian = false
+        end
+    end
     if !has_hessian
         options[:hessian_approximation] = MadNLP.CompactLBFGS
     end
     # 2/ Set Jacobian to constant if all constraints are linear.
     has_nlp_constraints =
         any(isequal(_kFunctionTypeScalarQuadratic), model.qp_data.function_type) ||
-        !isempty(model.nlp_data.constraint_bounds)
+        !isempty(model.nlp_data.constraint_bounds) ||
+        !isempty(model.vector_nonlinear_oracle_constraints)
     if !has_nlp_constraints
         options[:jacobian_constant] = true
     end
