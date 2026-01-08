@@ -124,7 +124,6 @@ function solve!(
     stats::MadNLPExecutionStats;
     kwargs...
 )
-    stats = MadNLPExecutionStats(solver)
     if !isempty(kwargs)
         @warn(solver.logger,"The options set during resolve may not have an effect")
         set_options!(solver.opt, kwargs)
