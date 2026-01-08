@@ -97,7 +97,7 @@ function Optimizer(; kwargs...)
         Int[],
         true,
         false,
-        false,
+        true,
         false,
         false,
     )
@@ -160,7 +160,7 @@ function MOI.empty!(model::Optimizer)
     model.hcols = Int[]
     model.needs_new_nlp = true
     model.islp = false
-    model.has_nlp_constraints = false
+    model.has_nlp_constraints = true
     model.hess_available = false
     model.hprod_available = false
     return
