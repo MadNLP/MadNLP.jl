@@ -10,7 +10,7 @@ import Base: string, show, print, size, getindex, copyto!, @kwdef
 import SuiteSparse: UMFPACK, CHOLMOD
 import NLPModels
 import NLPModels: finalize, AbstractNLPModel, obj, grad!, cons!, jac_coord!, hess_coord!, hess_structure!, jac_structure!, NLPModelMeta, get_nvar, get_ncon, get_minimize, get_x0, get_y0, get_nnzj, get_nnzh, get_lvar, get_uvar, get_lcon, get_ucon
-import SolverCore: solve!, getStatus, AbstractOptimizationSolver, AbstractExecutionStats
+import SolverCore: getStatus, AbstractOptimizationSolver, AbstractExecutionStats
 import LDLFactorizations
 import MUMPS_seq_jll, OpenBLAS32_jll
 
