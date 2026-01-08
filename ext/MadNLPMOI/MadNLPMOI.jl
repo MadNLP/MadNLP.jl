@@ -1,4 +1,4 @@
-module MadNLPMOI
+module UnoSolverMathOptInterfaceExt
 
 import MadNLP
 import NLPModels
