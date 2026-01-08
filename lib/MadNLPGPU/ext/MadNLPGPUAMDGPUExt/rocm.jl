@@ -42,7 +42,6 @@ function MadNLPGPU.gpu_transfer!(y::ROCMatrix{T}, x::rocSPARSE.ROCSparseMatrixCS
     fill!(y, zero(T))
     backend = ROCBackend()
     MadNLPGPU._csc_to_dense_kernel!(backend)(y, x.colPtr, x.rowVal, x.nzVal, ndrange = n)
-    synchronize(backend)
     return
 end
 
