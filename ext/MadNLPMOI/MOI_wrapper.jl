@@ -550,7 +550,7 @@ function MOI.set(
 }
     MOI.throw_if_not_valid(model, ci)
     MOI.set(model.qp_data, attr, ci, value)
-    # No need to reset model.solver, because this gets handled in optimize!.
+    model.needs_new_nlp = true
     return
 end
 
@@ -683,7 +683,7 @@ function MOI.set(
     else
         model.mult_g_nlp[index] = convert(Float64, value)
     end
-    # No need to reset model.solver, because this gets handled in optimize!.
+    model.needs_new_nlp = true
     return
 end
 
@@ -811,6 +811,7 @@ function MOI.set(
 ) where {F<:MOI.VectorOfVariables,S<:MOI.VectorNonlinearOracle{Float64}}
     _, cache = model.vector_nonlinear_oracle_constraints[ci.value]
     cache.start = start
+    model.needs_new_nlp = true
     return
 end
 
@@ -869,7 +870,7 @@ function MOI.set(
     end
     MOI.throw_if_not_valid(model, vi)
     model.variable_primal_start[column(vi)] = value
-    # No need to reset model.solver, because this gets handled in optimize!.
+    model.needs_new_nlp = true
     return
 end
 
@@ -897,7 +898,7 @@ function MOI.set(
 )
     MOI.throw_if_not_valid(model, ci)
     model.mult_x_L[ci.value] = value
-    # No need to reset model.solver, because this gets handled in optimize!.
+    model.needs_new_nlp = true
     return
 end
 
@@ -918,7 +919,7 @@ function MOI.set(
 )
     MOI.throw_if_not_valid(model, ci)
     model.mult_x_U[ci.value] = value
-    # No need to reset model.solver, because this gets handled in optimize!.
+    model.needs_new_nlp = true
     return
 end
 
@@ -948,7 +949,7 @@ function MOI.set(
         model.mult_x_L[ci.value] = 0.0
         model.mult_x_U[ci.value] = value
     end
-    # No need to reset model.solver, because this gets handled in optimize!.
+    model.needs_new_nlp = true
     return
 end
 
@@ -973,7 +974,7 @@ function MOI.set(
     values::Union{Nothing,Vector},
 )
     model.nlp_dual_start = values
-    # No need to reset model.solver, because this gets handled in optimize!.
+    model.needs_new_nlp = true
     return
 end
 
