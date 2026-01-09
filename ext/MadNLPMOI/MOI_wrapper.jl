@@ -7,13 +7,15 @@ _is_parameter(term::MOI.ScalarQuadraticTerm) = _is_parameter(term.variable_1) ||
 mutable struct _VectorNonlinearOracleCache
     set::MOI.VectorNonlinearOracle{Float64}
     x::Vector{Float64}
+    nzJ::Vector{Float64}
     start::Union{Nothing,Vector{Float64}}
     eval_f_timer::Float64
     eval_jacobian_timer::Float64
     eval_hessian_lagrangian_timer::Float64
 
     function _VectorNonlinearOracleCache(set::MOI.VectorNonlinearOracle{Float64})
-        return new(set, zeros(set.input_dimension), nothing, 0.0, 0.0, 0.0)
+        nnzj = length(set.jacobian_structure)
+        return new(set, zeros(set.input_dimension), zeros(nnzj), nothing, 0.0, 0.0, 0.0)
     end
 end
 
@@ -1148,28 +1150,9 @@ function MOI.eval_constraint_jacobian(model::Optimizer, values, x)
     return
 end
 
-# N.B.: VectorNonlinearOracle does not support transposed-Jacobian
-# vector-product by default. This function uses the original Jacobian when
-# we have to compute the product in MadNLP. This can be slow on large-scale
-# instances.
-function _eval_constraint_transpose_jacobian_product(
-    values::AbstractVector,
-    x::AbstractVector,
-    f::MOI.VectorOfVariables,
-    s::_VectorNonlinearOracleCache,
-    v::AbstractVector,
-)
-    J = Tuple{Int,Int}[]
-    _jacobian_structure(J, 0, f, s)
-    J_val = zeros(length(J))
-    _eval_constraint_jacobian(J_val, 0, x, f, s)
-    col_to_index = Dict(x.value => j for (j, x) in enumerate(f.variables))
-    for ((row, col), J_rc) in zip(J, J_val)
-        values[col_to_index[col]] += J_rc * v[row]
-    end
-    return
-end
-
+# N.B.: VectorNonlinearOracle does not support transposed-Jacobian vector-product by default.
+# This function uses the original Jacobian when we have to compute the product in MadNLP.
+# This can be slow on large-scale instances.
 function MOI.eval_constraint_jacobian_transpose_product(model::Optimizer, Jtv, x, v)
     fill!(Jtv, 0.0)
     offset = length(model.qp_data)
@@ -1178,10 +1161,18 @@ function MOI.eval_constraint_jacobian_transpose_product(model::Optimizer, Jtv, x
     MOI.eval_constraint_jacobian_transpose_product(model.qp_data, Jtv, x, v_qp)
     # Evaluate jtprod for all VectorNonlinearOracle.
     for (f, s) in model.vector_nonlinear_oracle_constraints
-        m = s.set.output_dimension
-        v_noc = view(v, offset+1:offset+m)
-        _eval_constraint_transpose_jacobian_product(Jtv, x, f, s, v_noc)
-        offset += m
+        for i = 1:s.set.input_dimension
+            s.x[i] = x[f.variables[i].value]
+        end
+        s.set.eval_jacobian(s.nzJ, s.x)
+        k = 0
+        for (r, c) in s.set.jacobian_structure
+            k += 1
+            row = offset + r
+            col = f.variables[c].value
+            Jtv[col] += s.nzJ[k] * v[row]
+        end
+        offset += s.set.output_dimension
     end
     # Evaluate jtprod for remaining nonlinear expressions.
     v_nlp = view(v, (offset+1):length(v))
