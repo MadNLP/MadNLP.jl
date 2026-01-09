@@ -10,7 +10,7 @@ import Test: @test, @testset
 import MadNLP
 import NLPModels
 import JuMP: Model, @variable, @constraint, @objective, optimize!,
-    MOI, termination_status, LowerBoundRef, UpperBoundRef, value, dual
+    MOI, termination_status, LowerBoundRef, UpperBoundRef, value, dual, fix
 import NLPModelsJuMP
 
 export test_madnlp, solcmp
@@ -329,6 +329,94 @@ function eigmina(optimizer_constructor::Function; Arr = Array)
 
         @test result.status == MadNLP.SOLVE_SUCCEEDED
     end
+end
+
+function test_scaling()
+    big_constant = 1e6
+    # Write ill-conditioned NLP model and check MadNLP returns the un-scaled solution
+    model = Model()
+    @variable(model, 0.0 <= x[1:3])
+    @constraint(model, big_constant * (x[1] + x[2] + x[3]) == big_constant)
+    @objective(model, Min, big_constant * (x[1] + 2 * x[2] + 3 * x[3]))
+
+    nlp = NLPModelsJuMP.MathOptNLPModel(model)
+    solver = MadNLP.MadNLPSolver(nlp; print_level=MadNLP.ERROR)
+
+    results = MadNLP.solve!(solver)
+
+    # Check MadNLP is scaling the problem.
+    @test solver.cb.obj_scale[] != 1.0
+    @test solver.cb.con_scale[1] != 1.0
+
+    # Check solution returned is correct
+    @test results.solution ≈ [1.0, 0.0, 0.0] rtol=1e-7
+    @test results.multipliers ≈ [-1.0] rtol=1e-7
+    # the problem is ill-conditioned, meaning this multiplier is inaccurate.
+    # We have to loosen the tolerancej
+    @test results.multipliers_L[1] ≈ 0.0 atol=1e-3
+    @test results.multipliers_L[2] ≈ big_constant rtol=1e-7
+    @test results.multipliers_L[3] ≈ 2*big_constant rtol=1e-7
+
+    return
+end
+
+function test_max_problem()
+    model = Model()
+    @variable(model, 0.0 <= x[1:3])
+    @constraint(model, x[1] + x[2] + x[3] == 1.0)
+    @objective(model, Max, x[1] + 2*x[2] + 3*x[3])
+
+    nlp = NLPModelsJuMP.MathOptNLPModel(model)
+    results = MadNLP.madnlp(nlp; print_level=MadNLP.ERROR)
+
+    @test results.status == MadNLP.SOLVE_SUCCEEDED
+    @test results.objective ≈ 3.0
+    @test results.solution ≈ [0.0, 0.0, 1.0] rtol=1e-7
+    @test results.multipliers[1] ≈ -3.0 rtol=1e-7
+    @test results.multipliers_L[1] ≈ 2.0 rtol=1e-7
+    @test results.multipliers_L[2] ≈ 1.0 rtol=1e-7
+    @test results.multipliers_L[3] ≈ 0.0 atol=1e-7
+    return
+end
+
+function test_fixed_variable()
+    # Min problem
+    model = Model()
+    @variable(model, 0.0 <= x[1:3])
+    fix(x[2], 0.5; force=true)
+    @constraint(model, x[1] + x[2] + x[3] == 1.0)
+    @objective(model, Min, x[1] + 2*x[2] + 3*x[3])
+
+    nlp = NLPModelsJuMP.MathOptNLPModel(model)
+    results = MadNLP.madnlp(nlp; print_level=MadNLP.ERROR)
+
+    @test results.status == MadNLP.SOLVE_SUCCEEDED
+    @test results.objective ≈ 1.5
+    @test results.solution ≈ [0.5, 0.5, 0.0] rtol=1e-7
+    @test results.multipliers[1] ≈ -1.0 rtol=1e-7
+    @test results.multipliers_L[1] ≈ 0.0 atol=1e-7
+    @test results.multipliers_L[2] ≈ 1.0 rtol=1e-7
+    @test results.multipliers_U[2] ≈ 0.0 atol=1e-7
+    @test results.multipliers_L[3] ≈ 2.0 rtol=1e-7
+
+    # Max problem
+    model = Model()
+    @variable(model, 0.0 <= x[1:3])
+    fix(x[2], 0.5; force=true)
+    @constraint(model, x[1] + x[2] + x[3] == 1.0)
+    @objective(model, Max, x[1] + 2*x[2] + 3*x[3])
+
+    nlp = NLPModelsJuMP.MathOptNLPModel(model)
+    results = MadNLP.madnlp(nlp; print_level=MadNLP.ERROR)
+
+    @test results.status == MadNLP.SOLVE_SUCCEEDED
+    @test results.objective ≈ 2.5
+    @test results.solution ≈ [0.0, 0.5, 0.5] rtol=1e-7
+    @test results.multipliers[1] ≈ -3.0 rtol=1e-7
+    @test results.multipliers_L[1] ≈ 2.0 rtol=1e-7
+    @test results.multipliers_L[2] ≈ 1.0 atol=1e-7
+    @test results.multipliers_U[2] ≈ 0.0 rtol=1e-7
+    @test results.multipliers_L[3] ≈ 0.0 atol=1e-7
 end
 
 function lp_examodels_issue75(optimizer_constructor::Function; Arr = Array)
