@@ -3,10 +3,10 @@
 ######################################################################
 
 #=
-    MadNLP.symul!
+    MadNLP._symv!
 =#
 
-MadNLP.symul!(y, A, x::CuVector{T}, α = one(T), β = zero(T)) where T = CUBLAS.symv!('L', T(α), A, x, T(β), y)
+MadNLP._symv!(y, A, x::CuVector{T}, α = one(T), β = zero(T)) where T = CUBLAS.symv!('L', T(α), A, x, T(β), y)
 
 #=
     MadNLP._ger!
