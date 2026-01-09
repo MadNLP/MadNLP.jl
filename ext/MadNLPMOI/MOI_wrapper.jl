@@ -56,10 +56,11 @@ mutable struct Optimizer <: MOI.AbstractOptimizer
     hrows::Vector{Int}
     hcols::Vector{Int}
     needs_new_nlp::Bool
+    has_only_linear_constraints::Bool
     islp::Bool
-    has_nlp_constraints::Bool
-    hess_available::Bool
+    jprod_available::Bool
     hprod_available::Bool
+    hess_available::Bool
 end
 
 function Optimizer(; kwargs...)
@@ -97,7 +98,8 @@ function Optimizer(; kwargs...)
         Int[],
         true,
         false,
-        true,
+        false,
+        false,
         false,
         false,
     )
@@ -159,10 +161,11 @@ function MOI.empty!(model::Optimizer)
     model.hrows = Int[]
     model.hcols = Int[]
     model.needs_new_nlp = true
+    model.has_only_linear_constraints = false
     model.islp = false
-    model.has_nlp_constraints = true
-    model.hess_available = false
+    model.jprod_available = false
     model.hprod_available = false
+    model.hess_available = false
     return
 end
 
@@ -1396,10 +1399,11 @@ function _setup_model(model::Optimizer)
         end
     end
 
-    model.islp = !has_quadratic_constraints && !has_nlp_constraints && !has_nlp_objective
-    model.has_nlp_constraints = has_nlp_constraints
-    model.hess_available = has_hessian
+    model.has_only_linear_constraints = !has_quadratic_constraints && !has_nlp_constraints
+    model.islp = model.has_only_linear_constraints && !has_nlp_objective
+    model.jprod_available = has_jacobian_operator && !has_oracle
     model.hprod_available = has_hessian_operator && !has_oracle
+    model.hess_available = has_hessian
 
     # Initialize evaluator using model's structure.
     init_feat = [:Grad]
@@ -1515,8 +1519,9 @@ function _setup_nlp(model::Optimizer)
             nnzh = nnzh,
             minimize = model.sense == MOI.MIN_SENSE,
             islp = model.islp,
-            hess_available = model.hess_available,
+            jprod_available = model.jprod_available,
             hprod_available = model.hprod_available,
+            hess_available = model.hess_available,
         ),
         model,
         NLPModels.Counters(),
@@ -1552,7 +1557,7 @@ function MOI.optimize!(model::Optimizer)
         options[:hessian_approximation] = MadNLP.CompactLBFGS
     end
     # Set Jacobian to constant if all constraints are linear.
-    if !model.has_nlp_constraints
+    if model.has_only_linear_constraints
         options[:jacobian_constant] = true
     end
     # Clear timers
