@@ -745,7 +745,16 @@ function MOI.get(
     λ .*= sign
     dual = zeros(MOI.dimension(s.set))
     # dual = λ' * J(x)
-    _eval_constraint_transpose_jacobian_product(dual, model.result.solution, f, s, λ)
+    for i = 1:s.set.input_dimension
+        s.x[i] = model.result.solution[f.variables[i].value]
+    end
+    s.set.eval_jacobian(s.nzJ, s.x)
+    k = 0
+    for (r, c) in s.set.jacobian_structure
+        k += 1
+        col = f.variables[c].value
+        dual[col] += s.nzJ[k] * λ[r]
+    end
     return dual
 end
 
