@@ -158,6 +158,27 @@ function solve!(kkt::SparseCondensedKKTSystem{T}, w::AbstractKKTVector)  where T
 end
 
 function solve!(
+    kkt::SparseUnreducedKKTSystem{T, VT, MT, QN},
+    w::AbstractKKTVector
+    ) where {T, VT, MT, QN<:CompactLBFGS}
+    error("Quasi-Newton approximation of the Hessian is not supported by the KKT formulation SparseUnreducedKKTSystem.")
+end
+
+function solve!(
+    kkt::SparseCondensedKKTSystem{T, VT, MT, QN},
+    w::AbstractKKTVector
+    ) where {T, VT, MT, QN<:CompactLBFGS}
+    error("Quasi-Newton approximation of the Hessian is not supported by the KKT formulation SparseCondensedKKTSystem.")
+end
+
+function solve!(
+    kkt::ScaledSparseKKTSystem{T, VT, MT, QN},
+    w::AbstractKKTVector
+    ) where {T, VT, MT, QN<:CompactLBFGS}
+    error("Quasi-Newton approximation of the Hessian is not supported by the KKT formulation ScaledSparseKKTSystem.")
+end
+
+function solve!(
     kkt::DenseCondensedKKTSystem,
     w::AbstractKKTVector{T},
     ) where T
