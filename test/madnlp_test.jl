@@ -164,6 +164,14 @@ end
     @test solver.status == MadNLP.SOLVE_SUCCEEDED
 end
 
+@testset "MadNLP scaling" begin
+    MadNLPTests.test_scaling()
+end
+
+@testset "Max optimization problem" begin
+    MadNLPTests.test_max_problem()
+end
+
 @testset "Fixed variables" begin
     nlp = MadNLPTests.HS15Model()
     solver = MadNLPSolver(nlp; print_level=MadNLP.ERROR)
