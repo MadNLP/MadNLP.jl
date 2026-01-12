@@ -7,15 +7,15 @@ _is_parameter(term::MOI.ScalarQuadraticTerm) = _is_parameter(term.variable_1) ||
 mutable struct _VectorNonlinearOracleCache
     set::MOI.VectorNonlinearOracle{Float64}
     x::Vector{Float64}
-    nzJ::Vector{Float64}
+    J_nzval::Vector{Float64}
     start::Union{Nothing,Vector{Float64}}
     eval_f_timer::Float64
     eval_jacobian_timer::Float64
     eval_hessian_lagrangian_timer::Float64
 
     function _VectorNonlinearOracleCache(set::MOI.VectorNonlinearOracle{Float64})
-        nnzj = length(set.jacobian_structure)
-        return new(set, zeros(set.input_dimension), zeros(nnzj), nothing, 0.0, 0.0, 0.0)
+        nnzJ = length(set.jacobian_structure)
+        return new(set, zeros(set.input_dimension), zeros(nnzJ), nothing, 0.0, 0.0, 0.0)
     end
 end
 
@@ -745,16 +745,7 @@ function MOI.get(
     λ .*= sign
     dual = zeros(MOI.dimension(s.set))
     # dual = λ' * J(x)
-    for i = 1:s.set.input_dimension
-        s.x[i] = model.result.solution[f.variables[i].value]
-    end
-    s.set.eval_jacobian(s.nzJ, s.x)
-    k = 0
-    for (r, c) in s.set.jacobian_structure
-        k += 1
-        col = f.variables[c].value
-        dual[col] += s.nzJ[k] * λ[r]
-    end
+    _eval_constraint_transpose_jacobian_product(dual, model.result.solution, 0, f, s, λ)
     return dual
 end
 
@@ -1162,6 +1153,27 @@ end
 # N.B.: VectorNonlinearOracle does not support transposed-Jacobian vector-product by default.
 # This function uses the original Jacobian when we have to compute the product in MadNLP.
 # This can be slow on large-scale instances.
+function _eval_constraint_transpose_jacobian_product(
+    Jtv::AbstractVector,
+    x::AbstractVector,
+    offset::Integer,
+    f::MOI.VectorOfVariables,
+    s::_VectorNonlinearOracleCache,
+    v::AbstractVector,
+)
+    for i = 1:s.set.input_dimension
+        s.x[i] = x[f.variables[i].value]
+    end
+    s.set.eval_jacobian(s.J_nzval, s.x)
+    k = 0
+    for (r, c) in s.set.jacobian_structure
+        k += 1
+        row = offset + r
+        col = f.variables[c].value
+        Jtv[col] += s.J_nzval[k] * v[row]
+    end
+end
+
 function MOI.eval_constraint_jacobian_transpose_product(model::Optimizer, Jtv, x, v)
     fill!(Jtv, 0.0)
     offset = length(model.qp_data)
@@ -1170,17 +1182,7 @@ function MOI.eval_constraint_jacobian_transpose_product(model::Optimizer, Jtv, x
     MOI.eval_constraint_jacobian_transpose_product(model.qp_data, Jtv, x, v_qp)
     # Evaluate jtprod for all VectorNonlinearOracle.
     for (f, s) in model.vector_nonlinear_oracle_constraints
-        for i = 1:s.set.input_dimension
-            s.x[i] = x[f.variables[i].value]
-        end
-        s.set.eval_jacobian(s.nzJ, s.x)
-        k = 0
-        for (r, c) in s.set.jacobian_structure
-            k += 1
-            row = offset + r
-            col = f.variables[c].value
-            Jtv[col] += s.nzJ[k] * v[row]
-        end
+        _eval_constraint_transpose_jacobian_product(Jtv, x, offset, f, s, v)
         offset += s.set.output_dimension
     end
     # Evaluate jtprod for remaining nonlinear expressions.
@@ -1419,8 +1421,8 @@ function _setup_model(model::Optimizer)
     else
         Tuple{Int,Int}[]
     end
-    nnzh = length(hessian_sparsity)
     nnzj = length(jacobian_sparsity)
+    nnzh = length(hessian_sparsity)
 
     # Dual multipliers
     y0 = zeros(Float64, ncon)
