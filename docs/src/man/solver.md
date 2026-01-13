@@ -52,6 +52,24 @@ E_0(x_k, s_k; y_k, \nu_k, w_k) < \varepsilon_{tol}
 
 ```
 
+### User-defined termination criteria
+
+Users can also define a custom termination criteria by using the `intermediate_callback` solver option to provide
+a function that returns a boolean value indicating whether to stop.
+The function takes two arguments, the `MadNLP` solver and the current mode of the solver, `:regular`, `:restore` or `:robust`.
+For example:
+
+```julia
+function user_callback_termination(solver::MadNLP.AbstractMadNLPSolver, mode::Symbol)
+    # Access solver state: solver.cnt.k, solver.inf_pr, solver.inf_du, etc.
+    return solver.cnt.k > 100
+end
+
+solver = MadNLPSolver(nlp; intermediate_callback=user_callback_termination)
+```
+
+When the callback returns `true`, the solver terminates with status `USER_REQUESTED_STOP`.
+
 ## Step 2: How to update the barrier parameter $$\mu$$?
 TODO
 
@@ -86,4 +104,3 @@ If that happens during several consecutive iterations, MadNLP
 enters into a feasible restoration phase. The goal of feasible
 restoration is to decrease the primal infeasibility, to move the
 current iterate closer to the feasible set.
-
