@@ -7,17 +7,9 @@ as a [`MadNLPExecutionStats`](@ref).
 
 """
 function madnlp(model::AbstractNLPModel; kwargs...)
-    solver = MadNLPSolver(model;kwargs...)
+    solver = MadNLPSolver(model; kwargs...)
     return solve!(solver)
 end
-
-solve!(nlp::AbstractNLPModel, solver::AbstractMadNLPSolver; kwargs...) = solve!(
-    nlp, solver, MadNLPExecutionStats(solver);
-    kwargs...)
-solve!(solver::AbstractMadNLPSolver; kwargs...) = solve!(
-    solver.nlp, solver;
-    kwargs...)
-
 
 function initialize!(solver::AbstractMadNLPSolver{T}) where T
 
@@ -126,28 +118,12 @@ function reinitialize!(solver::AbstractMadNLPSolver)
 end
 
 # major loops ---------------------------------------------------------
+solve!(solver::AbstractMadNLPSolver; kwargs...) = solve!(solver, MadNLPExecutionStats(solver); kwargs...)
 function solve!(
-    nlp::AbstractNLPModel,
     solver::AbstractMadNLPSolver,
     stats::MadNLPExecutionStats;
-    x = nothing, y = nothing,
-    zl = nothing, zu = nothing,
     kwargs...
-        )
-
-    if x != nothing
-        full(solver.x)[1:get_nvar(nlp)] .= x
-    end
-    if y != nothing
-        solver.y[1:get_ncon(nlp)] .= y
-    end
-    if zl != nothing
-        full(solver.zl)[1:get_nvar(nlp)] .= zl
-    end
-    if zu != nothing
-        full(solver.zu)[1:get_nvar(nlp)] .= zu
-    end
-
+)
     if !isempty(kwargs)
         @warn(solver.logger,"The options set during resolve may not have an effect")
         set_options!(solver.opt, kwargs)
