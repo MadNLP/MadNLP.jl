@@ -43,6 +43,7 @@ mutable struct Optimizer <: MOI.AbstractOptimizer
     solve_time::Float64
     solve_iterations::Int
     sense::MOI.OptimizationSense
+    array_type::Type
 
     parameters::Dict{MOI.VariableIndex,MOI.Nonlinear.ParameterIndex}
     variables::MOI.Utilities.VariablesContainer{Float64}
@@ -77,6 +78,7 @@ function MadNLP.Optimizer(; kwargs...)
         NaN,
         0,
         MOI.FEASIBILITY_SENSE,
+        Vector{Float64},
         Dict{MOI.VariableIndex,Float64}(),
         MOI.Utilities.VariablesContainer{Float64}(),
         MOI.VariableIndex[],
@@ -324,7 +326,11 @@ end
 MOI.supports(::Optimizer, ::MOI.RawOptimizerAttribute) = true
 
 function MOI.set(model::Optimizer, p::MOI.RawOptimizerAttribute, value)
-    model.options[Symbol(p.name)] = value
+    if p.name == "array_type"
+        model.array_type = value
+    else
+        model.options[Symbol(p.name)] = value
+    end
     # No need to reset model.solver because this gets handled in optimize!.
     return
 end
@@ -1524,8 +1530,22 @@ function MOI.optimize!(model::Optimizer)
         s.eval_hessian_lagrangian_timer = 0.0
     end
     # Instantiate MadNLP.
+    needs_wrap = model.array_type != Vector{Float64} && !(
+        model.nlp isa MadNLP.SparseWrapperModel &&
+            NLPModels.get_x0(model.nlp) isa model.array_type
+    )
+    model.nlp = if needs_wrap
+        MadNLP.SparseWrapperModel(model.array_type, model.nlp)
+    else
+        model.nlp
+    end
     model.solver = MadNLP.MadNLPSolver(model.nlp; options...)
     model.result = MadNLP.solve!(model.solver)
+    model.result = if !(model.result.solution isa Vector{Float64})
+        MadNLP.cpu_copy(model.result)
+    else
+        model.result
+    end
     model.solve_time = model.solver.cnt.total_time
     model.solve_iterations = model.solver.cnt.k
     return

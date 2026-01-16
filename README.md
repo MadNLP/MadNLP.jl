@@ -120,6 +120,8 @@ model = Model(()->MadNLP.Optimizer(linear_solver=CUDSSSolver))      # for sparse
 model = Model(()->MadNLP.Optimizer(linear_solver=CuCholeskySolver)) # for sparse problems
 model = Model(()->MadNLP.Optimizer(linear_solver=GLUSolver))        # for sparse problems
 model = Model(()->MadNLP.Optimizer(linear_solver=RFSolver))         # for sparse problems
+# IMPORTANT: set `array_type` to CuVector{Float64}
+set_optimizer_attribute(model, "array_type", CuVector{Float64})
 ```
 
 ## Citing MadNLP.jl

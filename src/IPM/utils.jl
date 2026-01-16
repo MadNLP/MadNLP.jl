@@ -68,6 +68,23 @@ get_counters(nlp::NLPModels.AbstractNLPModel) = nlp.counters
 get_counters(nlp::NLPModels.AbstractNLSModel) = nlp.counters.counters
 getStatus(result::MadNLPExecutionStats) = get_status_output(result.status, result.options)
 
+function cpu_copy(stats::MadNLPExecutionStats)
+    return MadNLPExecutionStats(
+        stats.options,
+        stats.status,
+        Array(stats.solution),
+        stats.objective,
+        Array(stats.constraints),
+        stats.dual_feas,
+        stats.primal_feas,
+        Array(stats.multipliers),
+        Array(stats.multipliers_L),
+        Array(stats.multipliers_U),
+        stats.iter,
+        stats.counters,
+    )
+end
+
 # Exceptions
 struct InvalidNumberException <: Exception
     callback::Symbol
