@@ -3,10 +3,16 @@
 ######################################################################
 
 #=
-    MadNLP.symul!
+    MadNLP._symv!, MadNLP._syr!
 =#
 
-MadNLP.symul!(y, A, x::ROCVector{T}, α = one(T), β = zero(T)) where T = rocBLAS.symv!('L', T(α), A, x, T(β), y)
+function MadNLP._symv!(uplo::Char, alpha::T, A::AbstractMatrix{T}, x::ROCVector{T}, beta::T, y::AbstractVector{T}) where T
+    return rocBLAS.symv!(uplo, T(alpha), A, x, T(beta), y)
+end
+
+function MadNLP._syr!(uplo::Char, alpha::T, x::ROCVector{T}, A::AbstractMatrix{T}) where T
+    return rocBLAS.syr!(uplo, T(alpha), x, A)
+end
 
 #=
     MadNLP._ger!
