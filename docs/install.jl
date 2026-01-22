@@ -2,10 +2,12 @@ using Pkg
 
 MADNLP_DIR = pwd()
 
+Pkg.update()
+Pkg.resolve()
 Pkg.develop(path=joinpath(MADNLP_DIR, "lib", "MadNLPTests"))
 Pkg.develop(path=joinpath(MADNLP_DIR, "lib", "MadNLPGPU"))
 Pkg.develop(path=MADNLP_DIR)
-# Compile cache for Documenter to avoid issue with MbedTLS
-Base.compilecache(Base.identify_package("Documenter"))
+Base.compilecache(Base.identify_package("MadNLPTests"))
+Base.compilecache(Base.identify_package("MadNLPGPU"))
+Base.compilecache(Base.identify_package("MadNLP"))
 Pkg.instantiate()
-
