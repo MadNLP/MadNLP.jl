@@ -1690,7 +1690,7 @@ end
 
 ### MOI.ConstraintDual
 
-_dual_multiplier(model::Optimizer) = 1.0
+_dual_multiplier(model::Optimizer) = model.sense == MOI.MIN_SENSE ? 1.0 : -1.0
 
 function MOI.get(
     model::Optimizer,
@@ -1699,7 +1699,7 @@ function MOI.get(
 )
     MOI.check_result_index_bounds(model, attr)
     MOI.throw_if_not_valid(model, ci)
-    s = -1.0
+    s = -_dual_multiplier(model)
     return s * model.result.multipliers[row(model, ci)]
 end
 
@@ -1710,8 +1710,7 @@ function MOI.get(
 )
     MOI.check_result_index_bounds(model, attr)
     MOI.throw_if_not_valid(model, ci)
-    rc = model.result.multipliers_L[ci.value] - model.result.multipliers_U[ci.value]
-    return min(0.0, rc * _dual_multiplier(model))
+    return -model.result.multipliers_U[ci.value]
 end
 
 function MOI.get(
@@ -1721,8 +1720,7 @@ function MOI.get(
 )
     MOI.check_result_index_bounds(model, attr)
     MOI.throw_if_not_valid(model, ci)
-    rc = model.result.multipliers_L[ci.value] - model.result.multipliers_U[ci.value]
-    return max(0.0, rc * _dual_multiplier(model))
+    return model.result.multipliers_L[ci.value]
 end
 
 function MOI.get(
@@ -1732,8 +1730,7 @@ function MOI.get(
 )
     MOI.check_result_index_bounds(model, attr)
     MOI.throw_if_not_valid(model, ci)
-    rc = model.result.multipliers_L[ci.value] - model.result.multipliers_U[ci.value]
-    return -rc
+    return model.result.multipliers_L[ci.value] - model.result.multipliers_U[ci.value]
 end
 
 function MOI.get(
@@ -1743,8 +1740,7 @@ function MOI.get(
 )
     MOI.check_result_index_bounds(model, attr)
     MOI.throw_if_not_valid(model, ci)
-    rc = model.result.multipliers_L[ci.value] - model.result.multipliers_U[ci.value]
-    return rc
+    return model.result.multipliers_L[ci.value] - model.result.multipliers_U[ci.value]
 end
 
 ### MOI.NLPBlockDual
