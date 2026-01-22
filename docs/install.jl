@@ -4,7 +4,7 @@ MADNLP_DIR = pwd()
 
 Pkg.update()
 Pkg.resolve()
-Pkg.add("https://github.com/JuliaBinaryWrappers/MbedTLS_jll.jl.git", rev="main")
+Pkg.add(url="https://github.com/JuliaBinaryWrappers/MbedTLS_jll.jl.git", rev="main")
 Pkg.develop(path=joinpath(MADNLP_DIR, "lib", "MadNLPTests"))
 Pkg.develop(path=joinpath(MADNLP_DIR, "lib", "MadNLPGPU"))
 Pkg.develop(path=MADNLP_DIR)
