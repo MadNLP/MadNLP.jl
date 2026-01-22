@@ -3,7 +3,7 @@
 println(nlp.params)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">[100.0, 1.0]</code></pre><p>By default the parameters are set to <code>[100.0, 1.0]</code>. In a first solve, we find a solution associated to these parameters. We want to warmstart MadNLP from the solution found in the first solve, after a small update in the problem&#39;s parameters.</p><div class="admonition is-info" id="Info-855a89dc29e49933"><header class="admonition-header">Info<a class="admonition-anchor" href="#Info-855a89dc29e49933" title="Permalink"></a></header><div class="admonition-body"><p>It is known that the interior-point method has a poor support of warmstarting, on the contrary to active-set methods. However, if the parameter changes remain reasonable and do not lead to significant changes in the active set, warmstarting the interior-point algorithm can significantly reduces the total number of barrier iterations in the second solve.</p></div></div><div class="admonition is-warning" id="Warning-15e1267983afb3b7"><header class="admonition-header">Warning<a class="admonition-anchor" href="#Warning-15e1267983afb3b7" title="Permalink"></a></header><div class="admonition-body"><p>The warm-start described in this tutorial remains basic. Its main application is updating the solution of a parametric problem after an update in the parameters. <strong>The warm-start always assumes that the structure of the problem remains the same between two consecutive solves</strong>. MadNLP cannot be warm-started if variables or constraints are added to the problem.</p></div></div><h2 id="Naive-solution:-starting-from-the-previous-solution"><a class="docs-heading-anchor" href="#Naive-solution:-starting-from-the-previous-solution">Naive solution: starting from the previous solution</a><a id="Naive-solution:-starting-from-the-previous-solution-1"></a><a class="docs-heading-anchor-permalink" href="#Naive-solution:-starting-from-the-previous-solution" title="Permalink"></a></h2><p>By default, MadNLP starts its interior-point algorithm at the primal variable stored in <code>nlp.meta.x0</code>. We can access this attribute using the function <code>get_x0</code>:</p><pre><code class="language-julia hljs">x0 = NLPModels.get_x0(nlp)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">2-element Vector{Float64}:
  0.0
  0.0</code></pre><p>Here, we observe that the initial solution is <code>[0, 0]</code>.</p><p>We solve the problem using the function <a href="../../lib/ipm/#MadNLP.madnlp"><code>madnlp</code></a>:</p><pre><code class="language-julia hljs">results = madnlp(nlp)
-nothing</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">This is <span class="sgr34">Mad</span><span class="sgr31">N</span><span class="sgr32">L</span><span class="sgr35">P</span> version v0.8.12, running with MUMPS v5.8.1
+nothing</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">This is <span class="sgr34">Mad</span><span class="sgr31">N</span><span class="sgr32">L</span><span class="sgr35">P</span> version v0.8.12, running with MUMPS v5.8.2
 
 Number of nonzeros in constraint Jacobian............:        4
 Number of nonzeros in Lagrangian Hessian.............:        3
@@ -55,11 +55,11 @@ Number of constraint evaluations                      = 46
 Number of constraint Jacobian evaluations             = 19
 Number of Lagrangian Hessian evaluations              = 18
 
-Total wall secs in initialization                     =  1.624
-Total wall secs in linear solver                      =  0.003
+Total wall secs in initialization                     =  2.487
+Total wall secs in linear solver                      =  0.002
 Total wall secs in NLP function evaluations           =  0.000
-Total wall secs in solver (w/o init./fun./lin. alg.)  =  6.247
-Total wall secs                                       =  7.873
+Total wall secs in solver (w/o init./fun./lin. alg.)  =  8.807
+Total wall secs                                       = 11.296
 
 <span class="sgr32">EXIT: Optimal Solution Found (tol = 1.0e-08).</span></code></pre><p>MadNLP converges in 19 barrier iterations.  The solution is:</p><pre><code class="language-julia hljs">println(&quot;Objective: &quot;, results.objective)
 println(&quot;Solution:  &quot;, results.solution)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Objective: 360.37976240508465
@@ -68,7 +68,7 @@ Solution:  [-0.7921232178470456, -1.2624298435831804]</code></pre><h3 id="Soluti
    1.1</code></pre><p>As MadNLP starts the algorithm at <code>nlp.meta.x0</code>, we pass the previous solution to the initial vector:</p><pre><code class="language-julia hljs">copyto!(NLPModels.get_x0(nlp), results.solution)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">2-element Vector{Float64}:
  -0.7921232178470456
  -1.2624298435831804</code></pre><p>Solving the problem again with MadNLP, we observe that MadNLP converges in only 6 iterations:</p><pre><code class="language-julia hljs">results_new = madnlp(nlp)
-nothing</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">This is <span class="sgr34">Mad</span><span class="sgr31">N</span><span class="sgr32">L</span><span class="sgr35">P</span> version v0.8.12, running with MUMPS v5.8.1
+nothing</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">This is <span class="sgr34">Mad</span><span class="sgr31">N</span><span class="sgr32">L</span><span class="sgr35">P</span> version v0.8.12, running with MUMPS v5.8.2
 
 Number of nonzeros in constraint Jacobian............:        4
 Number of nonzeros in Lagrangian Hessian.............:        3
@@ -110,13 +110,13 @@ Number of Lagrangian Hessian evaluations              = 6
 Total wall secs in initialization                     =  0.001
 Total wall secs in linear solver                      =  0.001
 Total wall secs in NLP function evaluations           =  0.000
-Total wall secs in solver (w/o init./fun./lin. alg.)  =  0.004
-Total wall secs                                       =  0.007
+Total wall secs in solver (w/o init./fun./lin. alg.)  =  0.001
+Total wall secs                                       =  0.002
 
 <span class="sgr32">EXIT: Optimal Solution Found (tol = 1.0e-08).</span></code></pre><p>By decreasing the initial barrier parameter, we can reduce the total number of iterations to 5:</p><pre><code class="language-julia hljs">results_new = madnlp(nlp; mu_init=1e-7)
 nothing</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">The following options are ignored:
  - mu_init
-This is <span class="sgr34">Mad</span><span class="sgr31">N</span><span class="sgr32">L</span><span class="sgr35">P</span> version v0.8.12, running with MUMPS v5.8.1
+This is <span class="sgr34">Mad</span><span class="sgr31">N</span><span class="sgr32">L</span><span class="sgr35">P</span> version v0.8.12, running with MUMPS v5.8.2
 
 Number of nonzeros in constraint Jacobian............:        4
 Number of nonzeros in Lagrangian Hessian.............:        3
@@ -158,8 +158,8 @@ Number of Lagrangian Hessian evaluations              = 6
 Total wall secs in initialization                     =  0.001
 Total wall secs in linear solver                      =  0.001
 Total wall secs in NLP function evaluations           =  0.000
-Total wall secs in solver (w/o init./fun./lin. alg.)  =  0.003
-Total wall secs                                       =  0.005
+Total wall secs in solver (w/o init./fun./lin. alg.)  =  0.001
+Total wall secs                                       =  0.002
 
 <span class="sgr32">EXIT: Optimal Solution Found (tol = 1.0e-08).</span></code></pre><p>The final solution is slightly different from the previous one, as we have updated the parameters inside the model <code>nlp</code>:</p><pre><code class="language-julia hljs">results_new.solution</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">2-element Vector{Float64}:
  -0.7920519043023828
@@ -171,7 +171,7 @@ number of constraints....................: 2
 number of nonzeros in Lagrangian Hessian.: 3
 number of nonzeros in constraint Jacobian: 4
 status...................................: INITIAL
-</code></pre><p>Note that</p><pre><code class="language-julia hljs">nlp === solver.nlp</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">true</code></pre><p>Hence, updating the parameter values in <code>nlp</code> will automatically update the parameters in the solver.</p><p>We solve the problem using the function <a href="../../lib/linear_solvers/#SolverCore.solve!"><code>solve!</code></a>:</p><pre><code class="language-julia hljs">results = MadNLP.solve!(solver)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">&quot;Execution stats: Optimal Solution Found (tol = 1.0e-08).&quot;</code></pre><p>Before warmstarting MadNLP, we proceed as before and update the parameters and the primal solution in <code>nlp</code>:</p><pre><code class="language-julia hljs">nlp.params .= [101.0, 1.1]
+</code></pre><p>Note that</p><pre><code class="language-julia hljs">nlp === solver.nlp</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">true</code></pre><p>Hence, updating the parameter values in <code>nlp</code> will automatically update the parameters in the solver.</p><p>We solve the problem using the function <a href="../../lib/linear_solvers/#MadNLP.solve!"><code>solve!</code></a>:</p><pre><code class="language-julia hljs">results = MadNLP.solve!(solver)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">&quot;Execution stats: Optimal Solution Found (tol = 1.0e-08).&quot;</code></pre><p>Before warmstarting MadNLP, we proceed as before and update the parameters and the primal solution in <code>nlp</code>:</p><pre><code class="language-julia hljs">nlp.params .= [101.0, 1.1]
 copyto!(NLPModels.get_x0(nlp), results.solution)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">2-element Vector{Float64}:
  -0.7921232178470456
  -1.2624298435831804</code></pre><p>MadNLP stores in memory the dual solutions computed during the first solve. One can access to the (scaled) multipliers as</p><pre><code class="language-julia hljs">solver.y</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">2-element Vector{Float64}:
@@ -180,7 +180,7 @@ copyto!(NLPModels.get_x0(nlp), results.solution)</code></pre><pre class="documen
    0.0        1.93936e-9
    0.0        0.0
  477.17       0.0
-   3.1262e-9  0.0</code></pre><div class="admonition is-warning" id="Warning-d209357cf98241d"><header class="admonition-header">Warning<a class="admonition-anchor" href="#Warning-d209357cf98241d" title="Permalink"></a></header><div class="admonition-body"><p>If we call the function <a href="../../lib/linear_solvers/#SolverCore.solve!"><code>solve!</code></a> a second-time, MadNLP will use the following rule:</p><ul><li>The initial primal solution is copied from <code>NLPModels.get_x0(nlp)</code></li><li>The initial dual solution is directly taken from the values specified in <code>solver.y</code>, <code>solver.zl</code> and <code>solver.zu</code>. (MadNLP is not using the values stored in <code>nlp.meta.y0</code> in the second solve).</li></ul></div></div><p>As before, it is advised to decrease the initial barrier parameter: if the initial point is close enough to the solution, this reduces drastically the total number of iterations. We solve the problem again using:</p><pre><code class="language-julia hljs">MadNLP.solve!(solver; mu_init=1e-7)
+   3.1262e-9  0.0</code></pre><div class="admonition is-warning" id="Warning-d209357cf98241d"><header class="admonition-header">Warning<a class="admonition-anchor" href="#Warning-d209357cf98241d" title="Permalink"></a></header><div class="admonition-body"><p>If we call the function <a href="../../lib/linear_solvers/#MadNLP.solve!"><code>solve!</code></a> a second-time, MadNLP will use the following rule:</p><ul><li>The initial primal solution is copied from <code>NLPModels.get_x0(nlp)</code></li><li>The initial dual solution is directly taken from the values specified in <code>solver.y</code>, <code>solver.zl</code> and <code>solver.zu</code>. (MadNLP is not using the values stored in <code>nlp.meta.y0</code> in the second solve).</li></ul></div></div><p>As before, it is advised to decrease the initial barrier parameter: if the initial point is close enough to the solution, this reduces drastically the total number of iterations. We solve the problem again using:</p><pre><code class="language-julia hljs">MadNLP.solve!(solver; mu_init=1e-7)
 nothing</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">The options set during resolve may not have an effect
   18  3.6431987e+02 1.11e-16 3.24e+00 1.58e-09  -1.0     -   1.00e+00  2  1h
   19  3.6432006e+02 1.73e-12 3.18e+00 6.22e-02  -1.0     -   1.95e-03  2 10f
@@ -205,10 +205,10 @@ Number of constraint evaluations                      = 63
 Number of constraint Jacobian evaluations             = 26
 Number of Lagrangian Hessian evaluations              = 24
 
-Total wall secs in initialization                     =  0.001
-Total wall secs in linear solver                      =  0.004
+Total wall secs in initialization                     =  0.000
+Total wall secs in linear solver                      =  0.005
 Total wall secs in NLP function evaluations           =  0.000
-Total wall secs in solver (w/o init./fun./lin. alg.)  =  0.461
-Total wall secs                                       =  0.466
+Total wall secs in solver (w/o init./fun./lin. alg.)  =  0.618
+Total wall secs                                       =  0.624
 
-<span class="sgr32">EXIT: Optimal Solution Found (tol = 1.0e-08).</span></code></pre><p>Three observations are in order:</p><ul><li>The iteration count starts directly from the previous count (as stored in <code>solver.cnt.k</code>).</li><li>MadNLP converges in only 4 iterations.</li><li>The factorization stored in <code>solver</code> is directly re-used, leading to significant savings. As a consequence, the warm-start does not work if the structure of the problem changes between the first and the second solve (e.g, if variables or constraints are added to the constraints).</li></ul></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../multiprecision/">« Multi-precision</a><a class="docs-footer-nextpage" href="../lbfgs/">LBFGS »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.16.1 on <span class="colophon-date" title="Wednesday 17 December 2025 03:45">Wednesday 17 December 2025</span>. Using Julia version 1.10.10.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+<span class="sgr32">EXIT: Optimal Solution Found (tol = 1.0e-08).</span></code></pre><p>Three observations are in order:</p><ul><li>The iteration count starts directly from the previous count (as stored in <code>solver.cnt.k</code>).</li><li>MadNLP converges in only 4 iterations.</li><li>The factorization stored in <code>solver</code> is directly re-used, leading to significant savings. As a consequence, the warm-start does not work if the structure of the problem changes between the first and the second solve (e.g, if variables or constraints are added to the constraints).</li></ul></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../multiprecision/">« Multi-precision</a><a class="docs-footer-nextpage" href="../lbfgs/">LBFGS »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.16.1 on <span class="colophon-date" title="Thursday 22 January 2026 17:59">Thursday 22 January 2026</span>. Using Julia version 1.12.4.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
