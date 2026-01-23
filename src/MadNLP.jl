@@ -39,7 +39,7 @@ include(joinpath("LinearSolvers", "linearsolvers.jl"))
 include(joinpath("IPM", "IPM.jl"))
 include("precompile.jl")
 
-madsuite(::Val{:madnlp}, args..., kwargs...) = madnlp(args..., kwargs...)
+madsuite(::Val{:madnlp}, args...; kwargs...) = madnlp(args...; kwargs...)
 
 global Optimizer
 
