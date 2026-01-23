@@ -1556,7 +1556,7 @@ function MOI.optimize!(model::Optimizer)
     end
 
     array_type = get(model.options, :array_type, nothing)
-    _setup_nlp(model; array_type=array_type)
+    _setup_nlp(model; array_type = array_type)
 
     if model.silent
         model.options[:print_level] = MadNLP.ERROR

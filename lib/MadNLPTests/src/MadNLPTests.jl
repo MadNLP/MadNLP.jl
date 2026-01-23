@@ -9,7 +9,7 @@ import Test: @test, @testset
 # Optimization packages
 import MadNLP
 import NLPModels
-import JuMP: Model, @variable, @constraint, @objective, optimize!,
+import JuMP: Model, @variable, @constraint, @objective, optimize!, set_attribute,
     MOI, termination_status, LowerBoundRef, UpperBoundRef, value, dual, fix
 import NLPModelsJuMP
 
