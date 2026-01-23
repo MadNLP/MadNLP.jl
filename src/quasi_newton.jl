@@ -271,7 +271,7 @@ function create_quasi_newton(
         fill!(create_array(cb, 0), zero(T)),
         fill!(create_array(cb, 0), zero(T)),
         fill!(create_array(cb, 0), zero(T)),
-        Nothing,
+        nothing,
         false,
     )
 end
