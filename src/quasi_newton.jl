@@ -209,7 +209,7 @@ end
 """
     CompactLBFGS{T, VT} <: AbstractQuasiNewton
 """
-mutable struct CompactLBFGS{T, VT <: AbstractVector{T}, MT <: AbstractMatrix{T}} <: AbstractQuasiNewton{T, VT}
+mutable struct CompactLBFGS{T, VT <: AbstractVector{T}, MT <: AbstractMatrix{T}, B} <: AbstractQuasiNewton{T, VT}
     init_strategy::BFGSInitStrategy
     sk::VT
     yk::VT
@@ -235,6 +235,7 @@ mutable struct CompactLBFGS{T, VT <: AbstractVector{T}, MT <: AbstractMatrix{T}}
     Dk::VT       # p
     _w1::VT
     _w2::VT
+    additional_buffers::B
     max_mem_reached::Bool
 end
 
@@ -270,6 +271,7 @@ function create_quasi_newton(
         fill!(create_array(cb, 0), zero(T)),
         fill!(create_array(cb, 0), zero(T)),
         fill!(create_array(cb, 0), zero(T)),
+        Nothing,
         false,
     )
 end
