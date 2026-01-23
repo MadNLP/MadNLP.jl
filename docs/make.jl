@@ -21,7 +21,7 @@ makedocs(
             "GPU acceleration" => "tutorials/gpu.md",
             "Multi-precision" => "tutorials/multiprecision.md",
             "Warm-start" => "tutorials/warmstart.md",
-            "LBFGS" => "tutorials/lbfgs.md",
+            "Quasi-Newton" => "tutorials/lbfgs.md",
             "Custom KKT system" => "tutorials/kktsystem.md",
         ],
         "Manual" => [
@@ -39,10 +39,10 @@ makedocs(
     ]
 )
 
-deploydocs(
-    repo = "github.com/MadNLP/MadNLP.jl.git",
-    target = "build",
-    devbranch = "master",
-    devurl = "dev",
-    push_preview = true,
-)
+# deploydocs(
+#     repo = "github.com/MadNLP/MadNLP.jl.git",
+#     target = "build",
+#     devbranch = "master",
+#     devurl = "dev",
+#     push_preview = true,
+# )

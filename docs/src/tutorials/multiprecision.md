@@ -9,10 +9,9 @@ using MadNLP
 
 ```
 
-MadNLP is written in pure Julia, and as such support solving
-optimization problems in arbitrary precision.
-By default, MadNLP adapts its precision according to the `NLPModel`
-passed in input. Most models use `Float64` (in fact, almost
+MadNLP supports solving optimization problems in arbitrary precision.
+By default, MadNLP adapts its precision following the `NLPModel`
+passed in input. Most models are using `Float64` (in fact, almost
 all optimization modelers are implemented using double
 precision), but for certain applications it can be useful to use
 arbitrary precision to get more accurate solution.
@@ -69,7 +68,7 @@ println(typeof(x0))
 ```
 
 ## Solving a problem in Float32
-Now that we have defined our model in `Float32`, we solve
+Now that we have instantiated our model in `Float32`, we solve
 it using MadNLP. As `nlp` is using `Float32`, MadNLP will automatically adjust
 its internal types to `Float32` during the instantiation.
 By default, the convergence tolerance is also adjusted to the input type, such that `tol = sqrt(eps(T))`.
@@ -80,6 +79,7 @@ tol = sqrt(eps(Float32))
 We solve the problem using Lapack as linear solver:
 ```@example multiprecision
 results = madnlp(nlp; linear_solver=LapackCPUSolver)
+nothing
 ```
 
 !!! note
@@ -104,6 +104,7 @@ same problem using `Float64`:
 ```@example multiprecision
 nlp_64 = airport_model(Float64)
 results_64 = madnlp(nlp_64; linear_solver=LapackCPUSolver)
+nothing
 ```
 The final objective is now
 ```@example multiprecision
@@ -130,19 +131,20 @@ nlp_128 = airport_model(Float128)
 
 
 !!! warning
-    Unfortunately, a few linear solvers support `Float128` out of the box.
-    Currently, the only solver suporting quadruple in MadNLP is `LDLSolver`, which implements
-    [an LDL factorization in pure Julia](https://github.com/JuliaSmoothOptimizers/LDLFactorizations.jl).
+    On the contrary to `Float32`, a few linear solvers support `Float128` out of the box.
+    Currently, the only solvers suporting quadruple in MadNLP are `LDLSolver`
+    and the HSL solvers (require MadNLPHSL).
+    `LDLSolvers` uses [an LDL factorization implemented in pure Julia](https://github.com/JuliaSmoothOptimizers/LDLFactorizations.jl).
     The solver `LDLSolver` is not adapted to solve large-scale nonconvex nonlinear programs,
     but works if the problem is small enough (as it is the case here).
 
-Replacing the solver by `LDLSolver`, solving the problem with MadNLP just amounts to
+Once we have replaced the solver by `LDLSolver`, solving the problem with MadNLP in `Float128` just amounts to
 ```@example multiprecision
 results_128 = madnlp(nlp_128; linear_solver=LDLSolver)
+nothing
 
 ```
-Note that the final tolerance is much lower than before.
-We get the solution in quadruple precision
+Note that the final tolerance is much lower than before. We get the solution in quadruple precision
 ```@example multiprecision
 results_128.solution
 ```
