@@ -1357,7 +1357,7 @@ function _setup_model(model::Optimizer)
     return
 end
 
-function _setup_nlp(model::Optimizer)
+function _setup_nlp(model::Optimizer; array_type = nothing)
     if !model.needs_new_nlp
         return model.nlp
     end
@@ -1415,7 +1415,7 @@ function _setup_nlp(model::Optimizer)
         end
     end
 
-    model.nlp = MOIModel(
+    nlp = MOIModel(
         NLPModels.NLPModelMeta(
             nvar,
             x0 = x0,
@@ -1437,6 +1437,12 @@ function _setup_nlp(model::Optimizer)
         NLPModels.Counters(),
     )
 
+    model.nlp = if isnothing(array_type)
+        nlp
+    else
+        MadNLP.SparseWrapperModel(array_type, nlp)
+    end
+
     model.needs_new_nlp = false
     return model.nlp
 end
@@ -1456,7 +1462,8 @@ function MOI.optimize!(model::Optimizer)
         end
     end
 
-    _setup_nlp(model)
+    array_type = get(model.options, :array_type, nothing)
+    _setup_nlp(model; array_type = array_type)
 
     if model.silent
         model.options[:print_level] = MadNLP.ERROR
@@ -1478,10 +1485,33 @@ function MOI.optimize!(model::Optimizer)
     end
     # Instantiate MadNLP.
     model.solver = MadNLP.MadNLPSolver(model.nlp; options...)
-    model.result = MadNLP.solve!(model.solver)
+    result = MadNLP.solve!(model.solver)
+    model.result = if isnothing(array_type)
+        result
+    else
+        copy_result_to_cpu(result)
+    end
     model.solve_time = model.solver.cnt.total_time
     model.solve_iterations = model.solver.cnt.k
     return
+end
+
+
+function copy_result_to_cpu(stats::MadNLP.MadNLPExecutionStats)
+    return MadNLP.MadNLPExecutionStats(
+        stats.options,
+        stats.status,
+        Array(stats.solution),
+        stats.objective,
+        Array(stats.constraints),
+        stats.dual_feas,
+        stats.primal_feas,
+        Array(stats.multipliers),
+        Array(stats.multipliers_L),
+        Array(stats.multipliers_U),
+        stats.iter,
+        stats.counters,
+    )
 end
 
 const _STATUS_CODES = Dict{MadNLP.Status,MOI.TerminationStatusCode}(
