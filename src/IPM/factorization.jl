@@ -87,8 +87,8 @@ function solve!(
 
     # Resize arrays with correct dimension
     if size(qn.E) != (nn, 2*p)
-        qn.E = zeros(nn, 2*p)
-        qn.H = zeros(nn, 2*p)
+        qn.E = zeros(T, nn, 2*p)
+        qn.H = zeros(T, nn, 2*p)
     else
         fill!(qn.E, zero(T))
         fill!(qn.H, zero(T))
