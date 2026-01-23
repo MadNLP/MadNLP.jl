@@ -2,7 +2,7 @@ module MadNLPGPU
 
 import LinearAlgebra
 import SparseArrays: SparseMatrixCSC, nonzeros, nnz
-import LinearAlgebra: Symmetric
+import LinearAlgebra: Symmetric, mul!, norm, dot
 # CUDA
 import CUDA: CUDA, CUSPARSE, CUBLAS, CUSOLVER, CuVector, CuMatrix, CuArray,
     has_cuda, @allowscalar, runtime_version, CUDABackend
@@ -29,8 +29,10 @@ import AMD, Metis
 include("utils.jl")
 include("KKT/kernels_dense.jl")
 include("KKT/kernels_sparse.jl")
+include("KKT/kernels_qn.jl")
 include("KKT/cuda_dense.jl")
 include("KKT/cuda_sparse.jl")
+include("KKT/cuda_qn.jl")
 include("LinearSolvers/lapackgpu.jl")
 include("LinearSolvers/cusolver.jl")
 include("LinearSolvers/cudss.jl")
