@@ -93,10 +93,10 @@ Number of Iterations....: 13
 
                                    (scaled)                 (unscaled)
 Objective...............:   4.7947302735661709e+04    4.7947302735661709e+04
-Dual infeasibility......:   1.2358625841564429e-06    1.2358625841564429e-06
-Constraint violation....:   4.1921440478600962e-09    4.1921440478600962e-09
-Complementarity.........:   7.8004282261755768e-06    7.8004282261755768e-06
-Overall NLP error.......:   7.8004282261755768e-06    7.8004282261755768e-06
+Dual infeasibility......:   1.2358625874757043e-06    1.2358625874757043e-06
+Constraint violation....:   4.1921440756427768e-09    4.1921440756427768e-09
+Complementarity.........:   7.8004282261773132e-06    7.8004282261773132e-06
+Overall NLP error.......:   7.8004282261773132e-06    7.8004282261773132e-06
 
 Number of objective function evaluations              = 14
 Number of objective gradient evaluations              = 14
@@ -104,11 +104,11 @@ Number of constraint evaluations                      = 14
 Number of constraint Jacobian evaluations             = 14
 Number of Lagrangian Hessian evaluations              = 13
 
-Total wall secs in initialization                     = 48.444
-Total wall secs in linear solver                      =  5.710
-Total wall secs in NLP function evaluations           =  2.034
-Total wall secs in solver (w/o init./fun./lin. alg.)  = 71.190
-Total wall secs                                       = 127.379
+Total wall secs in initialization                     = 48.625
+Total wall secs in linear solver                      =  5.693
+Total wall secs in NLP function evaluations           =  2.817
+Total wall secs in solver (w/o init./fun./lin. alg.)  = 75.386
+Total wall secs                                       = 132.521
 
 <span class="sgr32">EXIT: Optimal Solution Found (tol = 1.0e-04).</span></code></pre><p>When solving an optimization problem on the GPU, MadNLP proceeds to some automatic modifications. In order:</p><ol><li>It increases the parameter <code>bound_relax_factor</code> to <code>1e-4</code>.</li><li>It relaxes all the equality constraints <span>$g(x) = 0$</span> as a pair of inequality constraints <span>$-\tau \leq g(x) \leq \tau$</span>, with <span>$tau$</span> being equal to <code>bound_relax_factor</code>;</li><li>It reduces the KKT system down to sparse condensed system, exploiting the fact that the relaxed problem has only (potentially tight) inequality constraints. Up to a given primal regularization, the resulting KKT system is positive definite and can be factorized using a pivoting-free factorization routines (e.g. a Cholesky or an LDL&#39; decompositions). This is the so-called <em>Lifted-KKT</em> formulation documented in <a href="https://arxiv.org/html/2405.14236v2">this article</a>.</li><li>The new condensed KKT system increases the ill-conditioning inherent to the interior-point method, amplifying the loss of accuracy when the iterates get close to a local solution. As a result, the termination tolerance <code>tol</code> is also increased to <code>1e-4</code> to recover convergence.</li></ol><p>As a result, the convergence observed can be significantly different than what we observe on the CPU. In particular, relaxing the parameter <code>bound_relax_factor</code> has a non-marginal impact on the feasible set&#39;s geometry. You can limit the loss of accuracy by specifying explicitly the relaxation and tolerance parameters to MadNLP:</p><pre><code class="language-julia hljs">results = madnlp(
     nlp;
@@ -147,16 +147,16 @@ iter    objective    inf_pr   inf_du inf_compl lg(mu) lg(rg) alpha_pr ir ls
   11  4.7956891e+04 1.28e-06 6.14e-02 7.79e-02  -1.0     -   1.00e+00  1  1h
   12  4.7952818e+04 3.39e-06 1.21e-03 2.85e-03  -2.5     -   1.00e+00  1  1f
   13  4.7952696e+04 4.21e-09 1.24e-06 2.16e-06  -5.7     -   1.00e+00  1  1h
-  14  4.7952696e+04 2.18e-15 6.89e-13 7.07e-09  -8.0     -   1.00e+00  2  1h
+  14  4.7952696e+04 2.14e-15 6.89e-13 7.07e-09  -8.0     -   1.00e+00  2  1h
 
 Number of Iterations....: 14
 
                                    (scaled)                 (unscaled)
 Objective...............:   4.7952696276023358e+04    4.7952696276023358e+04
 Dual infeasibility......:   6.8916601564313557e-13    6.8916601564313557e-13
-Constraint violation....:   2.1827608122731404e-15    2.1827608122731404e-15
-Complementarity.........:   7.0655894247843478e-09    7.0655894247843478e-09
-Overall NLP error.......:   7.0655894247843478e-09    7.0655894247843478e-09
+Constraint violation....:   2.1411274223799174e-15    2.1411274223799174e-15
+Complementarity.........:   7.0655894247826521e-09    7.0655894247826521e-09
+Overall NLP error.......:   7.0655894247826521e-09    7.0655894247826521e-09
 
 Number of objective function evaluations              = 15
 Number of objective gradient evaluations              = 15
@@ -164,11 +164,11 @@ Number of constraint evaluations                      = 15
 Number of constraint Jacobian evaluations             = 15
 Number of Lagrangian Hessian evaluations              = 14
 
-Total wall secs in initialization                     =  0.027
-Total wall secs in linear solver                      =  0.022
-Total wall secs in NLP function evaluations           =  0.007
-Total wall secs in solver (w/o init./fun./lin. alg.)  =  0.039
-Total wall secs                                       =  0.095
+Total wall secs in initialization                     =  0.081
+Total wall secs in linear solver                      =  0.067
+Total wall secs in NLP function evaluations           =  0.040
+Total wall secs in solver (w/o init./fun./lin. alg.)  =  0.220
+Total wall secs                                       =  0.407
 
 <span class="sgr32">EXIT: Optimal Solution Found (tol = 1.0e-07).</span></code></pre><p>Decreasing the tolerance <code>tol</code> too much is likely to cause some numerical issues inside the algorithm. In general, we recommend keeping the value of <code>bound_relax_factor</code> below <code>tol</code>.</p><h2 id="Solving-the-problem-on-the-GPU-with-HyKKT"><a class="docs-heading-anchor" href="#Solving-the-problem-on-the-GPU-with-HyKKT">Solving the problem on the GPU with HyKKT</a><a id="Solving-the-problem-on-the-GPU-with-HyKKT-1"></a><a class="docs-heading-anchor-permalink" href="#Solving-the-problem-on-the-GPU-with-HyKKT" title="Permalink"></a></h2><p>Some applications require accurate solutions. In that case, we recommend using the extension <a href="https://github.com/MadNLP/HybridKKT.jl">HybridKKT.jl</a>, which implements the Golub &amp; Greif augmented Lagrangian formulation detailed <a href="https://www.tandfonline.com/doi/abs/10.1080/10556788.2022.2124990">in this article</a>. Compared to Lifted-KKT, the Hybrid-KKT strategy is more accurate (it doesn&#39;t relax the equality constraints in the problem) but slightly slower (it computes the descent direction using a conjugate gradient at every IPM iterations).</p><p>Once the package <code>HybridKKT</code> installed, the solution proceeds as</p><pre><code class="nohighlight hljs">using HybridKKT
 
@@ -179,4 +179,4 @@ results = madnlp(
     equality_treatment=MadNLP.EnforceEquality,
     fixed_variable_treatment=MadNLP.MakeParameter,
 )
-nothing</code></pre></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../../options/">« Options</a><a class="docs-footer-nextpage" href="../multiprecision/">Multi-precision »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.16.1 on <span class="colophon-date" title="Friday 23 January 2026 04:42">Friday 23 January 2026</span>. Using Julia version 1.12.4.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+nothing</code></pre></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../../options/">« Options</a><a class="docs-footer-nextpage" href="../multiprecision/">Multi-precision »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.16.1 on <span class="colophon-date" title="Friday 23 January 2026 12:17">Friday 23 January 2026</span>. Using Julia version 1.12.4.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
