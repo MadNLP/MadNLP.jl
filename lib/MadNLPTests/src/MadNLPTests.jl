@@ -111,7 +111,7 @@ end
 
 function test_madnlp(name,optimizer_constructor::Function,exclude; Arr = Array)
     @testset "$name" begin
-        for f in [infeasible,unbounded,lootsma,eigmina,lp_examodels_issue75]
+        for f in [infeasible, unbounded, lootsma, eigmina, lp_examodels_issue75, jump_array_type]
             !(string(f) in exclude) && f(optimizer_constructor; Arr = Arr)
         end
     end
@@ -438,6 +438,21 @@ function lp_examodels_issue75(optimizer_constructor::Function; Arr = Array)
 
         @test result.status == MadNLP.SOLVE_SUCCEEDED
     end
+end
+
+function jump_array_type(optimizer_constructor::Function; Arr = Array)
+    @testset "jump_array_type" begin
+        m = Model(optimizer_constructor)
+        set_attribute(m, "array_type", Arr)
+        @variable(m, x >= 1)
+        @objective(m, Min, x^2)
+        optimize!(m)
+
+        @test termination_status(m) == MOI.LOCALLY_SOLVED
+        @test solcmp([value(x)], [1.0])
+    end
+
+    return nothing
 end
 
 include("Instances/dummy_qp.jl")
