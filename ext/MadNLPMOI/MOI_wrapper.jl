@@ -1414,7 +1414,6 @@ function _setup_nlp(model::Optimizer)
             y0[offset+i] = _dual_start(model, start, -1)
         end
     end
-    # TODO: initial bounds' multipliers.
 
     model.nlp = MOIModel(
         NLPModels.NLPModelMeta(
