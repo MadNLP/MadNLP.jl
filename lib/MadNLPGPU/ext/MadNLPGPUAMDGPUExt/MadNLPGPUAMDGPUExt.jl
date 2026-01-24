@@ -13,7 +13,7 @@ using AMDGPU
 using AMDGPU.rocBLAS, AMDGPU.rocSOLVER, AMDGPU.rocSPARSE
 
 function __init__()
-    setglobal!(MadNLPGPU, :LapackROCSolver, LapackROCSolver)
+    setglobal!(MadNLPGPU, :LapackROCmSolver, LapackROCmSolver)
     return
 end
 
