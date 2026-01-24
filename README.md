@@ -5,8 +5,21 @@
 ---
 
 | **License** | **Documentation** | **Build Status** | **Coverage** | **DOI** |
-|:-----------------:|:-----------------:|:----------------:|:----------------:|:----------------:|
-| [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/MadNLP/MadNLP.jl/blob/master/LICENSE) | [![doc](https://img.shields.io/badge/docs-stable-blue.svg)](https://madnlp.github.io/MadNLP.jl/stable) [![doc](https://img.shields.io/badge/docs-dev-blue.svg)](https://madnlp.github.io/MadNLP.jl/dev) | [![build](https://github.com/MadNLP/MadNLP.jl/actions/workflows/test.yml/badge.svg)](https://github.com/MadNLP/MadNLP.jl/actions/workflows/test.yml) | [![codecov](https://codecov.io/gh/MadNLP/MadNLP.jl/branch/master/graph/badge.svg?token=MBxH2AAu8Z)](https://codecov.io/gh/MadNLP/MadNLP.jl) | [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.5825776.svg)](https://doi.org/10.5281/zenodo.5825776) |
+|:-----------:|:-----------------:|:----------------:|:------------:|:-------:|
+| [![License: MIT][license-img]][license-url] | [![docs-stable][docs-stable-img]][docs-stable-url] [![docs-dev][docs-dev-img]][docs-dev-url] | [![build-gh][build-gh-img]][build-gh-url] | [![codecov][codecov-img]][codecov-url] | [![doi][doi-img]][doi-url] |
+
+[license-img]: https://img.shields.io/badge/License-MIT-yellow.svg
+[license-url]: https://github.com/MadNLP/MadNLP.jl/blob/master/LICENSE
+[docs-stable-img]: https://img.shields.io/badge/docs-stable-blue.svg
+[docs-stable-url]: https://madnlp.github.io/MadNLP.jl/stable
+[docs-dev-img]: https://img.shields.io/badge/docs-dev-purple.svg
+[docs-dev-url]: https://madnlp.github.io/MadNLP.jl/dev
+[build-gh-img]: https://github.com/MadNLP/MadNLP.jl/actions/workflows/test.yml/badge.svg
+[build-gh-url]: https://github.com/MadNLP/MadNLP.jl/actions/workflows/test.yml
+[codecov-img]: https://codecov.io/gh/MadNLP/MadNLP.jl/branch/master/graph/badge.svg?token=MBxH2AAu8Z
+[codecov-url]: https://codecov.io/gh/MadNLP/MadNLP.jl
+[doi-img]: https://zenodo.org/badge/DOI/10.5281/zenodo.5825776.svg
+[doi-url]: https://doi.org/10.5281/zenodo.5825776
 
 ## Installation
 
