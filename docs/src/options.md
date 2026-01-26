@@ -17,7 +17,7 @@ These options are used to set the values for other options. The default values a
 - `kkt_system::Type` 
   The type of KKT system. Valid values are `MadNLP`.{`SparseKKTSystem`,`ScaledSparseKKTSystem`,`SparseUnreducedKKTSystem`,`SparseCondensedKKTSystem`, `DenseKKTSystem`,`DenseCondensedKKTSystem`}.
 - `linear_solver::Type`\
-  Linear solver used for solving primal-dual system. Valid values are: {`MadNLP.MumpsSolver`, `MadNLP.UmfpackSolver`, `MadNLP.LDLSolver`, `MadNLP.CHOLMODSolver`, `MadNLPPardiso.PardisoSolver`, `MadNLPPardiso.PardisoMKLSolver`, `MadNLPHSL.Ma27Solver`, `MadNLPHSL.Ma57Solver`, `MadNLPHSL.Ma77Solver`, `MadNLPHSL.Ma86Solver`, `MadNLPHSL.Ma97Solver`, `MadNLP.LapackCPUSolver`, `MadNLPGPU.LapackGPUSolver`,`MadNLPGPU.CUDSSSolver`, `MadNLPGPU.LapackROCSolver`} (some may require using extension packages).
+  Linear solver used for solving primal-dual system. Valid values are: {`MadNLP.MumpsSolver`, `MadNLP.UmfpackSolver`, `MadNLP.LDLSolver`, `MadNLP.CHOLMODSolver`, `MadNLPPardiso.PardisoSolver`, `MadNLPPardiso.PardisoMKLSolver`, `MadNLPHSL.Ma27Solver`, `MadNLPHSL.Ma57Solver`, `MadNLPHSL.Ma77Solver`, `MadNLPHSL.Ma86Solver`, `MadNLPHSL.Ma97Solver`, `MadNLP.LapackCPUSolver`, `MadNLPGPU.LapackCUDASolver`,`MadNLPGPU.CUDSSSolver`, `MadNLPGPU.LapackROCmSolver`} (some may require using extension packages).
   The selected solver should be properly built in the build procedure. See [README.md](https://github.com/sshin23/MadNLP.jl) file.
 
 ## General options
@@ -224,11 +224,11 @@ Irrelevant options are ignored and a warning message is printed.
 - `pardisomkl_msglvl::Int = 0`
 - `pardisomkl_order::Int = 2`
 
-#### LapackGPUSolver (requires `MadNLPGPU`)
-- `lapack_algorithm::LapackGPU.Algorithms = MadNLP.BUNCHKAUFMAN`
+#### LapackCUDASolver (requires `MadNLPGPU`)
+- `lapack_algorithm::LinearFactorization = MadNLP.BUNCHKAUFMAN`
 
-#### LapackROCSolver (requires `MadNLPGPU`)
-- `lapack_algorithm::LapackGPU.Algorithms = MadNLP.EVD`
+#### LapackROCmSolver (requires `MadNLPGPU`)
+- `lapack_algorithm::LinearFactorization = MadNLP.EVD`
 
 #### CUDSSSolver (requires `MadNLPGPU`)
 - `cudss_algorithm::MadNLP.LinearFactorization = MadNLP.LDL`

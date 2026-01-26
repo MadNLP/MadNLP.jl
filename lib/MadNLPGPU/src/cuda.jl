@@ -7,7 +7,7 @@ function MadNLP.MadNLPOptions{T}(
     dense_callback = MadNLP.is_dense_callback(nlp),
     callback = dense_callback ? MadNLP.DenseCallback : MadNLP.SparseCallback,
     kkt_system = dense_callback ? MadNLP.DenseCondensedKKTSystem : MadNLP.SparseCondensedKKTSystem,
-    linear_solver = dense_callback ? LapackGPUSolver : CUDSSSolver,
+    linear_solver = dense_callback ? LapackCUDASolver : CUDSSSolver,
     tol = MadNLP.get_tolerance(T,kkt_system),
     bound_relax_factor = (kkt_system == MadNLP.SparseCondensedKKTSystem) ? tol : T(1e-8),
 ) where {T, VT <: CuVector{T}}

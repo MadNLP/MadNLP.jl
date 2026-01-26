@@ -123,12 +123,13 @@ model = Model(()->MadNLP.Optimizer(linear_solver=PardisoMKLSolver))
 
 ```julia
 using MadNLPGPU, JuMP
-# ...
-model = Model(()->MadNLP.Optimizer(linear_solver=LapackGPUSolver, array_type=CuArray))  # for dense problems
-model = Model(()->MadNLP.Optimizer(linear_solver=CUDSSSolver, array_type=CuArray))      # for sparse problems
+
+using CUDA
+model = Model(()->MadNLP.Optimizer(linear_solver=LapackCUDASolver, array_type=CuArray))   # for dense problems
+model = Model(()->MadNLP.Optimizer(linear_solver=CUDSSSolver, array_type=CuArray))        # for sparse problems
 
 using AMDGPU
-model = Model(()->MadNLP.Optimizer(linear_solver=LapackROCSolver, array_type=ROCArray))  # for dense problems
+model = Model(()->MadNLP.Optimizer(linear_solver=LapackROCmSolver, array_type=ROCArray))  # for dense problems
 ```
 
 ## Citing MadNLP.jl
