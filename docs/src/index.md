@@ -58,8 +58,8 @@ CHOLMODSolver           | sparse | CPU
 __MadNLPGPU__||
 ||
 CUDSSSolver             | sparse | CUDA
-LapackGPUSolver         | dense  | CUDA
-LapackROCSolver         | dense  | AMD GPU
+LapackCUDASolver         | dense  | CUDA
+LapackROCmSolver         | dense  | AMD GPU
 ||
 __MadNLPHSL__||
 ||

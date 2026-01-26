@@ -39,10 +39,10 @@ makedocs(
     ]
 )
 
-# deploydocs(
-#     repo = "github.com/MadNLP/MadNLP.jl.git",
-#     target = "build",
-#     devbranch = "master",
-#     devurl = "dev",
-#     push_preview = true,
-# )
+deploydocs(
+    repo = "github.com/MadNLP/MadNLP.jl.git",
+    target = "build",
+    devbranch = "master",
+    devurl = "dev",
+    push_preview = true,
+)

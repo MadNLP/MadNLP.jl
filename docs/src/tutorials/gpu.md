@@ -153,3 +153,27 @@ results = madnlp(nlp_wrapped; linear_solver=CUDSSSolver)
 nothing
 ```
 
+## How to solve on the GPU a JuMP model?
+
+If your model is implemented with JuMP, you can solve it on the GPU using the
+same trick as in the previous paragraph just by passing a new option `array_type`
+specifying which array type to use to instantiate the `SparseWrapperModel`.
+
+This is demonstrated in the following example:
+```julia
+using CUDA
+using JuMP
+using MadNLP, MadNLPGPU
+
+model = Model(MadNLP.Optimizer)
+@variable(model, x1 <= 0.5)
+@variable(model, x2)
+
+@objective(model, Min, 100.0 * (x2 - x1^2)^2 + (1.0 - x1)^2)
+@constraint(model, x1 * x2 >= 1.0)
+@constraint(model, x1 + x2^2 >= 0.0)
+
+JuMP.set_optimizer_attribute(model, "array_type", CuArray)
+JuMP.set_optimizer_attribute(model, "linear_solver", CUDSSSolver)
+JuMP.optimize!(model) # Solve the model on the GPU!
+```
