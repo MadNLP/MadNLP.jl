@@ -16,6 +16,7 @@ makedocs(
         "Home" => "index.md",
         "Installation" => "installation.md",
         "Quickstart" => "quickstart.md",
+        "Algorithm" => "algorithm.md",
         "Options" => "options.md",
         "Tutorials" => [
             "GPU acceleration" => "tutorials/gpu.md",
@@ -25,7 +26,6 @@ makedocs(
             "Custom KKT system" => "tutorials/kktsystem.md",
         ],
         "Manual" => [
-            "IPM solver" => "man/solver.md",
             "KKT systems" => "man/kkt.md",
             "Linear Solvers" => "man/linear_solvers.md",
         ],
