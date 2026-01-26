@@ -283,3 +283,21 @@ end
     @test stats.status == MadNLP.SOLVE_SUCCEEDED
 end
 
+@kwdef struct UserCallback
+    counter::Base.RefValue{Int} = Ref(0)
+end
+
+function (cb::UserCallback)(solver::MadNLP.AbstractMadNLPSolver, mode::Symbol)
+    cb.counter[] += 1
+    return solver.cnt.k > 3
+end
+
+@testset "User-defined callback termination" begin
+    nlp = MadNLPTests.HS15Model()
+    cb = UserCallback()
+    solver = MadNLPSolver(nlp; print_level = MadNLP.ERROR, intermediate_callback=cb)
+    stats = MadNLP.solve!(solver)
+    @test stats.status == MadNLP.USER_REQUESTED_STOP
+    @test solver.cnt.k == 4
+    @test cb.counter[] == 5
+end
