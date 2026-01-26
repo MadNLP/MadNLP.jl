@@ -18,7 +18,6 @@ function MadNLP.diag!(dest::CuVector{T}, src::CuMatrix{T}) where {T}
     @assert length(dest) == size(src, 1)
     backend = CUDABackend()
     MadNLPGPU._copy_diag_kernel!(backend)(dest, src, ndrange = length(dest))
-    synchronize(backend)
     return
 end
 
@@ -29,7 +28,6 @@ end
 function MadNLP.diag_add!(dest::CuMatrix, src1::CuVector, src2::CuVector)
     backend = CUDABackend()
     MadNLPGPU._add_diagonal_kernel!(backend)(dest, src1, src2, ndrange = size(dest, 1))
-    synchronize(backend)
     return
 end
 
@@ -41,7 +39,6 @@ function MadNLP._set_diag!(A::CuMatrix, inds, a)
     if !isempty(inds)
         backend = CUDABackend()
         MadNLPGPU._set_diag_kernel!(backend)(A, inds, a; ndrange = length(inds))
-        synchronize(backend)
     end
     return
 end
@@ -78,7 +75,6 @@ function MadNLP._build_dense_kkt_system!(
         ns,
         ndrange = ndrange,
     )
-    synchronize(backend)
     return
 end
 
@@ -106,7 +102,6 @@ function MadNLP._build_ineq_jac!(
         m_ineq,
         ndrange = ndrange,
     )
-    synchronize(backend)
     return
 end
 
@@ -138,6 +133,5 @@ function MadNLP._build_condensed_kkt_system!(
         m_eq,
         ndrange = ndrange,
     )
-    synchronize(backend)
     return
 end
