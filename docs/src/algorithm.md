@@ -6,7 +6,7 @@ CurrentModule = MadNLP
 
 We give a brief description of the interior-point algorithm
 used in MadNLP, together with [the principal options](options.md)
-impacting MadNLP's behavior. The algorithm is described in more length in
+impacting MadNLP's behavior. The algorithm is described in more length in the
 [Ipopt paper](https://link.springer.com/article/10.1007/S10107-004-0559-Y).
 
 MadNLP searches for a local solution of the nonlinear program:
@@ -22,8 +22,8 @@ and $$g: \mathbb{R}^n \to \mathbb{R}^m$$ two smooth nonlinear functions.
 
 ## Pre-processing
 
-Before running the interior-point method, MadNLP applies three pre-processing steps
-to improve the numerical performance.
+Before running the interior-point method, MadNLP applies a pre-processing to the problem
+to improve the numerical performance. The pre-processing operations are described below.
 
 ### Problem's reformulation
 
@@ -52,7 +52,8 @@ As a result, we obtain an equivalent problem with the following structure:
     \text{subject to} \quad & c(w) = 0 \; , \quad w \geq 0 \; .
   \end{aligned}
 ```
-with $$w = (x, s)$$ and $$c(w) = (g_I(x) - s, g_E(x))$$.
+with $$w = (x, s)$$ and $$c(w) = (g_I(x) - s, g_E(x))$$, with ``I``
+the index set for the inequality constraints and ``E`` the index set for equality constraints.
 
 !!! info
     To simplify the exposition, we have assumed that the variables
@@ -243,6 +244,8 @@ J_k & -\delta_y
 ```
 with the diagonal matrix ``\Sigma_k = W_k^{-1} Z_k``.
 The default implementation of the `AbstractReducedKKTSystem` is provided in [`SparseKKTSystem`](@ref).
+If the problem exhibits significant ill-conditioning, the user can also use a [`ScaledSparseKKTSystem`](@ref),
+which is more numerically stable than the [`SparseKKTSystem`](@ref).
 
 There exists a smaller system [`AbstractCondensedKKTSystem`](@ref) that also removes
 the blocks associated to the inequality constraints. This system
@@ -259,7 +262,7 @@ a [custom KKT system](tutorials/kktsystem.md) to exploit the problem's structure
 The vector $$(\Delta w, \Delta y, \Delta z)$$ is a descent direction
 if the reduced Hessian (the Hessian $$H_k$$ projected on the null-space of the Jacobian
 $$J_k$$) of the primal-dual KKT system is **positive definite**.
-The reduced Hessian is positive definite if and only if the inertia of the primal-dual KKT system (the number of positive,
+The reduced Hessian is positive definite if and only if the inertia of the reduced primal-dual KKT system (the number of positive,
 zero and negative eigenvalues) should exactly be equal to ``(n, 0, m)``.
 
 MadNLP uses an inertia correction mechanism that increases the values of the

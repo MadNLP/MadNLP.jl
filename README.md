@@ -45,7 +45,11 @@ MadNLP can be installed directly via the Julia package manager:
 ```julia
 pkg> add MadNLP
 ```
-MadNLP supports a variety of sparse linear solvers, as reported in the documentation.
+Furthermore, MadNLP comes with several extensions:
+
+- `MadNLPGPU`: import GPU-accelerated linear solvers in MadNLP
+- `MadNLPHSL`: import the HSL linear solvers in MadNLP
+- `MadNLPPardiso`: import the Pardiso linear solver in MadNLP
 
 ## Citing MadNLP.jl
 

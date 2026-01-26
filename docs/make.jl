@@ -22,7 +22,7 @@ makedocs(
             "GPU acceleration" => "tutorials/gpu.md",
             "Multi-precision" => "tutorials/multiprecision.md",
             "Warm-start" => "tutorials/warmstart.md",
-            "Quasi-Newton" => "tutorials/lbfgs.md",
+            "Quasi-Newton" => "tutorials/quasi_newton.md",
             "Custom KKT system" => "tutorials/kktsystem.md",
         ],
         "Manual" => [

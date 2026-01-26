@@ -35,7 +35,7 @@ disable\\_garbage\\_collector  | false                | disable garbage collecto
 blas\\_num\\_thread            | 1                    | number of threads to use in the BLAS backend
 __Output options__||
 ||
-output\\_file                  | ""                   | if not `""`, the output log is teed to the file at this path
+output\\_file                  | `""`                 | if not `""`, the output log is teed to the file at this path
 print\\_level                  | INFO                 | verbosity level in MadNLP
 file\\_print\\_level           | INFO                 | verbosity level in file output
 ||
