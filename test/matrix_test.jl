@@ -25,7 +25,7 @@ end
     MadNLP.improve!(M)
     MadNLP.factorize!(M)
     MadNLP.is_inertia(M) && (MadNLP.inertia(M) = (2,0,0))
-    x = MadNLP.solve!(M,copy(b))
+    x = MadNLP.solve_linear_system!(M,copy(b))
     @test solcmp(x,sol)
 end
 

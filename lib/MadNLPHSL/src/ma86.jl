@@ -102,7 +102,7 @@ function factorize!(M::Ma86Solver{T,INT}) where {T,INT}
     M.info.flag < 0 && throw(FactorizationException())
     return M
 end
-function solve!(M::Ma86Solver{T,INT}, rhs::Vector{T}) where {T,INT}
+function solve_linear_system!(M::Ma86Solver{T,INT}, rhs::Vector{T}) where {T,INT}
     HSL.ma86_solve(
         T,
         INT,

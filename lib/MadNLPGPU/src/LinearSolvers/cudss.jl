@@ -165,7 +165,7 @@ function MadNLP.factorize!(M::CUDSSSolver)
     return M
 end
 
-function MadNLP.solve!(M::CUDSSSolver{T,V}, xb::V) where {T,V}
+function MadNLP.solve_linear_system!(M::CUDSSSolver{T,V}, xb::V) where {T,V}
     if M.opt.cudss_ir > 0
         copyto!(M.buffer, xb)
         CUDSS.cudss_update(M.b_gpu, M.buffer)

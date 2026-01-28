@@ -168,13 +168,13 @@ in `y`, such that ``y = A' x`` (with ``A`` current Jacobian).
 function jtprod! end
 
 """
-    solve!(kkt::AbstractKKTSystem, w::AbstractKKTVector)
+    solve_kkt_system!(kkt::AbstractKKTSystem, w::AbstractKKTVector)
 
 Solve the KKT system ``K x = w`` with the linear solver stored
 inside `kkt` and stores the result inplace inside the `AbstractKKTVector` `w`.
 
 """
-function solve! end
+function solve_kkt_system! end
 
 """
     regularize_diagonal!(kkt::AbstractKKTSystem, primal_values::Number, dual_values::Number)

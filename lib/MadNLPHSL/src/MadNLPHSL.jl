@@ -18,7 +18,7 @@ import MadNLP:
     InertiaException,
     introduce,
     factorize!,
-    solve!,
+    solve_linear_system!,
     improve!,
     is_inertia,
     inertia,

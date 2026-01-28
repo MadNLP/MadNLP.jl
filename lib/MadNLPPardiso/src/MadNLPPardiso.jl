@@ -22,7 +22,7 @@ import MadNLP:
     set_options!,
     introduce,
     factorize!,
-    solve!,
+    solve_linear_system!,
     improve!,
     is_inertia,
     inertia,

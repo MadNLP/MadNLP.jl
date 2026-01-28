@@ -127,7 +127,7 @@ const SubVector{Tv,VT, VI} = SubArray{Tv, 1, VT, Tuple{VI}, false}
     t6::Float64 = 0.
     t7::Float64 = 0.
     t8::Float64 = 0.
-    
+
     acceptable_cnt::Int = 0
     unsuccessful_iterate::Int = 0
     restoration_fail_count::Int = 0
@@ -170,7 +170,7 @@ function timing_linear_solver(ips; ntrials=10)
     for _ in 1:ntrials
         t_build     += @elapsed build_kkt!(ips.kkt)
         t_factorize += @elapsed factorize!(ips.kkt.linear_solver)
-        t_backsolve += @elapsed solve!(ips.kkt, ips.d)
+        t_backsolve += @elapsed solve_kkt_system!(ips.kkt, ips.d)
     end
     return (
         time_build_kkt = t_build / ntrials,

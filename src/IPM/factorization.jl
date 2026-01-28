@@ -22,26 +22,26 @@ function factorize_wrapper!(solver::AbstractMadNLPSolver)
     solver.cnt.linear_solver_time += @elapsed factorize!(solver.kkt.linear_solver)
 end
 
-function solve!(kkt::SparseUnreducedKKTSystem, w::AbstractKKTVector)
+function solve_kkt_system!(kkt::SparseUnreducedKKTSystem, w::AbstractKKTVector)
     wzl = dual_lb(w)
     wzu = dual_ub(w)
     f(x,y) = iszero(y) ? x : x/y
     wzl .= f.(wzl, kkt.l_lower_aug)
     wzu .= f.(wzu, kkt.u_lower_aug)
-    solve!(kkt.linear_solver, full(w))
+    solve_linear_system!(kkt.linear_solver, full(w))
     wzl .*= .-kkt.l_lower_aug
     wzu .*= kkt.u_lower_aug
     return w
 end
 
-function solve!(kkt::AbstractReducedKKTSystem, w::AbstractKKTVector)
+function solve_kkt_system!(kkt::AbstractReducedKKTSystem, w::AbstractKKTVector)
     reduce_rhs!(kkt, w)
-    solve!(kkt.linear_solver, primal_dual(w))
+    solve_linear_system!(kkt.linear_solver, primal_dual(w))
     finish_aug_solve!(kkt, w)
     return w
 end
 
-function solve!(kkt::ScaledSparseKKTSystem, w::AbstractKKTVector)
+function solve_kkt_system!(kkt::ScaledSparseKKTSystem, w::AbstractKKTVector)
     r3 = kkt.buffer1
     r4 = kkt.buffer2
     fill!(r3, 0.0)
@@ -60,7 +60,7 @@ function solve!(kkt::ScaledSparseKKTSystem, w::AbstractKKTVector)
     w.xp .*= kkt.scaling_factor
     w.xp .+= (r3 .+ r4)
     # Backsolve
-    solve!(kkt.linear_solver, primal_dual(w))
+    solve_linear_system!(kkt.linear_solver, primal_dual(w))
     # Unpack solution
     w.xp .*= kkt.scaling_factor
 
@@ -69,7 +69,7 @@ function solve!(kkt::ScaledSparseKKTSystem, w::AbstractKKTVector)
     return w
 end
 
-function solve!(
+function solve_kkt_system!(
     kkt::SparseKKTSystem{T, VT, MT, QN},
     w::AbstractKKTVector
     ) where {T, VT, MT, QN<:CompactLBFGS}
@@ -101,7 +101,7 @@ function solve!(
     #     [  0   Iₚ ]                        [ 0  0 ]
 
     # Solve linear system without low-rank part
-    solve!(kkt.linear_solver, w_)  # w_ stores the solution of Cx = b
+    solve_linear_system!(kkt.linear_solver, w_)  # w_ stores the solution of Cx = b
 
     # Add low-rank correction
     if p > 0
@@ -131,7 +131,7 @@ function solve!(
 end
 
 
-function solve!(kkt::SparseCondensedKKTSystem{T}, w::AbstractKKTVector)  where T
+function solve_kkt_system!(kkt::SparseCondensedKKTSystem{T}, w::AbstractKKTVector)  where T
 
     (n,m) = size(kkt.jt_csc)
 
@@ -146,7 +146,7 @@ function solve!(kkt::SparseCondensedKKTSystem{T}, w::AbstractKKTVector)  where T
     kkt.buffer .= kkt.diag_buffer .* (wz .+ ws ./ Σs)
 
     mul!(wx, kkt.jt_csc, kkt.buffer, one(T), one(T))
-    solve!(kkt.linear_solver, wx)
+    solve_linear_system!(kkt.linear_solver, wx)
 
     mul!(kkt.buffer2, kkt.jt_csc', wx) # TODO: investigate why directly using wz here is causing an error
 
@@ -157,28 +157,28 @@ function solve!(kkt::SparseCondensedKKTSystem{T}, w::AbstractKKTVector)  where T
     return w
 end
 
-function solve!(
+function solve_kkt_system!(
     kkt::SparseUnreducedKKTSystem{T, VT, MT, QN},
     w::AbstractKKTVector
     ) where {T, VT, MT, QN<:CompactLBFGS}
     error("Quasi-Newton approximation of the Hessian is not supported by the KKT formulation SparseUnreducedKKTSystem. Please use SparseKKTSystem instead.")
 end
 
-function solve!(
+function solve_kkt_system!(
     kkt::SparseCondensedKKTSystem{T, VT, MT, QN},
     w::AbstractKKTVector
     ) where {T, VT, MT, QN<:CompactLBFGS}
     error("Quasi-Newton approximation of the Hessian is not supported by the KKT formulation SparseCondensedKKTSystem. Please use SparseKKTSystem instead.")
 end
 
-function solve!(
+function solve_kkt_system!(
     kkt::ScaledSparseKKTSystem{T, VT, MT, QN},
     w::AbstractKKTVector
     ) where {T, VT, MT, QN<:CompactLBFGS}
     error("Quasi-Newton approximation of the Hessian is not supported by the KKT formulation ScaledSparseKKTSystem. Please use SparseKKTSystem instead.")
 end
 
-function solve!(
+function solve_kkt_system!(
     kkt::DenseCondensedKKTSystem,
     w::AbstractKKTVector{T},
     ) where T
@@ -206,7 +206,7 @@ function solve!(
     mul!(xx, kkt.jac', kkt.buffer)
     xx .+= wx
     xy .= wy
-    solve!(kkt.linear_solver, x)
+    solve_linear_system!(kkt.linear_solver, x)
 
     wx .= xx
     mul!(dual(w), kkt.jac, wx)

@@ -118,6 +118,17 @@ function reinitialize!(solver::AbstractMadNLPSolver)
 end
 
 # major loops ---------------------------------------------------------
+"""
+    solve!(
+        solver::AbstractMadNLPSolver,
+        stats::MadNLPExecutionStats;
+        kwargs...
+    )
+
+Solve the problem formulated inside `solver`. Return the solution
+in `stats` by modifying inplace the values. The options are specified in `kwargs`.
+
+"""
 solve!(solver::AbstractMadNLPSolver; kwargs...) = solve!(solver, MadNLPExecutionStats(solver); kwargs...)
 function solve!(
     solver::AbstractMadNLPSolver,
