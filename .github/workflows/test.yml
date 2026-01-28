@@ -62,6 +62,7 @@ jobs:
         run: |
           using Pkg
           Pkg.Registry.update()
+          Pkg.develop(path=".")
           Pkg.instantiate()
           path_HSL_jll = "/home/action-runner/HSL_jll.jl.v" * ENV["HSL_VERSION"]
           Pkg.develop(path=path_HSL_jll)

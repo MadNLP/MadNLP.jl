@@ -107,10 +107,10 @@ for T in (:Float32, :Float64)
     end
 end
 
-function MadNLP.solve!(M::LapackROCmSolver, x::AbstractVector)
+function MadNLP.solve_linear_system!(M::LapackROCmSolver, x::AbstractVector)
     isempty(M.sol) && resize!(M.sol, M.n)
     copyto!(M.sol, x)
-    MadNLP.solve!(M, M.sol)
+    MadNLP.solve_linear_system!(M, M.sol)
     copyto!(x, M.sol)
     return x
 end

@@ -20,7 +20,7 @@ import MadNLP:
     @kwdef, MadNLPLogger, @debug, @warn, @error,
     AbstractOptions, AbstractLinearSolver, AbstractNLPModel, set_options!,
     SymbolicException,FactorizationException,SolveException,InertiaException,
-    introduce, factorize!, solve!, improve!, is_inertia, inertia, tril_to_full!,
+    introduce, factorize!, solve_linear_system!, improve!, is_inertia, inertia, tril_to_full!,
     LapackOptions, input_type, is_supported, default_options
 
 # AMD and Metis
