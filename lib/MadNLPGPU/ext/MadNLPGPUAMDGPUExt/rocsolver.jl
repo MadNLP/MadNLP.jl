@@ -89,7 +89,7 @@ end
 
 for T in (:Float32, :Float64)
     @eval begin
-        function MadNLP.solve!(M::LapackROCmSolver{$T}, x::ROCVector{$T})
+        function MadNLP.solve_linear_system!(M::LapackROCmSolver{$T}, x::ROCVector{$T})
             if M.opt.lapack_algorithm == MadNLP.LU
                 solve_lu!(M, x)
             elseif M.opt.lapack_algorithm == MadNLP.QR

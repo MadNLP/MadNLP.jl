@@ -43,7 +43,7 @@ function factorize!(M::UmfpackSolver)
     return M
 end
 
-function solve!(M::UmfpackSolver{T},rhs::Vector{T}) where T
+function solve_linear_system!(M::UmfpackSolver{T},rhs::Vector{T}) where T
     if UMFPACK.issuccess(M.inner)
         M.p .= rhs
         UMFPACK.ldiv!(M.d, M.inner, M.p)

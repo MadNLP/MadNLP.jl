@@ -46,7 +46,7 @@ function test_linear_solver(solver, T; kwargs...)
     if MadNLP.is_inertia(M)
         @test MadNLP.inertia(M) == (2, 0, 0)
     end
-    x = MadNLP.solve!(M,copy(b))
+    x = MadNLP.solve_linear_system!(M,copy(b))
     @test solcmp(x,sol)
 end
 
@@ -89,7 +89,7 @@ function test_kkt_system(kkt, cb)
     # Backsolve
     x = MadNLP.UnreducedKKTVector(kkt)
     fill!(MadNLP.full(x), 1.0)  # fill RHS with 1
-    out1 = MadNLP.solve!(kkt, x)
+    out1 = MadNLP.solve_kkt_system!(kkt, x)
     @test out1 === x
 
     y = copy(x)
