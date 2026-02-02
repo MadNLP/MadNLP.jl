@@ -8,8 +8,8 @@ function set_aug_diagonal!(kkt::AbstractKKTSystem{T}, solver::AbstractMadNLPSolv
     zl = full(solver.zl)
     zu = full(solver.zu)
 
-    fill!(kkt.reg, zero(T))
-    fill!(kkt.du_diag, zero(T))
+    fill!(kkt.reg, solver.opt.default_primal_regularization)
+    fill!(kkt.du_diag, -solver.opt.default_dual_regularization)
     kkt.l_diag .= solver.xl_r .- solver.x_lr   # (Xˡ - X)
     kkt.u_diag .= solver.x_ur .- solver.xu_r   # (X - Xᵘ)
     copyto!(kkt.l_lower, solver.zl_r)
@@ -34,8 +34,8 @@ function _set_aug_diagonal!(kkt::AbstractUnreducedKKTSystem)
 end
 
 function set_aug_diagonal!(kkt::ScaledSparseKKTSystem{T}, solver::AbstractMadNLPSolver{T}) where T
-    fill!(kkt.reg, zero(T))
-    fill!(kkt.du_diag, zero(T))
+    fill!(kkt.reg, solver.opt.default_primal_regularization)
+    fill!(kkt.du_diag, -solver.opt.default_dual_regularization)
     # Ensure l_diag and u_diag have only non negative entries
     kkt.l_diag .= solver.x_lr .- solver.xl_r   # (X - Xˡ)
     kkt.u_diag .= solver.xu_r .- solver.x_ur   # (Xᵘ - X)
@@ -75,8 +75,8 @@ function set_aug_RR!(kkt::AbstractKKTSystem, solver::AbstractMadNLPSolver, RR::R
     xu = full(solver.xu)
     zl = full(solver.zl)
     zu = full(solver.zu)
-    kkt.reg .= RR.zeta .* RR.D_R .^ 2
-    kkt.du_diag .= .- RR.pp ./ RR.zp .- RR.nn ./ RR.zn
+    kkt.reg .= solver.opt.default_primal_regularization .+ RR.zeta .* RR.D_R .^ 2
+    kkt.du_diag .= - solver.opt.default_dual_regularization .- RR.pp ./ RR.zp .- RR.nn ./ RR.zn
     copyto!(kkt.l_lower, solver.zl_r)
     copyto!(kkt.u_lower, solver.zu_r)
     kkt.l_diag .= solver.xl_r .- solver.x_lr
@@ -92,8 +92,8 @@ function set_aug_RR!(kkt::ScaledSparseKKTSystem, solver::AbstractMadNLPSolver, R
     xu = full(solver.xu)
     zl = full(solver.zl)
     zu = full(solver.zu)
-    kkt.reg .= RR.zeta .* RR.D_R .^ 2
-    kkt.du_diag .= .- RR.pp ./ RR.zp .- RR.nn ./ RR.zn
+    kkt.reg .= solver.opt.default_primal_regularization .+ RR.zeta .* RR.D_R .^ 2
+    kkt.du_diag .= - solver.opt.default_dual_regularization .- RR.pp ./ RR.zp .- RR.nn ./ RR.zn
     copyto!(kkt.l_lower, solver.zl_r)
     copyto!(kkt.u_lower, solver.zu_r)
     kkt.l_diag .= solver.x_lr .- solver.xl_r

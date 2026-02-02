@@ -82,6 +82,10 @@ These options are used to set the values for other options. The default values a
     - `INERTIA_FREE` uses the strategy in Chiang (2016).
     - `INERTIA_AUTO` uses `INERTIA_BASED` if inertia information is available and uses `INERTIA_FREE` otherwise.
 - `inertia_free_tol::Float64 = 0.`
+- `default_primal_regularization::T = 0.`\
+	Default primal regularization in the KKT system. `1e-8` is used for CUDA solvers.
+- `default_dual_regularization::T = 0.`\
+	Default dual regularization in the KKT system.  `1e-8` is used for CUDA solvers.
 
 ---
 ## Initialization Options
