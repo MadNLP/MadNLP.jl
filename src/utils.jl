@@ -37,26 +37,43 @@ for (name,level,color) in [(:trace,TRACE,7),(:debug,DEBUG,6),(:info,INFO,256),(:
     end
 end
 
-# BLAS
-# CUBLAS currently does not import symv!,
-# so using symv! is not dispatched to CUBLAS.symv!
-# symul! wraps symv! and dispatch based on the data type
-symul!(y, A, x::AbstractVector{T}, α = 1, β = 0) where T = BLAS.symv!('L', T(α), A, x, T(β), y)
-
 # Two-arguments BLAS.scal! is not supported in Julia 1.6.
 function _scal!(a::T, x::AbstractVector{T}) where T
     return BLAS.scal!(length(x), a, x, 1)
 end
-# Similarly, _ger! wraps ger! to dispatch on the data type.
-_ger!(alpha::Number, x::AbstractVector{T}, y::AbstractVector{T}, A::AbstractMatrix{T}) where T = BLAS.ger!(alpha, x, y, A)
 
-function symmetrize!(A::AbstractMatrix{T}) where T
-    n, m = size(A)
-    @assert n == m
-    @inbounds for i in 1:n, j=i+1:n
-        aij = T(0.5) * (A[i, j] + A[j, i])
-        A[i, j] = aij
-        A[j, i] = aij
+# BLAS
+# _ger! wraps ger! to dispatch on the data type.
+_ger!(alpha::T, x::AbstractVector{T}, y::AbstractVector{T}, A::AbstractMatrix{T}) where T = BLAS.ger!(alpha, x, y, A)
+
+# Similarly, _syr! wraps syr! to dispatch on the data type.
+_syr!(uplo::Char, alpha::T, x::AbstractVector{T}, A::AbstractMatrix{T}) where T = BLAS.syr!(uplo, alpha, x, A)
+
+# Similarly, _symv! wraps symv! and dispatch based on the data type
+function _symv!(uplo::Char, alpha::T, A::AbstractMatrix{T}, x::AbstractVector{T}, beta::T, y::AbstractVector{T}) where T
+    return BLAS.symv!(uplo, alpha, A, x, beta, y)
+end
+
+# Similarly, _syrk! wraps syrk! to dispatch on the data type.
+function _syrk!(uplo::Char, trans::Char, alpha::T, A::AbstractMatrix{T}, beta::T, C::AbstractMatrix{T}) where T
+    return BLAS.syrk!(uplo, trans, alpha, A, beta, C)
+end
+
+# Similarly, _trsm! wraps trsm! to dispatch on the data type.
+function _trsm!(side::Char, uplo::Char, transa::Char, diag::Char, alpha::T, A::AbstractMatrix{T}, B::AbstractMatrix{T}) where T
+    return BLAS.trsm!(side, uplo, transa, diag, alpha, A, B)
+end
+
+# Similarly, _dgmm! wraps dgmm! to dispatch on the data type.
+function _dgmm!(side::Char, A::AbstractMatrix{T}, x::AbstractVector{T}, B::AbstractMatrix{T}) where T
+    if side == 'L'
+        copyto!(B, A)
+        lmul!(Diagonal(x), B)
+    elseif side == 'R'
+        copyto!(B, A)
+        rmul!(B, Diagonal(x))
+    else
+        error("Unsupported side = $side.")
     end
 end
 
@@ -177,4 +194,3 @@ function timing_madnlp(ips; ntrials=10)
         time_callbacks=timing_callbacks(ips; ntrials=ntrials),
     )
 end
-

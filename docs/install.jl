@@ -2,8 +2,12 @@ using Pkg
 
 MADNLP_DIR = pwd()
 
+Pkg.update()
+Pkg.resolve()
 Pkg.develop(path=joinpath(MADNLP_DIR, "lib", "MadNLPTests"))
-Pkg.develop(path="https://github.com/MadNLP/HybridKKT.jl")
+Pkg.develop(path=joinpath(MADNLP_DIR, "lib", "MadNLPGPU"))
 Pkg.develop(path=MADNLP_DIR)
+Base.compilecache(Base.identify_package("MadNLPTests"))
+Base.compilecache(Base.identify_package("MadNLPGPU"))
+Base.compilecache(Base.identify_package("MadNLP"))
 Pkg.instantiate()
-

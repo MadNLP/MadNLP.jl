@@ -8,13 +8,13 @@ Implement the [`AbstractCondensedKKTSystem`](@ref) in sparse COO format.
 struct SparseCondensedKKTSystem{T, VT, MT, QN, LS, VI, VI32, VTu1, VTu2, EXT} <: AbstractCondensedKKTSystem{T, VT, MT, QN}
     # Hessian
     hess::VT
-    hess_raw::SparseMatrixCOO{T,Int32,VT, VI32}
+    hess_raw::SparseMatrixCOO{T, Int32, VT, VI32}
     hess_com::MT
     hess_csc_map::Union{Nothing, VI}
 
     # Jacobian
     jac::VT
-    jt_coo::SparseMatrixCOO{T,Int32,VT, VI32}
+    jt_coo::SparseMatrixCOO{T, Int32, VT, VI32}
     jt_csc::MT
     jt_csc_map::Union{Nothing, VI}
 
@@ -94,20 +94,20 @@ function create_kkt_system(
     l_lower = VT(undef, nlb)
     u_lower = VT(undef, nub)
     buffer = VT(undef, m)
-    buffer2= VT(undef, m)
+    buffer2 = VT(undef, m)
     hess = VT(undef, n_hess)
     jac = VT(undef, n_jac)
     diag_buffer = VT(undef, m)
     fill!(jac, zero(T))
 
     hess_raw = SparseMatrixCOO(n, n, hess_sparsity_I, hess_sparsity_J, hess)
-
     jt_coo = SparseMatrixCOO(
         n, m,
         jac_sparsity_J,
         jac_sparsity_I,
         jac,
     )
+
     jt_csc, jt_csc_map = coo_to_csc(jt_coo)
     hess_com, hess_csc_map = coo_to_csc(hess_raw)
 
@@ -115,6 +115,7 @@ function create_kkt_system(
         hess_com,
         jt_csc
     )
+
     _linear_solver = linear_solver(aug_com; opt = opt_linear_solver)
     ext = get_sparse_condensed_ext(VT, hess_com, jptr, jt_csc_map, hess_csc_map)
     return SparseCondensedKKTSystem(

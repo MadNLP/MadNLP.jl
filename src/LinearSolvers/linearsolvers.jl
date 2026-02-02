@@ -87,9 +87,9 @@ function solve!(s::AbstractLinearSolver, x::AbstractKKTVector)
     solve!(s, full(x))
 end
 
-function multi_solve!(s::AbstractLinearSolver, X::AbstractMatrix)
+function multi_solve!(s::AbstractLinearSolver{T}, X::AbstractMatrix) where T
     n, nrhs = size(X)
-    x = zeros(n)
+    x = zeros(T, n)
     for i in 1:nrhs
         copyto!(x, 1, X, (i-1)*n + 1, n)
         solve!(s, x)

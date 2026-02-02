@@ -47,8 +47,18 @@ function init! end
 
 curvature(::Val{SCALAR1}, sk, yk) = dot(yk, sk) / dot(sk, sk)
 curvature(::Val{SCALAR2}, sk, yk) = dot(yk, yk) / dot(sk, yk)
-curvature(::Val{SCALAR3}, sk, yk) = 0.5 * (curvature(Val(SCALAR1), sk, yk) + curvature(Val(SCALAR2), sk, yk))
-curvature(::Val{SCALAR4}, sk, yk) = sqrt(curvature(Val(SCALAR1), sk, yk) * curvature(Val(SCALAR2), sk, yk))
+function curvature(::Val{SCALAR3}, sk, yk)
+    sᵀy = dot(sk, yk)
+    sᵀs = dot(sk, sk)
+    yᵀy = dot(yk, yk)
+    return ((sᵀy / sᵀs) + (yᵀy / sᵀy)) / 2
+end
+function curvature(::Val{SCALAR4}, sk, yk)
+    sᵀy = dot(sk, yk)
+    sᵀs = dot(sk, sk)
+    yᵀy = dot(yk, yk)
+    return sqrt((sᵀy / sᵀs) * (yᵀy / sᵀy))
+end
 
 @kwdef mutable struct QuasiNewtonOptions{T} <: AbstractOptions
     init_strategy::BFGSInitStrategy = SCALAR1
@@ -57,7 +67,6 @@ curvature(::Val{SCALAR4}, sk, yk) = sqrt(curvature(Val(SCALAR1), sk, yk) * curva
     sigma_min::T = 1e-8
     sigma_max::T = 1e+8
 end
-
 
 """
     BFGS{T, VT} <: AbstractQuasiNewton{T, VT}
@@ -112,11 +121,11 @@ function update!(qn::BFGS{T, VT}, Bk::AbstractMatrix, sk::AbstractVector, yk::Ab
         qn.is_instantiated[] = true
     end
     # BFGS update
-    mul!(qn.bsk, Bk, sk)
+    _symv!('L', one(T), Bk, sk, zero(T), qn.bsk)
     alpha1 = one(T) / dot(sk, qn.bsk)
     alpha2 = one(T) / yksk
-    _ger!(-alpha1, qn.bsk, qn.bsk, Bk)  # Bk = Bk - alpha1 * bsk * bsk'
-    _ger!(alpha2, yk, yk, Bk)           # Bk = Bk + alpha2 * yk * yk'
+    _syr!('L', -alpha1, qn.bsk, Bk)  # Bk = Bk - alpha1 * bsk * bsk'
+    _syr!('L', alpha2, yk, Bk)       # Bk = Bk + alpha2 * yk * yk'
     return true
 end
 
@@ -160,7 +169,7 @@ function update!(qn::DampedBFGS{T, VT}, Bk::AbstractMatrix, sk::AbstractVector, 
         qn.is_instantiated[] = true
     end
 
-    mul!(qn.bsk, Bk, sk)
+    _symv!('L', one(T), Bk, sk, zero(T), qn.bsk)
     sBs = dot(sk, qn.bsk)
 
     # Procedure 18.2 (Nocedal & Wright, page 537)
@@ -177,8 +186,8 @@ function update!(qn::DampedBFGS{T, VT}, Bk::AbstractMatrix, sk::AbstractVector, 
     alpha1 = one(T) / sBs
     alpha2 = one(T) / dot(qn.rk, qn.sk)
 
-    _ger!(-alpha1, qn.bsk, qn.bsk, Bk)
-    _ger!(alpha2, qn.rk, qn.rk, Bk)
+    _syr!('L', -alpha1, qn.bsk, Bk)
+    _syr!('L', alpha2, qn.rk, Bk)
     return true
 end
 
@@ -200,7 +209,7 @@ end
 """
     CompactLBFGS{T, VT} <: AbstractQuasiNewton
 """
-mutable struct CompactLBFGS{T, VT <: AbstractVector{T}, MT <: AbstractMatrix{T}} <: AbstractQuasiNewton{T, VT}
+mutable struct CompactLBFGS{T, VT <: AbstractVector{T}, MT <: AbstractMatrix{T}, B} <: AbstractQuasiNewton{T, VT}
     init_strategy::BFGSInitStrategy
     sk::VT
     yk::VT
@@ -216,17 +225,18 @@ mutable struct CompactLBFGS{T, VT <: AbstractVector{T}, MT <: AbstractMatrix{T}}
     Sk::MT       # n x p
     Yk::MT       # n x p
     Lk::MT       # p x p
-    Mk::MT       # p x p (for Cholesky factorization Mₖ = Jₖᵀ Jₖ)
+    Mk::MT       # p x p (for Cholesky factorization Mₖ = Jₖ Jₖᵀ)
     Tk::MT       # 2p x 2p
-    Jk::MT       # p x p
-    SdotS::MT    # p x p
     DkLk::MT     # p x p
-    U::MT        # n x 2p
-    V1::MT       # m x 2p
-    V2::MT       # m x 2p
+    U::MT        # n x p
+    V::MT        # n x p
+    E::MT        # (n+m) x 2p
+    H::MT        # (n+m) x 2p
     Dk::VT       # p
     _w1::VT
     _w2::VT
+    additional_buffers::B
+    max_mem_reached::Bool
 end
 
 function create_quasi_newton(
@@ -250,7 +260,6 @@ function create_quasi_newton(
         0,
         fill!(create_array(cb, n, 0), zero(T)),
         fill!(create_array(cb, n, 0), zero(T)),
-        fill!(create_array(cb, n, 0), zero(T)),
         fill!(create_array(cb, 0, 0), zero(T)),
         fill!(create_array(cb, 0, 0), zero(T)),
         fill!(create_array(cb, 0, 0), zero(T)),
@@ -262,6 +271,8 @@ function create_quasi_newton(
         fill!(create_array(cb, 0), zero(T)),
         fill!(create_array(cb, 0), zero(T)),
         fill!(create_array(cb, 0), zero(T)),
+        nothing,
+        false,
     )
 end
 
@@ -269,15 +280,14 @@ Base.size(qn::CompactLBFGS) = (size(qn.Sk, 1), qn.current_mem)
 
 function _resize!(qn::CompactLBFGS{T, VT, MT}) where {T, VT, MT}
     n, k = size(qn)
-    qn.Lk     = zeros(T, k, k)
-    qn.SdotS  = zeros(T, k, k)
-    qn.Mk     = zeros(T, k, k)
-    qn.Jk     = zeros(T, k, k)
-    qn.Tk     = zeros(T, 2*k, 2*k)
-    qn.DkLk   = zeros(T, k, k)
-    qn.U      = zeros(T, n, 2*k)
-    qn._w1    = zeros(T, k)
-    qn._w2    = zeros(T, 2*k)
+    qn.Lk    = fill!(MT(undef, k, k), zero(T))
+    qn.Mk    = fill!(MT(undef, k, k), zero(T))
+    qn.Tk    = fill!(MT(undef, 2*k, 2*k), zero(T))
+    qn.DkLk  = fill!(MT(undef, k, k), zero(T))
+    qn.U     = fill!(MT(undef, n, k), zero(T))
+    qn.V     = fill!(MT(undef, n, k), zero(T))
+    qn._w1   = fill!(VT(undef, k), zero(T))
+    qn._w2   = fill!(VT(undef, 2*k), zero(T))
     return
 end
 
@@ -286,18 +296,25 @@ function _reset!(qn::CompactLBFGS{T, VT, MT}) where {T, VT, MT}
     qn.current_mem = 0
     qn.skipped_iter = 0
     fill!(qn.last_jv, zero(T))
-    qn.Dk  = zeros(T, 0)
-    qn.Sk  = zeros(T, n, 0)
-    qn.Yk  = zeros(T, n, 0)
+    qn.Dk = VT(undef, 0)
+    qn.Sk = MT(undef, n, 0)
+    qn.Yk = MT(undef, n, 0)
+    qn.max_mem_reached = false
     _resize!(qn)
 end
 
-# augment / shift
-function _update_SY!(qn::CompactLBFGS, s, y)
+function _update_S_and_Y!(qn::CompactLBFGS, s::Vector, y::Vector)
     if qn.current_mem < qn.max_mem
         qn.current_mem += 1
-        qn.Sk = hcat(qn.Sk, s)
-        qn.Yk = hcat(qn.Yk, y)
+        n, k = size(qn)
+        vec_Sk = vec(qn.Sk)
+        vec_Yk = vec(qn.Yk)
+        resize!(vec_Sk, n*k)
+        resize!(vec_Yk, n*k)
+        qn.Sk = reshape(vec_Sk, n, k)
+        qn.Yk = reshape(vec_Yk, n, k)
+        view(qn.Sk, 1:n, k) .= s
+        view(qn.Yk, 1:n, k) .= y
         _resize!(qn)
     else
         n, k = size(qn)
@@ -314,33 +331,39 @@ function _update_SY!(qn::CompactLBFGS, s, y)
     end
 end
 
-function _refresh_D!(qn::CompactLBFGS, sk, yk)
-    k = qn.current_mem
-    sTy = dot(sk, yk)
-    if length(qn.Dk) < qn.max_mem
-        push!(qn.Dk, sTy)
-    else
-        # shift
+function _update_L_and_D!(qn::CompactLBFGS{T}, sk::Vector, yk::Vector) where {T}
+    # Update the strict lower triangular part of S'Y
+    n, k = size(qn)
+    if qn.max_mem_reached
+        # shift of all coefficients
         @inbounds for i in 1:k-1
             qn.Dk[i] = qn.Dk[i+1]
+            @inbounds for j in 1:i-1
+                qn.Lk[i, j] = qn.Lk[i+1, j+1]
+            end
         end
-        qn.Dk[k] = sTy
+        # Compute the new last row of tril(S'Y)
+        # It can be recovered with sₖᵀY or Yᵀsₖ
+        lk = view(qn.Lk, k, 1:k)
+        sk = view(qn.Sk, 1:n, k)
+        mul!(lk, qn.Yk', sk)
+        qn.Dk[k] = qn.Lk[k,k]
+        qn.Lk[k,k] = zero(T)
+    else
+        # To be optimized...
+        p = size(qn.Lk, 1)
+        mul!(qn.Lk, qn.Sk', qn.Yk)
+        push!(qn.Dk, qn.Lk[k,k])
+        @inbounds for i in 1:p, j in i:p
+            qn.Lk[i, j] = zero(T)
+        end
+        if qn.current_mem == qn.max_mem
+            qn.max_mem_reached = true
+        end
     end
 end
 
-function _refresh_L!(qn::CompactLBFGS{T, VT, MT}) where {T, VT, MT}
-    p = size(qn.Lk, 1)
-    mul!(qn.Lk, qn.Sk', qn.Yk)
-    @inbounds for i in 1:p, j in i:p
-        qn.Lk[i, j] = zero(T)
-    end
-end
-
-function _refresh_STS!(qn::CompactLBFGS{T, VT, MT}) where {T, VT, MT}
-    mul!(qn.SdotS, qn.Sk', qn.Sk, one(T), zero(T))
-end
-
-function update!(qn::CompactLBFGS{T, VT, MT}, Bk, sk, yk) where {T, VT, MT}
+function update!(qn::CompactLBFGS{T}, Bk, sk, yk) where {T}
     norm_sk, norm_yk = norm(sk), norm(yk)
     # Skip update if vectors are too small or local curvature is negative.
     if ((norm_sk < T(100) * eps(T)) ||
@@ -355,41 +378,34 @@ function update!(qn::CompactLBFGS{T, VT, MT}, Bk, sk, yk) where {T, VT, MT}
     end
 
     # Refresh internal structures
-    _update_SY!(qn, sk, yk)
-    _refresh_D!(qn, sk, yk)
-    _refresh_L!(qn)
-    _refresh_STS!(qn)
+    _update_S_and_Y!(qn, sk, yk)
+    _update_L_and_D!(qn, sk, yk)
 
     # Load buffers
     k = qn.current_mem
     δ = qn._w1
 
-    # Compute compact representation Bₖ = σₖ I + Uₖ Vₖᵀ
-    #       Uₖ = [ U₁ ]     Vₖ = [ -U₁ ]
-    #            [ U₂ ]          [  U₂ ]
-
+    # Compute compact representation Bₖ = σₖI -UₖUₖᵀ + VₖVₖᵀ
     # Step 1: σₖ I
-    sigma = curvature(Val(qn.init_strategy), sk, yk)  # σₖ
+    sigma = curvature(Val(qn.init_strategy), sk, yk)    # σₖ
     sigma = clamp(sigma, qn.sigma_min, qn.sigma_max)
-    Bk .= sigma                                       # Hₖ .= σₖ I (diagonal Hessian approx.)
+    Bk .= sigma                                         # Hₖ .= σₖI (diagonal Hessian approx.)
 
     # Step 2: Mₖ = σₖ Sₖᵀ Sₖ + Lₖ Dₖ⁻¹ Lₖᵀ
-    qn.DkLk .= (one(T) ./ qn.Dk) .* qn.Lk'            # DₖLₖ = Dₖ⁻¹ Lₖᵀ
-    qn.Mk .= qn.SdotS                                 # Mₖ = Sₖᵀ Sₖ
-    mul!(qn.Mk, qn.Lk, qn.DkLk, one(T), sigma)        # Mₖ = σₖ Sₖᵀ Sₖ + Lₖ Dₖ⁻¹ Lₖᵀ
-    symmetrize!(qn.Mk)
+    δ .= one(T) ./ sqrt.(qn.Dk)                         # δₖ = 1 / √Dₖ
+    _dgmm!('L', qn.Lk', δ, qn.DkLk)                     # Compute (1 / √Dₖ) * Lₖᵀ
+    _syrk!('L', 'T', one(T), qn.Sk, zero(T), qn.Mk)     # Mₖ = Sₖᵀ Sₖ
+    _syrk!('L', 'T', one(T), qn.DkLk, sigma, qn.Mk)     # Mₖ = σₖ Sₖᵀ Sₖ + Lₖ Dₖ⁻¹ Lₖᵀ
 
-    copyto!(qn.Jk, qn.Mk)
-    cholesky!(qn.Jk)                                  # Mₖ = Jₖᵀ Jₖ (factorization)
+    # Step 3: Perform a Cholesky factorization of Mₖ
+    LAPACK.potrf!('L', qn.Mk)                           # Mₖ = Jₖ Jₖᵀ (factorization)
 
-    # Step 3: Nₖ = [U₁ U₂]
-    U1 = view(qn.U, :, 1:k)
-    copyto!(U1, qn.Sk)                                # U₁ = Sₖ
-    mul!(U1, qn.Yk, qn.DkLk, one(T), sigma)           # U₁ = σₖ Sₖ + Yₖ Dₖ⁻¹ Lₖ
-    BLAS.trsm!('R', 'U', 'N', 'N', one(T), qn.Jk, U1) # U₁ = Jₖ⁻ᵀ (σₖ Sₖ + Yₖ Dₖ⁻¹ Lₖ)
-    U2 = view(qn.U, :, 1+k:2*k)
-    δ .= .-one(T) ./ sqrt.(qn.Dk)                     # δ = 1 / √Dₖ
-    U2 .= δ' .* qn.Yk                                 # U₂ = (1 / √Dₖ) * Yₖ
+    # Step 4: Update Uₖ and Vₖ
+    _dgmm!('R', qn.Yk, δ, qn.V)                         # Vₖ = Yₖ * (1 / √Dₖ)
+    copyto!(qn.U, qn.Sk)                                # Uₖ = Sₖ
+    mul!(qn.U, qn.V, qn.DkLk, one(T), sigma)            # Uₖ = σₖ Sₖ + Yₖ Dₖ⁻¹ Lₖᵀ
+    _trsm!('R', 'L', 'T', 'N', one(T), qn.Mk, qn.U)     # Uₖ = (σₖ Sₖ + Yₖ Dₖ⁻¹ Lₖᵀ) Jₖ⁻ᵀ
+
     return true
 end
 
@@ -406,7 +422,6 @@ function init!(qn::CompactLBFGS{T}, Bk::AbstractVector{T}, g0::AbstractVector{T}
     Bk .= (T(2) * rho0 * qn.init_value)
     return
 end
-
 
 struct ExactHessian{T, VT} <: AbstractHessian{T, VT} end
 create_quasi_newton(::Type{ExactHessian}, cb::AbstractCallback{T,VT}, n; options...) where {T,VT} = ExactHessian{T, VT}()

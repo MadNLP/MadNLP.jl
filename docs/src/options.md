@@ -15,9 +15,10 @@ These options are used to set the values for other options. The default values a
 - `callback::Type` 	
   Valid values are: `MadNLP`.{`DenseCallback`,`SparseCallback`}.
 - `kkt_system::Type` 
-  The type of KKT system. Valid values are `MadNLP`.{`SpasreKKTSystem`,`SparseUnreducedKKTSystem`,`SparseCondensedKKTSystem`,`DenseKKTSystem`,`DenseCondensedKKTSystem`}.
+  The type of KKT system. Valid values are `MadNLP`.{`SparseKKTSystem`,`ScaledSparseKKTSystem`,`SparseUnreducedKKTSystem`,`SparseCondensedKKTSystem`, `DenseKKTSystem`,`DenseCondensedKKTSystem`}.
 - `linear_solver::Type`\
-  Linear solver used for solving primal-dual system. Valid values are: {`MadNLP.UmfpackSolver`,`MadNLP.LDLSolver`,`MadNLP.CHOLMODSolver`, `MadNLP.MumpsSolver`, `MadNLP.PardisoSolver`, `MadNLP.PardisoMKLSolver`, `MadNLP.Ma27Solver`, `MadNLP.Ma57Solver`, `MadNLP.Ma77Solver`, `MadNLP.Ma86Solver`, `MadNLP.Ma97Solver`, `MadNLP.LapackCPUSolver`, `MadNLPGPU.LapackGPUSolver`,`MadNLPGPU.RFSolver`,`MadNLPGPU.GLUSolver`,`MadNLPGPU.CuCholeskySolver`,`MadNLPGPU.CUDSSSolver`} (some may require using extension packages). The selected solver should be properly built in the build procedure. See [README.md](https://github.com/sshin23/MadNLP.jl) file.
+  Linear solver used for solving primal-dual system. Valid values are: {`MadNLP.MumpsSolver`, `MadNLP.UmfpackSolver`, `MadNLP.LDLSolver`, `MadNLP.CHOLMODSolver`, `MadNLPPardiso.PardisoSolver`, `MadNLPPardiso.PardisoMKLSolver`, `MadNLPHSL.Ma27Solver`, `MadNLPHSL.Ma57Solver`, `MadNLPHSL.Ma77Solver`, `MadNLPHSL.Ma86Solver`, `MadNLPHSL.Ma97Solver`, `MadNLP.LapackCPUSolver`, `MadNLPGPU.LapackCUDASolver`,`MadNLPGPU.CUDSSSolver`, `MadNLPGPU.LapackROCmSolver`} (some may require using extension packages).
+  The selected solver should be properly built in the build procedure. See [README.md](https://github.com/sshin23/MadNLP.jl) file.
 
 ## General options
 
@@ -140,9 +141,24 @@ These options are used to set the values for other options. The default values a
 
 ---
 ## Linear Solver Options
-Linear solver options are specific to the linear solver chosen at
-`linear_solver` option. Irrelevant options are ignored and a warning message
-is printed.
+Linear solver options are specific to the linear solver chosen at `linear_solver` option.
+Irrelevant options are ignored and a warning message is printed.
+
+#### Mumps (default -- available with `MadNLP`)
+- `mumps_dep_tol::Float64 = 0.`
+- `mumps_mem_percent::Int = 1000`
+- `mumps_permuting_scaling::Int = 7`
+- `mumps_pivot_order::Int = 7`
+- `mumps_pivtol::Float64 = 1e-6`
+- `mumps_pivtolmax::Float64 = .1`
+- `mumps_scaling::Int = 77`
+
+#### Umfpack (available with `MadNLP`)
+- `umfpack_pivtol::Float64 = 1e-4`
+- `umfpack_pivtolmax::Float64 = 1e-1`
+- `umfpack_sym_pivtol::Float64 = 1e-3`
+- `umfpack_block_size::Float64 = 16`
+- `umfpack_strategy::Float64 = 2.`
 
 #### Ma27 (requires `MadNLPHSL`)
 - `ma27_pivtol::Float64 = 1e-8`
@@ -195,40 +211,46 @@ is printed.
 - `ma97_u::Float64 = 1e-8`
 - `ma97_umax::Float64 = 1e-4`
 
-#### Mumps (requires `MadNLPMumps`)
-- `mumps_dep_tol::Float64 = 0.`
-- `mumps_mem_percent::Int = 1000`
-- `mumps_permuting_scaling::Int = 7`
-- `mumps_pivot_order::Int = 7`
-- `mumps_pivtol::Float64 = 1e-6`
-- `mumps_pivtolmax::Float64 = .1`
-- `mumps_scaling::Int = 77`
-
-#### Umfpack (requires `MadNLPUmfpack`)
-- `umfpack_pivtol::Float64 = 1e-4`
-- `umfpack_pivtolmax::Float64 = 1e-1`
-- `umfpack_sym_pivtol::Float64 = 1e-3`
-- `umfpack_block_size::Float64 = 16`
-- `umfpack_strategy::Float64 = 2.`
-
 #### Pardiso (requires `MadNLPPardiso`)
 - `pardiso_matching_strategy::Pardiso.MatchingStrategy = COMPLETE2x2`
 - `pardiso_max_inner_refinement_steps::Int = 1`
 - `pardiso_msglvl::Int = 0`
 - `pardiso_order::Int = 2`
 
-#### PardisoMKL
+#### PardisoMKL (requires `MadNLPPardiso`)
 - `pardisomkl_num_threads::Int = 1`
 - `pardiso_matching_strategy::PardisoMKL.MatchingStrategy = COMPLETE2x2`
 - `pardisomkl_max_iterative_refinement_steps::Int = 1`
 - `pardisomkl_msglvl::Int = 0`
 - `pardisomkl_order::Int = 2`
 
-#### LapackGPU (requires `MadNLPGPU`)
-- `lapackgpu_algorithm::LapackGPU.Algorithms = BUNCHKAUFMAN`
+#### LapackCUDASolver (requires `MadNLPGPU`)
+- `lapack_algorithm::LinearFactorization = MadNLP.BUNCHKAUFMAN`
 
-#### LapackCPU
-- `lapackcpu_algorithm::LapackCPU.Algorithms = BUNCHKAUFMAN`
+#### LapackROCmSolver (requires `MadNLPGPU`)
+- `lapack_algorithm::LinearFactorization = MadNLP.EVD`
+
+#### CUDSSSolver (requires `MadNLPGPU`)
+- `cudss_algorithm::MadNLP.LinearFactorization = MadNLP.LDL`
+- `cudss_ordering::ORDERING = DEFAULT_ORDERING`
+- `cudss_perm::Vector{Cint} = Cint[]`
+- `cudss_ir::Int = 0`
+- `cudss_ir_tol::Float64 = 1e-8`
+- `cudss_pivot_threshold::Float64 = 0.0`
+- `cudss_pivot_epsilon::Float64 = 0.0`
+- `cudss_matching_alg::String = "default"`
+- `cudss_reordering_alg::String = "default"`
+- `cudss_factorization_alg::String = "default"`
+- `cudss_solve_alg::String = "default"`
+- `cudss_matching::Bool = false`
+- `cudss_pivoting::Bool = true`
+- `cudss_hybrid_execute::Bool = false`
+- `cudss_hybrid_memory::Bool = false`
+- `cudss_hybrid_memory_limit::Int = 0`
+- `cudss_superpanels::Bool = true`
+- `cudss_schur::Bool = false`
+- `cudss_deterministic::Bool = false`
+- `cudss_device_indices::Vector{Cint} = Cint[]`
 
 ### Iterator Options
 #### Richardson

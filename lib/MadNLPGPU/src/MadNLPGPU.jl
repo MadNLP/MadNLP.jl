@@ -2,7 +2,7 @@ module MadNLPGPU
 
 import LinearAlgebra
 import SparseArrays: SparseMatrixCSC, nonzeros, nnz
-import LinearAlgebra: Symmetric
+import LinearAlgebra: Symmetric, mul!, norm, dot
 # CUDA
 import CUDA: CUDA, CUSPARSE, CUBLAS, CUSOLVER, CuVector, CuMatrix, CuArray,
     has_cuda, @allowscalar, runtime_version, CUDABackend
@@ -21,7 +21,7 @@ import MadNLP:
     AbstractOptions, AbstractLinearSolver, AbstractNLPModel, set_options!,
     SymbolicException,FactorizationException,SolveException,InertiaException,
     introduce, factorize!, solve!, improve!, is_inertia, inertia, tril_to_full!,
-    LapackOptions, input_type, is_supported, default_options, symul!
+    LapackOptions, input_type, is_supported, default_options
 
 # AMD and Metis
 import AMD, Metis
@@ -29,15 +29,17 @@ import AMD, Metis
 include("utils.jl")
 include("KKT/kernels_dense.jl")
 include("KKT/kernels_sparse.jl")
+include("KKT/kernels_qn.jl")
 include("KKT/cuda_dense.jl")
 include("KKT/cuda_sparse.jl")
+include("KKT/cuda_qn.jl")
 include("LinearSolvers/lapackgpu.jl")
 include("LinearSolvers/cusolver.jl")
 include("LinearSolvers/cudss.jl")
 include("cuda.jl")
 
-global LapackROCSolver
-export LapackGPUSolver, CUDSSSolver, LapackROCSolver
+global LapackROCmSolver
+export LapackCUDASolver, CUDSSSolver, LapackROCmSolver
 
 # re-export MadNLP, including deprecated names
 for name in names(MadNLP, all=true)

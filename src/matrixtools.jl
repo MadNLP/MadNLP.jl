@@ -52,7 +52,7 @@ function tril_to_full!(dense::Matrix{T}) where T
     end
 end
 
-function coo_to_csc(coo) 
+function coo_to_csc(coo::SparseMatrixCOO)
     cscind = sparse(
         coo.I,
         coo.J,

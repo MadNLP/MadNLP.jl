@@ -174,7 +174,7 @@ Solve the KKT system ``K x = w`` with the linear solver stored
 inside `kkt` and stores the result inplace inside the `AbstractKKTVector` `w`.
 
 """
-function solve!(kkt, w) end
+function solve! end
 
 """
     regularize_diagonal!(kkt::AbstractKKTSystem, primal_values::Number, dual_values::Number)
@@ -219,7 +219,6 @@ function regularize_diagonal!(kkt::AbstractKKTSystem, primal, dual)
     kkt.reg .+= primal
     kkt.pr_diag .+= primal
     kkt.du_diag .-= dual
-    build_kkt!(kkt)
 end
 
 Base.size(kkt::AbstractKKTSystem) = size(kkt.aug_com)

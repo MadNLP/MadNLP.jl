@@ -9,7 +9,7 @@ function _compare_gpu_with_cpu(KKTSystem, n, m, ind_fixed)
         madnlp_options = Dict{Symbol, Any}(
             :callback=>MadNLP.DenseCallback,
             :kkt_system=>KKTSystem,
-            :linear_solver=>LapackGPUSolver,
+            :linear_solver=>LapackCUDASolver,
             :print_level=>MadNLP.ERROR,
             :tol=>tol
         )
@@ -36,7 +36,7 @@ function _compare_gpu_with_cpu(KKTSystem, n, m, ind_fixed)
     end
 end
 
-@testset "MadNLPGPU -- LapackGPUSolver -- ($(kkt_system))" for kkt_system in [
+@testset "MadNLPGPU -- LapackCUDASolver -- ($(kkt_system))" for kkt_system in [
         MadNLP.DenseKKTSystem,
         MadNLP.DenseCondensedKKTSystem,
     ]
@@ -48,7 +48,7 @@ end
     end
 end
 
-@testset "MadNLP -- LapackGPUSolver: $QN + $KKT" for QN in [
+@testset "MadNLP -- LapackCUDASolver: $QN + $KKT" for QN in [
     MadNLP.BFGS,
     MadNLP.DampedBFGS,
 ], KKT in [
@@ -62,7 +62,7 @@ end
             callback=MadNLP.DenseCallback,
             print_level=MadNLP.ERROR,
             kkt_system=KKT,
-            linear_solver=LapackGPUSolver,
+            linear_solver=LapackCUDASolver,
         )
         results_ref = MadNLP.solve!(solver_exact)
 
@@ -73,7 +73,7 @@ end
             print_level=MadNLP.ERROR,
             kkt_system=KKT,
             hessian_approximation=QN,
-            linear_solver=LapackGPUSolver,
+            linear_solver=LapackCUDASolver,
         )
         results_qn = MadNLP.solve!(solver_qn)
 

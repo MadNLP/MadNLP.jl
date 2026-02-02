@@ -9,8 +9,8 @@ import Test: @test, @testset
 # Optimization packages
 import MadNLP
 import NLPModels
-import JuMP: Model, @variable, @constraint, @objective, optimize!,
-    MOI, termination_status, LowerBoundRef, UpperBoundRef, value, dual
+import JuMP: Model, @variable, @constraint, @objective, optimize!, set_attribute,
+    MOI, termination_status, LowerBoundRef, UpperBoundRef, value, dual, fix
 import NLPModelsJuMP
 
 export test_madnlp, solcmp
@@ -111,7 +111,7 @@ end
 
 function test_madnlp(name,optimizer_constructor::Function,exclude; Arr = Array)
     @testset "$name" begin
-        for f in [infeasible,unbounded,lootsma,eigmina,lp_examodels_issue75]
+        for f in [infeasible, unbounded, lootsma, eigmina, lp_examodels_issue75, jump_array_type]
             !(string(f) in exclude) && f(optimizer_constructor; Arr = Arr)
         end
     end
@@ -124,7 +124,7 @@ function infeasible(optimizer_constructor::Function; Arr = Array)
         @constraint(m,x==0.)
         @objective(m,Min,x^2)
 
-        nlp = SparseWrapperModel(
+        nlp = MadNLP.SparseWrapperModel(
             Arr,
             NLPModelsJuMP.MathOptNLPModel(m)
         )
@@ -141,7 +141,7 @@ function unbounded(optimizer_constructor::Function; Arr = Array)
         @variable(m,x,start=1)
         @objective(m,Max,x^2)
 
-        nlp = SparseWrapperModel(
+        nlp = MadNLP.SparseWrapperModel(
             Arr,
             NLPModelsJuMP.MathOptNLPModel(m)
         )
@@ -164,7 +164,7 @@ function lootsma(optimizer_constructor::Function; Arr = Array)
         @objective(m,Min,x[1]^3 + 11. *x[1] - par*sqrt(x[1])  +x[3] )
 
 
-        nlp = SparseWrapperModel(
+        nlp = MadNLP.SparseWrapperModel(
             Arr,
             NLPModelsJuMP.MathOptNLPModel(m)
         )
@@ -320,7 +320,7 @@ function eigmina(optimizer_constructor::Function; Arr = Array)
         @constraint(m, x[100]*x[101] - 100*x[100] == 0)
         @objective(m, Min, x[101])
 
-        nlp = SparseWrapperModel(
+        nlp = MadNLP.SparseWrapperModel(
             Arr,
             NLPModelsJuMP.MathOptNLPModel(m)
         )
@@ -329,6 +329,94 @@ function eigmina(optimizer_constructor::Function; Arr = Array)
 
         @test result.status == MadNLP.SOLVE_SUCCEEDED
     end
+end
+
+function test_scaling()
+    big_constant = 1e6
+    # Write ill-conditioned NLP model and check MadNLP returns the un-scaled solution
+    model = Model()
+    @variable(model, 0.0 <= x[1:3])
+    @constraint(model, big_constant * (x[1] + x[2] + x[3]) == big_constant)
+    @objective(model, Min, big_constant * (x[1] + 2 * x[2] + 3 * x[3]))
+
+    nlp = NLPModelsJuMP.MathOptNLPModel(model)
+    solver = MadNLP.MadNLPSolver(nlp; print_level=MadNLP.ERROR)
+
+    results = MadNLP.solve!(solver)
+
+    # Check MadNLP is scaling the problem.
+    @test solver.cb.obj_scale[] != 1.0
+    @test solver.cb.con_scale[1] != 1.0
+
+    # Check solution returned is correct
+    @test results.solution ≈ [1.0, 0.0, 0.0] rtol=1e-7
+    @test results.multipliers ≈ [-1.0] rtol=1e-7
+    # the problem is ill-conditioned, meaning this multiplier is inaccurate.
+    # We have to loosen the tolerancej
+    @test results.multipliers_L[1] ≈ 0.0 atol=1e-3
+    @test results.multipliers_L[2] ≈ big_constant rtol=1e-7
+    @test results.multipliers_L[3] ≈ 2*big_constant rtol=1e-7
+
+    return
+end
+
+function test_max_problem()
+    model = Model()
+    @variable(model, 0.0 <= x[1:3])
+    @constraint(model, x[1] + x[2] + x[3] == 1.0)
+    @objective(model, Max, x[1] + 2*x[2] + 3*x[3])
+
+    nlp = NLPModelsJuMP.MathOptNLPModel(model)
+    results = MadNLP.madnlp(nlp; print_level=MadNLP.ERROR)
+
+    @test results.status == MadNLP.SOLVE_SUCCEEDED
+    @test results.objective ≈ 3.0
+    @test results.solution ≈ [0.0, 0.0, 1.0] rtol=1e-7
+    @test results.multipliers[1] ≈ -3.0 rtol=1e-7
+    @test results.multipliers_L[1] ≈ 2.0 rtol=1e-7
+    @test results.multipliers_L[2] ≈ 1.0 rtol=1e-7
+    @test results.multipliers_L[3] ≈ 0.0 atol=1e-7
+    return
+end
+
+function test_fixed_variable()
+    # Min problem
+    model = Model()
+    @variable(model, 0.0 <= x[1:3])
+    fix(x[2], 0.5; force=true)
+    @constraint(model, x[1] + x[2] + x[3] == 1.0)
+    @objective(model, Min, x[1] + 2*x[2] + 3*x[3])
+
+    nlp = NLPModelsJuMP.MathOptNLPModel(model)
+    results = MadNLP.madnlp(nlp; print_level=MadNLP.ERROR)
+
+    @test results.status == MadNLP.SOLVE_SUCCEEDED
+    @test results.objective ≈ 1.5
+    @test results.solution ≈ [0.5, 0.5, 0.0] rtol=1e-7
+    @test results.multipliers[1] ≈ -1.0 rtol=1e-7
+    @test results.multipliers_L[1] ≈ 0.0 atol=1e-7
+    @test results.multipliers_L[2] ≈ 1.0 rtol=1e-7
+    @test results.multipliers_U[2] ≈ 0.0 atol=1e-7
+    @test results.multipliers_L[3] ≈ 2.0 rtol=1e-7
+
+    # Max problem
+    model = Model()
+    @variable(model, 0.0 <= x[1:3])
+    fix(x[2], 0.5; force=true)
+    @constraint(model, x[1] + x[2] + x[3] == 1.0)
+    @objective(model, Max, x[1] + 2*x[2] + 3*x[3])
+
+    nlp = NLPModelsJuMP.MathOptNLPModel(model)
+    results = MadNLP.madnlp(nlp; print_level=MadNLP.ERROR)
+
+    @test results.status == MadNLP.SOLVE_SUCCEEDED
+    @test results.objective ≈ 2.5
+    @test results.solution ≈ [0.0, 0.5, 0.5] rtol=1e-7
+    @test results.multipliers[1] ≈ -3.0 rtol=1e-7
+    @test results.multipliers_L[1] ≈ 2.0 rtol=1e-7
+    @test results.multipliers_L[2] ≈ 1.0 atol=1e-7
+    @test results.multipliers_U[2] ≈ 0.0 rtol=1e-7
+    @test results.multipliers_L[3] ≈ 0.0 atol=1e-7
 end
 
 function lp_examodels_issue75(optimizer_constructor::Function; Arr = Array)
@@ -341,7 +429,7 @@ function lp_examodels_issue75(optimizer_constructor::Function; Arr = Array)
         @constraint(m, c1, 6x + 8y >= 100)
         @constraint(m, c2, 7x + 12y >= 120)
 
-        nlp = SparseWrapperModel(
+        nlp = MadNLP.SparseWrapperModel(
             Arr,
             NLPModelsJuMP.MathOptNLPModel(m)
         )
@@ -352,10 +440,24 @@ function lp_examodels_issue75(optimizer_constructor::Function; Arr = Array)
     end
 end
 
+function jump_array_type(optimizer_constructor::Function; Arr = Array)
+    @testset "jump_array_type" begin
+        m = Model(optimizer_constructor)
+        set_attribute(m, "array_type", Arr)
+        @variable(m, x >= 1)
+        @objective(m, Min, x^2)
+        optimize!(m)
+
+        @test termination_status(m) == MOI.LOCALLY_SOLVED
+        @test solcmp([value(x)], [1.0])
+    end
+
+    return nothing
+end
+
 include("Instances/dummy_qp.jl")
 include("Instances/hs15.jl")
 include("Instances/hs15nohessian.jl")
 include("Instances/nls.jl")
-include("wrapper.jl")
 
 end # module
