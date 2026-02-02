@@ -22,7 +22,7 @@ import CUDSS
     cudss_schur::Bool = false
     cudss_deterministic::Bool = false
     cudss_device_indices::Vector{Cint} = Cint[]
-    cudss_asynchronous::Bool = false
+    cudss_asynchronous::Bool = true
 end
 
 function set_cudss_options!(solver::CUDSS.CudssSolver, opt::CudssSolverOptions)
