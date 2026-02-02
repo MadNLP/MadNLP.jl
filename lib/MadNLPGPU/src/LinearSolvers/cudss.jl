@@ -140,7 +140,7 @@ function CUDSSSolver(
     # The phase "analysis" is "reordering" combined with "symbolic_factorization"
     x_gpu = CUDSS.CudssMatrix(T, n; nbatch=nbatch)
     b_gpu = CUDSS.CudssMatrix(T, n; nbatch=nbatch)
-    CUDSS.cudss("analysis", solver, x_gpu, b_gpu, asynchronous=opt.cudss_aysnchronous)
+    CUDSS.cudss("analysis", solver, x_gpu, b_gpu, asynchronous=M.opt.cudss_aysnchronous)
 
     # Allocate additional buffer for iterative refinement
     # Always allocate it to support dynamic updates to opt.cudss_ir
