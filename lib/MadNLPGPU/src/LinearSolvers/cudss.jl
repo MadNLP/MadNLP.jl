@@ -98,6 +98,12 @@ function CUDSSSolver(
     n, m = size(csc)
     @assert n == m
 
+    if opt.cudss_asynchronous
+        @warn(logger, """
+Asynchronous execution in cuDSS is enabled.
+The linear solver time may not reflect the actual time spent in the solver.""")
+    end
+
     view = 'U'
     structure = 'G'
     # We need view = 'F' for the sparse LU decomposition
@@ -140,7 +146,7 @@ function CUDSSSolver(
     # The phase "analysis" is "reordering" combined with "symbolic_factorization"
     x_gpu = CUDSS.CudssMatrix(T, n; nbatch=nbatch)
     b_gpu = CUDSS.CudssMatrix(T, n; nbatch=nbatch)
-    CUDSS.cudss("analysis", solver, x_gpu, b_gpu, asynchronous=M.opt.cudss_aysnchronous)
+    CUDSS.cudss("analysis", solver, x_gpu, b_gpu, asynchronous=opt.cudss_asynchronous)
 
     # Allocate additional buffer for iterative refinement
     # Always allocate it to support dynamic updates to opt.cudss_ir
@@ -156,9 +162,9 @@ end
 function MadNLP.factorize!(M::CUDSSSolver)
     CUDSS.cudss_update(M.inner.matrix, nonzeros(M.tril))
     if M.inner.fresh_factorization
-        CUDSS.cudss("factorization", M.inner, M.x_gpu, M.b_gpu, asynchronous=M.opt.cudss_aysnchronous)
+        CUDSS.cudss("factorization", M.inner, M.x_gpu, M.b_gpu, asynchronous=M.opt.cudss_asynchronous)
     else
-        CUDSS.cudss("refactorization", M.inner, M.x_gpu, M.b_gpu, asynchronous=M.opt.cudss_aysnchronous)
+        CUDSS.cudss("refactorization", M.inner, M.x_gpu, M.b_gpu, asynchronous=M.opt.cudss_asynchronous)
     end
     return M
 end
@@ -171,7 +177,7 @@ function MadNLP.solve!(M::CUDSSSolver{T,V}, xb::V) where {T,V}
         CUDSS.cudss_update(M.b_gpu, xb)
     end
     CUDSS.cudss_update(M.x_gpu, xb)
-    CUDSS.cudss("solve", M.inner, M.x_gpu, M.b_gpu, asynchronous=M.opt.cudss_aysnchronous)
+    CUDSS.cudss("solve", M.inner, M.x_gpu, M.b_gpu, asynchronous=M.opt.cudss_asynchronous)
     return xb
 end
 
