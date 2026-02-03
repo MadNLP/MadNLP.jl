@@ -17,8 +17,8 @@ function MadNLP.MadNLPOptions{T}(
         kkt_system = kkt_system,
         linear_solver = linear_solver,
         bound_relax_factor = bound_relax_factor, 
-        default_primal_regularization = (kkt_system == MadNLP.SparseCondensedKKTSystem) ? zero(T) : T(1e-8),
-        default_dual_regularization = (kkt_system == MadNLP.SparseCondensedKKTSystem) ? zero(T) : T(1e-8),
+        default_primal_regularization = (kkt_system == MadNLP.SparseCondensedKKTSystem) ? T(1e-8) : zero(T),
+        default_dual_regularization = (kkt_system == MadNLP.SparseCondensedKKTSystem) ? T(1e-8) : zero(T),
     )
 end
 
