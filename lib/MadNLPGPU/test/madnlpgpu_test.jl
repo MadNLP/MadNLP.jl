@@ -178,10 +178,10 @@ rocm_testset = [
 oneapi_testset = [
     [
         "LapackOneMKLSolver-LU",
-        ()->MadNLP.Optimizer(
-            linear_solver=LapackOneMKLSolver,
-            lapack_algorithm=MadNLP.LU,
-            print_level=MadNLP.ERROR,
+        () -> MadNLP.Optimizer(
+            linear_solver = LapackOneMKLSolver,
+            lapack_algorithm = MadNLP.LU,
+            print_level = MadNLP.ERROR,
         ),
         [],
     ],
@@ -221,10 +221,10 @@ oneapi_testset = [
         end
     end
     if GPU_BACKEND == "oneapi" && oneAPI.functional()
-        MadNLPTests.test_linear_solver(LapackOneMKLSolver,Float32)
-        MadNLPTests.test_linear_solver(LapackOneMKLSolver,Float64)
-        for (name,optimizer_constructor,exclude) in oneapi_testset
-            test_madnlp(name,optimizer_constructor,exclude; Arr=oneArray)
+        MadNLPTests.test_linear_solver(LapackOneMKLSolver, Float32)
+        MadNLPTests.test_linear_solver(LapackOneMKLSolver, Float64)
+        for (name, optimizer_constructor, exclude) in oneapi_testset
+            test_madnlp(name, optimizer_constructor, exclude; Arr = oneArray)
         end
     end
 end
