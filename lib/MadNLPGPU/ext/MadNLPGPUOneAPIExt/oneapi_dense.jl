@@ -3,16 +3,10 @@
 ########################################################################
 
 #=
-    MadNLP.symul!
-=#
-
-MadNLP.symul!(y, A, x::oneVector{T}, α = one(T), β = zero(T)) where T = oneMKL.symv!('L', T(α), A, x, T(β), y)
-
-#=
     MadNLP._ger!
 =#
 
-MadNLP._ger!(alpha::Number, x::oneVector{T}, y::oneVector{T}, A::oneMatrix{T}) where T = oneMKL.ger!(alpha, x, y, A)
+MadNLP._ger!(alpha::T, x::oneVector{T}, y::oneVector{T}, A::oneMatrix{T}) where T = oneMKL.ger!(alpha, x, y, A)
 
 #=
     MadNLP._madnlp_unsafe_wrap

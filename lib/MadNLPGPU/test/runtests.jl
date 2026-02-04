@@ -12,7 +12,7 @@ using Test, CUDA, AMDGPU, oneAPI, MadNLP, MadNLPGPU, MadNLPTests
         # Need to add support for CompactLBFGS in SparseCondensedKKTSystem (Issue #563)
         # include("sparsekkt_rocm.jl")
     end
-    # if oneAPI.functional()
-    #     include("densekkt_oneapi.jl")
-    # end
+    if oneAPI.functional()
+        include("densekkt_oneapi.jl")
+    end
 end
