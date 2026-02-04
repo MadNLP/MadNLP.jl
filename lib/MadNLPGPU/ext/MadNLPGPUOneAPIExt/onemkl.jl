@@ -220,9 +220,8 @@ for (geqrf, geqrf_buffer, ormqr, ormqr_buffer, trsv, T) in
         function setup_qr!(M::LapackOneMKLSolver{$T})
             resize!(M.tau, M.n)
             geqrf_scratchpad_size = Support.$geqrf_buffer(M.device_queue, M.n, M.n, M.n)
-            # TODO: Fix ormqr buffer size calculation - undefined variables
-            # ormqr_scratchpad_size = Support.$ormqr_buffer(M.device_queue, side, trans, m, n, k, lda, ldc)
-            M.scratchpad_size = geqrf_scratchpad_size
+            ormqr_scratchpad_size = Support.$ormqr_buffer(M.device_queue, 'L', 'T', M.n, one(Int64), M.n, M.n, M.n)
+            M.scratchpad_size = max(geqrf_scratchpad_size, ormqr_scratchpad_size)
             resize!(M.scratchpad, M.scratchpad_size)
             return M
         end
@@ -242,35 +241,24 @@ for (geqrf, geqrf_buffer, ormqr, ormqr_buffer, trsv, T) in
         end
 
         function solve_qr!(M::LapackOneMKLSolver{$T}, x::oneVector{$T})
+            # Apply Q^T to x: x = Q^T * x
             Support.$ormqr(
                 M.device_queue,
-                M.side,
-                M.trans,
-                M.n,
-                M.n,
-                M.n,
-                M.fact,
-                M.n,
-                M.tau,
-                c,
-                ldc,
+                'L',          # side (left multiplication)
+                'T',          # trans (transpose)
+                M.n,          # m
+                one(Int64),   # n (single RHS)
+                M.n,          # k
+                M.fact,       # A
+                M.n,          # lda
+                M.tau,        # tau
+                x,            # c (the RHS vector)
+                M.n,          # ldc
                 M.scratchpad,
                 M.scratchpad_size,
             )
-            oneBLAS.$trsv(
-                oneBLAS.handle(),
-                oneBLAS.oneblas_side_left,
-                oneBLAS.oneblas_fill_upper,
-                oneBLAS.oneblas_operation_none,
-                oneBLAS.oneblas_diagonal_non_unit,
-                M.n,
-                one(Int64),
-                M.alpha,
-                M.fact,
-                M.n,
-                x,
-                M.n,
-            )
+            # Solve R*x = Q^T*b using triangular solve
+            oneMKL.trsv!('U', 'N', 'N', M.fact, x)  # upper, no-trans, non-unit diagonal
             return x
         end
     end

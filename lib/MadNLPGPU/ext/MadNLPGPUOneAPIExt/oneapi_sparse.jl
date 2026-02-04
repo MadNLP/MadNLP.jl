@@ -295,7 +295,6 @@ function MadNLP.coo_to_csc(
 
     rowval = map(x -> x[1][1], coord_csc)
     nzval = similar(rowval, T)
-    @show size(coo)
     csc = oneMKL.oneSparseMatrixCSC(colptr, rowval, nzval, size(coo))
 
     cscmap = similar(coo.I, Int)
