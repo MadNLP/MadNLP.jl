@@ -151,9 +151,9 @@ following operations:
 # Assemble
 MadNLP.build_kkt!(kkt)
 # Factorize  the KKT system
-MadNLP.factorize!(kkt.linear_solver)
+MadNLP.factorize_kkt!(kkt)
 # Backsolve
-MadNLP.solve!(kkt, w)
+MadNLP.solve_kkt_system!(kkt, w)
 
 ```
 

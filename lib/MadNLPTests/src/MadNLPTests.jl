@@ -444,12 +444,12 @@ function jump_array_type(optimizer_constructor::Function; Arr = Array)
     @testset "jump_array_type" begin
         m = Model(optimizer_constructor)
         set_attribute(m, "array_type", Arr)
-        @variable(m, x >= 1)
-        @objective(m, Min, x^2)
+        @variable(m, x[1:2] >= 1)
+        @objective(m, Min, x[1]^2 + x[2]^2)
         optimize!(m)
 
         @test termination_status(m) == MOI.LOCALLY_SOLVED
-        @test solcmp([value(x)], [1.0])
+        @test solcmp(value.(x), [1.0, 1.0])
     end
 
     return nothing

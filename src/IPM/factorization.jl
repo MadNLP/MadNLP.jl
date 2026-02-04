@@ -19,7 +19,7 @@ end
 function factorize_wrapper!(solver::AbstractMadNLPSolver)
     @trace(solver.logger,"Factorization started.")
     build_kkt!(solver.kkt)
-    solver.cnt.linear_solver_time += @elapsed factorize!(solver.kkt.linear_solver)
+    solver.cnt.linear_solver_time += @elapsed factorize_kkt!(solver.kkt)
 end
 
 function solve_kkt_system!(kkt::SparseUnreducedKKTSystem, w::AbstractKKTVector)

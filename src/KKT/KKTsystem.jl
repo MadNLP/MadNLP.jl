@@ -137,6 +137,14 @@ Assemble the KKT matrix before calling the factorization routine.
 function build_kkt! end
 
 """
+    factorize_kkt!(kkt::AbstractKKTSystem)
+
+Factorize the KKT matrix using the linear solver stored in `kkt`.
+
+"""
+function factorize_kkt! end
+
+"""
     compress_hessian!(kkt::AbstractKKTSystem)
 
 Compress the Hessian inside `kkt`'s internals.
@@ -213,6 +221,10 @@ function initialize!(kkt::AbstractKKTSystem)
     fill!(kkt.du_diag, 0.0)
     fill!(kkt.hess, 0.0)
     return
+end
+
+function factorize_kkt!(kkt::AbstractKKTSystem)
+    return factorize!(kkt.linear_solver)
 end
 
 function regularize_diagonal!(kkt::AbstractKKTSystem, primal, dual)
