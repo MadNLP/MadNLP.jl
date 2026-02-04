@@ -139,11 +139,9 @@ jobs:
           using Pkg
           Pkg.add("oneAPI")
       - name: test MadNLPGPU
-        shell: julia --project=./lib/MadNLPGPU/test --color=yes {0}
         env:
           MADNLP_GPU_BACKEND: ${{ matrix.gpu }}
-        run: |
-          include("lib/MadNLPGPU/test/runtests.jl")
+        run: julia --project=./lib/MadNLPGPU/test --color=yes -e 'include("lib/MadNLPGPU/test/runtests.jl")'
       - uses: julia-actions/julia-processcoverage@v1
         with:
           directories: lib/MadNLPGPU/src
