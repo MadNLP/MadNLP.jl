@@ -6,14 +6,14 @@
     MadNLP._ger!
 =#
 
-MadNLP._ger!(alpha::T, x::oneVector{T}, y::oneVector{T}, A::oneMatrix{T}) where T = oneMKL.ger!(alpha, x, y, A)
+MadNLP._ger!(alpha::T, x::oneVector{T}, y::oneVector{T}, A::oneMatrix{T}) where {T} = oneMKL.ger!(alpha, x, y, A)
 
 #=
     MadNLP._madnlp_unsafe_wrap
 =#
 
-function MadNLP._madnlp_unsafe_wrap(vec::VT, n, shift=1) where {T, VT <: oneVector{T}}
-    return view(vec,shift:shift+n-1)
+function MadNLP._madnlp_unsafe_wrap(vec::VT, n, shift = 1) where {T, VT <: oneVector{T}}
+    return view(vec, shift:(shift + n - 1))
 end
 
 #=
@@ -57,17 +57,17 @@ end
 =#
 
 function MadNLP._build_dense_kkt_system!(
-    dest::oneMatrix,
-    hess::oneMatrix,
-    jac::oneMatrix,
-    pr_diag::oneVector,
-    du_diag::oneVector,
-    diag_hess::oneVector,
-    ind_ineq::AbstractVector,
-    n,
-    m,
-    ns,
-)
+        dest::oneMatrix,
+        hess::oneMatrix,
+        jac::oneMatrix,
+        pr_diag::oneVector,
+        du_diag::oneVector,
+        diag_hess::oneVector,
+        ind_ineq::AbstractVector,
+        n,
+        m,
+        ns,
+    )
     ind_ineq_gpu = oneVector(ind_ineq)
     ndrange = (n + m + ns, n)
     backend = oneAPIBackend()
@@ -93,13 +93,13 @@ end
 =#
 
 function MadNLP._build_ineq_jac!(
-    dest::oneMatrix,
-    jac::oneMatrix,
-    diag_buffer::oneVector,
-    ind_ineq::AbstractVector,
-    n,
-    m_ineq,
-)
+        dest::oneMatrix,
+        jac::oneMatrix,
+        diag_buffer::oneVector,
+        ind_ineq::AbstractVector,
+        n,
+        m_ineq,
+    )
     (m_ineq == 0) && return # nothing to do if no ineq. constraints
     ind_ineq_gpu = oneVector(ind_ineq)
     ndrange = (m_ineq, n)
@@ -121,15 +121,15 @@ end
 =#
 
 function MadNLP._build_condensed_kkt_system!(
-    dest::oneMatrix,
-    hess::oneMatrix,
-    jac::oneMatrix,
-    pr_diag::oneVector,
-    du_diag::oneVector,
-    ind_eq::AbstractVector,
-    n,
-    m_eq,
-)
+        dest::oneMatrix,
+        hess::oneMatrix,
+        jac::oneMatrix,
+        pr_diag::oneVector,
+        du_diag::oneVector,
+        ind_eq::AbstractVector,
+        n,
+        m_eq,
+    )
     ind_eq_gpu = oneVector(ind_eq)
     ndrange = (n + m_eq, n)
     backend = oneAPIBackend()
