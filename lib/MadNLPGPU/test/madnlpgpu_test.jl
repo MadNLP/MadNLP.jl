@@ -178,10 +178,10 @@ rocm_testset = [
 oneapi_testset = [
     [
         "LapackOneMKLSolver-LU",
-        () -> MadNLP.Optimizer(
-            linear_solver = LapackOneMKLSolver,
-            lapack_algorithm = MadNLP.LU,
-            print_level = MadNLP.ERROR,
+        ()->MadNLP.Optimizer(
+            linear_solver=LapackOneMKLSolver,
+            lapack_algorithm=MadNLP.LU,
+            print_level=MadNLP.ERROR,
         ),
         [],
     ],
@@ -205,7 +205,7 @@ oneapi_testset = [
     # ],
 ]
 @testset "MadNLPGPU test" begin
-    if CUDA.functional()
+    if CUDA.functional() && GPU_BACKEND == "cuda"
         MadNLPTests.test_linear_solver(LapackCUDASolver,Float32)
         MadNLPTests.test_linear_solver(LapackCUDASolver,Float64)
         # Test LapackGPU wrapper
@@ -213,18 +213,18 @@ oneapi_testset = [
             test_madnlp(name,optimizer_constructor,exclude; Arr=CuArray)
         end
     end
-    if AMDGPU.functional()
-        MadNLPTests.test_linear_solver(LapackROCSolver, Float32)
-        MadNLPTests.test_linear_solver(LapackROCSolver, Float64)
+    if GPU_BACKEND == "amdgpu" && AMDGPU.functional()
+        MadNLPTests.test_linear_solver(LapackROCmSolver,Float32)
+        MadNLPTests.test_linear_solver(LapackROCmSolver,Float64)
         for (name,optimizer_constructor,exclude) in rocm_testset
             test_madnlp(name,optimizer_constructor,exclude; Arr=ROCArray)
         end
     end
-    if oneAPI.functional()
-        MadNLPTests.test_linear_solver(LapackOneMKLSolver, Float32)
-        MadNLPTests.test_linear_solver(LapackOneMKLSolver, Float64)
-        for (name, optimizer_constructor, exclude) in oneapi_testset
-            test_madnlp(name, optimizer_constructor, exclude; Arr = oneArray)
+    if GPU_BACKEND == "oneapi" && oneAPI.functional()
+        MadNLPTests.test_linear_solver(LapackOneMKLSolver,Float32)
+        MadNLPTests.test_linear_solver(LapackOneMKLSolver,Float64)
+        for (name,optimizer_constructor,exclude) in oneapi_testset
+            test_madnlp(name,optimizer_constructor,exclude; Arr=oneArray)
         end
     end
 end

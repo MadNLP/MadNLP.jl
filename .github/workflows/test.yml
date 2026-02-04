@@ -118,8 +118,22 @@ jobs:
         with:
           channel: ${{ matrix.julia-version }}
       - uses: julia-actions/cache@v1
+      - name: Add AMDGPU
+        if: matrix.gpu == 'amdgpu'
+        shell: julia --project=./lib/MadNLPGPU --color=yes {0}
+        run: |
+          using Pkg
+          Pkg.add("AMDGPU")
+      - name: Add oneAPI
+        if: matrix.gpu == 'oneapi'
+        shell: julia --project=./lib/MadNLPGPU --color=yes {0}
+        run: |
+          using Pkg
+          Pkg.add("oneAPI")
       - name: test MadNLPGPU
         shell: julia --project=./lib/MadNLPGPU --color=yes {0}
+        env:
+          MADNLP_GPU_BACKEND: ${{ matrix.gpu }}
         run: |
           using Pkg
           Pkg.Registry.update()
