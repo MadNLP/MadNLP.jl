@@ -12,10 +12,10 @@ LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 MadNLP = "2621e9c9-9eb4-46b1-8089-e8c72242dfb6"
 Metis = "2679e427-3c69-5b7f-982b-ece356f1e94b"
 SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
-oneAPI = "8f75cd03-7ff8-4ecb-9b8f-daf728133b1b"
 
 [weakdeps]
 AMDGPU = "21141c5a-9bdb-4563-92ae-f87d6854732e"
+oneAPI = "8f75cd03-7ff8-4ecb-9b8f-daf728133b1b"
 
 [extensions]
 MadNLPGPUAMDGPUExt = "AMDGPU"
@@ -39,4 +39,4 @@ MadNLPTests = "b52a2a03-04ab-4a5f-9698-6a2deff93217"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [targets]
-test = ["Test", "MadNLPTests", "AMDGPU"]
+test = ["Test", "MadNLPTests", "AMDGPU", "oneAPI"]
