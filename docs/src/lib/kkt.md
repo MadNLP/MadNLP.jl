@@ -53,11 +53,11 @@ as implemented by `SparseKKTSystem`:
 SparseKKTSystem
 
 ```
-Alternatively, the user has the choice to store the KKT system as a `SparseUnreducedKKTSystem`
-or as a `SparseCondensedKKTSystem`:
+The user has the alternative choices:
 ```@docs
 SparseUnreducedKKTSystem
 SparseCondensedKKTSystem
+ScaledSparseKKTSystem
 ```
 
 ## Dense KKT systems
