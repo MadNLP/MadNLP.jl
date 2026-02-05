@@ -1,0 +1,9 @@
+[deps]
+CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
+MadNLP = "2621e9c9-9eb4-46b1-8089-e8c72242dfb6"
+MadNLPGPU = "d72a61cc-809d-412f-99be-fd81f4b8a598"
+MadNLPTests = "b52a2a03-04ab-4a5f-9698-6a2deff93217"
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[compat]
+MadNLPTests = "0.5.3"

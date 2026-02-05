@@ -108,7 +108,7 @@ jobs:
       fail-fast: false
       matrix:
         julia-version: ['1']
-        gpu: [cuda, amdgpu]
+        gpu: [cuda, amdgpu, oneapi]
     runs-on:
       - self-hosted
       - ${{ matrix.gpu }}
@@ -118,13 +118,30 @@ jobs:
         with:
           channel: ${{ matrix.julia-version }}
       - uses: julia-actions/cache@v1
-      - name: test MadNLPGPU
-        shell: julia --project=./lib/MadNLPGPU --color=yes {0}
+      - name: Setup test environment
+        shell: julia --project=./lib/MadNLPGPU/test --color=yes {0}
         run: |
           using Pkg
           Pkg.Registry.update()
           Pkg.develop(path=".")
-          Pkg.test("MadNLPGPU", coverage=true)
+          Pkg.develop(path="./lib/MadNLPGPU")
+          Pkg.develop(path="./lib/MadNLPTests")
+      - name: Add AMDGPU
+        if: matrix.gpu == 'amdgpu'
+        shell: julia --project=./lib/MadNLPGPU/test --color=yes {0}
+        run: |
+          using Pkg
+          Pkg.add("AMDGPU")
+      - name: Add oneAPI
+        if: matrix.gpu == 'oneapi'
+        shell: julia --project=./lib/MadNLPGPU/test --color=yes {0}
+        run: |
+          using Pkg
+          Pkg.add("oneAPI")
+      - name: test MadNLPGPU
+        env:
+          MADNLP_GPU_BACKEND: ${{ matrix.gpu }}
+        run: julia --project=./lib/MadNLPGPU/test --color=yes -e 'include("lib/MadNLPGPU/test/runtests.jl")'
       - uses: julia-actions/julia-processcoverage@v1
         with:
           directories: lib/MadNLPGPU/src
