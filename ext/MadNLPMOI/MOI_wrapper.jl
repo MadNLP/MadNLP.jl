@@ -1489,8 +1489,8 @@ function MOI.optimize!(model::Optimizer)
     model.result = if isnothing(array_type)
         result
     else
-        copy_result_to_cpu(result)
         model.options[:array_type] = array_type
+        copy_result_to_cpu(result)
     end
     model.solve_time = model.solver.cnt.total_time
     model.solve_iterations = model.solver.cnt.k
