@@ -277,9 +277,9 @@ The right-hand-side encodes a vector of 1:
 ```@example kkt_example
 MadNLP.full(b)
 ```
-We solve the system ``K x = b`` using the [`solve!`](@ref) function:
+We solve the system ``K x = b`` using the [`solve_kkt_system!`](@ref) function:
 ```@example kkt_example
-MadNLP.solve!(kkt, x)
+MadNLP.solve_kkt_system!(kkt, x)
 MadNLP.full(x)
 ```
 We verify that the solution is correct by multiplying it on the left
