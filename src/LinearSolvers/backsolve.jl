@@ -42,7 +42,7 @@ function solve_refine!(
         iterator.cnt.ir = 0
 
         while true
-            solve_kkt_system!(iterator.kkt, w)
+            solve_kkt!(iterator.kkt, w)
             axpy!(1., full(w), full(x))
             copyto!(full(w), full(b))
 

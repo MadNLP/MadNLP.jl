@@ -153,7 +153,7 @@ MadNLP.build_kkt!(kkt)
 # Factorize  the KKT system
 MadNLP.factorize_kkt!(kkt)
 # Backsolve
-MadNLP.solve_kkt_system!(kkt, w)
+MadNLP.solve_kkt!(kkt, w)
 
 ```
 

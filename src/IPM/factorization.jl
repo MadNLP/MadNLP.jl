@@ -22,7 +22,7 @@ function factorize_wrapper!(solver::AbstractMadNLPSolver)
     solver.cnt.linear_solver_time += @elapsed factorize_kkt!(solver.kkt)
 end
 
-function solve_kkt_system!(kkt::SparseUnreducedKKTSystem, w::AbstractKKTVector)
+function solve_kkt!(kkt::SparseUnreducedKKTSystem, w::AbstractKKTVector)
     wzl = dual_lb(w)
     wzu = dual_ub(w)
     f(x,y) = iszero(y) ? x : x/y
@@ -34,14 +34,14 @@ function solve_kkt_system!(kkt::SparseUnreducedKKTSystem, w::AbstractKKTVector)
     return w
 end
 
-function solve_kkt_system!(kkt::AbstractReducedKKTSystem, w::AbstractKKTVector)
+function solve_kkt!(kkt::AbstractReducedKKTSystem, w::AbstractKKTVector)
     reduce_rhs!(kkt, w)
     solve_linear_system!(kkt.linear_solver, primal_dual(w))
     finish_aug_solve!(kkt, w)
     return w
 end
 
-function solve_kkt_system!(kkt::ScaledSparseKKTSystem, w::AbstractKKTVector)
+function solve_kkt!(kkt::ScaledSparseKKTSystem, w::AbstractKKTVector)
     r3 = kkt.buffer1
     r4 = kkt.buffer2
     fill!(r3, 0.0)
@@ -69,7 +69,7 @@ function solve_kkt_system!(kkt::ScaledSparseKKTSystem, w::AbstractKKTVector)
     return w
 end
 
-function solve_kkt_system!(
+function solve_kkt!(
     kkt::SparseKKTSystem{T, VT, MT, QN},
     w::AbstractKKTVector
     ) where {T, VT, MT, QN<:CompactLBFGS}
@@ -131,7 +131,7 @@ function solve_kkt_system!(
 end
 
 
-function solve_kkt_system!(kkt::SparseCondensedKKTSystem{T}, w::AbstractKKTVector)  where T
+function solve_kkt!(kkt::SparseCondensedKKTSystem{T}, w::AbstractKKTVector)  where T
 
     (n,m) = size(kkt.jt_csc)
 
@@ -157,28 +157,28 @@ function solve_kkt_system!(kkt::SparseCondensedKKTSystem{T}, w::AbstractKKTVecto
     return w
 end
 
-function solve_kkt_system!(
+function solve_kkt!(
     kkt::SparseUnreducedKKTSystem{T, VT, MT, QN},
     w::AbstractKKTVector
     ) where {T, VT, MT, QN<:CompactLBFGS}
     error("Quasi-Newton approximation of the Hessian is not supported by the KKT formulation SparseUnreducedKKTSystem. Please use SparseKKTSystem instead.")
 end
 
-function solve_kkt_system!(
+function solve_kkt!(
     kkt::SparseCondensedKKTSystem{T, VT, MT, QN},
     w::AbstractKKTVector
     ) where {T, VT, MT, QN<:CompactLBFGS}
     error("Quasi-Newton approximation of the Hessian is not supported by the KKT formulation SparseCondensedKKTSystem. Please use SparseKKTSystem instead.")
 end
 
-function solve_kkt_system!(
+function solve_kkt!(
     kkt::ScaledSparseKKTSystem{T, VT, MT, QN},
     w::AbstractKKTVector
     ) where {T, VT, MT, QN<:CompactLBFGS}
     error("Quasi-Newton approximation of the Hessian is not supported by the KKT formulation ScaledSparseKKTSystem. Please use SparseKKTSystem instead.")
 end
 
-function solve_kkt_system!(
+function solve_kkt!(
     kkt::DenseCondensedKKTSystem,
     w::AbstractKKTVector{T},
     ) where T
