@@ -210,7 +210,7 @@ J_k & -\delta_y & 0 \\
 Z_k & 0 & W_k
 \end{bmatrix}
 \begin{bmatrix}
-\Delta x \\ \Delta y \\ \Delta z
+\Delta w \\ \Delta y \\ \Delta z
 \end{bmatrix}
 = -
 \begin{bmatrix}
@@ -234,7 +234,7 @@ H_k + \Sigma_k + \delta_x I & J_k^\top \\
 J_k & -\delta_y
 \end{bmatrix}
 \begin{bmatrix}
-\Delta x \\ \Delta y
+\Delta w \\ \Delta y
 \end{bmatrix}
 = -
 \begin{bmatrix}
@@ -299,12 +299,12 @@ defined by the option `tau_min`.
 Once the maximum steps computed with the fraction-to-boundary rule, MadNLP finds
 the new iterate by using a backtracking line-search by testing different trial
 values for $$\alpha_{k,l} = \frac{1}{2^l} \alpha_k^{p,max}$$. Once a new trial
-iterate $$w_{kl} = w_k + \alpha_{k,l} \Delta w$$ achieves sufficient progress,
+iterate $$w_{k,l} = w_k + \alpha_{k,l} \Delta w$$ achieves sufficient progress,
 the line-search stops and MadNLP proceeds to the next iteration.
 The progress is measured by a [filter](https://link.springer.com/article/10.1007/s101070100244),
 which accepts a new point either if it reduces the value of the barrier
 function $$\phi_\mu(w) = f(w) - \mu \sum_{i=1}^n \log(w_i)$$ or it reduces
-the constraint violation $$\|c(x)\|_1$$, by comparing these two values with those of a list of past iterates.
+the constraint violation $$\|c(w)\|_1$$, by comparing these two values with those of a list of past iterates.
 
 
 #### Feasility restoration phase
