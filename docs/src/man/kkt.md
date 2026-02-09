@@ -53,7 +53,7 @@ J_k & -\delta_y & 0 \\
 Z_k & 0 & W_k
 \end{bmatrix}
 \begin{bmatrix}
-\Delta x \\ \Delta y \\ \Delta z
+\Delta w \\ \Delta y \\ \Delta z
 \end{bmatrix}
 = -
 \begin{bmatrix}
@@ -63,7 +63,7 @@ Z_k & 0 & W_k
 \end{bmatrix} \; ,
 ```
 with $$\delta_x$$ and $$\delta_y$$ appropriate primal-dual regularization terms
-that guarantee ``(\Delta x, \Delta y, \Delta z)`` is a descent direction for the current filter.
+that guarantee ``(\Delta w, \Delta y, \Delta z)`` is a descent direction for the current filter.
 The system needs evaluating the Jacobian of the constraints ``J_k = \nabla c(w_k)^\top``
 and the Hessian of the Lagrangian ``H_k = \nabla_{xx}^2 L(w_k, y_k, z_k)``.
 
@@ -76,7 +76,7 @@ J_k & -\delta_y & 0 \\
 Z_k^{1/2} & 0 & -W_k
 \end{bmatrix}
 \begin{bmatrix}
-\Delta x \\ \Delta y \\ -Z_k^{1/2} \Delta z
+\Delta x \\ \Delta y \\ -Z_k^{-1/2} \Delta z
 \end{bmatrix}
 =
 \begin{bmatrix}
@@ -86,14 +86,14 @@ r_1 \\ r_2 \\ Z_k^{-1/2} r_3
 This system is implemented as an [`AbstractUnreducedKKTSystem`](@ref) in MadNLP.
 
 We can obtain a smaller augmented KKT system by eliminating the last block
-of rows associated to ``\Delta z = W_k^{-1} (r_3 - Z_k \Delta x)``:
+of rows associated to ``\Delta z = W_k^{-1} (r_3 - Z_k \Delta w)``:
 ```math
 \begin{bmatrix}
 H_k + \Sigma_k + \delta_x I & J_k^\top \\
 J_k & -\delta_y
 \end{bmatrix}
 \begin{bmatrix}
-\Delta x \\ \Delta y
+\Delta w \\ \Delta y
 \end{bmatrix}
 =
 \begin{bmatrix}
@@ -130,7 +130,7 @@ The size of the KKT system depends directly on the problem's characteristics
 A [`SparseKKTSystem`](@ref) stores the Hessian and the Jacobian in sparse
 (COO) format. The KKT matrix can be factorized using either a
 dense or a sparse linear solvers. Here we use the solver provided
-in Lapack:
+in LAPACK:
 ```@example kkt_example
 linear_solver = LapackCPUSolver
 ```
