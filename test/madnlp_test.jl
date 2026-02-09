@@ -285,7 +285,7 @@ end
 
 @testset "Warn on option ignore" begin
     pipe = Pipe()
-    redirect_stdout(pipe) do 
+    redirect_stdout(pipe) do
         MadNLPSolver(MadNLPTests.HS15Model(); fake_option = true)
     end
     @test readline(pipe) == "The following options are ignored: "
