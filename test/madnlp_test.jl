@@ -283,3 +283,11 @@ end
     @test stats.status == MadNLP.SOLVE_SUCCEEDED
 end
 
+@testset "Warn on option ignore" begin
+    pipe = Pipe()
+    redirect_stdout(pipe) do 
+        MadNLPSolver(MadNLPTests.HS15Model(); fake_option = true)
+    end
+    @test readline(pipe) == "The following options are ignored: "
+    @test readline(pipe) == " - fake_option"
+end
