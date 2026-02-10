@@ -120,7 +120,6 @@ jac = MadNLP.get_jacobian(kkt)
 MadNLP.compress_jacobian!(kkt)
 ```
 
-
 ### Assembling the KKT system
 
 Once the sensitivities have been updated, we can assemble the KKT matrix ``K``
@@ -140,7 +139,7 @@ it is stored in the attribute `kkt.linear_solver`. The factorization is handled
 internally in MadNLP.
 
 Once factorized, it remains to solve the linear system using a backsolve.
-The backsolve has to be implemented by the user in the function `solve!`.
+The backsolve has to be implemented by the user in the function `solve_kkt!`.
 It reduces the right-hand-side (RHS) down to a form adapted to the condensed matrix
 ``K_c`` and calls the linear solver to perform the backsolve. Then the condensed solution
 is unpacked to recover the full solution ``(\Delta x, \Delta y, \Delta z_\ell, \Delta z_u)``.
@@ -150,11 +149,12 @@ following operations:
 ```julia
 # Assemble
 MadNLP.build_kkt!(kkt)
-# Factorize  the KKT system
+
+# Factorize the KKT system
 MadNLP.factorize_kkt!(kkt)
+
 # Backsolve
 MadNLP.solve_kkt!(kkt, w)
-
 ```
 
 
@@ -410,24 +410,24 @@ The backsolve solves for ``(\Delta x, \Delta y)``. The dual's descent direction
 ``\Delta z_\ell`` and ``\Delta z_u`` are recovered afterwards using
 the function `MadNLP.finish_aug_solve!`:
 ```julia
-function MadNLP.solve!(kkt::DiagonalHessianKKTSystem, w::MadNLP.AbstractKKTVector)
+function MadNLP.solve_kkt!(kkt::DiagonalHessianKKTSystem, w::MadNLP.AbstractKKTVector)
     MadNLP.reduce_rhs!(w.xp_lr, dual_lb(w), kkt.l_diag, w.xp_ur, dual_ub(w), kkt.u_diag)
-    MadNLP.solve!(kkt.linear_solver, primal_dual(w))
+    MadNLP.solve_linear_system!(kkt.linear_solver, primal_dual(w))
     MadNLP.finish_aug_solve!(kkt, w)
     return w
 end
 ```
 
 !!! note
-    The function `solve!` takes as second argument a vector `w` being an
+    The function `solve_kkt!` takes as second argument a vector `w` being an
     [`AbstractKKTVector`](@ref). An `AbstractKKTVector` is a convenient data
     structure used in MadNLP to store and access the elements in the primal-dual vector
     ``(\Delta x, \Delta y, \Delta z_\ell, \Delta z_u)``.
 
 !!! warning
-    When calling `solve!`, the values in the vector `w` are updated inplace.
+    When calling `solve_kkt!`, the values in the vector `w` are updated inplace.
     The vector `w` should be initialized with the RHS ``(r_1, r_2, r_3, r_4)`` before calling
-    the function `solve!`. The function modifies the values directly in the vector `w`
+    the function `solve_kkt!`. The function modifies the values directly in the vector `w`
     to return the solution ``(\Delta x, \Delta y, \Delta z_\ell, \Delta z_u)``.
 
 Last, MadNLP implements an iterative refinement method to get accurate descent
