@@ -207,11 +207,11 @@ function set_initial_bounds!(xl::AbstractVector{T}, xu::AbstractVector{T}, tol) 
     # If `tol` is set to zero, keep the bounds unchanged.
     if tol > zero(T)
         map!(
-            x->x - max(one(T), abs(x)) .* tol,
+            x->x - max(one(T), abs(x)) * tol,
             xl, xl
         )
         map!(
-            x->x + max(one(T), abs(x)) .* tol,
+            x->x + max(one(T), abs(x)) * tol,
             xu, xu
         )
     end
@@ -725,14 +725,14 @@ function get_varphi_d_R(
 end
 
 function _initialize_variables!(x::T, xl, xu, bound_push, bound_fac) where T
-    if xl!=-T(Inf) && xu!=T(Inf)
+    if isfinite(xl) && isfinite(xu)
         return min(
             xu-min(bound_push*max(1,abs(xu)), bound_fac*(xu-xl)),
             max(xl+min(bound_push*max(1,abs(xl)),bound_fac*(xu-xl)),x),
         )
-    elseif xl!=-T(Inf) && xu==T(Inf)
+    elseif isfinite(xl) && isinf(xu)
         return max(xl+bound_push*max(1,abs(xl)), x)
-    elseif xl==-T(Inf) && xu!=T(Inf)
+    elseif isinf(xl) && isfinite(xu)
         return min(xu-bound_push*max(1,abs(xu)), x)
     end
     return x

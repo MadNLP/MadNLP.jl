@@ -272,18 +272,18 @@ function regular!(solver::AbstractMadNLPSolver{T}) where T
 
         solver.zl_r .+= solver.alpha_z .* dual_lb(solver.d)
         solver.zu_r .+= solver.alpha_z .* dual_ub(solver.d)
-        reset_bound_dual!(
-            primal(solver.zl),
-            primal(solver.x),
-            primal(solver.xl),
-            solver.mu,solver.opt.kappa_sigma,
-        )
-        reset_bound_dual!(
-            primal(solver.zu),
-            primal(solver.xu),
-            primal(solver.x),
-            solver.mu,solver.opt.kappa_sigma,
-        )
+        # reset_bound_dual!(
+        #     primal(solver.zl),
+        #     primal(solver.x),
+        #     primal(solver.xl),
+        #     solver.mu,solver.opt.kappa_sigma,
+        # )
+        # reset_bound_dual!(
+        #     primal(solver.zu),
+        #     primal(solver.xu),
+        #     primal(solver.x),
+        #     solver.mu,solver.opt.kappa_sigma,
+        # )
 
         eval_grad_f_wrapper!(solver, solver.f,solver.x)
 

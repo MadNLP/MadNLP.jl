@@ -22,7 +22,7 @@ function RichardsonIterator(
     )
 end
 
-default_options(::Type{RichardsonIterator}, tol) = RichardsonOptions(richardson_tol=tol^(5/4), richardson_acceptable_tol=tol^(5/8))
+default_options(::Type{RichardsonIterator}, tol) = RichardsonOptions(richardson_tol=1e-10, richardson_acceptable_tol=1e-10)
 
 function solve_refine!(
     x::VT,
