@@ -17,15 +17,15 @@ struct SparseKKTSystem{T, VT, MT, QN, LS, VI, VI32} <: AbstractReducedKKTSystem{
     l_lower::VT
     u_lower::VT
     # Augmented system
-    aug_raw::SparseMatrixCOO{T,Int32,VT, VI32}
+    aug_raw::SparseMatrixCOO{T, Int32, VT, VI32}
     aug_com::MT
     aug_csc_map::Union{Nothing, VI}
     # Hessian
-    hess_raw::SparseMatrixCOO{T,Int32,VT, VI32}
+    hess_raw::SparseMatrixCOO{T, Int32, VT, VI32}
     hess_com::MT
     hess_csc_map::Union{Nothing, VI}
     # Jacobian
-    jac_raw::SparseMatrixCOO{T,Int32,VT, VI32}
+    jac_raw::SparseMatrixCOO{T, Int32, VT, VI32}
     jac_com::MT
     jac_csc_map::Union{Nothing, VI}
     # LinearSolver
@@ -40,14 +40,13 @@ end
 function create_kkt_system(
     ::Type{SparseKKTSystem},
     cb::SparseCallback{T,VT},
-    ind_cons,
     linear_solver::Type;
     opt_linear_solver=default_options(linear_solver),
     hessian_approximation=ExactHessian,
     qn_options=QuasiNewtonOptions(),
 ) where {T,VT}
 
-    n_slack = length(ind_cons.ind_ineq)
+    n_slack = length(cb.ind_ineq)
     # Deduce KKT size.
 
     n = cb.nvar
@@ -60,18 +59,17 @@ function create_kkt_system(
     quasi_newton = create_quasi_newton(hessian_approximation, cb, n; options=qn_options)
     hess_sparsity_I, hess_sparsity_J = build_hessian_structure(cb, hessian_approximation)
 
-    nlb = length(ind_cons.ind_lb)
-    nub = length(ind_cons.ind_ub)
+    nlb = length(cb.ind_lb)
+    nub = length(cb.ind_ub)
 
     force_lower_triangular!(hess_sparsity_I,hess_sparsity_J)
 
-    ind_ineq = ind_cons.ind_ineq
+    ind_ineq = cb.ind_ineq
 
     n_slack = length(ind_ineq)
     n_jac = length(jac_sparsity_I)
     n_hess = length(hess_sparsity_I)
     n_tot = n + n_slack
-
 
     aug_vec_length = n_tot+m
     aug_mat_length = n_tot+m+n_hess+n_jac+n_slack
@@ -115,6 +113,7 @@ function create_kkt_system(
         Int32[jac_sparsity_J; n+1:n+n_slack],
         jac,
     )
+
     hess_raw = SparseMatrixCOO(
         n_tot, n_tot,
         hess_sparsity_I,
@@ -137,7 +136,7 @@ function create_kkt_system(
         hess_raw, hess_com, hess_csc_map,
         jac_raw, jac_com, jac_csc_map,
         _linear_solver,
-        ind_ineq, ind_cons.ind_lb, ind_cons.ind_ub,
+        ind_ineq, cb.ind_lb, cb.ind_ub,
     )
 
 end
@@ -147,4 +146,3 @@ num_variables(kkt::SparseKKTSystem) = length(kkt.pr_diag)
 function build_kkt!(kkt::SparseKKTSystem)
     transfer!(kkt.aug_com, kkt.aug_raw, kkt.aug_csc_map)
 end
-

@@ -7,17 +7,9 @@ as a [`MadNLPExecutionStats`](@ref).
 
 """
 function madnlp(model::AbstractNLPModel; kwargs...)
-    solver = MadNLPSolver(model;kwargs...)
+    solver = MadNLPSolver(model; kwargs...)
     return solve!(solver)
 end
-
-solve!(nlp::AbstractNLPModel, solver::AbstractMadNLPSolver; kwargs...) = solve!(
-    nlp, solver, MadNLPExecutionStats(solver);
-    kwargs...)
-solve!(solver::AbstractMadNLPSolver; kwargs...) = solve!(
-    solver.nlp, solver;
-    kwargs...)
-
 
 function initialize!(solver::AbstractMadNLPSolver{T}) where T
 
@@ -63,7 +55,6 @@ function initialize!(solver::AbstractMadNLPSolver{T}) where T
     eval_jac_wrapper!(solver, solver.kkt, solver.x)
     eval_grad_f_wrapper!(solver, solver.f,solver.x)
 
-
     @trace(solver.logger,"Initializing constraint duals.")
     if !solver.opt.dual_initialized
         initialize_dual(solver, opt.dual_initialization_method)
@@ -77,8 +68,10 @@ function initialize!(solver::AbstractMadNLPSolver{T}) where T
     theta = get_theta(solver.c)
     solver.theta_max = 1e4*max(1,theta)
     solver.theta_min = 1e-4*max(1,theta)
-    solver.mu = solver.opt.mu_init
-    solver.tau = max(solver.opt.tau_min,1-solver.opt.mu_init)
+
+    mu_init = solver.opt.barrier.mu_init
+    solver.mu = mu_init
+    solver.tau = max(solver.opt.tau_min,1-mu_init)
     push!(solver.filter, (solver.theta_max,-Inf))
 
     return REGULAR
@@ -116,8 +109,8 @@ function reinitialize!(solver::AbstractMadNLPSolver)
     theta = get_theta(solver.c)
     solver.theta_max=1e4*max(1,theta)
     solver.theta_min=1e-4*max(1,theta)
-    solver.mu=solver.opt.mu_init
-    solver.tau=max(solver.opt.tau_min,1-solver.opt.mu_init)
+    solver.mu=solver.opt.barrier.mu_init
+    solver.tau=max(solver.opt.tau_min,1-solver.opt.barrier.mu_init)
     empty!(solver.filter)
     push!(solver.filter, (solver.theta_max,-Inf))
 
@@ -125,31 +118,32 @@ function reinitialize!(solver::AbstractMadNLPSolver)
 end
 
 # major loops ---------------------------------------------------------
+"""
+    solve!(
+        solver::AbstractMadNLPSolver,
+        stats::MadNLPExecutionStats;
+        kwargs...
+    )
+
+Solve the problem formulated inside `solver`. Return the solution
+in `stats` by modifying inplace the values. The options are specified in `kwargs`.
+
+"""
+solve!(solver::AbstractMadNLPSolver; kwargs...) = solve!(solver, MadNLPExecutionStats(solver); kwargs...)
 function solve!(
-    nlp::AbstractNLPModel,
     solver::AbstractMadNLPSolver,
     stats::MadNLPExecutionStats;
-    x = nothing, y = nothing,
-    zl = nothing, zu = nothing,
     kwargs...
-        )
-
-    if x != nothing
-        full(solver.x)[1:get_nvar(nlp)] .= x
-    end
-    if y != nothing
-        solver.y[1:get_ncon(nlp)] .= y
-    end
-    if zl != nothing
-        full(solver.zl)[1:get_nvar(nlp)] .= zl
-    end
-    if zu != nothing
-        full(solver.zu)[1:get_nvar(nlp)] .= zu
-    end
-
+)
     if !isempty(kwargs)
         @warn(solver.logger,"The options set during resolve may not have an effect")
         set_options!(solver.opt, kwargs)
+    end
+
+    # If the problem has no free variable, do nothing
+    if solver.n == 0
+        update!(stats, solver)
+        return stats
     end
 
     try
@@ -198,7 +192,7 @@ function solve!(
         if !(solver.status < SOLVE_SUCCEEDED)
             print_summary(solver)
         end
-        @notice(solver.logger,"EXIT: $(get_status_output(solver.status, solver.opt))")
+        @notice(solver.logger,"$(Base.text_colors[color_status(solver.status)])EXIT: $(get_status_output(solver.status, solver.opt))$(Base.text_colors[:normal])")
         solver.opt.disable_garbage_collector &&
             (GC.enable(true); @warn(solver.logger,"Julia garbage collector is turned back on"))
         finalize(solver.logger)
@@ -209,6 +203,10 @@ function solve!(
 
     return stats
 end
+
+color_status(status::Status) =
+    status <= SOLVE_SUCCEEDED ? :green :
+    status <= SOLVED_TO_ACCEPTABLE_LEVEL ? :blue : :red
 
 
 function regular!(solver::AbstractMadNLPSolver{T}) where T
@@ -229,7 +227,6 @@ function regular!(solver::AbstractMadNLPSolver{T}) where T
             sd,
         )
         solver.inf_compl = get_inf_compl(solver.x_lr,solver.xl_r,solver.zl_r,solver.xu_r,solver.x_ur,solver.zu_r,zero(T),sc)
-        inf_compl_mu = get_inf_compl(solver.x_lr,solver.xl_r,solver.zl_r,solver.xu_r,solver.x_ur,solver.zu_r,solver.mu,sc)
 
         print_iter(solver)
 
@@ -243,29 +240,20 @@ function regular!(solver::AbstractMadNLPSolver{T}) where T
         solver.cnt.k>=solver.opt.max_iter && return MAXIMUM_ITERATIONS_EXCEEDED
         time()-solver.cnt.start_time>=solver.opt.max_wall_time && return MAXIMUM_WALLTIME_EXCEEDED
 
-        # update the barrier parameter
-        @trace(solver.logger,"Updating the barrier parameter.")
-        while solver.mu != max(solver.opt.mu_min,solver.opt.tol/10) &&
-            max(solver.inf_pr,solver.inf_du,inf_compl_mu) <= solver.opt.barrier_tol_factor*solver.mu
-            mu_new = get_mu(solver.mu,solver.opt.mu_min,
-                            solver.opt.mu_linear_decrease_factor,solver.opt.mu_superlinear_decrease_power,solver.opt.tol)
-            inf_compl_mu = get_inf_compl(solver.x_lr,solver.xl_r,solver.zl_r,solver.xu_r,solver.x_ur,solver.zu_r,solver.mu,sc)
-            solver.tau= get_tau(solver.mu,solver.opt.tau_min)
-            solver.mu = mu_new
-            empty!(solver.filter)
-            push!(solver.filter,(solver.theta_max,-Inf))
-        end
-
-        # compute the newton step
-        @trace(solver.logger,"Computing the newton step.")
+        # evaluate Hessian
         if (solver.cnt.k!=0 && !solver.opt.hessian_constant)
             eval_lag_hess_wrapper!(solver, solver.kkt, solver.x, solver.y)
         end
 
-        set_aug_diagonal!(solver.kkt,solver)
-        set_aug_rhs!(solver, solver.kkt, solver.c)
-        dual_inf_perturbation!(primal(solver.p),solver.ind_llb,solver.ind_uub,solver.mu,solver.opt.kappa_d)
+        # update the barrier parameter
+        @trace(solver.logger,"Updating the barrier parameter.")
+        update_barrier!(solver.opt.barrier, solver, sc)
 
+        # factorize the KKT system and solve Newton step
+        @trace(solver.logger,"Computing the Newton step.")
+        set_aug_diagonal!(solver.kkt,solver)
+        set_aug_rhs!(solver, solver.kkt, solver.c, solver.mu)
+        dual_inf_perturbation!(primal(solver.p),solver.ind_llb,solver.ind_uub,solver.mu,solver.opt.kappa_d)
         inertia_correction!(solver.inertia_corrector, solver) || return ROBUST
 
         @trace(solver.logger,"Backtracking line search initiated.")
@@ -300,7 +288,7 @@ function regular!(solver::AbstractMadNLPSolver{T}) where T
         eval_grad_f_wrapper!(solver, solver.f,solver.x)
 
         solver.cnt.k+=1
-            @trace(solver.logger,"Proceeding to the next interior point iteration.")
+        @trace(solver.logger,"Proceeding to the next interior point iteration.")
     end
 end
 
@@ -405,7 +393,7 @@ function restore!(solver::AbstractMadNLPSolver{T}) where T
 
         !solver.opt.hessian_constant && eval_lag_hess_wrapper!(solver,solver.kkt,solver.x,solver.y)
         set_aug_diagonal!(solver.kkt,solver)
-        set_aug_rhs!(solver, solver.kkt, solver.c)
+        set_aug_rhs!(solver, solver.kkt, solver.c, solver.mu)
 
         dual_inf_perturbation!(primal(solver.p),solver.ind_llb,solver.ind_uub,solver.mu,solver.opt.kappa_d)
         factorize_wrapper!(solver)
@@ -445,8 +433,6 @@ function robust!(solver::AbstractMadNLPSolver{T}) where T
         RR.inf_du_R = get_inf_du_R(RR.f_R,solver.y,primal(solver.zl),primal(solver.zu),solver.jacl,RR.zp,RR.zn,solver.opt.rho,sd)
         RR.inf_compl_R = get_inf_compl_R(
             solver.x_lr,solver.xl_r,solver.zl_r,solver.xu_r,solver.x_ur,solver.zu_r,RR.pp,RR.zp,RR.nn,RR.zn,zero(T),sc)
-        inf_compl_mu_R = get_inf_compl_R(
-            solver.x_lr,solver.xl_r,solver.zl_r,solver.xu_r,solver.x_ur,solver.zu_r,RR.pp,RR.zp,RR.nn,RR.zn,RR.mu_R,sc)
 
         print_iter(solver;is_resto=true)
 
@@ -456,32 +442,17 @@ function robust!(solver::AbstractMadNLPSolver{T}) where T
 
         # update the barrier parameter
         @trace(solver.logger,"Updating restoration phase barrier parameter.")
-        while RR.mu_R >= solver.opt.mu_min &&
-            max(RR.inf_pr_R,RR.inf_du_R,inf_compl_mu_R) <= solver.opt.barrier_tol_factor*RR.mu_R
-            RR.mu_R = get_mu(RR.mu_R,solver.opt.mu_min,
-                             solver.opt.mu_linear_decrease_factor,solver.opt.mu_superlinear_decrease_power,solver.opt.tol)
-            inf_compl_mu_R = get_inf_compl_R(
-                solver.x_lr,solver.xl_r,solver.zl_r,solver.xu_r,solver.x_ur,solver.zu_r,RR.pp,RR.zp,RR.nn,RR.zn,RR.mu_R,sc)
-            RR.tau_R= max(solver.opt.tau_min,1-RR.mu_R)
-            RR.zeta = sqrt(RR.mu_R)
+        _update_monotone_RR!(solver.opt.barrier, solver, sc)
 
-            empty!(RR.filter)
-            push!(RR.filter,(solver.theta_max,-Inf))
-        end
-
-        # compute the newton step
+        # compute the Newton step
         if !solver.opt.hessian_constant
             eval_lag_hess_wrapper!(solver, solver.kkt, solver.x, solver.y; is_resto=true)
         end
-        set_aug_RR!(solver.kkt, solver, RR)
 
-        # without inertia correction,
         @trace(solver.logger,"Solving restoration phase primal-dual system.")
+        set_aug_RR!(solver.kkt, solver, RR)
         set_aug_rhs_RR!(solver, solver.kkt, RR, solver.opt.rho)
-
         inertia_correction!(solver.inertia_corrector, solver) || return RESTORATION_FAILED
-
-
         finish_aug_solve_RR!(
             RR.dpp,RR.dnn,RR.dzp,RR.dzn,solver.y,dual(solver.d),
             RR.pp,RR.nn,RR.zp,RR.zn,RR.mu_R,solver.opt.rho
@@ -578,7 +549,7 @@ function second_order_correction(solver::AbstractMadNLPSolver,alpha_max,theta,va
     theta_soc_old = theta_trial
     for p=1:solver.opt.max_soc
         # compute second order correction
-        set_aug_rhs!(solver, solver.kkt, wy)
+        set_aug_rhs!(solver, solver.kkt, wy, solver.mu)
         dual_inf_perturbation!(
             primal(solver.p),
             solver.ind_llb,solver.ind_uub,solver.mu,solver.opt.kappa_d,
@@ -633,10 +604,11 @@ end
 function inertia_correction!(
     inertia_corrector::InertiaBased,
     solver::AbstractMadNLPSolver{T}
-    ) where {T}
+) where {T}
 
     n_trial = 0
     solver.del_w = del_w_prev = zero(T)
+    solver.del_c = del_c_prev = zero(T)
 
     @trace(solver.logger,"Inertia-based regularization started.")
 
@@ -644,12 +616,12 @@ function inertia_correction!(
 
     num_pos,num_zero,num_neg = inertia(solver.kkt.linear_solver)
 
-
-    solve_status = !is_inertia_correct(solver.kkt, num_pos, num_zero, num_neg) ?
-        false : solve_refine_wrapper!(
-            solver.d, solver, solver.p, solver._w4,
-        )
-
+    solve_status = if is_inertia_correct(solver.kkt, num_pos, num_zero, num_neg)
+        # Try a backsolve. If the factorization has failed, solve_refine_wrapper returns false.
+        solve_refine_wrapper!(solver.d, solver, solver.p, solver._w4)
+    else
+        false
+    end
 
     while !solve_status
         @debug(solver.logger,"Primal-dual perturbed.")
@@ -665,17 +637,20 @@ function inertia_correction!(
                 return false
             end
         end
-        solver.del_c = num_neg == 0 ? zero(T) : solver.opt.jacobian_regularization_value * solver.mu^(solver.opt.jacobian_regularization_exponent)
-        regularize_diagonal!(solver.kkt, solver.del_w - del_w_prev, solver.del_c)
+        solver.del_c = num_zero == 0 ? zero(T) : solver.opt.jacobian_regularization_value * solver.mu^(solver.opt.jacobian_regularization_exponent)
+        regularize_diagonal!(solver.kkt, solver.del_w - del_w_prev, solver.del_c - del_c_prev)
         del_w_prev = solver.del_w
+        del_c_prev = solver.del_c
 
         factorize_wrapper!(solver)
         num_pos,num_zero,num_neg = inertia(solver.kkt.linear_solver)
 
-        solve_status = !is_inertia_correct(solver.kkt, num_pos, num_zero, num_neg) ?
-            false : solve_refine_wrapper!(
-                solver.d, solver, solver.p, solver._w4
-            )
+        solve_status = if is_inertia_correct(solver.kkt, num_pos, num_zero, num_neg)
+            solve_refine_wrapper!(solver.d, solver, solver.p, solver._w4)
+        else
+            false
+        end
+
         n_trial += 1
     end
 
@@ -687,9 +662,9 @@ function inertia_correction!(
     inertia_corrector::InertiaFree,
     solver::AbstractMadNLPSolver{T}
     ) where T
-
     n_trial = 0
     solver.del_w = del_w_prev = zero(T)
+    solver.del_c = del_c_prev = zero(T)
 
     @trace(solver.logger,"Inertia-free regularization started.")
     dx = primal(solver.d)
@@ -701,6 +676,7 @@ function inertia_correction!(
     g = inertia_corrector.g
 
     set_g_ifr!(solver,g)
+    # Initialize p0
     set_aug_rhs_ifr!(solver, solver.kkt, p0)
 
     factorize_wrapper!(solver)
@@ -727,8 +703,9 @@ function inertia_correction!(
             end
         end
         solver.del_c = solver.opt.jacobian_regularization_value * solver.mu^(solver.opt.jacobian_regularization_exponent)
-        regularize_diagonal!(solver.kkt, solver.del_w - del_w_prev, solver.del_c)
+        regularize_diagonal!(solver.kkt, solver.del_w - del_w_prev, solver.del_c - del_c_prev)
         del_w_prev = solver.del_w
+        del_c_prev = solver.del_c
 
         factorize_wrapper!(solver)
         solve_status = solve_refine_wrapper!(
@@ -753,6 +730,7 @@ function inertia_correction!(
 
     n_trial = 0
     solver.del_w = del_w_prev = zero(T)
+    solver.del_c = del_c_prev = zero(T)
 
     @trace(solver.logger,"Inertia-based regularization started.")
 
@@ -775,8 +753,9 @@ function inertia_correction!(
             end
         end
         solver.del_c = solver.opt.jacobian_regularization_value * solver.mu^(solver.opt.jacobian_regularization_exponent)
-        regularize_diagonal!(solver.kkt, solver.del_w - del_w_prev, solver.del_c)
+        regularize_diagonal!(solver.kkt, solver.del_w - del_w_prev, solver.del_c - del_c_prev)
         del_w_prev = solver.del_w
+        del_c_prev = solver.del_c
 
         factorize_wrapper!(solver)
         solve_status = solve_refine_wrapper!(

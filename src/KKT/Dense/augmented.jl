@@ -42,22 +42,21 @@ end
 function create_kkt_system(
     ::Type{DenseKKTSystem},
     cb::AbstractCallback{T,VT},
-    ind_cons,
     linear_solver::Type;
     opt_linear_solver=default_options(linear_solver),
     hessian_approximation=ExactHessian,
     qn_options=QuasiNewtonOptions(),
 ) where {T, VT}
 
-    ind_ineq = ind_cons.ind_ineq
-    ind_lb = ind_cons.ind_lb
-    ind_ub = ind_cons.ind_ub
+    ind_ineq = cb.ind_ineq
+    ind_lb = cb.ind_lb
+    ind_ub = cb.ind_ub
 
     n = cb.nvar
     m = cb.ncon
     ns = length(ind_ineq)
-    nlb = length(ind_cons.ind_lb)
-    nub = length(ind_cons.ind_ub)
+    nlb = length(cb.ind_lb)
+    nub = length(cb.ind_ub)
 
     hess = create_array(cb, n, n)
     jac = create_array(cb, m, n)
@@ -88,7 +87,7 @@ function create_kkt_system(
         hess, jac, quasi_newton,
         reg, pr_diag, du_diag, l_diag, u_diag, l_lower, u_lower,
         diag_hess, aug_com,
-        ind_ineq, ind_cons.ind_lb, ind_cons.ind_ub,
+        ind_ineq, cb.ind_lb, cb.ind_ub,
         _linear_solver,
         Dict{Symbol, Any}(),
     )
@@ -96,8 +95,8 @@ end
 
 num_variables(kkt::DenseKKTSystem) = length(kkt.pr_diag)
 
-function mul!(y::AbstractVector, kkt::DenseKKTSystem, x::AbstractVector)
-    symul!(y, kkt.aug_com, x)
+function mul!(y::AbstractVector, kkt::DenseKKTSystem{T}, x::AbstractVector) where T
+    _symv!('L', one(T), kkt.aug_com, x, zero(T), y)
 end
 
 # Special getters for Jacobian

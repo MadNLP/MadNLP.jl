@@ -8,13 +8,13 @@ Implement the [`AbstractCondensedKKTSystem`](@ref) in sparse COO format.
 struct SparseCondensedKKTSystem{T, VT, MT, QN, LS, VI, VI32, VTu1, VTu2, EXT} <: AbstractCondensedKKTSystem{T, VT, MT, QN}
     # Hessian
     hess::VT
-    hess_raw::SparseMatrixCOO{T,Int32,VT, VI32}
+    hess_raw::SparseMatrixCOO{T, Int32, VT, VI32}
     hess_com::MT
     hess_csc_map::Union{Nothing, VI}
 
     # Jacobian
     jac::VT
-    jt_coo::SparseMatrixCOO{T,Int32,VT, VI32}
+    jt_coo::SparseMatrixCOO{T, Int32, VT, VI32}
     jt_csc::MT
     jt_csc_map::Union{Nothing, VI}
 
@@ -55,13 +55,12 @@ end
 function create_kkt_system(
     ::Type{SparseCondensedKKTSystem},
     cb::SparseCallback{T,VT},
-    ind_cons,
     linear_solver::Type;
     opt_linear_solver=default_options(linear_solver),
     hessian_approximation=ExactHessian,
     qn_options=QuasiNewtonOptions(),
 ) where {T, VT}
-    ind_ineq = ind_cons.ind_ineq
+    ind_ineq = cb.ind_ineq
     n = cb.nvar
     m = cb.ncon
     n_slack = length(ind_ineq)
@@ -83,8 +82,8 @@ function create_kkt_system(
     n_jac = length(jac_sparsity_I)
     n_hess = length(hess_sparsity_I)
     n_tot = n + n_slack
-    nlb = length(ind_cons.ind_lb)
-    nub = length(ind_cons.ind_ub)
+    nlb = length(cb.ind_lb)
+    nub = length(cb.ind_ub)
 
 
     reg = VT(undef, n_tot)
@@ -95,20 +94,20 @@ function create_kkt_system(
     l_lower = VT(undef, nlb)
     u_lower = VT(undef, nub)
     buffer = VT(undef, m)
-    buffer2= VT(undef, m)
+    buffer2 = VT(undef, m)
     hess = VT(undef, n_hess)
     jac = VT(undef, n_jac)
     diag_buffer = VT(undef, m)
     fill!(jac, zero(T))
 
     hess_raw = SparseMatrixCOO(n, n, hess_sparsity_I, hess_sparsity_J, hess)
-
     jt_coo = SparseMatrixCOO(
         n, m,
         jac_sparsity_J,
         jac_sparsity_I,
         jac,
     )
+
     jt_csc, jt_csc_map = coo_to_csc(jt_coo)
     hess_com, hess_csc_map = coo_to_csc(hess_raw)
 
@@ -116,6 +115,7 @@ function create_kkt_system(
         hess_com,
         jt_csc
     )
+
     _linear_solver = linear_solver(aug_com; opt = opt_linear_solver)
     ext = get_sparse_condensed_ext(VT, hess_com, jptr, jt_csc_map, hess_csc_map)
     return SparseCondensedKKTSystem(
@@ -127,7 +127,7 @@ function create_kkt_system(
         buffer, buffer2,
         aug_com, diag_buffer, dptr, hptr, jptr,
         _linear_solver,
-        ind_ineq, ind_cons.ind_lb, ind_cons.ind_ub,
+        ind_ineq, cb.ind_lb, cb.ind_ub,
         ext
     )
 end

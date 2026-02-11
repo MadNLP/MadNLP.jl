@@ -137,6 +137,14 @@ Assemble the KKT matrix before calling the factorization routine.
 function build_kkt! end
 
 """
+    factorize_kkt!(kkt::AbstractKKTSystem)
+
+Factorize the KKT matrix using the linear solver stored in `kkt`.
+
+"""
+function factorize_kkt! end
+
+"""
     compress_hessian!(kkt::AbstractKKTSystem)
 
 Compress the Hessian inside `kkt`'s internals.
@@ -168,18 +176,18 @@ in `y`, such that ``y = A' x`` (with ``A`` current Jacobian).
 function jtprod! end
 
 """
-    solve!(kkt::AbstractKKTSystem, w::AbstractKKTVector)
+    solve_kkt_system!(kkt::AbstractKKTSystem, w::AbstractKKTVector)
 
 Solve the KKT system ``K x = w`` with the linear solver stored
 inside `kkt` and stores the result inplace inside the `AbstractKKTVector` `w`.
 
 """
-function solve!(kkt, w) end
+function solve_kkt_system! end
 
 """
     regularize_diagonal!(kkt::AbstractKKTSystem, primal_values::Number, dual_values::Number)
 
-Regularize the values in the diagonal of the KKT system.
+Regularize the values in the diagonal of the KKT system in an incremental fashion.
 Called internally inside the interior-point routine.
 """
 function regularize_diagonal! end
@@ -215,10 +223,14 @@ function initialize!(kkt::AbstractKKTSystem)
     return
 end
 
+function factorize_kkt!(kkt::AbstractKKTSystem)
+    return factorize!(kkt.linear_solver)
+end
+
 function regularize_diagonal!(kkt::AbstractKKTSystem, primal, dual)
     kkt.reg .+= primal
     kkt.pr_diag .+= primal
-    kkt.du_diag .= .-dual
+    kkt.du_diag .-= dual
 end
 
 Base.size(kkt::AbstractKKTSystem) = size(kkt.aug_com)

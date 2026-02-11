@@ -1,4 +1,4 @@
-mutable struct LapackGPUSolver{T,MT} <: AbstractLinearSolver{T}
+mutable struct LapackCUDASolver{T,MT} <: AbstractLinearSolver{T}
     A::MT
     fact::CuMatrix{T}
     n::Int64
@@ -17,7 +17,7 @@ mutable struct LapackGPUSolver{T,MT} <: AbstractLinearSolver{T}
     legacy::Bool
     params::CuSolverParameters
 
-    function LapackGPUSolver(
+    function LapackCUDASolver(
         A::MT;
         option_dict::Dict{Symbol,Any} = Dict{Symbol,Any}(),
         opt = LapackOptions(),
@@ -48,7 +48,7 @@ mutable struct LapackGPUSolver{T,MT} <: AbstractLinearSolver{T}
     end
 end
 
-function setup!(M::LapackGPUSolver)
+function setup!(M::LapackCUDASolver)
     if M.opt.lapack_algorithm == MadNLP.BUNCHKAUFMAN
         setup_bunchkaufman!(M)
     elseif M.opt.lapack_algorithm == MadNLP.LU
@@ -64,7 +64,7 @@ function setup!(M::LapackGPUSolver)
     end
 end
 
-function factorize!(M::LapackGPUSolver)
+function factorize!(M::LapackCUDASolver)
     gpu_transfer!(M.fact, M.A)
     if M.opt.lapack_algorithm == MadNLP.BUNCHKAUFMAN
         factorize_bunchkaufman!(M)
@@ -85,7 +85,7 @@ end
 
 for T in (:Float32, :Float64)
     @eval begin
-        function solve!(M::LapackGPUSolver{$T}, x::CuVector{$T})
+        function solve_linear_system!(M::LapackCUDASolver{$T}, x::CuVector{$T})
             if M.opt.lapack_algorithm == MadNLP.BUNCHKAUFMAN
                 solve_bunchkaufman!(M, x)
             elseif M.opt.lapack_algorithm == MadNLP.LU
@@ -101,21 +101,21 @@ for T in (:Float32, :Float64)
             end
         end
 
-        is_supported(::Type{LapackGPUSolver}, ::Type{$T}) = true
+        is_supported(::Type{LapackCUDASolver}, ::Type{$T}) = true
     end
 end
 
-function solve!(M::LapackGPUSolver, x::AbstractVector)
+function solve_linear_system!(M::LapackCUDASolver, x::AbstractVector)
     isempty(M.sol) && resize!(M.sol, M.n)
     copyto!(M.sol, x)
-    solve!(M, M.sol)
+    solve_linear_system!(M, M.sol)
     copyto!(x, M.sol)
     return x
 end
 
-improve!(M::LapackGPUSolver) = false
-is_inertia(M::LapackGPUSolver) = (M.opt.lapack_algorithm == MadNLP.CHOLESKY) || (M.opt.lapack_algorithm == MadNLP.EVD)
-function inertia(M::LapackGPUSolver)
+improve!(M::LapackCUDASolver) = false
+is_inertia(M::LapackCUDASolver) = (M.opt.lapack_algorithm == MadNLP.CHOLESKY) || (M.opt.lapack_algorithm == MadNLP.EVD)
+function inertia(M::LapackCUDASolver)
     if M.opt.lapack_algorithm == MadNLP.CHOLESKY
         sum(M.info) == 0 ? (M.n, 0, 0) : (0, M.n, 0)
     elseif M.opt.lapack_algorithm == MadNLP.EVD
@@ -128,6 +128,6 @@ function inertia(M::LapackGPUSolver)
     end
 end
 
-input_type(::Type{LapackGPUSolver}) = :dense
-MadNLP.default_options(::Type{LapackGPUSolver}) = LapackOptions()
-introduce(M::LapackGPUSolver) = "cuSOLVER v$(CUSOLVER.version()) -- ($(M.opt.lapack_algorithm))"
+input_type(::Type{LapackCUDASolver}) = :dense
+MadNLP.default_options(::Type{LapackCUDASolver}) = LapackOptions()
+introduce(M::LapackCUDASolver) = "cuSOLVER v$(CUSOLVER.version()) -- ($(M.opt.lapack_algorithm))"

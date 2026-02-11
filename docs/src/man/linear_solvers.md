@@ -13,12 +13,10 @@ cb = MadNLP.create_callback(
     MadNLP.SparseCallback,
     nlp,
 )
-ind_cons = MadNLP.get_index_constraints(nlp)
 linear_solver = LapackCPUSolver
 kkt = MadNLP.create_kkt_system(
     MadNLP.SparseKKTSystem,
     cb,
-    ind_cons,
     linear_solver,
 )
 
@@ -117,7 +115,7 @@ for a right-hand-side `b` amounts to
 ```@example linear_solver_example
 nk = size(kkt, 1)
 b = rand(nk)
-MadNLP.solve!(linear_solver, b)
+MadNLP.solve_linear_system!(linear_solver, b)
 ```
 The values of `b` being modified inplace to store the solution $$x$$ of the linear
 system $$Kx =b$$.

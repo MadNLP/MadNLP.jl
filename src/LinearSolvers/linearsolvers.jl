@@ -28,14 +28,14 @@ inside the `AbstractLinearSolver` instance.
 function factorize! end
 
 """
-    solve!(::AbstractLinearSolver, x::AbstractVector)
+    solve_linear_system!(::AbstractLinearSolver, x::AbstractVector)
 
 Solve the linear system ``Ax = b``.
 
 This function assumes the linear system has been
 factorized previously with [`factorize!`](@ref).
 """
-function solve! end
+function solve_linear_system! end
 
 """
     is_supported(solver,T)
@@ -83,16 +83,16 @@ function inertia end
 function improve! end
 
 # Default function for AbstractKKTVector
-function solve!(s::AbstractLinearSolver, x::AbstractKKTVector)
-    solve!(s, full(x))
+function solve_linear_system!(s::AbstractLinearSolver, x::AbstractKKTVector)
+    solve_linear_system!(s, full(x))
 end
 
-function multi_solve!(s::AbstractLinearSolver, X::AbstractMatrix)
+function multi_solve!(s::AbstractLinearSolver{T}, X::AbstractMatrix) where T
     n, nrhs = size(X)
-    x = zeros(n)
+    x = zeros(T, n)
     for i in 1:nrhs
         copyto!(x, 1, X, (i-1)*n + 1, n)
-        solve!(s, x)
+        solve_linear_system!(s, x)
         copyto!(X, (i-1)*n + 1, x, 1, n)
     end
 end
@@ -144,6 +144,7 @@ include("backsolve.jl")
 # dense solvers
 include("lapack.jl")
 include("ldl.jl")
+include("mumps.jl")
 
 # These solvers are only available if Julia was built with SuiteSparse,
 # which is GPL.  If not, then the `using`s here will fail.

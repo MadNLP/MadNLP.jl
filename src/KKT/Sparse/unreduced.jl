@@ -47,19 +47,18 @@ end
 function create_kkt_system(
     ::Type{SparseUnreducedKKTSystem},
     cb::SparseCallback{T,VT},
-    ind_cons,
     linear_solver::Type;
     opt_linear_solver=default_options(linear_solver),
     hessian_approximation=ExactHessian,
     qn_options=QuasiNewtonOptions(),
 ) where {T, VT}
-    ind_ineq = ind_cons.ind_ineq
-    ind_lb = ind_cons.ind_lb
-    ind_ub = ind_cons.ind_ub
+    ind_ineq = cb.ind_ineq
+    ind_lb = cb.ind_lb
+    ind_ub = cb.ind_ub
 
     n_slack = length(ind_ineq)
-    nlb = length(ind_cons.ind_lb)
-    nub = length(ind_cons.ind_ub)
+    nlb = length(cb.ind_lb)
+    nub = length(cb.ind_ub)
     # Deduce KKT size.
     n = cb.nvar
     m = cb.ncon
@@ -165,19 +164,14 @@ function initialize!(kkt::SparseUnreducedKKTSystem{T}) where T
     fill!(kkt.hess, zero(T))
     fill!(kkt.l_lower, zero(T))
     fill!(kkt.u_lower, zero(T))
-    fill!(kkt.l_diag, one(T))
-    fill!(kkt.u_diag, one(T))
+    fill!(kkt.l_diag, -one(T))
+    fill!(kkt.u_diag, -one(T))
     fill!(kkt.l_lower_aug, zero(T))
     fill!(kkt.u_lower_aug, zero(T))
     fill!(nonzeros(kkt.hess_com), zero(T)) # so that mul! in the initial primal-dual solve has no effect
 end
 
 num_variables(kkt::SparseUnreducedKKTSystem) = length(kkt.pr_diag)
-
-function is_inertia_correct(kkt::SparseUnreducedKKTSystem, num_pos, num_zero, num_neg)
-    n, nlb, nub = num_variables(kkt), length(kkt.ind_lb), length(kkt.ind_ub)
-    return (num_zero == 0) && (num_pos == n + nlb + nub)
-end
 
 function build_kkt!(kkt::SparseUnreducedKKTSystem)
     transfer!(kkt.aug_com, kkt.aug_raw, kkt.aug_csc_map)

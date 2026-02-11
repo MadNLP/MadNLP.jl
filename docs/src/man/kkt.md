@@ -20,83 +20,95 @@ the KKT system. The [`AbstractKKTSystem`](@ref) fulfills two goals:
 1. Store the values of the Hessian of the Lagrangian and of the Jacobian.
 2. Assemble the corresponding KKT matrix $$K$$.
 
-
 ## A brief look at the math
-We recall that at each iteration the interior-point
-algorithm aims at solving the following relaxed KKT equations
-($$\mu$$ playing the role of a homotopy parameter) with a Newton method:
+
+We have seen [previously](../algorithm.md) that MadNLP reformulates the
+inequality constraints as equality constraints, by introducing slack variables.
+In what follows, we denote by ``w = (x, s)`` the primal iterate concatenating
+the original decision variable ``x`` and the slack variable ``s``.
+Once reformulated, the problem has the following structure:
 ```math
-F_\mu(x, s, y, v, w) = 0
+  \begin{aligned}
+    \min_{w} \; & f(w) \; , \\
+    \text{subject to} \quad & c(w) = 0 \; , \quad w \geq 0 \; .
+  \end{aligned}
 ```
-with
+
+At each iteration, MadNLP aims at solving the following system of nonlinear
+equations, parameterized by a positive barrier parameter ``\mu``:
 ```math
-F_\mu(x, s, y, v, w) =
-\left\{
 \begin{aligned}
-    & \nabla f(x) + A^\top y + \nu + w & (F_1) \\
-    & - y - w  & (F_2) \\
-    & g(x) - s &  (F_3) \\
-    & X v - \mu e_n & (F_4) \\
-    & S w - \mu e_m & (F_5)
+& \nabla f(w) + \nabla c(w)^\top y - z = 0 \; , \\
+& c(w) = 0 \; , \\
+& WZe = \mu e \;, \; (w, z) > 0 \; .
 \end{aligned}
-\right.
 ```
 
-The Newton step associated to the KKT equations writes
+MadNLP solves this system using the Newton method, and computes a
+descent direction ``(\Delta w, \Delta y, \Delta z)`` as solution of
 ```math
-\overline{
-\begin{pmatrix}
- W & 0 & A^\top & - I & 0 \\
- 0 & 0 & -I & 0 & -I \\
- A & -I & 0& 0 & 0 \\
- V & 0 & 0 & X & 0 \\
- 0 & W & 0 & 0 & S
-\end{pmatrix}}^{K_{3}}
-\begin{pmatrix}
-    \Delta x \\
-    \Delta s \\
-    \Delta y \\
-    \Delta v \\
-    \Delta w
-\end{pmatrix}
+\begin{bmatrix}
+H_k +\delta_x I & J_k^\top & -I \\
+J_k & -\delta_y & 0 \\
+Z_k & 0 & W_k
+\end{bmatrix}
+\begin{bmatrix}
+\Delta w \\ \Delta y \\ \Delta z
+\end{bmatrix}
 = -
-\begin{pmatrix}
-    F_1 \\ F_2 \\ F_3 \\ F_4 \\ F_5
-\end{pmatrix}
+\begin{bmatrix}
+ \nabla f(w_k) + \nabla c(w_k)^\top y_k - z_k \\
+ c(w_k)  \\
+ W_k Z_k e - \mu e
+\end{bmatrix} \; ,
 ```
-The matrix $$K_3$$ is unsymmetric, but we can obtain an equivalent symmetric
-system by eliminating the two last rows:
-```math
-\overline{
-\begin{pmatrix}
- W + \Sigma_x & 0 & A^\top \\
- 0 & \Sigma_s & -I \\
- A & -I & 0
-\end{pmatrix}}^{K_{2}}
-\begin{pmatrix}
-    \Delta x \\
-    \Delta s \\
-    \Delta y
-\end{pmatrix}
-= -
-\begin{pmatrix}
-    F_1 + X^{-1} F_4 \\ F_2 + S^{-1} F_5 \\ F_3
-\end{pmatrix}
-```
-with $$\Sigma_x = X^{-1} v$$ and $$\Sigma_s = S^{-1} w$$.
-The matrix $$K_2$$, symmetric, has a structure more favorable
-for a direct linear solver.
+with $$\delta_x$$ and $$\delta_y$$ appropriate primal-dual regularization terms
+that guarantee ``(\Delta w, \Delta y, \Delta z)`` is a descent direction for the current filter.
+The system needs evaluating the Jacobian of the constraints ``J_k = \nabla c(w_k)^\top``
+and the Hessian of the Lagrangian ``H_k = \nabla_{xx}^2 L(w_k, y_k, z_k)``.
 
-In MadNLP, the matrix $$K_3$$ is encoded as an [`AbstractUnreducedKKTSystem`](@ref)
-and the matrix $$K_2$$ is encoded as an [`AbstractReducedKKTSystem`](@ref).
+We note by ``(r_1, r_2, r_3)`` the right-hand-side. The primal-dual KKT system
+can be symmetrized as
+```math
+\begin{bmatrix}
+H_k +\delta_x I & J_k^\top & Z_k^{1/2} \\
+J_k & -\delta_y & 0 \\
+Z_k^{1/2} & 0 & -W_k
+\end{bmatrix}
+\begin{bmatrix}
+\Delta x \\ \Delta y \\ -Z_k^{-1/2} \Delta z
+\end{bmatrix}
+=
+\begin{bmatrix}
+r_1 \\ r_2 \\ Z_k^{-1/2} r_3
+\end{bmatrix}
+```
+This system is implemented as an [`AbstractUnreducedKKTSystem`](@ref) in MadNLP.
+
+We can obtain a smaller augmented KKT system by eliminating the last block
+of rows associated to ``\Delta z = W_k^{-1} (r_3 - Z_k \Delta w)``:
+```math
+\begin{bmatrix}
+H_k + \Sigma_k + \delta_x I & J_k^\top \\
+J_k & -\delta_y
+\end{bmatrix}
+\begin{bmatrix}
+\Delta w \\ \Delta y
+\end{bmatrix}
+=
+\begin{bmatrix}
+r_1 + W_k^{-1} r_3 \\ r_2
+\end{bmatrix}
+```
+with ``\Sigma_k = W_k^{-1} Z_k``.
+This system is implemented as an [`AbstractReducedKKTSystem`](@ref) in MadNLP.
 
 
 ## Assembling a KKT system, step by step
 
-We note that both $$K_3$$ and $$K_2$$ depend on the Hessian
-of the Lagrangian $$W$$, the Jacobian $$A$$ and the
-diagonal matrices $$\Sigma_x = X^{1}V$$ and $$\Sigma_s = S^{-1}W$$.
-Hence, we have to update the KKT system at each iteration
+The primal-dual KKT systems depend on the Hessian of the Lagrangian ``H_k``
+and the Jacobian ``J_k``.
+Hence, we have to update the values in the KKT system at each iteration
 of the interior-point algorithm.
 
 By default, MadNLP stores the KKT system as a [`SparseKKTSystem`](@ref).
@@ -108,7 +120,6 @@ cb = MadNLP.create_callback(
     MadNLP.SparseCallback,
     nlp,
 )
-ind_cons = MadNLP.get_index_constraints(nlp)
 
 ```
 
@@ -119,7 +130,7 @@ The size of the KKT system depends directly on the problem's characteristics
 A [`SparseKKTSystem`](@ref) stores the Hessian and the Jacobian in sparse
 (COO) format. The KKT matrix can be factorized using either a
 dense or a sparse linear solvers. Here we use the solver provided
-in Lapack:
+in LAPACK:
 ```@example kkt_example
 linear_solver = LapackCPUSolver
 ```
@@ -130,7 +141,6 @@ the function [`create_kkt_system`](@ref):
 kkt = MadNLP.create_kkt_system(
     MadNLP.SparseKKTSystem,
     cb,
-    ind_cons,
     linear_solver,
 )
 
@@ -267,9 +277,9 @@ The right-hand-side encodes a vector of 1:
 ```@example kkt_example
 MadNLP.full(b)
 ```
-We solve the system ``K x = b`` using the [`solve!`](@ref) function:
+We solve the system ``K x = b`` using the [`solve_kkt_system!`](@ref) function:
 ```@example kkt_example
-MadNLP.solve!(kkt, x)
+MadNLP.solve_kkt_system!(kkt, x)
 MadNLP.full(x)
 ```
 We verify that the solution is correct by multiplying it on the left

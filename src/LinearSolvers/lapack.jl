@@ -79,7 +79,7 @@ end
 
 for T in (:Float32, :Float64)
     @eval begin
-        function solve!(M::LapackCPUSolver{$T}, x::Vector{$T})
+        function solve_linear_system!(M::LapackCPUSolver{$T}, x::Vector{$T})
             if M.opt.lapack_algorithm == BUNCHKAUFMAN
                 solve_bunchkaufman!(M, x)
             elseif M.opt.lapack_algorithm == LU
@@ -99,10 +99,10 @@ for T in (:Float32, :Float64)
     end
 end
 
-function solve!(M::LapackCPUSolver, x::AbstractVector)
+function solve_linear_system!(M::LapackCPUSolver, x::AbstractVector)
     isempty(M.sol) && resize!(M.sol, M.n)
     copyto!(M.sol, x)
-    solve!(M, M.sol)
+    solve_linear_system!(M, M.sol)
     copyto!(x, M.sol)
     return x
 end

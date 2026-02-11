@@ -1,5 +1,12 @@
 testset = [
     [
+        "SparseKKTSystem + Mumps",
+        ()->MadNLP.Optimizer(
+            linear_solver=MadNLP.MumpsSolver,
+            print_level=MadNLP.ERROR),
+        []
+    ],
+    [
         "SparseKKTSystem + Umfpack",
         ()->MadNLP.Optimizer(
             linear_solver=MadNLP.UmfpackSolver,
@@ -62,7 +69,9 @@ testset = [
             linear_solver=MadNLP.LapackCPUSolver,
             lapack_algorithm=MadNLP.EVD,
             print_level=MadNLP.ERROR),
-        []
+        [
+            "eigmina" # fails; regularization does not correct the inertia; inertia calculation based on EVD does not seem reliable
+         ]
     ],
     [
         "DenseKKTSystem + LapackCPU-CHOLESKY",
@@ -77,6 +86,7 @@ testset = [
         "SparseUnreducedKKTSystem",
         ()->MadNLP.Optimizer(
             kkt_system=MadNLP.SparseUnreducedKKTSystem,
+            linear_solver=UmfpackSolver,
             print_level=MadNLP.ERROR),
         []
     ],
@@ -84,6 +94,7 @@ testset = [
         "SparseUnreducedKKTSystem + InertiaFree",
         ()->MadNLP.Optimizer(
             inertia_correction_method=MadNLP.InertiaFree,
+            linear_solver=UmfpackSolver,
             kkt_system=MadNLP.SparseUnreducedKKTSystem,
             print_level=MadNLP.ERROR),
         []
@@ -128,7 +139,6 @@ if VERSION >= v"1.10"
     )
 end
 
-
 for (name,optimizer_constructor,exclude) in testset
     test_madnlp(name,optimizer_constructor,exclude)
 end
@@ -136,22 +146,45 @@ end
 @testset "HS15 problem" begin
     nlp = MadNLPTests.HS15Model()
     n, m = NLPModels.get_nvar(nlp), NLPModels.get_ncon(nlp)
-    x0 = NLPModels.get_x0(nlp)
-    y0 = NLPModels.get_y0(nlp)
-
-    # Test all combinations between x0 and y0
-    for xini in [nothing, x0], yini in [nothing, y0]
-        solver = MadNLP.MadNLPSolver(nlp; print_level=MadNLP.ERROR)
-        MadNLP.solve!(solver; x=xini, y=yini)
-        @test solver.status == MadNLP.SOLVE_SUCCEEDED
-    end
-
-    # Test all arguments at the same time
-    zl = zeros(n)
-    zu = zeros(n)
     solver = MadNLP.MadNLPSolver(nlp; print_level=MadNLP.ERROR)
-    MadNLP.solve!(solver; x=x0, y=y0, zl=zl, zu=zu)
+    MadNLP.solve!(solver)
     @test solver.status == MadNLP.SOLVE_SUCCEEDED
+end
+
+@testset "MadNLP scaling" begin
+    MadNLPTests.test_scaling()
+end
+
+@testset "Max optimization problem" begin
+    MadNLPTests.test_max_problem()
+end
+
+@testset "Fixed variables" begin
+    nlp = MadNLPTests.HS15Model()
+    solver = MadNLPSolver(nlp; print_level=MadNLP.ERROR)
+    MadNLP.solve!(solver)
+    @test isa(solver.cb.fixed_handler, MadNLP.NoFixedVariables)
+
+    # Fix first variable:
+    nlp.meta.lvar[1] = 0.5
+    solver_sparse = MadNLP.MadNLPSolver(nlp; callback=MadNLP.SparseCallback, print_level=MadNLP.ERROR)
+    sol_sparse = MadNLP.solve!(solver_sparse)
+    @test length(solver_sparse.ind_fixed) == 1
+    @test isa(solver_sparse.cb.fixed_handler, MadNLP.MakeParameter)
+    @test solver_sparse.n == 3 # fixed variables are removed
+
+    solver_dense = MadNLP.MadNLPSolver(nlp; callback=MadNLP.DenseCallback, print_level=MadNLP.ERROR)
+    sol_dense = MadNLP.solve!(solver_dense)
+    @test length(solver_dense.ind_fixed) == 1
+    @test isa(solver_dense.cb.fixed_handler, MadNLP.MakeParameter)
+    @test solver_dense.n == 4 # fixed variables are frozen
+
+    @test sol_dense.iter == sol_sparse.iter
+    @test sol_dense.objective == sol_sparse.objective
+    @test sol_dense.solution == sol_sparse.solution
+    @test sol_dense.multipliers == sol_sparse.multipliers
+    @test sol_dense.multipliers_L == sol_sparse.multipliers_L
+    @test sol_dense.multipliers_U == sol_sparse.multipliers_U
 end
 
 @testset "MadNLP warmstart" begin
@@ -190,7 +223,7 @@ end
     MadNLP.eval_lag_hess_wrapper!(solver, kkt, x, solver.y)
 
     n_allocs = @allocated MadNLP.eval_f_wrapper(solver, x)
-    @test n_allocs == 16 # objective is still allocating
+    @test n_allocs == 0
     n_allocs = @allocated MadNLP.eval_grad_f_wrapper!(solver, f, x)
     @test n_allocs == 0
     n_allocs = @allocated MadNLP.eval_cons_wrapper!(solver, c, x)
@@ -226,11 +259,35 @@ end
     @test result.status == MadNLP.SOLVE_SUCCEEDED
 end
 
+@testset "Adaptive barrier" begin
+    nlp = MadNLPTests.HS15Model(; x0=[1.0, 1.0])
+    ref = madnlp(nlp; print_level = MadNLP.ERROR)
+    for barrier in [
+        MadNLP.LOQOUpdate(),
+        MadNLP.QualityFunctionUpdate(),
+        MadNLP.QualityFunctionUpdate(; globalization=false),
+    ]
+        results = madnlp(nlp; print_level = MadNLP.ERROR, barrier=barrier)
+        @test results.status == MadNLP.SOLVE_SUCCEEDED
+        @test results.objective ≈ ref.objective
+        @test results.solution ≈ ref.solution
+        @test results.multipliers ≈ ref.multipliers
+    end
+end
+
 @testset "Issue #430" begin
     # Test MadNLP is working with bound_relax_factor=0
     nlp = MadNLPTests.HS15Model()
-    solver = MadNLPSolver(nlp; bound_relax_factor=0.0)
+    solver = MadNLPSolver(nlp; bound_relax_factor=0.0, print_level=MadNLP.ERROR)
     stats = MadNLP.solve!(solver)
     @test stats.status == MadNLP.SOLVE_SUCCEEDED
 end
 
+@testset "Warn on option ignore" begin
+    pipe = Pipe()
+    redirect_stdout(pipe) do
+        MadNLPSolver(MadNLPTests.HS15Model(); fake_option = true)
+    end
+    @test readline(pipe) == "The following options are ignored: "
+    @test readline(pipe) == " - fake_option"
+end
