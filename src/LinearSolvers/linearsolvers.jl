@@ -143,6 +143,11 @@ include("backsolve.jl")
 
 # dense solvers
 include("lapack.jl")
-include("umfpack.jl")
-include("cholmod.jl")
 include("ldl.jl")
+
+# These solvers are only available if Julia was built with SuiteSparse,
+# which is GPL.  If not, then the `using`s here will fail.
+if Base.USE_GPL_LIBS
+    include("umfpack.jl")
+    include("cholmod.jl")
+end
