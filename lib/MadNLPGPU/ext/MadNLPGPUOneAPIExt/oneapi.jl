@@ -77,23 +77,30 @@ MadNLP._trsm!(side::Char, uplo::Char, transa::Char, diag::Char, alpha::T, A::one
 MadNLP._dgmm!(side::Char, A::oneMatrix{T}, x::oneVector{T}, B::oneMatrix{T}) where {T} = oneMKL.dgmm!(side, A, x, B)
 
 #=
-    MadNLP.get_sd / MadNLP.get_sc
-    Workaround for norm() on views of oneArray triggering scalar indexing in Julia 1.12+
-    See https://github.com/JuliaGPU/CUDA.jl/issues/2811 for similar issue in CUDA.jl
+    LinearAlgebra.norm for oneAPI arrays.
+    GPUArrays' norm uses LinearAlgebra.norm as a map function in mapreduce,
+    which fails on oneAPI because norm on scalars generates jl_f_throw_methoderror
+    calls that can't be compiled to SPIRV. Replace with abs-based implementation.
+    The SubArray method also avoids scalar indexing on views.
 =#
 
-if VERSION > v"1.11"
-    function MadNLP.get_sd(l::oneVector{T}, zl_r, zu_r, s_max) where {T}
-        return max(
-            s_max,
-            (my1norm(l) + my1norm(zl_r) + my1norm(zu_r)) / max(1, (length(l) + length(zl_r) + length(zu_r))),
-        ) / s_max
+function _onenorm(v, p::Real)
+    isempty(v) && return float(zero(eltype(v)))
+    if p == Inf
+        return maximum(abs, v)
+    elseif p == -Inf
+        return minimum(abs, v)
+    elseif p == 1
+        return mapreduce(abs, +, v)
+    elseif p == 2
+        return sqrt(mapreduce(abs2, +, v))
+    elseif p == 0
+        return float(count(!iszero, v))
+    else
+        spp = float(p)
+        return mapreduce(x -> abs(x)^spp, +, v)^inv(spp)
     end
-    function MadNLP.get_sc(zl_r::SubArray{T, 1, VT}, zu_r, s_max) where {T, VT <: oneVector{T}}
-        return max(
-            s_max,
-            (my1norm(zl_r) + my1norm(zu_r)) / max(1, length(zl_r) + length(zu_r)),
-        ) / s_max
-    end
-    my1norm(x) = mapreduce(abs, +, x)
 end
+
+LinearAlgebra.norm(v::oneArray{<:Number}, p::Real = 2) = _onenorm(v, p)
+LinearAlgebra.norm(v::SubArray{<:Number, <:Any, <:oneArray}, p::Real = 2) = _onenorm(v, p)

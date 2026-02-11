@@ -22,6 +22,16 @@ mutable struct LapackOneMKLSolver{T, MT} <: MadNLP.AbstractLinearSolver{T}
             logger = MadNLP.MadNLPLogger(),
             kwargs...,
         ) where {MT <: AbstractMatrix}
+        # Reclaim GPU resources from previous solvers.  Julia's GC doesn't see GPU
+        # memory pressure, so old oneArray/MKL handles accumulate.
+        # Synchronize FIRST to ensure all pending GPU operations complete, making
+        # it safe for GC finalizers to free GPU buffers.  Then GC to collect stale
+        # objects, flush deferred MKL sparse handles, and GC again.
+        oneAPI.synchronize()
+        GC.gc(true)
+        oneAPI.oneL0._run_reclaim_callbacks()
+        GC.gc(true)
+        oneAPI.synchronize()
         MadNLP.set_options!(opt, option_dict, kwargs...)
         T = eltype(A)
         m, n = size(A)
@@ -155,7 +165,7 @@ for (potrf, potrf_buffer, potrs, potrs_buffer, T) in
             Support.$potrs(
                 M.device_queue,
                 'L',
-                n,
+                M.n,
                 one(Int64),
                 M.fact,
                 M.n,
