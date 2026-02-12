@@ -38,7 +38,7 @@ get_hessian
 initialize!
 build_kkt!
 factorize_kkt!
-solve_kkt_system!
+solve_kkt!
 compress_hessian!
 compress_jacobian!
 jtprod!

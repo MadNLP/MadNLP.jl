@@ -89,7 +89,7 @@ function test_kkt_system(kkt, cb)
     # Backsolve
     x = MadNLP.UnreducedKKTVector(kkt)
     fill!(MadNLP.full(x), 1.0)  # fill RHS with 1
-    out1 = MadNLP.solve_kkt_system!(kkt, x)
+    out1 = MadNLP.solve_kkt!(kkt, x)
     @test out1 === x
 
     y = copy(x)
