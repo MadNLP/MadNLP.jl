@@ -2,8 +2,8 @@
     MadNLP wrappers
 
     MadNLP adapts any AbstractNLPModel to avoid numerical issues.
-    The `AbstractNLPModel` is wrapped as a `SparseCallback` or
-    as a `DenseCallback` (if the dense callbacks `jac_dense!` and `hess_dense!` are specified).
+    The `AbstractNLPModel` is wrapped as a `SparseCallback` or as a `DenseCallback`
+    (if both nlp.meta.sparse_jacobian and nlp.meta.sparse_hessian are set to false).
 
     The wrapper reformulates the model by:
     1. scaling the objective and the constraints.
@@ -751,7 +751,7 @@ function set_scaling!(
     jac_buffer = similar(grad_buffer, cb.ncon, cb.nvar)
 
     # Set scaling
-    jac_dense!(nlp, x0, jac_buffer)
+    NLPModels.jac_dense!(nlp, x0, jac_buffer)
     set_con_scale_dense!(con_scale, jac_buffer, nlp_scaling_max_gradient)
 
     NLPModels.grad!(nlp, x0, grad_buffer)
@@ -891,7 +891,7 @@ function _eval_jac_wrapper!(
     x::AbstractVector,
     jac::AbstractMatrix,
 ) where {T, VT, VI, NLP, FH}
-    jac_dense!(cb.nlp, x, jac)
+    NLPModels.jac_dense!(cb.nlp, x, jac)
     jac .*= cb.con_scale
     return jac
 end
@@ -903,7 +903,7 @@ function _eval_lag_hess_wrapper!(
     hess::AbstractMatrix;
     obj_weight = one(T),
 ) where {T, VT, VI, NLP, FH}
-    hess_dense!(cb.nlp, x, y, hess; obj_weight = obj_weight * cb.obj_scale[])
+    NLPModels.hess_dense!(cb.nlp, x, y, hess; obj_weight = obj_weight * cb.obj_scale[])
     return hess
 end
 
@@ -1039,7 +1039,7 @@ function _eval_jac_wrapper!(
     x::AbstractVector,
     jac::AbstractMatrix,
 ) where {T, VT, VI, NLP, FH<:MakeParameter}
-    jac_dense!(cb.nlp, x, jac)
+    NLPModels.jac_dense!(cb.nlp, x, jac)
     jac .*= cb.con_scale
     return jac[:, cb.fixed_handler.fixed] .= zero(T)
 end
@@ -1051,7 +1051,7 @@ function _eval_lag_hess_wrapper!(
     hess::AbstractMatrix;
     obj_weight = one(T),
 ) where {T, VT, VI, NLP, FH<:MakeParameter}
-    hess_dense!(cb.nlp, x, y, hess; obj_weight = obj_weight * cb.obj_scale[])
+    NLPModels.hess_dense!(cb.nlp, x, y, hess; obj_weight = obj_weight * cb.obj_scale[])
     fixed = cb.fixed_handler.fixed
     hess[:, fixed] .= zero(T)
     hess[fixed, :] .= zero(T)
