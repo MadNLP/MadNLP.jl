@@ -204,14 +204,6 @@ function is_inertia_correct end
 "Nonzero in Jacobian"
 function nnz_jacobian end
 
-# TODO: we need these two templates as NLPModels does not implement
-# a template for dense Jacobian and dense Hessian
-"Dense Jacobian callback"
-function jac_dense! end
-
-"Dense Hessian callback"
-function hess_dense! end
-
 #=
     Generic functions
 =#

@@ -193,8 +193,7 @@ tau\\_min                      | 0.99                 | lower bound on fraction-
     tau_min::T = 0.99
 end
 
-is_dense_callback(nlp) = hasmethod(jac_dense!, Tuple{typeof(nlp), AbstractVector, AbstractMatrix}) &&
-    hasmethod(hess_dense!, Tuple{typeof(nlp), AbstractVector, AbstractVector, AbstractMatrix})
+is_dense_callback(nlp) = !nlp.meta.sparse_jacobian && !nlp.meta.sparse_hessian
 
 # smart option presets
 function MadNLPOptions{T}(
