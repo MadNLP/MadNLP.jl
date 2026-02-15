@@ -144,6 +144,11 @@ function solve!(
             solver.status = reinitialize!(solver)
         end
 
+        if is_async(solver.kkt.linear_solver)
+            @trace(solver.logger, "linear solver time is not available for asynchronous linear solvers.")
+            solver.cnt.linear_solver_time = NaN
+        end
+
         while solver.status >= REGULAR
             solver.status == REGULAR && (solver.status = regular!(solver))
             solver.status == RESTORE && (solver.status = restore!(solver))

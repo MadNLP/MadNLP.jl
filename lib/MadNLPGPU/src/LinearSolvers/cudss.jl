@@ -98,12 +98,6 @@ function CUDSSSolver(
     n, m = size(csc)
     @assert n == m
 
-    if opt.cudss_asynchronous
-        @warn(logger, """
-Asynchronous execution in cuDSS is enabled.
-The linear solver time may not reflect the actual time spent in the solver.""")
-    end
-
     view = 'U'
     structure = 'G'
     # We need view = 'F' for the sparse LU decomposition
@@ -217,3 +211,4 @@ MadNLP.improve!(M::CUDSSSolver) = false
 MadNLP.is_supported(::Type{CUDSSSolver},::Type{Float32}) = true
 MadNLP.is_supported(::Type{CUDSSSolver},::Type{Float64}) = true
 MadNLP.introduce(M::CUDSSSolver) = "cuDSS v$(CUDSS.version())"
+MadNLP.is_async(M::CUDSSSolver) = M.opt.cudss_asynchronous
