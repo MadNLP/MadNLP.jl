@@ -2,8 +2,8 @@ module MadNLP
 
 import Pkg.TOML: parsefile
 import Printf: @sprintf
-import LinearAlgebra: BLAS, LAPACK, Adjoint, Symmetric, Diagonal, mul!, ldiv!, lmul!, rmul!, norm, dot, diagind, normInf, transpose!, issuccess
-import LinearAlgebra: bunchkaufman, cholesky, qr, lu, cholesky!, axpy!
+import LinearAlgebra: BLAS, LAPACK, Adjoint, Symmetric, Diagonal, mul!, ldiv!, rdiv!, lmul!, rmul!, norm, dot, diagind, normInf, transpose!, issuccess
+import LinearAlgebra: BlasReal, bunchkaufman, cholesky, qr, lu, bunchkaufman!, cholesky!, axpy!, LowerTriangular
 import LinearAlgebra.BLAS: libblastrampoline, BlasInt, @blasfunc
 import SparseArrays: SparseArrays, AbstractSparseMatrix, SparseMatrixCSC, sparse, getcolptr, rowvals, nnz, nonzeros
 import Base: string, show, print, size, getindex, copyto!, @kwdef

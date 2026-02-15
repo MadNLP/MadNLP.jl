@@ -87,7 +87,7 @@ function solve_linear_system!(s::AbstractLinearSolver, x::AbstractKKTVector)
     solve_linear_system!(s, full(x))
 end
 
-function multi_solve!(s::AbstractLinearSolver{T}, X::AbstractMatrix) where T
+function solve_linear_system!(s::AbstractLinearSolver{T}, X::AbstractMatrix) where T
     n, nrhs = size(X)
     x = zeros(T, n)
     for i in 1:nrhs
