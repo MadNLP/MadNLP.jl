@@ -22,6 +22,7 @@ import CUDSS
     cudss_schur::Bool = false
     cudss_deterministic::Bool = false
     cudss_device_indices::Vector{Cint} = Cint[]
+    cudss_asynchronous::Bool = true
 end
 
 function set_cudss_options!(solver::CUDSS.CudssSolver, opt::CudssSolverOptions)
@@ -139,7 +140,7 @@ function CUDSSSolver(
     # The phase "analysis" is "reordering" combined with "symbolic_factorization"
     x_gpu = CUDSS.CudssMatrix(T, n; nbatch=nbatch)
     b_gpu = CUDSS.CudssMatrix(T, n; nbatch=nbatch)
-    CUDSS.cudss("analysis", solver, x_gpu, b_gpu, asynchronous=true)
+    CUDSS.cudss("analysis", solver, x_gpu, b_gpu, asynchronous=opt.cudss_asynchronous)
 
     # Allocate additional buffer for iterative refinement
     # Always allocate it to support dynamic updates to opt.cudss_ir
@@ -155,12 +156,9 @@ end
 function MadNLP.factorize!(M::CUDSSSolver)
     CUDSS.cudss_update(M.inner.matrix, nonzeros(M.tril))
     if M.inner.fresh_factorization
-        CUDSS.cudss("factorization", M.inner, M.x_gpu, M.b_gpu, asynchronous=true)
+        CUDSS.cudss("factorization", M.inner, M.x_gpu, M.b_gpu, asynchronous=M.opt.cudss_asynchronous)
     else
-        CUDSS.cudss("refactorization", M.inner, M.x_gpu, M.b_gpu, asynchronous=true)
-    end
-    if !M.opt.cudss_hybrid_memory && !M.opt.cudss_hybrid_execute
-        CUDA.synchronize()
+        CUDSS.cudss("refactorization", M.inner, M.x_gpu, M.b_gpu, asynchronous=M.opt.cudss_asynchronous)
     end
     return M
 end
@@ -173,10 +171,7 @@ function MadNLP.solve_linear_system!(M::CUDSSSolver{T,V}, xb::V) where {T,V}
         CUDSS.cudss_update(M.b_gpu, xb)
     end
     CUDSS.cudss_update(M.x_gpu, xb)
-    CUDSS.cudss("solve", M.inner, M.x_gpu, M.b_gpu, asynchronous=true)
-    if !M.opt.cudss_hybrid_memory && !M.opt.cudss_hybrid_execute
-        CUDA.synchronize()
-    end
+    CUDSS.cudss("solve", M.inner, M.x_gpu, M.b_gpu, asynchronous=M.opt.cudss_asynchronous)
     return xb
 end
 
@@ -216,3 +211,4 @@ MadNLP.improve!(M::CUDSSSolver) = false
 MadNLP.is_supported(::Type{CUDSSSolver},::Type{Float32}) = true
 MadNLP.is_supported(::Type{CUDSSSolver},::Type{Float64}) = true
 MadNLP.introduce(M::CUDSSSolver) = "cuDSS v$(CUDSS.version())"
+MadNLP.is_async(M::CUDSSSolver) = M.opt.cudss_asynchronous

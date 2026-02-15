@@ -57,6 +57,17 @@ function is_supported(::Type{LS},::Type{T}) where {LS <: AbstractLinearSolver, T
 end
 
 """
+    is_async(::AbstractLinearSolver)
+
+Return `true` if the linear solver runs asynchronously
+i.e., the `factorize!` and `solve!` functions return before
+the factorization and solve operations are completed.
+"""
+function is_async(::AbstractLinearSolver)
+    return false
+end
+
+"""
     is_inertia(::AbstractLinearSolver)
 
 Return `true` if the linear solver supports the
