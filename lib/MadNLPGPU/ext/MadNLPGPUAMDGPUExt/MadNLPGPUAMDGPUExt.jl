@@ -13,12 +13,13 @@ using AMDGPU
 using AMDGPU.rocBLAS, AMDGPU.rocSOLVER, AMDGPU.rocSPARSE
 
 function __init__()
-    setglobal!(MadNLPGPU, :LapackROCSolver, LapackROCSolver)
+    setglobal!(MadNLPGPU, :LapackROCmSolver, LapackROCmSolver)
     return
 end
 
 include("rocm_dense.jl")
 include("rocm_sparse.jl")
+include("rocm_qn.jl")
 include("rocsolver.jl")
 include("rocm.jl")
 

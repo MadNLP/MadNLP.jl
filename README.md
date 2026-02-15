@@ -5,8 +5,21 @@
 ---
 
 | **License** | **Documentation** | **Build Status** | **Coverage** | **DOI** |
-|:-----------------:|:-----------------:|:----------------:|:----------------:|:----------------:|
-| [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/MadNLP/MadNLP.jl/blob/master/LICENSE) | [![doc](https://img.shields.io/badge/docs-stable-blue.svg)](https://madnlp.github.io/MadNLP.jl/stable) [![doc](https://img.shields.io/badge/docs-dev-blue.svg)](https://madnlp.github.io/MadNLP.jl/dev) | [![build](https://github.com/MadNLP/MadNLP.jl/actions/workflows/test.yml/badge.svg)](https://github.com/MadNLP/MadNLP.jl/actions/workflows/test.yml) | [![codecov](https://codecov.io/gh/MadNLP/MadNLP.jl/branch/master/graph/badge.svg?token=MBxH2AAu8Z)](https://codecov.io/gh/MadNLP/MadNLP.jl) | [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.5825776.svg)](https://doi.org/10.5281/zenodo.5825776) |
+|:-----------:|:-----------------:|:----------------:|:------------:|:-------:|
+| [![License: MIT][license-img]][license-url] | [![docs-stable][docs-stable-img]][docs-stable-url] [![docs-dev][docs-dev-img]][docs-dev-url] | [![build-gh][build-gh-img]][build-gh-url] | [![codecov][codecov-img]][codecov-url] | [![doi][doi-img]][doi-url] |
+
+[license-img]: https://img.shields.io/badge/License-MIT-yellow.svg
+[license-url]: https://github.com/MadNLP/MadNLP.jl/blob/master/LICENSE
+[docs-stable-img]: https://img.shields.io/badge/docs-stable-blue.svg
+[docs-stable-url]: https://madnlp.github.io/MadNLP.jl/stable
+[docs-dev-img]: https://img.shields.io/badge/docs-dev-purple.svg
+[docs-dev-url]: https://madnlp.github.io/MadNLP.jl/dev
+[build-gh-img]: https://github.com/MadNLP/MadNLP.jl/actions/workflows/test.yml/badge.svg
+[build-gh-url]: https://github.com/MadNLP/MadNLP.jl/actions/workflows/test.yml
+[codecov-img]: https://codecov.io/gh/MadNLP/MadNLP.jl/branch/master/graph/badge.svg?token=MBxH2AAu8Z
+[codecov-url]: https://codecov.io/gh/MadNLP/MadNLP.jl
+[doi-img]: https://zenodo.org/badge/DOI/10.5281/zenodo.5825776.svg
+[doi-url]: https://doi.org/10.5281/zenodo.5825776
 
 ## Installation
 
@@ -16,13 +29,14 @@ pkg> add MadNLP
 
 Optionally, various extension packages can be installed together:
 ```julia
-pkg> add MadNLPHSL, MadNLPPardiso, MadNLPMumps, MadNLPGPU
+pkg> add MadNLPHSL, MadNLPPardiso, MadNLPGPU
 ```
 
-These packages are stored in the `lib` subdirectory within the main MadNLP repository. Some extension packages may require additional dependencies or specific hardware. For the instructions for the build procedure, see the following links:
+These packages are stored in the `lib` subdirectory within the main MadNLP repository.
+Some extension packages may require additional dependencies or specific hardware.
+For the instructions for the build procedure, see the following links:
 
  * [MadNLPHSL](https://github.com/MadNLP/MadNLP.jl/tree/master/lib/MadNLPHSL)
- * [MadNLPMumps](https://github.com/MadNLP/MadNLP.jl/tree/master/lib/MadNLPMumps)
  * [MadNLPPardiso](https://github.com/MadNLP/MadNLP.jl/tree/master/lib/MadNLPHSL)
  * [MadNLPGPU](https://github.com/MadNLP/MadNLP.jl/tree/master/lib/MadNLPGPU)
 
@@ -35,7 +49,9 @@ MadNLP is interfaced with modeling packages:
 - [JuMP](https://github.com/jump-dev/JuMP.jl)
 - [NLPModels](https://github.com/JuliaSmoothOptimizers/NLPModels.jl).
 
-Users can pass various options to MadNLP also through the modeling packages. The interface-specific syntax are shown below. To see the list of MadNLP solver options, check the [documentation](https://madnlp.github.io/MadNLP.jl/dev/options/).
+Users can pass various options to MadNLP also through the modeling packages.
+The interface-specific syntax are shown below.
+To see the list of MadNLP solver options, check the [documentation](https://madnlp.github.io/MadNLP.jl/dev/options/).
 
 #### JuMP interface
 
@@ -58,15 +74,15 @@ madnlp(model, print_level=MadNLP.WARN, max_wall_time=3600)
 
 ### Linear Solvers
 
-MadNLP is interfaced with non-Julia sparse/dense linear solvers:
+MadNLP is interfaced with non-Julia direct sparse/dense linear solvers:
 - [Umfpack](https://people.engr.tamu.edu/davis/suitesparse.html)
 - [Lapack](https://software.intel.com/content/www/us/en/develop/documentation/mkl-developer-reference-fortran/top/lapack-routines.html)
-- [HSL solvers](http://www.hsl.rl.ac.uk/ipopt/) (requires extension)
-- [Pardiso](https://www.pardiso-project.org/) (requires extension)
-- [Pardiso-MKL](https://software.intel.com/content/www/us/en/develop/documentation/mkl-developer-reference-fortran/top/sparse-solver-routines/intel-mkl-pardiso-parallel-direct-sparse-solver-interface.html) (requires extension)
-- [Mumps](http://mumps.enseeiht.fr/)  (requires extension)
-- [cuSOLVER](https://docs.nvidia.com/cuda/cusolver/index.html) (requires extension)
-- [cuDSS](https://docs.nvidia.com/cuda/cudss/index.html) (requires extension)
+- [HSL solvers](http://www.hsl.rl.ac.uk/ipopt/) (requires extension `MadNLPHSL`)
+- [Pardiso](https://www.pardiso-project.org/) (requires extension `MadNLPPardiso`)
+- [Pardiso-MKL](https://software.intel.com/content/www/us/en/develop/documentation/mkl-developer-reference-fortran/top/sparse-solver-routines/intel-mkl-pardiso-parallel-direct-sparse-solver-interface.html) (requires extension `MadNLPPardiso`)
+- [cuSOLVER](https://docs.nvidia.com/cuda/cusolver/index.html) (requires extension `MadNLPGPU`)
+- [cuDSS](https://docs.nvidia.com/cuda/cudss/index.html) (requires extension `MadNLPGPU`)
+- [rocSOLVER](https://rocm.docs.amd.com/projects/rocSOLVER/en/latest/) (requires extension `MadNLPGPU`)
 
 Each linear solver in MadNLP is a Julia type, and the `linear_solver` option should be specified by the actual type. Note that the linear solvers are always exported to `Main`.
 
@@ -75,7 +91,8 @@ Each linear solver in MadNLP is a Julia type, and the `linear_solver` option sho
 ```julia
 using MadNLP, JuMP
 # ...
-model = Model(()->MadNLP.Optimizer(linear_solver=UmfpackSolver)) # default
+model = Model(()->MadNLP.Optimizer(linear_solver=MumpsSolver))   # default
+model = Model(()->MadNLP.Optimizer(linear_solver=UmfpackSolver))
 model = Model(()->MadNLP.Optimizer(linear_solver=LDLSolver))     # works only for convex problems
 model = Model(()->MadNLP.Optimizer(linear_solver=CHOLMODSolver)) # works only for convex problems
 model = Model(()->MadNLP.Optimizer(linear_solver=LapackCPUSolver))
@@ -93,14 +110,6 @@ model = Model(()->MadNLP.Optimizer(linear_solver=Ma86Solver))
 model = Model(()->MadNLP.Optimizer(linear_solver=Ma97Solver))
 ```
 
-#### Mumps (requires extension `MadNLPMumps`)
-
-```julia
-using MadNLPMumps, JuMP
-# ...
-model = Model(()->MadNLP.Optimizer(linear_solver=MumpsSolver))
-```
-
 #### Pardiso (requires extension `MadNLPPardiso`)
 
 ```julia
@@ -110,16 +119,17 @@ model = Model(()->MadNLP.Optimizer(linear_solver=PardisoSolver))
 model = Model(()->MadNLP.Optimizer(linear_solver=PardisoMKLSolver))
 ```
 
-#### CUDA (requires extension `MadNLPGPU`)
+#### CUDA and ROCm (requires extension `MadNLPGPU`)
 
 ```julia
 using MadNLPGPU, JuMP
-# ...
-model = Model(()->MadNLP.Optimizer(linear_solver=LapackGPUSolver))  # for dense problems
-model = Model(()->MadNLP.Optimizer(linear_solver=CUDSSSolver))      # for sparse problems
-model = Model(()->MadNLP.Optimizer(linear_solver=CuCholeskySolver)) # for sparse problems
-model = Model(()->MadNLP.Optimizer(linear_solver=GLUSolver))        # for sparse problems
-model = Model(()->MadNLP.Optimizer(linear_solver=RFSolver))         # for sparse problems
+
+using CUDA
+model = Model(()->MadNLP.Optimizer(linear_solver=LapackCUDASolver, array_type=CuArray))   # for dense problems
+model = Model(()->MadNLP.Optimizer(linear_solver=CUDSSSolver, array_type=CuArray))        # for sparse problems
+
+using AMDGPU
+model = Model(()->MadNLP.Optimizer(linear_solver=LapackROCmSolver, array_type=ROCArray))  # for dense problems
 ```
 
 ## Citing MadNLP.jl
@@ -128,23 +138,24 @@ If you use MadNLP.jl in your research, we would greatly appreciate your citing i
 
 ```bibtex
 @article{shin2024accelerating,
-  title={Accelerating optimal power flow with {GPU}s: {SIMD} abstraction of nonlinear programs and condensed-space interior-point methods},
-  author={Shin, Sungho and Anitescu, Mihai and Pacaud, Fran{\c{c}}ois},
-  journal={Electric Power Systems Research},
-  volume={236},
-  pages={110651},
-  year={2024},
-  publisher={Elsevier}
+  title     = {Accelerating optimal power flow with {GPU}s: {SIMD} abstraction of nonlinear programs and condensed-space interior-point methods},
+  author    = {Shin, Sungho and Anitescu, Mihai and Pacaud, Fran{\c{c}}ois},
+  journal   = {Electric Power Systems Research},
+  volume    = {236},
+  pages     = {110651},
+  year      = {2024},
+  publisher = {Elsevier}
 }
+
 @article{shin2021graph,
-  title={Graph-based modeling and decomposition of energy infrastructures},
-  author={Shin, Sungho and Coffrin, Carleton and Sundar, Kaarthik and Zavala, Victor M},
-  journal={IFAC-PapersOnLine},
-  volume={54},
-  number={3},
-  pages={693--698},
-  year={2021},
-  publisher={Elsevier}
+  title     = {Graph-based modeling and decomposition of energy infrastructures},
+  author    = {Shin, Sungho and Coffrin, Carleton and Sundar, Kaarthik and Zavala, Victor M},
+  journal   = {IFAC-PapersOnLine},
+  volume    = {54},
+  number    = {3},
+  pages     = {693--698},
+  year      = {2021},
+  publisher = {Elsevier}
 }
 ```
 

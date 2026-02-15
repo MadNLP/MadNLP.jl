@@ -3,18 +3,6 @@
 ######################################################################
 
 #=
-    MadNLP.symul!
-=#
-
-MadNLP.symul!(y, A, x::ROCVector{T}, α = one(T), β = zero(T)) where T = rocBLAS.symv!('L', T(α), A, x, T(β), y)
-
-#=
-    MadNLP._ger!
-=#
-
-MadNLP._ger!(alpha::Number, x::ROCVector{T}, y::ROCVector{T}, A::ROCMatrix{T}) where T = rocBLAS.ger!(alpha, x, y, A)
-
-#=
     MadNLP._madnlp_unsafe_wrap
 =#
 

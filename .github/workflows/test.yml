@@ -123,6 +123,7 @@ jobs:
         run: |
           using Pkg
           Pkg.Registry.update()
+          Pkg.develop(path=".")
           Pkg.test("MadNLPGPU", coverage=true)
       - uses: julia-actions/julia-processcoverage@v1
         with:

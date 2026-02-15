@@ -1,5 +1,5 @@
 cuda_testset = [
-    # Temporarily commented out since LapackGPUSolver does not currently support sparse callbacks
+    # Temporarily commented out since LapackCUDASolver does not currently support sparse callbacks
     [
         "CUDSS",
         ()->MadNLP.Optimizer(
@@ -92,7 +92,7 @@ cuda_testset = [
     [
         "LapackGPU-BUNCHKAUFMAN",
         ()->MadNLP.Optimizer(
-            linear_solver=LapackGPUSolver,
+            linear_solver=LapackCUDASolver,
             lapack_algorithm=MadNLP.BUNCHKAUFMAN,
             print_level=MadNLP.ERROR,
         ),
@@ -101,7 +101,7 @@ cuda_testset = [
     [
         "LapackGPU-LU",
         ()->MadNLP.Optimizer(
-            linear_solver=LapackGPUSolver,
+            linear_solver=LapackCUDASolver,
             lapack_algorithm=MadNLP.LU,
             print_level=MadNLP.ERROR,
         ),
@@ -110,7 +110,7 @@ cuda_testset = [
     [
         "LapackGPU-QR",
         ()->MadNLP.Optimizer(
-            linear_solver=LapackGPUSolver,
+            linear_solver=LapackCUDASolver,
             lapack_algorithm=MadNLP.QR,
             print_level=MadNLP.ERROR,
         ),
@@ -119,7 +119,7 @@ cuda_testset = [
     [
         "LapackGPU-EVD",
         ()->MadNLP.Optimizer(
-            linear_solver=LapackGPUSolver,
+            linear_solver=LapackCUDASolver,
             lapack_algorithm=MadNLP.EVD,
             print_level=MadNLP.ERROR,
         ),
@@ -128,7 +128,7 @@ cuda_testset = [
     [
         "LapackGPU-CHOLESKY",
         ()->MadNLP.Optimizer(
-            linear_solver=LapackGPUSolver,
+            linear_solver=LapackCUDASolver,
             lapack_algorithm=MadNLP.CHOLESKY,
             print_level=MadNLP.ERROR,
         ),
@@ -138,36 +138,36 @@ cuda_testset = [
 
 rocm_testset = [
     [
-        "LapackROCSolver-LU",
+        "LapackROCmSolver-LU",
         ()->MadNLP.Optimizer(
-            linear_solver=LapackROCSolver,
+            linear_solver=LapackROCmSolver,
             lapack_algorithm=MadNLP.LU,
             print_level=MadNLP.ERROR,
         ),
         [],
     ],
     [
-        "LapackROCSolver-QR",
+        "LapackROCmSolver-QR",
         ()->MadNLP.Optimizer(
-            linear_solver=LapackROCSolver,
+            linear_solver=LapackROCmSolver,
             lapack_algorithm=MadNLP.QR,
             print_level=MadNLP.ERROR,
         ),
         [],
     ],
     [
-        "LapackROCSolver-EVD",
+        "LapackROCmSolver-EVD",
         ()->MadNLP.Optimizer(
-            linear_solver=LapackROCSolver,
+            linear_solver=LapackROCmSolver,
             lapack_algorithm=MadNLP.EVD,
             print_level=MadNLP.ERROR,
         ),
         [],
     ],
     [
-        "LapackROCSolver-CHOLESKY",
+        "LapackROCmSolver-CHOLESKY",
         ()->MadNLP.Optimizer(
-            linear_solver=LapackROCSolver,
+            linear_solver=LapackROCmSolver,
             lapack_algorithm=MadNLP.CHOLESKY,
             print_level=MadNLP.ERROR,
         ),
@@ -177,16 +177,16 @@ rocm_testset = [
 
 @testset "MadNLPGPU test" begin
     if CUDA.functional()
-        MadNLPTests.test_linear_solver(LapackGPUSolver,Float32)
-        MadNLPTests.test_linear_solver(LapackGPUSolver,Float64)
+        MadNLPTests.test_linear_solver(LapackCUDASolver,Float32)
+        MadNLPTests.test_linear_solver(LapackCUDASolver,Float64)
         # Test LapackGPU wrapper
         for (name,optimizer_constructor,exclude) in cuda_testset
             test_madnlp(name,optimizer_constructor,exclude; Arr=CuArray)
         end
     end
     if AMDGPU.functional()
-        MadNLPTests.test_linear_solver(LapackROCSolver,Float32)
-        MadNLPTests.test_linear_solver(LapackROCSolver,Float64)
+        MadNLPTests.test_linear_solver(LapackROCmSolver,Float32)
+        MadNLPTests.test_linear_solver(LapackROCmSolver,Float64)
         for (name,optimizer_constructor,exclude) in rocm_testset
             test_madnlp(name,optimizer_constructor,exclude; Arr=ROCArray)
         end

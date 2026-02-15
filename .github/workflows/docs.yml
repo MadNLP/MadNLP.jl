@@ -16,7 +16,7 @@ jobs:
       - uses: actions/checkout@v2
       - uses: julia-actions/install-juliaup@v2
         with:
-          channel: '1.10'
+          channel: '1'
       - name: Install dependencies
         run: julia --project=docs/ docs/install.jl
       - name: Build and deploy
