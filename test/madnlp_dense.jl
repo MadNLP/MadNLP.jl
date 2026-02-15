@@ -1,5 +1,4 @@
 using Test
-import MadNLP: jac_structure!, hess_structure!, obj, grad!, cons!, jac_coord!, hess_coord!, jac_dense!, hess_dense!
 using NLPModels
 using LinearAlgebra
 using MadNLPTests

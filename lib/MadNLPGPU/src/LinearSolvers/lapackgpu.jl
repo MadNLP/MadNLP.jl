@@ -85,7 +85,7 @@ end
 
 for T in (:Float32, :Float64)
     @eval begin
-        function solve!(M::LapackCUDASolver{$T}, x::CuVector{$T})
+        function solve_linear_system!(M::LapackCUDASolver{$T}, x::CuVector{$T})
             if M.opt.lapack_algorithm == MadNLP.BUNCHKAUFMAN
                 solve_bunchkaufman!(M, x)
             elseif M.opt.lapack_algorithm == MadNLP.LU
@@ -105,10 +105,10 @@ for T in (:Float32, :Float64)
     end
 end
 
-function solve!(M::LapackCUDASolver, x::AbstractVector)
+function solve_linear_system!(M::LapackCUDASolver, x::AbstractVector)
     isempty(M.sol) && resize!(M.sol, M.n)
     copyto!(M.sol, x)
-    solve!(M, M.sol)
+    solve_linear_system!(M, M.sol)
     copyto!(x, M.sol)
     return x
 end

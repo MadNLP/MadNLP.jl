@@ -17,6 +17,101 @@ function set_options!(opt::AbstractOptions, options)
     return other_options
 end
 
+"""
+Option | Default Value | Description
+:--- | :--- | :---
+||
+__Primary options__||
+||
+tol                            | 1e-8                 | termination tolerance on KKT residual
+callback                       | [`SparseCallback`](@ref) | type of callback (`SparseCallback` or `DenseCallback`)
+kkt\\_system                   | [`SparseKKTSystem`](@ref) | type of primal-dual KKT system
+linear\\_solver                | MumpsSolver          | linear solver used for solving primal-dual KKT system
+||
+__General options__||
+||
+rethrow\\_error                | true                 | rethrow any error encountered during the algorithm
+disable\\_garbage\\_collector  | false                | disable garbage collector in MadNLP
+blas\\_num\\_thread            | 1                    | number of threads to use in the BLAS backend
+__Output options__||
+||
+output\\_file                  | `""`                 | if not `""`, the output log is teed to the file at this path
+print\\_level                  | INFO                 | verbosity level in MadNLP
+file\\_print\\_level           | INFO                 | verbosity level in file output
+||
+__Termination options__||
+||
+max\\_iter                     | 3000                 | maximum number of interior-point iterations
+max\\_wall_time                | 1e6                  | maximum wall time in seconds
+acceptable\\_tol               | 1e-6                 | acceptable tolerance on KKT residual
+acceptable\\_iter              | 15                   | number of acceptable iterates before stopping algorithm
+diverging\\_iter               | 1e20                 | threshold on KKT residual to declare algorithm as diverging
+s\\_max                        | 100.0                | scaling threshold for KKT residual
+||
+__NLP options__||
+||
+kappa\\_d                      | 1e-5                 | weight for linear damping term
+fixed\\_variable\\_treatment   | [`MakeParameter`](@ref) | treatment for the fixed variables (`MakeParameter` or `RelaxBound`)
+equality\\_treatment           | [`EnforceEquality`](@ref) | treatment for the equality constraints (`EnforceEquality` or `RelaxEquality`)
+bound\\_relax\\_factor         | 1e-8                 | factor for initial relaxation of bounds
+jacobian\\_constant            | false                | set to true if the constraints are linear.
+hessian\\_constant             | false                | set to true if the problem is linear or quadratic
+hessian\\_approximation        | `ExactHessian` | method used to approximate the Hessian
+quasi\\_newton\\_options       | QuasiNewtonOptions() | options for quasi-Newton algorithm
+inertia\\_correction\\_method  | InertiaAuto          | inertia correction mechanism
+inertia\\_free\\_tol           | 0.0                  | tolerance for inertia free method
+default\\_primal\\_regularization | 0.0 | default regularization for primal variable blocks in the KKT system
+default\\_dual\\_regularization   | 0.0 | default regularization for dual variable blocks in the KKT system
+||
+__Initialization__||
+||
+dual\\_initialized             | false                | specify if dual initial point is available
+dual\\_initialization\\_method | DualInitializeLeastSquares | method to compute the initial dual multipliers
+constr\\_mult\\_init\\_max     | 1e3                  | maximum allowable value in initial dual multipliers
+bound\\_push                   | 1e-2                 | minimum absolute distance from the initial point to bound
+bound\\_fac                    | 1e-2                 | minimum relative distance from the initial point to bound
+nlp\\_scaling                  | true                 | scale nonlinear program
+nlp\\_scaling\\_max\\_gradient | 100.0                | maximum gradient after NLP scaling
+||
+__Hessian perturbation__||
+||
+min\\_hessian\\_perturbation       | 1e-20                | smallest perturbation of Hessian block in inertia correction
+first\\_hessian\\_perturbation     | 1e-4                 | first value tried in inertia correction
+max\\_hessian\\_perturbation       | 1e20                 | largest perturbation of Hessian block in inertia correction
+perturb\\_inc\\_fact\\_first       | 1e2                  | increase factor for primal perturbation for very first perturbation
+perturb\\_inc\\_fact               | 8.                   | increase factor for primal perturbation
+perturb\\_dec\\_fact               | 1/3                  | decrease factor for primal perturbation
+jacobian\\_regularization\\_exponent | 1/4                | exponent for mu in the regularization of rank-defficient Jacobian
+jacobian\\_regularization\\_value  | 1e-8                 | size of regularization for rank-defficient Jacobian
+||
+__Feasible restoration__||
+||
+soft\\_resto\\_pderror\\_reduction\\_factor | 0.9999          | required reduction in primal-dual error in the soft restoration phase
+required\\_infeasibility\\_reduction        | 0.9             | required reduction of infeasibility before leaving restoration phase
+||
+__Line search__||
+||
+obj\\_max\\_inc                | 5.                   | upper bound on the acceptable increase of barrier objective function
+kappha\\_soc                   | 0.99                 | factor in the sufficient reduction rule for second order correction
+max\\_soc                      | 4                    | maximum number of second order correction trial steps at each iteration
+alpha\\_min\\_frac             | 0.05                 | safety factor for the minimal step size
+s\\_theta                      | 1.1                  | exponent for current constraint violation in the switching rule
+s\\_phi                        | 2.3                  | exponent for linear barrier function model in the switching rule
+eta\\_phi                      | 1e-4                 | relaxation factor in the Armijo condition
+kappa\\_soc                    | 0.99                 | factor in the sufficient reduction rule for second order correction
+gamma\\_theta                  | 1e-5                 | relaxation factor in the filter margin for the constraint violation
+gamma\\_phi                    | 1e-5                 | relaxation factor in the filter margin for the barrier function
+delta                          | 1.0                  | multiplier for constraint violation in the switching rule
+kappa\\_sigma                  | 1e10                 | factor limiting the deviation of dual variables from primal estimates
+barrier\\_tol\\_factor         | 10.0                 | factor for mu in barrier stop test
+rho                            | 1000.0               | value in penalty parameter update formula
+||
+__Barrier__||
+||
+barrier                        | [`MonotoneUpdate`](@ref) | algorithm to update barrier parameter
+tau\\_min                      | 0.99                 | lower bound on fraction-to-the-boundary parameter tau
+||
+"""
 @kwdef mutable struct MadNLPOptions{T} <: AbstractOptions
     # Primary options
     tol::T
@@ -102,8 +197,7 @@ end
     tau_min::T = 0.99
 end
 
-is_dense_callback(nlp) = hasmethod(jac_dense!, Tuple{typeof(nlp), AbstractVector, AbstractMatrix}) &&
-    hasmethod(hess_dense!, Tuple{typeof(nlp), AbstractVector, AbstractVector, AbstractMatrix})
+is_dense_callback(nlp) = !nlp.meta.sparse_jacobian && !nlp.meta.sparse_hessian
 
 # smart option presets
 function MadNLPOptions{T}(

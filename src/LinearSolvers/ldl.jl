@@ -17,7 +17,7 @@ function LDLSolver(
 ) where T
     # TODO: convert tril to triu, not full
     full, tril_to_full_view = get_tril_to_full(T,tril)
-    
+
     return LDLSolver(
         LDLF.ldl(
             full
@@ -32,7 +32,7 @@ function factorize!(M::LDLSolver)
     return M
 end
 
-function solve!(M::LDLSolver{T},rhs::Vector{T}) where T
+function solve_linear_system!(M::LDLSolver{T},rhs::Vector{T}) where T
     ldiv!(M.inner, rhs)
     # If the factorization failed, we return the same
     # rhs to enter into a primal-dual regularization phase.
@@ -52,7 +52,7 @@ function inertia(M::LDLSolver)
             zero += 1
         else
             neg += 1
-        end            
+        end
     end
     return pos, zero, neg
 end

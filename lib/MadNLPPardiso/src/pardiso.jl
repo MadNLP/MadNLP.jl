@@ -220,7 +220,7 @@ function factorize!(M::PardisoSolver{T}) where {T}
     return M
 end
 
-function solve!(M::PardisoSolver{T}, rhs::Vector{T}) where {T}
+function solve_linear_system!(M::PardisoSolver{T}, rhs::Vector{T}) where {T}
     _pardiso(
         M.pt,
         Ref{Int32}(1),
