@@ -44,6 +44,7 @@ compress_jacobian!
 jtprod!
 regularize_diagonal!
 is_inertia_correct
+should_regularize_dual
 nnz_jacobian
 ```
 
