@@ -207,10 +207,9 @@ function LinearAlgebra.mul!(
     return w
 end
 
-function MadNLP.solve!(kkt::DiagonalHessianKKTSystem, w::MadNLP.AbstractKKTVector)
+function MadNLP.solve_kkt!(kkt::DiagonalHessianKKTSystem, w::MadNLP.AbstractKKTVector)
     MadNLP.reduce_rhs!(w.xp_lr, dual_lb(w), kkt.l_diag, w.xp_ur, dual_ub(w), kkt.u_diag)
-    MadNLP.solve!(kkt.linear_solver, primal_dual(w))
+    MadNLP.solve_linear_system!(kkt.linear_solver, primal_dual(w))
     MadNLP.finish_aug_solve!(kkt, w)
     return w
 end
-
