@@ -283,7 +283,7 @@ end
     @test stats.status == MadNLP.SOLVE_SUCCEEDED
 end
 
-@kwdef struct UserCallback
+@kwdef struct UserCallback <: MadNLP.AbstractUserCallback
     counter::Base.RefValue{Int} = Ref(0)
 end
 

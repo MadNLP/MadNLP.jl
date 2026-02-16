@@ -1,5 +1,13 @@
 abstract type AbstractOptions end
 
+abstract type AbstractUserCallback end
+# By default, the user callback is deactivated
+struct NoUserCallback <: AbstractUserCallback end
+function (cb::NoUserCallback)(solver, mode::Symbol)
+    return false
+end
+
+
 # MadNLPLogger
 @kwdef mutable struct MadNLPLogger
     print_level::LogLevels = INFO

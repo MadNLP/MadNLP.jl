@@ -1,6 +1,7 @@
 # Options
 
 parse_option(::Type{Module},str::String) = eval(Symbol(str))
+parse_option(::Type{<:AbstractUserCallback}, f::Any) = f
 parse_option(type::Type{T},i::Int64) where {T<:Enum} = type(i)
 
 function set_options!(opt::AbstractOptions, options)
@@ -17,7 +18,6 @@ function set_options!(opt::AbstractOptions, options)
     return other_options
 end
 
-@kwdef mutable struct MadNLPOptions{T, ICB} <: AbstractOptions
 """
 Option | Default Value | Description
 :--- | :--- | :---
@@ -28,13 +28,13 @@ tol                            | 1e-8                 | termination tolerance on
 callback                       | [`SparseCallback`](@ref) | type of callback (`SparseCallback` or `DenseCallback`)
 kkt\\_system                   | [`SparseKKTSystem`](@ref) | type of primal-dual KKT system
 linear\\_solver                | MumpsSolver          | linear solver used for solving primal-dual KKT system
-intermediate_callback          | Function             | Intermediate callback called at each IPM iteration
 ||
 __General options__||
 ||
 rethrow\\_error                | true                 | rethrow any error encountered during the algorithm
 disable\\_garbage\\_collector  | false                | disable garbage collector in MadNLP
 blas\\_num\\_thread            | 1                    | number of threads to use in the BLAS backend
+intermediate_callback          | AbstractUserCallback | Intermediate callback called at each IPM iteration
 __Output options__||
 ||
 output\\_file                  | `""`                 | if not `""`, the output log is teed to the file at this path
@@ -112,7 +112,7 @@ barrier                        | [`MonotoneUpdate`](@ref) | algorithm to update 
 tau\\_min                      | 0.99                 | lower bound on fraction-to-the-boundary parameter tau
 ||
 """
-@kwdef mutable struct MadNLPOptions{T, ICB} <: AbstractOptions
+@kwdef mutable struct MadNLPOptions{T} <: AbstractOptions
     # Primary options
     tol::T
     callback::Type
@@ -124,7 +124,7 @@ tau\\_min                      | 0.99                 | lower bound on fraction-
     disable_garbage_collector::Bool = false
     blas_num_threads::Int = 1
     iterator::Type = RichardsonIterator
-    intermediate_callback::ICB
+    intermediate_callback::AbstractUserCallback = NoUserCallback()
 
     # Output options
     output_file::String = ""
@@ -201,19 +201,17 @@ is_dense_callback(nlp) = !nlp.meta.sparse_jacobian && !nlp.meta.sparse_hessian
 # smart option presets
 function MadNLPOptions{T}(
     nlp::AbstractNLPModel{T};
-    intermediate_callback::ICB = (solver, mode) -> false,
     dense_callback = MadNLP.is_dense_callback(nlp),
     callback = dense_callback ? DenseCallback : SparseCallback,
     kkt_system = dense_callback ? DenseCondensedKKTSystem : SparseKKTSystem,
     linear_solver = dense_callback ? LapackCPUSolver : default_sparse_solver(nlp),
     tol = get_tolerance(T,kkt_system)
-) where {T, ICB}
-    return MadNLPOptions{T, ICB}(
+) where {T}
+    return MadNLPOptions{T}(
         tol = tol,
         callback = callback,
         kkt_system = kkt_system,
         linear_solver = linear_solver,
-        intermediate_callback = intermediate_callback,
     )
 end
 
@@ -246,7 +244,7 @@ function _get_primary_options(options)
     primary_opt = Dict{Symbol,Any}()
     remaining_opt = Dict{Symbol,Any}()
     for (k,v) in options
-        if k in [:tol, :linear_solver, :callback, :kkt_system, :intermediate_callback]
+        if k in [:tol, :linear_solver, :callback, :kkt_system]
             primary_opt[k] = v
         else
             remaining_opt[k] = v
@@ -263,6 +261,7 @@ function load_options(nlp::AbstractNLPModel{T,VT}; options...) where {T, VT}
     # Initiate interior-point options
     opt_ipm = MadNLPOptions{T}(nlp; primary_opt...)
     linear_solver_options = set_options!(opt_ipm, options)
+
     check_option_sanity(opt_ipm)
     # Initiate linear-solver options
     opt_linear_solver = default_options(nlp, opt_ipm.kkt_system, opt_ipm.linear_solver)
