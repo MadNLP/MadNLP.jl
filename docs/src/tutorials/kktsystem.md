@@ -264,6 +264,16 @@ end
 ```
 
 !!! info
+    Remind that the primal vector manipulated by MadNLP concatenates the
+    original primal variable together with a slack variable: ``w = (x, s)``.
+    The KKT system requires the following information from MadNLP:
+    - `n_var` is the dimension of the original primal variable ``x``;
+    - `n_tot` is the dimension of the extended primal variable ``w``;
+    - `n_ineq` is the number of inequality constraints, equal to the dimension of ``s``;
+    - `ind_lb` is the index of the variables in ``w`` which are lower-bounded ;
+    - `ind_ub` is the index of the variables in ``w`` which are upper-bounded.
+
+!!! info
     Here, we define a DiagonalHessianKKTSystem as a subtype
     of a [`AbstractReducedKKTSystem`](@ref). Depending on the condensation,
     the following alternatives are available:
