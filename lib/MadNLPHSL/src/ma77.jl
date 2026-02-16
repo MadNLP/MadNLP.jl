@@ -150,7 +150,7 @@ function factorize!(M::Ma77Solver{T,INT}) where {T,INT}
     M.info.flag < 0 && throw(FactorizationException())
     return M
 end
-function solve!(M::Ma77Solver{T,INT}, rhs::Vector{T}) where {T,INT}
+function solve_linear_system!(M::Ma77Solver{T,INT}, rhs::Vector{T}) where {T,INT}
     HSL.ma77_solve(
         T,
         INT,

@@ -234,7 +234,7 @@ function factorize!(M::MumpsSolver)
     return M
 end
 
-function solve!(M::MumpsSolver{T},rhs::Vector{T}) where T
+function solve_linear_system!(M::MumpsSolver{T},rhs::Vector{T}) where T
     M.is_singular && return rhs
     M.mumps_struc.rhs = pointer(rhs)
     M.mumps_struc.job = 3

@@ -176,7 +176,7 @@ function factorize!(M::Ma27Solver{T,INT}) where {T,INT}
     return M
 end
 
-function solve!(M::Ma27Solver{T,INT}, rhs::Vector{T}) where {T,INT}
+function solve_linear_system!(M::Ma27Solver{T,INT}, rhs::Vector{T}) where {T,INT}
     length(M.w) < M.maxfrt[1] && resize!(M.w, M.maxfrt[1])
     length(M.iw1) < M.nsteps[1] && resize!(M.iw1, M.nsteps[1])
     HSL.ma27cr(

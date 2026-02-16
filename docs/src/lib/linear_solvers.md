@@ -12,7 +12,7 @@ implements the following interface.
 AbstractLinearSolver
 introduce
 factorize!
-solve!
+solve_linear_system!
 is_inertia
 inertia
 ```

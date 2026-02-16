@@ -137,6 +137,14 @@ Assemble the KKT matrix before calling the factorization routine.
 function build_kkt! end
 
 """
+    factorize_kkt!(kkt::AbstractKKTSystem)
+
+Factorize the KKT matrix using the linear solver stored in `kkt`.
+
+"""
+function factorize_kkt! end
+
+"""
     compress_hessian!(kkt::AbstractKKTSystem)
 
 Compress the Hessian inside `kkt`'s internals.
@@ -168,13 +176,13 @@ in `y`, such that ``y = A' x`` (with ``A`` current Jacobian).
 function jtprod! end
 
 """
-    solve!(kkt::AbstractKKTSystem, w::AbstractKKTVector)
+    solve_kkt!(kkt::AbstractKKTSystem, w::AbstractKKTVector)
 
 Solve the KKT system ``K x = w`` with the linear solver stored
 inside `kkt` and stores the result inplace inside the `AbstractKKTVector` `w`.
 
 """
-function solve! end
+function solve_kkt! end
 
 """
     regularize_diagonal!(kkt::AbstractKKTSystem, primal_values::Number, dual_values::Number)
@@ -196,14 +204,6 @@ function is_inertia_correct end
 "Nonzero in Jacobian"
 function nnz_jacobian end
 
-# TODO: we need these two templates as NLPModels does not implement
-# a template for dense Jacobian and dense Hessian
-"Dense Jacobian callback"
-function jac_dense! end
-
-"Dense Hessian callback"
-function hess_dense! end
-
 #=
     Generic functions
 =#
@@ -213,6 +213,10 @@ function initialize!(kkt::AbstractKKTSystem)
     fill!(kkt.du_diag, 0.0)
     fill!(kkt.hess, 0.0)
     return
+end
+
+function factorize_kkt!(kkt::AbstractKKTSystem)
+    return factorize!(kkt.linear_solver)
 end
 
 function regularize_diagonal!(kkt::AbstractKKTSystem, primal, dual)

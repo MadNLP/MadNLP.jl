@@ -53,7 +53,7 @@ function factorize!(M::CHOLMODSolver)
     return M
 end
 
-function solve!(M::CHOLMODSolver{T}, rhs::Vector{T}) where T
+function solve_linear_system!(M::CHOLMODSolver{T}, rhs::Vector{T}) where T
     if issuccess(M.inner)
         B = CHOLMOD.Dense(rhs)
         X = CHOLMOD.solve(CHOLMOD.CHOLMOD_A, M.inner, B)

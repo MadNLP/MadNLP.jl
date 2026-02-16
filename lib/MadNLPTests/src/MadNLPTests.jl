@@ -46,7 +46,7 @@ function test_linear_solver(solver, T; kwargs...)
     if MadNLP.is_inertia(M)
         @test MadNLP.inertia(M) == (2, 0, 0)
     end
-    x = MadNLP.solve!(M,copy(b))
+    x = MadNLP.solve_linear_system!(M,copy(b))
     @test solcmp(x,sol)
 end
 
@@ -89,7 +89,7 @@ function test_kkt_system(kkt, cb)
     # Backsolve
     x = MadNLP.UnreducedKKTVector(kkt)
     fill!(MadNLP.full(x), 1.0)  # fill RHS with 1
-    out1 = MadNLP.solve!(kkt, x)
+    out1 = MadNLP.solve_kkt!(kkt, x)
     @test out1 === x
 
     y = copy(x)
@@ -444,12 +444,12 @@ function jump_array_type(optimizer_constructor::Function; Arr = Array)
     @testset "jump_array_type" begin
         m = Model(optimizer_constructor)
         set_attribute(m, "array_type", Arr)
-        @variable(m, x >= 1)
-        @objective(m, Min, x^2)
+        @variable(m, x[1:2] >= 1)
+        @objective(m, Min, x[1]^2 + x[2]^2)
         optimize!(m)
 
         @test termination_status(m) == MOI.LOCALLY_SOLVED
-        @test solcmp([value(x)], [1.0])
+        @test solcmp(value.(x), [1.0, 1.0])
     end
 
     return nothing

@@ -1462,7 +1462,7 @@ function MOI.optimize!(model::Optimizer)
         end
     end
 
-    array_type = get(model.options, :array_type, nothing)
+    array_type = pop!(model.options, :array_type, nothing)
     _setup_nlp(model; array_type = array_type)
 
     if model.silent
@@ -1489,6 +1489,7 @@ function MOI.optimize!(model::Optimizer)
     model.result = if isnothing(array_type)
         result
     else
+        model.options[:array_type] = array_type
         copy_result_to_cpu(result)
     end
     model.solve_time = model.solver.cnt.total_time

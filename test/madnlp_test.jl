@@ -301,3 +301,12 @@ end
     @test solver.cnt.k == 4
     @test cb.counter[] == 5
 end
+
+@testset "Warn on option ignore" begin
+    pipe = Pipe()
+    redirect_stdout(pipe) do
+        MadNLPSolver(MadNLPTests.HS15Model(); fake_option = true)
+    end
+    @test readline(pipe) == "The following options are ignored: "
+    @test readline(pipe) == " - fake_option"
+end
