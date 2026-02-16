@@ -194,18 +194,14 @@ function print_summary(solver::AbstractMadNLPSolver)
     @notice(solver.logger,"Number of constraint evaluations                      = $(solver.cnt.con_cnt)")
     @notice(solver.logger,"Number of constraint Jacobian evaluations             = $(solver.cnt.con_jac_cnt)")
     @notice(solver.logger,"Number of Lagrangian Hessian evaluations              = $(solver.cnt.lag_hess_cnt)\n")
-    @notice(solver.logger,@sprintf("Total wall secs in initialization                     = %6.3f",
-                                solver.cnt.init_time))
-    @notice(solver.logger,@sprintf("Total wall secs in linear solver                      = %6.3f",
-                                solver.cnt.linear_solver_time))
-    @notice(solver.logger,@sprintf("Total wall secs in NLP function evaluations           = %6.3f",
-                                solver.cnt.eval_function_time))
-    @notice(solver.logger,@sprintf("Total wall secs in solver (w/o init./fun./lin. alg.)  = %6.3f",
-                                solver.cnt.total_time - solver.cnt.init_time - solver.cnt.linear_solver_time - solver.cnt.eval_function_time))
-    @notice(solver.logger,@sprintf("Total wall secs                                       = %6.3f\n",
-                                solver.cnt.total_time))
+    @notice(solver.logger,"Total wall secs in initialization                     = $(format_time(solver.cnt.init_time))")
+    @notice(solver.logger,"Total wall secs in linear solver                      = $(format_time(solver.cnt.linear_solver_time))")
+    @notice(solver.logger,"Total wall secs in NLP function evaluations           = $(format_time(solver.cnt.eval_function_time))")
+    @notice(solver.logger,"Total wall secs in solver (w/o init./fun./lin. alg.)  = $(format_time(solver.cnt.total_time - solver.cnt.init_time - solver.cnt.linear_solver_time - solver.cnt.eval_function_time))")
+    @notice(solver.logger,"Total wall secs                                       = $(format_time(solver.cnt.total_time))\n")
 end
 
+format_time(t::Float64) = isnan(t) ? " unavailable" : @sprintf("%6.3f s", t)
 
 function string(solver::AbstractMadNLPSolver)
     """

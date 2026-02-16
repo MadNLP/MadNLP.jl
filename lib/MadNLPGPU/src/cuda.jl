@@ -49,7 +49,6 @@ function gpu_transfer!(y::CuMatrix{T}, x::CUSPARSE.CuSparseMatrixCSC{T}) where {
     fill!(y, zero(T))
     backend = CUDABackend()
     _csc_to_dense_kernel!(backend)(y, x.colPtr, x.rowVal, x.nzVal, ndrange = n)
-    synchronize(backend)
     return
 end
 
