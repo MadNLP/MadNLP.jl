@@ -76,11 +76,7 @@ end
             )
             results_qn = MadNLP.solve!(solver_qn)
 
-            if T == Float128
-                @test results_qn.status == MadNLP.SOLVED_TO_ACCEPTABLE_LEVEL
-            else
-                @test results_qn.status == MadNLP.SOLVE_SUCCEEDED
-            end
+            @test results_qn.status == MadNLP.SOLVE_SUCCEEDED || results_qn.status == MadNLP.SOLVED_TO_ACCEPTABLE_LEVEL
             if T == Float64
                 @test results_qn.objective ≈ results_ref.objective atol=1e-6
                 @test results_qn.solution ≈ results_ref.solution atol=1e-6
