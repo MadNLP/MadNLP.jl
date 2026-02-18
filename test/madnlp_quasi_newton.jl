@@ -52,12 +52,13 @@ end
 
     end
     @testset "Size: ($n, $m)" for (n, m) in [(10, 0), (10, 5), (50, 10)]
-        @testset "Precision = $T" for T in (Float32, Float64)
+        @testset "Precision = $T" for T in (Float32, Float64, Float128)
             x0 = zeros(T, n)
             nlp = MadNLPTests.DenseDummyQP(x0; m=m)
             # Reference solve with exact Hessian
             solver_exact = MadNLP.MadNLPSolver(
                 nlp;
+                linear_solver = (T == Float128) ? MadNLP.LDLSolver : MadNLP.MumpsSolver,
                 callback = MadNLP.SparseCallback,
                 kkt_system = MadNLP.SparseKKTSystem,
                 print_level=MadNLP.ERROR,
@@ -67,6 +68,7 @@ end
             # LBFGS solve
             solver_qn = MadNLP.MadNLPSolver(
                 nlp;
+                linear_solver = (T == Float128) ? MadNLP.LDLSolver : MadNLP.MumpsSolver,
                 callback = MadNLP.SparseCallback,
                 kkt_system = MadNLP.SparseKKTSystem,
                 hessian_approximation=MadNLP.CompactLBFGS,
