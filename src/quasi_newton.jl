@@ -394,17 +394,30 @@ function update!(qn::CompactLBFGS{T}, Bk, sk, yk) where {T}
     # Step 2: Mₖ = σₖ Sₖᵀ Sₖ + Lₖ Dₖ⁻¹ Lₖᵀ
     δ .= one(T) ./ sqrt.(qn.Dk)                         # δₖ = 1 / √Dₖ
     _dgmm!('L', qn.Lk', δ, qn.DkLk)                     # Compute (1 / √Dₖ) * Lₖᵀ
-    _syrk!('L', 'T', one(T), qn.Sk, zero(T), qn.Mk)     # Mₖ = Sₖᵀ Sₖ
-    _syrk!('L', 'T', one(T), qn.DkLk, sigma, qn.Mk)     # Mₖ = σₖ Sₖᵀ Sₖ + Lₖ Dₖ⁻¹ Lₖᵀ
+    if T <: BlasReal
+        _syrk!('L', 'T', one(T), qn.Sk, zero(T), qn.Mk) # Mₖ = Sₖᵀ Sₖ
+        _syrk!('L', 'T', one(T), qn.DkLk, sigma, qn.Mk) # Mₖ = σₖ Sₖᵀ Sₖ + Lₖ Dₖ⁻¹ Lₖᵀ
+    else
+        mul!(qn.Mk, qn.Sk', qn.Sk)                      # Mₖ = Sₖᵀ Sₖ
+        mul!(qn.Mk, qn.DkLk', qn.DkLk, one(T), sigma)   # Mₖ = σₖ Sₖᵀ Sₖ + Lₖ Dₖ⁻¹ Lₖᵀ
+    end
 
     # Step 3: Perform a Cholesky factorization of Mₖ
-    LAPACK.potrf!('L', qn.Mk)                           # Mₖ = Jₖ Jₖᵀ (factorization)
+    if T <: BlasReal
+        LAPACK.potrf!('L', qn.Mk)                       # Mₖ = Jₖ Jₖᵀ (factorization)
+    else
+        cholesky!(Symmetric(qn.Mk, :L))                 # Mₖ = Jₖ Jₖᵀ (factorization)
+    end
 
     # Step 4: Update Uₖ and Vₖ
     _dgmm!('R', qn.Yk, δ, qn.V)                         # Vₖ = Yₖ * (1 / √Dₖ)
     copyto!(qn.U, qn.Sk)                                # Uₖ = Sₖ
     mul!(qn.U, qn.V, qn.DkLk, one(T), sigma)            # Uₖ = σₖ Sₖ + Yₖ Dₖ⁻¹ Lₖᵀ
-    _trsm!('R', 'L', 'T', 'N', one(T), qn.Mk, qn.U)     # Uₖ = (σₖ Sₖ + Yₖ Dₖ⁻¹ Lₖᵀ) Jₖ⁻ᵀ
+    if T <: BlasReal
+        _trsm!('R', 'L', 'T', 'N', one(T), qn.Mk, qn.U) # Uₖ = (σₖ Sₖ + Yₖ Dₖ⁻¹ Lₖᵀ) Jₖ⁻ᵀ
+    else
+        rdiv!(qn.U, LowerTriangular(qn.Mk)')            # Uₖ = (σₖ Sₖ + Yₖ Dₖ⁻¹ Lₖᵀ) Jₖ⁻ᵀ
+    end
 
     return true
 end
