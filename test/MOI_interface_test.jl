@@ -198,7 +198,7 @@ end
 
 function test_Parameter_basic()
     F, S = MOI.VariableIndex, MOI.Parameter{Float64}
-    model = UMadNLP.Optimizer()
+    model = MadNLP.Optimizer()
     @test MOI.supports_add_constrained_variable(model, S)
     @test !MOI.supports_constraint(model, F, S)
     @test isempty(MOI.get(model, MOI.ListOfConstraintTypesPresent()))
