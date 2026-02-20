@@ -104,8 +104,8 @@ The attributes `kkt.hess` and `kkt.jac` are accessed respectively using
 the getters [`get_hessian`](@ref) and [`get_jacobian`](@ref).
 
 Every time MadNLP queries the Hessian and the Jacobian, it updates the
-nonzeros values in `kkt.hess` and `kkt.jac`.
-Rightafter, MadNLP calls respectively
+nonzero values in `kkt.hess` and `kkt.jac`.
+Rightafter, MadNLP calls
 the functions [`compress_hessian!`](@ref) and [`compress_jacobian!`](@ref) respectively, to propagate these updates to all internal structures of the KKT system `kkt` associated with the Hessian and the Jacobian.
 
 To recap, every time we evaluate the Hessian and the Jacobian, MadNLP
