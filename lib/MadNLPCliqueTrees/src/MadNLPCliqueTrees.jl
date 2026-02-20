@@ -3,7 +3,8 @@ module MadNLPCliqueTrees
 using CliqueTrees
 using CliqueTrees: EliminationAlgorithm, SupernodeType
 using CliqueTrees.Multifrontal
-using CliqueTrees.Multifrontal: FVector, flatindices, setflatindex!
+using CliqueTrees.Multifrontal: FChordalLDLt, FChordalCholesky, flatindices, setflatindex!
+using CliqueTrees: DEFAULT_ELIMINATION_ALGORITHM, DEFAULT_SUPERNODE_TYPE
 using LinearAlgebra
 using SparseArrays
 
@@ -29,34 +30,29 @@ import MadNLP:
 
 @kwdef mutable struct CliqueTreesOptions <: AbstractOptions
     cliquetrees_algorithm::LinearFactorization = LDL
-    cliquetrees_ordering::EliminationAlgorithm = AMF()
-    cliquetrees_supernode::SupernodeType = Maximal()
+    cliquetrees_ordering::EliminationAlgorithm = DEFAULT_ELIMINATION_ALGORITHM # AMF
+    cliquetrees_supernode::SupernodeType = DEFAULT_SUPERNODE_TYPE # Maximal
 end
-
-const FChordalLDLt{T}      = ChordalLDLt{:L, T, Int, FVector{T}, FVector{Int}}
-const FChordalCholesky{T}  = ChordalCholesky{:L, T, Int, FVector{T}, FVector{Int}}
 
 mutable struct CliqueTreesSolver{T, F <: Factorization{T}} <: AbstractLinearSolver{T}
     tril::SparseMatrixCSC{T, Int32}
     F::F
-    P::Vector{Int}
+    P::Vector{Int32}
     opt::CliqueTreesOptions
     logger::MadNLPLogger
 end
 
 function _build_factorization(tril::SparseMatrixCSC{T, Int32}, opt::CliqueTreesOptions, ::Val{LDL}) where T
-    csc = SparseMatrixCSC{T, Int}(tril)
-    sym = Symmetric(csc, :L)
-    F = ChordalLDLt{:L}(sym; alg=opt.cliquetrees_ordering, snd=opt.cliquetrees_supernode)::FChordalLDLt{T}
-    P = flatindices(F, sym)
+    S = Symmetric(tril, :L)
+    F = ChordalLDLt{:L}(S; alg = opt.cliquetrees_ordering, snd = opt.cliquetrees_supernode)::FChordalLDLt{:L, T, Int32}
+    P = flatindices(F, S)
     return F, P
 end
 
 function _build_factorization(tril::SparseMatrixCSC{T, Int32}, opt::CliqueTreesOptions, ::Val{CHOLESKY}) where T
-    csc = SparseMatrixCSC{T, Int}(tril)
-    sym = Symmetric(csc, :L)
-    F = ChordalCholesky{:L}(sym; alg=opt.cliquetrees_ordering, snd=opt.cliquetrees_supernode)::FChordalCholesky{T}
-    P = flatindices(F, sym)
+    S = Symmetric(tril, :L)
+    F = ChordalCholesky{:L}(S; alg = opt.cliquetrees_ordering, snd = opt.cliquetrees_supernode)::FChordalCholesky{:L, T, Int32}
+    P = flatindices(F, S)
     return F, P
 end
 
@@ -71,7 +67,6 @@ end
 
 function factorize!(M::CliqueTreesSolver{T, <:ChordalLDLt}) where T
     fill!(M.F, zero(T))
-    fill!(M.F.d, zero(T))
     nzval = M.tril.nzval
     @inbounds for i in eachindex(M.P)
         setflatindex!(M.F, nzval[i], M.P[i])
