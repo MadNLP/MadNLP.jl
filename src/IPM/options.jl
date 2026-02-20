@@ -60,6 +60,8 @@ hessian\\_approximation        | `ExactHessian` | method used to approximate the
 quasi\\_newton\\_options       | QuasiNewtonOptions() | options for quasi-Newton algorithm
 inertia\\_correction\\_method  | InertiaAuto          | inertia correction mechanism
 inertia\\_free\\_tol           | 0.0                  | tolerance for inertia free method
+default\\_primal\\_regularization | 0.0 | default regularization for primal variable blocks in the KKT system
+default\\_dual\\_regularization   | 0.0 | default regularization for dual variable blocks in the KKT system
 ||
 __Initialization__||
 ||
@@ -147,6 +149,8 @@ tau\\_min                      | 0.99                 | lower bound on fraction-
     quasi_newton_options::QuasiNewtonOptions{T} = QuasiNewtonOptions{T}()
     inertia_correction_method::Type = InertiaAuto
     inertia_free_tol::T = 0.
+    default_primal_regularization::T = 0.
+    default_dual_regularization::T = 0.
 
     # initialization options
     dual_initialized::Bool = false
