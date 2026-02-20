@@ -1,4 +1,4 @@
-using Test, MadNLP, MadNLPCliqueTrees, MadNLPTests
+using Test, MadNLP, MadNLPCliqueTrees, MadNLPTests, CliqueTrees
 using SparseArrays
 
 @testset "MadNLPCliqueTrees test" begin
@@ -28,4 +28,32 @@ using SparseArrays
         () -> MadNLP.Optimizer(linear_solver = CliqueTreesSolver, print_level = MadNLP.ERROR),
         [],
     )
+
+    @testset "Elimination orderings" begin
+        for alg in [MMD(), MCS(), LexBFS(), MCSM(), LexM(), MF(), RCMMD(), RCMGL()]
+            test_madnlp(
+                "CliqueTrees/$(nameof(typeof(alg)))",
+                () -> MadNLP.Optimizer(
+                    linear_solver = CliqueTreesSolver,
+                    print_level = MadNLP.ERROR,
+                    cliquetrees_ordering = alg,
+                ),
+                [],
+            )
+        end
+    end
+
+    @testset "Supernode types" begin
+        for snd in [Fundamental(), Nodal()]
+            test_madnlp(
+                "CliqueTrees/$(nameof(typeof(snd)))",
+                () -> MadNLP.Optimizer(
+                    linear_solver = CliqueTreesSolver,
+                    print_level = MadNLP.ERROR,
+                    cliquetrees_supernode = snd,
+                ),
+                [],
+            )
+        end
+    end
 end
