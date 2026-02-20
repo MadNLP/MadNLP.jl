@@ -140,16 +140,11 @@ By default, it is stored in the attribute `kkt.linear_solver`.
 The factorization is handled internally in MadNLP.
 
 Once factorized, it remains to solve the linear system using a backsolve.
-<<<<<<< HEAD
-The backsolve has to be implemented by the user in the function `solve_kkt!`.
+The backsolve has to be implemented by the user in the function [`solve_kkt!`](@ref).
 It reduces the right-hand-side (RHS) down to a form adapted to the condensed matrix
-``K_c`` and calls the linear solver to perform the backsolve. Then the condensed solution
+``K_c`` and calls the linear solver to perform the backsolve.
+Then the condensed solution
 is unpacked to recover the full solution ``(\Delta x, \Delta y, \Delta z_\ell, \Delta z_u)``.
-=======
-The backsolve has to be implemented by the user in the function [`solve!`](@ref).
-It reduces the right-hand-side (RHS) down to a form adapted to the condensed matrix ``K_c`` and calls the linear solver to perform the backsolve.
-Then the condensed solution is unpacked to recover the full solution ``(\Delta x, \Delta y, \Delta z_\ell, \Delta z_u)``.
->>>>>>> ff7b7993 ([documentation] Update the tutorial related to the custom KKT system)
 
 To recap, MadNLP assembles and solves the KKT linear system using the
 following operations:
@@ -305,7 +300,6 @@ We pass as arguments:
 This function instantiates all the data structures needed in `DiagonalHessianKKTSystem`.
 The most difficult part is to assemble the sparse matrices `aug_raw` and `jac_raw`,
 here stored in COO format.
-<!-- What is exactly aug_raw and jac_raw? -->
 This is done in four steps:
 
 **Step 1.** We import the sparsity pattern of the Jacobian :
