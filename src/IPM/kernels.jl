@@ -76,7 +76,7 @@ function set_aug_RR!(kkt::AbstractKKTSystem, solver::AbstractMadNLPSolver, RR::R
     zl = full(solver.zl)
     zu = full(solver.zu)
     kkt.reg .= solver.opt.default_primal_regularization .+ RR.zeta .* RR.D_R .^ 2
-    kkt.du_diag .= - solver.opt.default_dual_regularization .- RR.pp ./ RR.zp .- RR.nn ./ RR.zn
+    kkt.du_diag .= .- solver.opt.default_dual_regularization .- RR.pp ./ RR.zp .- RR.nn ./ RR.zn
     copyto!(kkt.l_lower, solver.zl_r)
     copyto!(kkt.u_lower, solver.zu_r)
     kkt.l_diag .= solver.xl_r .- solver.x_lr
@@ -93,7 +93,7 @@ function set_aug_RR!(kkt::ScaledSparseKKTSystem, solver::AbstractMadNLPSolver, R
     zl = full(solver.zl)
     zu = full(solver.zu)
     kkt.reg .= solver.opt.default_primal_regularization .+ RR.zeta .* RR.D_R .^ 2
-    kkt.du_diag .= - solver.opt.default_dual_regularization .- RR.pp ./ RR.zp .- RR.nn ./ RR.zn
+    kkt.du_diag .= .- solver.opt.default_dual_regularization .- RR.pp ./ RR.zp .- RR.nn ./ RR.zn
     copyto!(kkt.l_lower, solver.zl_r)
     copyto!(kkt.u_lower, solver.zu_r)
     kkt.l_diag .= solver.x_lr .- solver.xl_r

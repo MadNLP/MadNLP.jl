@@ -244,12 +244,12 @@ function is_inertia_correct(kkt::AbstractKKTSystem, num_pos, num_zero, num_neg)
 end
 
 """
-        should_regularize_dual(solver::AbstractKKTSystem, num_pos, num_zero, num_neg)
+        should_regularize_dual(kkt::AbstractKKTSystem, num_pos, num_zero, num_neg)
 
 Check if the inertia ``(num_pos, num_zero, num_neg)`` returned by the linear solver
 necessitates the dual regularization of the KKT system.
 """
-function should_regularize_dual(solver::AbstractKKTSystem, num_pos, num_zero, num_neg)
+function should_regularize_dual(kkt::AbstractKKTSystem, num_pos, num_zero, num_neg)
     return num_zero != 0
 end
 

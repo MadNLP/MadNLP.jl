@@ -138,7 +138,7 @@ num_variables(kkt::SparseCondensedKKTSystem) = length(kkt.pr_diag)
 function is_inertia_correct(kkt::SparseCondensedKKTSystem, num_pos, num_zero, num_neg)
     return (num_zero == 0) && (num_pos == size(kkt.aug_com, 1))
 end
-should_regularize_dual(solver::SparseCondensedKKTSystem, num_pos, num_zero, num_neg) = true
+should_regularize_dual(kkt::SparseCondensedKKTSystem, num_pos, num_zero, num_neg) = true
 
 Base.size(kkt::SparseCondensedKKTSystem,n::Int) = size(kkt.aug_com,n)
 
