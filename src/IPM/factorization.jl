@@ -111,18 +111,23 @@ function solve_kkt!(
         end
         copyto!(qn.H, qn.E)
 
-        multi_solve!(kkt.linear_solver, qn.H)  # H = C⁻¹ E
+        solve_linear_system!(kkt.linear_solver, qn.H)  # H = C⁻¹ E
 
         for i = 1:p
             Tk[i,i] = -one(T)                  # Tₖ = P
             Tk[i+p,i+p] = one(T)
         end
         mul!(Tk, qn.E', qn.H, one(T), one(T))  # Tₖ = (P + Eᵀ C⁻¹ E)
-
-        F, ipiv, info = LAPACK.sytrf!('L', Tk) # Tₖ⁻¹
-
         mul!(xr, qn.E', w_)                    # xᵣ = Eᵀ C⁻¹ b
-        LAPACK.sytrs!('L', F, ipiv, xr)        # xᵣ = (P + Eᵀ C⁻¹ E)⁻¹ Eᵀ C⁻¹ b
+
+        if T <: BlasReal
+            F, ipiv, info = LAPACK.sytrf!('L', Tk)  # Tₖ⁻¹
+            LAPACK.sytrs!('L', F, ipiv, xr)         # xᵣ = (P + Eᵀ C⁻¹ E)⁻¹ Eᵀ C⁻¹ b
+        else
+            F = bunchkaufman!(Symmetric(Tk, :L))    # Tₖ⁻¹
+            ldiv!(F, xr)                            # xᵣ = (P + Eᵀ C⁻¹ E)⁻¹ Eᵀ C⁻¹ b
+        end
+
         mul!(w_, qn.H, xr, -one(T), one(T))    # x = x - C⁻¹ E xᵣ
     end
 
@@ -327,6 +332,7 @@ function mul_hess_blk!(wx, kkt::Union{SparseKKTSystem,SparseCondensedKKTSystem},
     fill!(@view(wx[n+1:end]), 0)
     wx .+= t .* kkt.pr_diag
 end
+
 function mul_hess_blk!(wx, kkt::SparseUnreducedKKTSystem, t)
     ind_lb = kkt.ind_lb
     ind_ub = kkt.ind_ub
