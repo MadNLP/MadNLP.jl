@@ -13,19 +13,19 @@ struct DenseWrapperModel{T,VT,T2,VT2,MT2, I <: NLPModels.AbstractNLPModel{T2,VT2
 end
 
 mutable struct SparseWrapperModel{T,VT,T2,VI2,VT2,I <: NLPModels.AbstractNLPModel{T2,VT2}} <: AbstractWrapperModel{T,VT}
-    inner::I
-    jrows::VI2
-    jcols::VI2
-    hrows::VI2
-    hcols::VI2
-    x::VT2
-    y::VT2
-    con::VT2
-    grad::VT2
-    jac::VT2
-    hess::VT2
-    meta::NLPModels.NLPModelMeta{T, VT}
-    counters::NLPModels.Counters
+    const inner::I
+    const jrows::VI2
+    const jcols::VI2
+    const hrows::VI2
+    const hcols::VI2
+    const x::VT2
+    const y::VT2
+    const con::VT2
+    const grad::VT2
+    const jac::VT2
+    const hess::VT2
+    const meta::NLPModels.NLPModelMeta{T, VT}
+    const counters::NLPModels.Counters
 end
 
 """
