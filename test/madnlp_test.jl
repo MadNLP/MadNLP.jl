@@ -287,9 +287,9 @@ end
     counter::Base.RefValue{Int} = Ref(0)
 end
 
-function (cb::UserCallback)(solver::MadNLP.AbstractMadNLPSolver, mode::Symbol)
+function (cb::UserCallback)(solver::MadNLP.AbstractMadNLPSolver, mode)
     cb.counter[] += 1
-    return solver.cnt.k > 3
+    return solver.cnt.k <= 3
 end
 
 @testset "User-defined callback termination" begin
