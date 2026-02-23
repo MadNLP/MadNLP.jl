@@ -3,9 +3,10 @@ module MadNLPCliqueTrees
 using CliqueTrees
 using CliqueTrees: EliminationAlgorithm, SupernodeType
 using CliqueTrees.Multifrontal
-using CliqueTrees.Multifrontal: FChordalLDLt, FChordalCholesky, flatindices, setflatindex!
+using CliqueTrees.Multifrontal: FChordalLDLt, FChordalCholesky
 using CliqueTrees: DEFAULT_ELIMINATION_ALGORITHM, DEFAULT_SUPERNODE_TYPE
 using LinearAlgebra
+using LinearAlgebra: PivotingStrategy
 using SparseArrays
 
 import MadNLP:
@@ -32,12 +33,12 @@ import MadNLP:
     cliquetrees_algorithm::LinearFactorization = LDL
     cliquetrees_ordering::EliminationAlgorithm = DEFAULT_ELIMINATION_ALGORITHM # AMF
     cliquetrees_supernode::SupernodeType = DEFAULT_SUPERNODE_TYPE # Maximal
+    cliquetrees_strategy::PivotingStrategy = NoPivot()
 end
 
 mutable struct CliqueTreesSolver{T, F <: Factorization{T}} <: AbstractLinearSolver{T}
     tril::SparseMatrixCSC{T, Int32}
     F::F
-    P::Vector{Int32}
     opt::CliqueTreesOptions
     logger::MadNLPLogger
 end
@@ -45,15 +46,13 @@ end
 function _build_factorization(tril::SparseMatrixCSC{T, Int32}, opt::CliqueTreesOptions, ::Val{LDL}) where T
     S = Symmetric(tril, :L)
     F = ChordalLDLt{:L}(S; alg = opt.cliquetrees_ordering, snd = opt.cliquetrees_supernode)::FChordalLDLt{:L, T, Int32}
-    P = flatindices(F, S)
-    return F, P
+    return F
 end
 
 function _build_factorization(tril::SparseMatrixCSC{T, Int32}, opt::CliqueTreesOptions, ::Val{CHOLESKY}) where T
     S = Symmetric(tril, :L)
     F = ChordalCholesky{:L}(S; alg = opt.cliquetrees_ordering, snd = opt.cliquetrees_supernode)::FChordalCholesky{:L, T, Int32}
-    P = flatindices(F, S)
-    return F, P
+    return F
 end
 
 function CliqueTreesSolver(
@@ -61,17 +60,12 @@ function CliqueTreesSolver(
     opt = CliqueTreesOptions(),
     logger = MadNLPLogger(),
 ) where T
-    F, P = _build_factorization(tril, opt, Val(opt.cliquetrees_algorithm))
-    return CliqueTreesSolver{T, typeof(F)}(tril, F, P, opt, logger)
+    F = _build_factorization(tril, opt, Val(opt.cliquetrees_algorithm))
+    return CliqueTreesSolver{T, typeof(F)}(tril, F, opt, logger)
 end
 
 function factorize!(M::CliqueTreesSolver{T, <:ChordalLDLt}) where T
-    fill!(M.F, zero(T))
-    nzval = M.tril.nzval
-    @inbounds for i in eachindex(M.P)
-        setflatindex!(M.F, nzval[i], M.P[i])
-    end
-    ldlt!(M.F; check=false)
+    ldlt!(copy!(M.F, M.tril), M.opt.cliquetrees_strategy; check=false)
     return M
 end
 
@@ -79,6 +73,7 @@ function solve_linear_system!(M::CliqueTreesSolver{T, <:ChordalLDLt}, rhs::Vecto
     if issuccess(M.F)
         ldiv!(M.F, rhs)
     end
+
     return rhs
 end
 
@@ -101,12 +96,7 @@ introduce(::CliqueTreesSolver{T, <:ChordalLDLt}) where T =
     "CliqueTrees/LDLᵀ v$(pkgversion(CliqueTrees))"
 
 function factorize!(M::CliqueTreesSolver{T, <:ChordalCholesky}) where T
-    fill!(M.F, zero(T))
-    nzval = M.tril.nzval
-    @inbounds for i in eachindex(M.P)
-        setflatindex!(M.F, nzval[i], M.P[i])
-    end
-    cholesky!(M.F; check=false)
+    cholesky!(copy!(M.F, M.tril), M,opt.cliquetrees_strategy; check=false)
     return M
 end
 
@@ -114,11 +104,13 @@ function solve_linear_system!(M::CliqueTreesSolver{T, <:ChordalCholesky}, rhs::V
     if issuccess(M.F)
         ldiv!(M.F, rhs)
     end
+
     return rhs
 end
 
 function inertia(M::CliqueTreesSolver{T, <:ChordalCholesky}) where T
     n = size(M.tril, 1)
+
     if issuccess(M.F)
         return (n, 0, 0)
     else

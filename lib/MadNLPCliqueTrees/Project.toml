@@ -9,7 +9,7 @@ MadNLP = "2621e9c9-9eb4-46b1-8089-e8c72242dfb6"
 SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 
 [compat]
-CliqueTrees = "1.14.1"
+CliqueTrees = "1.15"
 MadNLP = "0.8"
 julia = "1.10"
 
