@@ -24,7 +24,7 @@ mutable struct MadNLPSolver{
     cb::CB
     kkt::KKTSystem
 
-    opt::MadNLPOptions
+    opt::MadNLPOptions{T}
     cnt::MadNLPCounters
     logger::MadNLPLogger
 
