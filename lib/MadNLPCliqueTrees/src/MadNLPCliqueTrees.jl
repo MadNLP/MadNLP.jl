@@ -33,7 +33,19 @@ import MadNLP:
     cliquetrees_algorithm::LinearFactorization = LDL
     cliquetrees_ordering::EliminationAlgorithm = DEFAULT_ELIMINATION_ALGORITHM # AMF
     cliquetrees_supernode::SupernodeType = DEFAULT_SUPERNODE_TYPE # Maximal
-    cliquetrees_strategy::PivotingStrategy = NoPivot()
+    cliquetrees_strategy::PivotingStrategy = choose_strategy(cliquetrees_algorithm)
+end
+
+function choose_strategy(alg::LinearFactorization)
+    if alg == CHOLESKY
+        strategy = NoPivot()
+    elseif alg == LDL
+        strategy = RowMaximum()
+    else
+        error()
+    end
+
+    return strategy
 end
 
 mutable struct CliqueTreesSolver{T, F <: Factorization{T}} <: AbstractLinearSolver{T}
