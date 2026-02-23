@@ -62,6 +62,7 @@ jobs:
         run: |
           using Pkg
           Pkg.Registry.update()
+          Pkg.develop(path=".")
           Pkg.instantiate()
           path_HSL_jll = "/home/action-runner/HSL_jll.jl.v" * ENV["HSL_VERSION"]
           Pkg.develop(path=path_HSL_jll)
@@ -123,6 +124,10 @@ jobs:
         run: |
           using Pkg
           Pkg.Registry.update()
+          Pkg.develop(path=".")
+          using MadNLP
+          PATH_MADNLP = dirname(pathof(MadNLP))
+          Pkg.develop(path=joinpath(PATH_MADNLP, "..", "lib", "MadNLPTests"))
           Pkg.test("MadNLPGPU", coverage=true)
       - uses: julia-actions/julia-processcoverage@v1
         with:

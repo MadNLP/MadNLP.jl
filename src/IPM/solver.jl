@@ -7,17 +7,9 @@ as a [`MadNLPExecutionStats`](@ref).
 
 """
 function madnlp(model::AbstractNLPModel; kwargs...)
-    solver = MadNLPSolver(model;kwargs...)
+    solver = MadNLPSolver(model; kwargs...)
     return solve!(solver)
 end
-
-solve!(nlp::AbstractNLPModel, solver::AbstractMadNLPSolver; kwargs...) = solve!(
-    nlp, solver, MadNLPExecutionStats(solver);
-    kwargs...)
-solve!(solver::AbstractMadNLPSolver; kwargs...) = solve!(
-    solver.nlp, solver;
-    kwargs...)
-
 
 function initialize!(solver::AbstractMadNLPSolver{T}) where T
 
@@ -126,28 +118,23 @@ function reinitialize!(solver::AbstractMadNLPSolver)
 end
 
 # major loops ---------------------------------------------------------
+"""
+    solve!(
+        solver::AbstractMadNLPSolver,
+        stats::MadNLPExecutionStats;
+        kwargs...
+    )
+
+Solve the problem formulated inside `solver`. Return the solution
+in `stats` by modifying inplace the values. The options are specified in `kwargs`.
+
+"""
+solve!(solver::AbstractMadNLPSolver; kwargs...) = solve!(solver, MadNLPExecutionStats(solver); kwargs...)
 function solve!(
-    nlp::AbstractNLPModel,
     solver::AbstractMadNLPSolver,
     stats::MadNLPExecutionStats;
-    x = nothing, y = nothing,
-    zl = nothing, zu = nothing,
     kwargs...
-        )
-
-    if x != nothing
-        full(solver.x)[1:get_nvar(nlp)] .= x
-    end
-    if y != nothing
-        solver.y[1:get_ncon(nlp)] .= y
-    end
-    if zl != nothing
-        full(solver.zl)[1:get_nvar(nlp)] .= zl
-    end
-    if zu != nothing
-        full(solver.zu)[1:get_nvar(nlp)] .= zu
-    end
-
+)
     if !isempty(kwargs)
         @warn(solver.logger,"The options set during resolve may not have an effect")
         set_options!(solver.opt, kwargs)
@@ -166,6 +153,11 @@ function solve!(
             solver.status = initialize!(solver)
         else # resolving the problem
             solver.status = reinitialize!(solver)
+        end
+
+        if is_async(solver.kkt.linear_solver)
+            @trace(solver.logger, "linear solver time is not available for asynchronous linear solvers.")
+            solver.cnt.linear_solver_time = NaN
         end
 
         while solver.status >= REGULAR
@@ -650,7 +642,7 @@ function inertia_correction!(
                 return false
             end
         end
-        solver.del_c = num_zero == 0 ? zero(T) : solver.opt.jacobian_regularization_value * solver.mu^(solver.opt.jacobian_regularization_exponent)
+        solver.del_c = should_regularize_dual(solver.kkt, num_pos, num_zero, num_neg) ? solver.opt.jacobian_regularization_value * solver.mu^(solver.opt.jacobian_regularization_exponent) : zero(T)
         regularize_diagonal!(solver.kkt, solver.del_w - del_w_prev, solver.del_c - del_c_prev)
         del_w_prev = solver.del_w
         del_c_prev = solver.del_c

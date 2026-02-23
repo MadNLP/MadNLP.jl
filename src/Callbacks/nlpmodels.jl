@@ -2,8 +2,8 @@
     MadNLP wrappers
 
     MadNLP adapts any AbstractNLPModel to avoid numerical issues.
-    The `AbstractNLPModel` is wrapped as a `SparseCallback` or
-    as a `DenseCallback` (if the dense callbacks `jac_dense!` and `hess_dense!` are specified).
+    The `AbstractNLPModel` is wrapped as a `SparseCallback` or as a `DenseCallback`
+    (if both nlp.meta.sparse_jacobian and nlp.meta.sparse_hessian are set to false).
 
     The wrapper reformulates the model by:
     1. scaling the objective and the constraints.
@@ -659,7 +659,7 @@ function unpack_z!(z_full, cb::AbstractCallback, z)
     z_full .= z ./ cb.obj_scale[]
 end
 function unpack_y!(y_full, cb::AbstractCallback, y)
-    y_full .= (y .* cb.con_scale) ./ cb.obj_scale[]
+    y_full .= (y .* cb.con_scale) .* (cb.obj_sign / cb.obj_scale[])
 end
 
 # N.B.: Special getters if we use SparseCallback with a MakeParameter fixed_handler,
@@ -688,7 +688,7 @@ function unpack_x!(x_full, cb::SparseCallback{T, VT, VI, NLP, FH}, x) where {T, 
 end
 function unpack_z!(z_full, cb::SparseCallback{T, VT, VI, NLP, FH}, z) where {T, VT, VI, NLP, FH<:MakeParameter}
     free = cb.fixed_handler.free
-    z_full[free] .= z
+    z_full[free] .= z ./ cb.obj_scale[]
 end
 
 
@@ -751,7 +751,7 @@ function set_scaling!(
     jac_buffer = similar(grad_buffer, cb.ncon, cb.nvar)
 
     # Set scaling
-    jac_dense!(nlp, x0, jac_buffer)
+    NLPModels.jac_dense!(nlp, x0, jac_buffer)
     set_con_scale_dense!(con_scale, jac_buffer, nlp_scaling_max_gradient)
 
     NLPModels.grad!(nlp, x0, grad_buffer)
@@ -875,6 +875,9 @@ function _eval_lag_hess_wrapper!(
     @inbounds @simd for k in 1:length(cb.hess_I)
         i, j = cb.hess_I[k], cb.hess_J[k]
         hess[i, j] += hess_buffer[k]
+        if i != j
+            hess[j, i] += hess_buffer[k]
+        end
     end
     return hess
 end
@@ -888,7 +891,7 @@ function _eval_jac_wrapper!(
     x::AbstractVector,
     jac::AbstractMatrix,
 ) where {T, VT, VI, NLP, FH}
-    jac_dense!(cb.nlp, x, jac)
+    NLPModels.jac_dense!(cb.nlp, x, jac)
     jac .*= cb.con_scale
     return jac
 end
@@ -900,7 +903,7 @@ function _eval_lag_hess_wrapper!(
     hess::AbstractMatrix;
     obj_weight = one(T),
 ) where {T, VT, VI, NLP, FH}
-    hess_dense!(cb.nlp, x, y, hess; obj_weight = obj_weight * cb.obj_scale[])
+    NLPModels.hess_dense!(cb.nlp, x, y, hess; obj_weight = obj_weight * cb.obj_scale[])
     return hess
 end
 
@@ -1036,7 +1039,7 @@ function _eval_jac_wrapper!(
     x::AbstractVector,
     jac::AbstractMatrix,
 ) where {T, VT, VI, NLP, FH<:MakeParameter}
-    jac_dense!(cb.nlp, x, jac)
+    NLPModels.jac_dense!(cb.nlp, x, jac)
     jac .*= cb.con_scale
     return jac[:, cb.fixed_handler.fixed] .= zero(T)
 end
@@ -1048,7 +1051,7 @@ function _eval_lag_hess_wrapper!(
     hess::AbstractMatrix;
     obj_weight = one(T),
 ) where {T, VT, VI, NLP, FH<:MakeParameter}
-    hess_dense!(cb.nlp, x, y, hess; obj_weight = obj_weight * cb.obj_scale[])
+    NLPModels.hess_dense!(cb.nlp, x, y, hess; obj_weight = obj_weight * cb.obj_scale[])
     fixed = cb.fixed_handler.fixed
     hess[:, fixed] .= zero(T)
     hess[fixed, :] .= zero(T)
@@ -1059,7 +1062,13 @@ end
 #=
     Compute bounds' multipliers for fixed variables
 
-    At a KKT solution, we have ∇f + ∇cᵀ y - zl + zu = 0 , (zl, zu) >= 0
+    At a KKT solution, we have:
+
+    Min problem:
+    ∇f + ∇cᵀ y - zl + zu = 0 , (zl, zu) >= 0
+
+    Max problem:
+    ∇f + ∇cᵀ y + zl - zu = 0 , (zl, zu) >= 0
 =#
 
 # N.B.: by default do nothing as the bounds' multipliers are computed by the algorithm
@@ -1067,7 +1076,6 @@ function update_z!(cb, x, y, zl, zu, jacl) end
 
 function update_z!(cb::AbstractCallback{T, VT, FH}, x, y, zl, zu, jacl) where {T, VT, FH<:MakeParameter}
     fixed_handler = cb.fixed_handler::MakeParameter
-    sense = get_minimize(cb.nlp) ? 1 : -1
     ind_fixed = fixed_handler.fixed
     g_full = fixed_handler.g_full
     jtv = similar(g_full) ; fill!(jtv, zero(T))
@@ -1075,8 +1083,8 @@ function update_z!(cb::AbstractCallback{T, VT, FH}, x, y, zl, zu, jacl) where {T
     NLPModels.jtprod!(cb.nlp, x, y, jtv)     # ∇cᵀ y
     g_full .+= jtv                           # ∇f + ∇cᵀ y
     g_fixed = view(g_full, ind_fixed)
-    zl[ind_fixed] .= sense .* max.(zero(T), g_fixed)
-    zu[ind_fixed] .= sense .* max.(zero(T), .-g_fixed)
+    zl[ind_fixed] .= max.(zero(T), cb.obj_sign .* g_fixed)
+    zu[ind_fixed] .= max.(zero(T), .-cb.obj_sign .* g_fixed)
     return
 end
 

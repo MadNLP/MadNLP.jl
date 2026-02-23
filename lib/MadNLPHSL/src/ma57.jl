@@ -153,7 +153,7 @@ function factorize!(M::Ma57Solver{T,INT}) where {T,INT}
     return M
 end
 
-function solve!(M::Ma57Solver{T,INT}, rhs::Vector{T}) where {T,INT}
+function solve_linear_system!(M::Ma57Solver{T,INT}, rhs::Vector{T}) where {T,INT}
     HSL.ma57cr(
         T,
         INT,

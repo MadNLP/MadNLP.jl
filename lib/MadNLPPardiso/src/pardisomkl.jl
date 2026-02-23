@@ -200,7 +200,7 @@ function factorize!(M::PardisoMKLSolver{T}) where {T}
     M.err.x < 0 && throw(FactorizationException())
     return M
 end
-function solve!(M::PardisoMKLSolver{T}, rhs::Vector{T}) where {T}
+function solve_linear_system!(M::PardisoMKLSolver{T}, rhs::Vector{T}) where {T}
     pardisomkl_set_num_threads!(M.opt.pardisomkl_num_threads)
     pardisomkl_pardiso(
         M.pt,

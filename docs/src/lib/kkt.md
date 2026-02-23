@@ -37,11 +37,14 @@ get_hessian
 
 initialize!
 build_kkt!
+factorize_kkt!
+solve_kkt!
 compress_hessian!
 compress_jacobian!
 jtprod!
 regularize_diagonal!
 is_inertia_correct
+should_regularize_dual
 nnz_jacobian
 ```
 
@@ -53,11 +56,11 @@ as implemented by `SparseKKTSystem`:
 SparseKKTSystem
 
 ```
-Alternatively, the user has the choice to store the KKT system as a `SparseUnreducedKKTSystem`
-or as a `SparseCondensedKKTSystem`:
+The user has the alternative choices:
 ```@docs
 SparseUnreducedKKTSystem
 SparseCondensedKKTSystem
+ScaledSparseKKTSystem
 ```
 
 ## Dense KKT systems

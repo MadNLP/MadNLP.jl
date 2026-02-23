@@ -191,7 +191,7 @@ function is_inertia_correct(kkt::DenseCondensedKKTSystem, num_pos, num_zero, num
 end
 
 # For inertia-free regularization
-function _mul_expanded!(y::AbstractVector, kkt::DenseCondensedKKTSystem, x::AbstractVector)
+function _mul_expanded!(y::AbstractVector, kkt::DenseCondensedKKTSystem{T}, x::AbstractVector) where T
     n = size(kkt.hess, 1)
     ns = kkt.n_ineq
     m = size(kkt.jac, 1)
@@ -212,8 +212,8 @@ function _mul_expanded!(y::AbstractVector, kkt::DenseCondensedKKTSystem, x::Abst
 
     # / x (variable)
     yx .= Σx .* xx
-    symul!(yx, kkt.hess, xx)
-    mul!(yx, kkt.jac', xy, 1.0, 1.0)
+    _symv!('L', one(T), kkt.hess, xx, zero(T), yx)
+    mul!(yx, kkt.jac', xy, one(T), one(T))
 
     # / s (slack)
     ys .= Σs .* xs
@@ -221,15 +221,15 @@ function _mul_expanded!(y::AbstractVector, kkt::DenseCondensedKKTSystem, x::Abst
 
     # / y (multiplier)
     yy .= Σd .* xy
-    mul!(yy, kkt.jac, xx, 1.0, 1.0)
+    mul!(yy, kkt.jac, xx, one(T), one(T))
     yy[kkt.ind_ineq] .-= xs
     return
 end
 
-function mul!(y::AbstractVector, kkt::DenseCondensedKKTSystem, x::AbstractVector)
+function mul!(y::AbstractVector, kkt::DenseCondensedKKTSystem{T}, x::AbstractVector) where T
     # TODO: implement properly with AbstractKKTRHS
     if length(y) == length(x) == size(kkt.aug_com, 1)
-        symul!(y, kkt.aug_com, x)
+        _symv!('L', one(T), kkt.aug_com, x, zero(T), y)
     else
         _mul_expanded!(y, kkt, x)
     end

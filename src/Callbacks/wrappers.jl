@@ -56,6 +56,8 @@ function DenseWrapperModel(Arr, m::NLPModels.AbstractNLPModel)
             ucon = Arr(m.meta.ucon),
             nnzj = m.meta.nnzj,
             nnzh = m.meta.nnzh,
+            sparse_jacobian = false,
+            sparse_hessian = false,
             minimize = m.meta.minimize
         ),
         NLPModels.Counters()
@@ -94,6 +96,8 @@ function SparseWrapperModel(Arr, m::NLPModels.AbstractNLPModel)
             ucon = Arr(m.meta.ucon),
             nnzj = m.meta.nnzj,
             nnzh = m.meta.nnzh,
+            sparse_jacobian = true,
+            sparse_hessian = true,
             minimize = m.meta.minimize
         ),
         NLPModels.Counters()
@@ -189,18 +193,18 @@ function NLPModels.hess_coord!(
     return
 end
 
-function jac_dense!(
+function NLPModels.jac_dense!(
     m::Model,
     x::V,
     jac::M
 ) where {Model <: DenseWrapperModel, V <: AbstractVector, M <: AbstractMatrix}
     copyto!(m.x, x)
-    jac_dense!(m.inner, m.x, m.jac)
+    NLPModels.jac_dense!(m.inner, m.x, m.jac)
     copyto!(jac, m.jac)
     return
 end
 
-function hess_dense!(
+function NLPModels.hess_dense!(
     m::Model,
     x::V,
     y::V,
@@ -209,8 +213,7 @@ function hess_dense!(
 ) where {Model <: DenseWrapperModel, V <: AbstractVector, M <: AbstractMatrix}
     copyto!(m.x, x)
     copyto!(m.y, y)
-    hess_dense!(m.inner, m.x, m.y, m.hess; obj_weight=obj_weight)
+    NLPModels.hess_dense!(m.inner, m.x, m.y, m.hess; obj_weight=obj_weight)
     copyto!(hess, m.hess)
     return
 end
-

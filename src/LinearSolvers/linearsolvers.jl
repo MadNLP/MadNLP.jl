@@ -28,14 +28,14 @@ inside the `AbstractLinearSolver` instance.
 function factorize! end
 
 """
-    solve!(::AbstractLinearSolver, x::AbstractVector)
+    solve_linear_system!(::AbstractLinearSolver, x::AbstractVector)
 
 Solve the linear system ``Ax = b``.
 
 This function assumes the linear system has been
 factorized previously with [`factorize!`](@ref).
 """
-function solve! end
+function solve_linear_system! end
 
 """
     is_supported(solver,T)
@@ -53,6 +53,17 @@ false
 ```
 """
 function is_supported(::Type{LS},::Type{T}) where {LS <: AbstractLinearSolver, T <: AbstractFloat}
+    return false
+end
+
+"""
+    is_async(::AbstractLinearSolver)
+
+Return `true` if the linear solver runs asynchronously
+i.e., the `factorize!` and `solve!` functions return before
+the factorization and solve operations are completed.
+"""
+function is_async(::AbstractLinearSolver)
     return false
 end
 
@@ -83,16 +94,16 @@ function inertia end
 function improve! end
 
 # Default function for AbstractKKTVector
-function solve!(s::AbstractLinearSolver, x::AbstractKKTVector)
-    solve!(s, full(x))
+function solve_linear_system!(s::AbstractLinearSolver, x::AbstractKKTVector)
+    solve_linear_system!(s, full(x))
 end
 
-function multi_solve!(s::AbstractLinearSolver, X::AbstractMatrix)
+function solve_linear_system!(s::AbstractLinearSolver{T}, X::AbstractMatrix) where T
     n, nrhs = size(X)
-    x = zeros(n)
+    x = zeros(T, n)
     for i in 1:nrhs
         copyto!(x, 1, X, (i-1)*n + 1, n)
-        solve!(s, x)
+        solve_linear_system!(s, x)
         copyto!(X, (i-1)*n + 1, x, 1, n)
     end
 end
@@ -143,7 +154,12 @@ include("backsolve.jl")
 
 # dense solvers
 include("lapack.jl")
-include("umfpack.jl")
-include("cholmod.jl")
 include("ldl.jl")
 include("mumps.jl")
+
+# These solvers are only available if Julia was built with SuiteSparse,
+# which is GPL.  If not, then the `using`s here will fail.
+if Base.USE_GPL_LIBS
+    include("umfpack.jl")
+    include("cholmod.jl")
+end

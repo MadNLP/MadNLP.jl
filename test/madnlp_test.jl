@@ -146,22 +146,17 @@ end
 @testset "HS15 problem" begin
     nlp = MadNLPTests.HS15Model()
     n, m = NLPModels.get_nvar(nlp), NLPModels.get_ncon(nlp)
-    x0 = NLPModels.get_x0(nlp)
-    y0 = NLPModels.get_y0(nlp)
-
-    # Test all combinations between x0 and y0
-    for xini in [nothing, x0], yini in [nothing, y0]
-        solver = MadNLP.MadNLPSolver(nlp; print_level=MadNLP.ERROR)
-        MadNLP.solve!(solver; x=xini, y=yini)
-        @test solver.status == MadNLP.SOLVE_SUCCEEDED
-    end
-
-    # Test all arguments at the same time
-    zl = zeros(n)
-    zu = zeros(n)
     solver = MadNLP.MadNLPSolver(nlp; print_level=MadNLP.ERROR)
-    MadNLP.solve!(solver; x=x0, y=y0, zl=zl, zu=zu)
+    MadNLP.solve!(solver)
     @test solver.status == MadNLP.SOLVE_SUCCEEDED
+end
+
+@testset "MadNLP scaling" begin
+    MadNLPTests.test_scaling()
+end
+
+@testset "Max optimization problem" begin
+    MadNLPTests.test_max_problem()
 end
 
 @testset "Fixed variables" begin
@@ -288,3 +283,11 @@ end
     @test stats.status == MadNLP.SOLVE_SUCCEEDED
 end
 
+@testset "Warn on option ignore" begin
+    pipe = Pipe()
+    redirect_stdout(pipe) do
+        MadNLPSolver(MadNLPTests.HS15Model(); fake_option = true)
+    end
+    @test readline(pipe) == "The following options are ignored: "
+    @test readline(pipe) == " - fake_option"
+end

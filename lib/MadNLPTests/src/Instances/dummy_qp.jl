@@ -29,14 +29,17 @@ function NLPModels.obj(qp::DenseDummyQP{T}, x::AbstractVector{T}) where T
     mul!(qp.buffer, qp.P, x)
     return T(0.5) * dot(x, qp.buffer) + dot(qp.q, x)
 end
+
 function NLPModels.grad!(qp::DenseDummyQP, x::AbstractVector, g::AbstractVector)
     mul!(g, qp.P, x)
     g .+= qp.q
     return
 end
+
 function NLPModels.cons!(qp::DenseDummyQP, x::AbstractVector, c::AbstractVector)
     mul!(c, qp.A, x)
 end
+
 # Jacobian: sparse callback
 function NLPModels.jac_coord!(qp::DenseDummyQP, x::AbstractVector, J::AbstractVector)
     index = 1
@@ -56,9 +59,9 @@ function NLPModels.jtprod!(qp::DenseDummyQP, x::AbstractVector, v::AbstractVecto
     return jv
 end
 
-
 # Jacobian: dense callback
-MadNLP.jac_dense!(qp::DenseDummyQP, x, J::AbstractMatrix) = copyto!(J, qp.A)
+NLPModels.jac_dense!(qp::DenseDummyQP, x, J::AbstractMatrix) = copyto!(J, qp.A)
+
 # Hessian: sparse callback
 function NLPModels.hess_coord!(qp::DenseDummyQP{T},x, l, hess::AbstractVector; obj_weight=one(T)) where T
     index = 1
@@ -67,8 +70,9 @@ function NLPModels.hess_coord!(qp::DenseDummyQP{T},x, l, hess::AbstractVector; o
         index += 1
     end
 end
+
 # Hessian: dense callback
-function MadNLP.hess_dense!(qp::DenseDummyQP{T}, x, l,hess::AbstractMatrix; obj_weight=one(T)) where T
+function NLPModels.hess_dense!(qp::DenseDummyQP{T}, x, l, hess::AbstractMatrix; obj_weight=one(T)) where T
     copyto!(hess, obj_weight .* qp.P)
 end
 
@@ -136,6 +140,8 @@ function DenseDummyQP(
             uvar = xu,
             lcon = gl,
             ucon = gu,
+            sparse_jacobian = false,
+            sparse_hessian = false,
             minimize = true
         ),
         P,A,q,buffer,

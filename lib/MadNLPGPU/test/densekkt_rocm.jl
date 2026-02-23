@@ -9,7 +9,7 @@ function _compare_amdgpu_with_cpu(KKTSystem, n, m, ind_fixed)
         madnlp_options = Dict{Symbol, Any}(
             :callback=>MadNLP.DenseCallback,
             :kkt_system=>KKTSystem,
-            :linear_solver=>LapackROCSolver,
+            :linear_solver=>LapackROCmSolver,
             :lapack_algorithm=>MadNLP.QR,
             :print_level=>MadNLP.ERROR,
             :tol=>tol
@@ -39,7 +39,7 @@ function _compare_amdgpu_with_cpu(KKTSystem, n, m, ind_fixed)
     end
 end
 
-@testset "MadNLPGPU -- LapackROCSolver -- ($(kkt_system))" for kkt_system in [
+@testset "MadNLPGPU -- LapackROCmSolver -- ($(kkt_system))" for kkt_system in [
         MadNLP.DenseKKTSystem,
         MadNLP.DenseCondensedKKTSystem,
     ]
@@ -51,7 +51,7 @@ end
     end
 end
 
-@testset "MadNLP -- LapackROCSolver: $QN + $KKT" for QN in [
+@testset "MadNLP -- LapackROCmSolver: $QN + $KKT" for QN in [
     MadNLP.BFGS,
     MadNLP.DampedBFGS,
 ], KKT in [
@@ -65,7 +65,7 @@ end
             callback=MadNLP.DenseCallback,
             print_level=MadNLP.ERROR,
             kkt_system=KKT,
-            linear_solver=LapackROCSolver,
+            linear_solver=LapackROCmSolver,
         )
         results_ref = MadNLP.solve!(solver_exact)
 
@@ -76,7 +76,7 @@ end
             print_level=MadNLP.ERROR,
             kkt_system=KKT,
             hessian_approximation=QN,
-            linear_solver=LapackROCSolver,
+            linear_solver=LapackROCmSolver,
         )
         results_qn = MadNLP.solve!(solver_qn)
 

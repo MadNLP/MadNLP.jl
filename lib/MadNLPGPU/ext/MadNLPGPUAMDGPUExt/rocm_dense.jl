@@ -3,18 +3,6 @@
 ######################################################################
 
 #=
-    MadNLP.symul!
-=#
-
-MadNLP.symul!(y, A, x::ROCVector{T}, α = one(T), β = zero(T)) where T = rocBLAS.symv!('L', T(α), A, x, T(β), y)
-
-#=
-    MadNLP._ger!
-=#
-
-MadNLP._ger!(alpha::Number, x::ROCVector{T}, y::ROCVector{T}, A::ROCMatrix{T}) where T = rocBLAS.ger!(alpha, x, y, A)
-
-#=
     MadNLP._madnlp_unsafe_wrap
 =#
 
@@ -30,7 +18,7 @@ function MadNLP.diag!(dest::ROCVector{T}, src::ROCMatrix{T}) where {T}
     @assert length(dest) == size(src, 1)
     backend = ROCBackend()
     MadNLPGPU._copy_diag_kernel!(backend)(dest, src, ndrange = length(dest))
-    synchronize(backend)
+    
     return
 end
 
@@ -41,7 +29,7 @@ end
 function MadNLP.diag_add!(dest::ROCMatrix, src1::ROCVector, src2::ROCVector)
     backend = ROCBackend()
     MadNLPGPU._add_diagonal_kernel!(backend)(dest, src1, src2, ndrange = size(dest, 1))
-    synchronize(backend)
+    
     return
 end
 
@@ -53,7 +41,7 @@ function MadNLP._set_diag!(A::ROCMatrix, inds, a)
     if !isempty(inds)
         backend = ROCBackend()
         MadNLPGPU._set_diag_kernel!(backend)(A, inds, a; ndrange = length(inds))
-        synchronize(backend)
+        
     end
     return
 end
@@ -90,7 +78,7 @@ function MadNLP._build_dense_kkt_system!(
         ns,
         ndrange = ndrange,
     )
-    synchronize(backend)
+    
     return
 end
 
@@ -118,7 +106,7 @@ function MadNLP._build_ineq_jac!(
         m_ineq,
         ndrange = ndrange,
     )
-    synchronize(backend)
+    
     return
 end
 
@@ -150,6 +138,6 @@ function MadNLP._build_condensed_kkt_system!(
         m_eq,
         ndrange = ndrange,
     )
-    synchronize(backend)
+    
     return
 end

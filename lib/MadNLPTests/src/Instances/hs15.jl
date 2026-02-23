@@ -16,6 +16,8 @@ function HS15Model(;T = Float64, x0=zeros(T,2), y0=zeros(T,2))
             uvar = T[0.5, Inf],
             lcon = T[1.0, 0.0],
             ucon = T[Inf, Inf],
+            sparse_jacobian = false,
+            sparse_hessian = false,
             minimize = true
         ),
         NLPModels.Counters()
@@ -63,7 +65,7 @@ function NLPModels.jtprod!(nlp::HS15Model, x::AbstractVector, v::AbstractVector,
     return jv
 end
 
-function MadNLP.jac_dense!(nlp::HS15Model, x::AbstractVector, J::AbstractMatrix)
+function NLPModels.jac_dense!(nlp::HS15Model, x::AbstractVector, J::AbstractMatrix)
     J[1, 1] = x[2]    # (1, 1)
     J[1, 2] = x[1]    # (1, 2)
     J[2, 1] = 1.0     # (2, 1)
@@ -88,7 +90,7 @@ function NLPModels.hess_coord!(nlp::HS15Model, x, y, H::AbstractVector; obj_weig
     return H
 end
 
-function MadNLP.hess_dense!(nlp::HS15Model, x, y, H::AbstractMatrix; obj_weight=1.0)
+function NLPModels.hess_dense!(nlp::HS15Model, x, y, H::AbstractMatrix; obj_weight=1.0)
     H[1, 1] = obj_weight * (-400.0 * x[2] + 1200.0 * x[1]^2 + 2.0)
     H[2, 1] = obj_weight * (-400.0 * x[1])
     H[2, 2] = obj_weight * 200.0
