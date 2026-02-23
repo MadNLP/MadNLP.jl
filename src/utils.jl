@@ -119,6 +119,9 @@ const SubVector{Tv,VT, VI} = SubArray{Tv, 1, VT, Tuple{VI}, false}
     con_jac_cnt::Int = 0
     lag_hess_cnt::Int = 0
 
+    factorization_cnt::Int = 0
+    backsolve_cnt::Int = 0
+
     t1::Float64 = 0.
     t2::Float64 = 0.
     t3::Float64 = 0.

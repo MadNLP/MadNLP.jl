@@ -12,6 +12,7 @@ function solve_refine_wrapper!(d, solver, p, w)
             end
         end
     end
+    solver.cnt.backsolve_cnt += 1
 
     return result
 end
@@ -20,6 +21,8 @@ function factorize_wrapper!(solver::AbstractMadNLPSolver)
     @trace(solver.logger,"Factorization started.")
     build_kkt!(solver.kkt)
     solver.cnt.linear_solver_time += @elapsed factorize_kkt!(solver.kkt)
+    solver.cnt.factorization_cnt += 1
+    return
 end
 
 function solve_kkt!(kkt::SparseUnreducedKKTSystem, w::AbstractKKTVector)
