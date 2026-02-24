@@ -12,7 +12,9 @@ function solve_refine_wrapper!(d, solver, p, w)
             end
         end
     end
-
+    # Get number of iterations in Richardson's iterative refinement
+    iter_richardson = solver.cnt.ir
+    solver.cnt.backsolve_cnt += iter_richardson
     return result
 end
 
@@ -20,6 +22,8 @@ function factorize_wrapper!(solver::AbstractMadNLPSolver)
     @trace(solver.logger,"Factorization started.")
     build_kkt!(solver.kkt)
     solver.cnt.linear_solver_time += @elapsed factorize_kkt!(solver.kkt)
+    solver.cnt.factorization_cnt += 1
+    return
 end
 
 function solve_kkt!(kkt::SparseUnreducedKKTSystem, w::AbstractKKTVector)
