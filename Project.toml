@@ -1,6 +1,6 @@
 name = "MadNLP"
 uuid = "2621e9c9-9eb4-46b1-8089-e8c72242dfb6"
-version = "0.8.12"
+version = "0.9.0"
 
 [deps]
 LDLFactorizations = "40e66cde-538c-5869-a4ad-c39174c6795b"
@@ -25,7 +25,7 @@ MadNLPMOI = "MathOptInterface"
 [compat]
 LDLFactorizations = "0.10"
 MINLPTests = "~0.5"
-MadNLPTests = "0.5"
+MadNLPTests = "0.6"
 MathOptInterface = "1.48"
 NLPModels = "0.21.9"
 PrecompileTools = "1.2"
