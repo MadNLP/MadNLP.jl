@@ -1,5 +1,19 @@
 abstract type AbstractOptions end
 
+# Pass MadNLP current status to the user callback
+abstract type AbstractUserCallbackStatus end
+struct UserCallbackRegular <: AbstractUserCallbackStatus end
+struct UserCallbackRestore <: AbstractUserCallbackStatus end
+struct UserCallbackRobust <: AbstractUserCallbackStatus end
+
+abstract type AbstractUserCallback end
+# By default, the user callback is deactivated
+struct NoUserCallback <: AbstractUserCallback end
+function (cb::NoUserCallback)(solver, mode::AbstractUserCallbackStatus)
+    return true
+end
+
+
 # MadNLPLogger
 @kwdef mutable struct MadNLPLogger
     print_level::LogLevels = INFO
