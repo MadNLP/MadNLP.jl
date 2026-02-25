@@ -120,7 +120,7 @@ function NLPModels.cons!(
     copyto!(m.x, x)
     NLPModels.cons!(m.inner, m.x, m.con)
     copyto!(g, m.con)
-    return
+    return g
 end
 
 function NLPModels.grad!(
@@ -131,7 +131,7 @@ function NLPModels.grad!(
     copyto!(m.x, x)
     NLPModels.grad!(m.inner, m.x, m.grad)
     copyto!(f, m.grad)
-    return
+    return f
 end
 
 function NLPModels.jac_structure!(
@@ -142,6 +142,7 @@ function NLPModels.jac_structure!(
     NLPModels.jac_structure!(m.inner, m.jrows, m.jcols)
     copyto!(rows, m.jrows)
     copyto!(cols, m.jcols)
+    return rows, cols
 end
 
 function NLPModels.hess_structure!(
@@ -152,6 +153,7 @@ function NLPModels.hess_structure!(
     NLPModels.hess_structure!(m.inner, m.hrows, m.hcols)
     copyto!(rows, m.hrows)
     copyto!(cols, m.hcols)
+    return rows, cols
 end
 
 function NLPModels.jtprod!(
@@ -165,7 +167,7 @@ function NLPModels.jtprod!(
     copyto!(m.con, v)
     NLPModels.jtprod!(m.inner, m.x, m.con, m.grad)
     copyto!(jtv, m.grad)
-    return
+    return jtv
 end
 
 function NLPModels.jac_coord!(
@@ -176,7 +178,7 @@ function NLPModels.jac_coord!(
     copyto!(m.x, x)
     NLPModels.jac_coord!(m.inner, m.x, m.jac)
     copyto!(jac, m.jac)
-    return
+    return jac
 end
 
 function NLPModels.hess_coord!(
@@ -190,7 +192,7 @@ function NLPModels.hess_coord!(
     copyto!(m.y, y)
     NLPModels.hess_coord!(m.inner, m.x, m.y, m.hess; obj_weight=obj_weight)
     copyto!(hess, m.hess)
-    return
+    return hess
 end
 
 function NLPModels.jac_dense!(
@@ -201,7 +203,7 @@ function NLPModels.jac_dense!(
     copyto!(m.x, x)
     NLPModels.jac_dense!(m.inner, m.x, m.jac)
     copyto!(jac, m.jac)
-    return
+    return jac
 end
 
 function NLPModels.hess_dense!(
@@ -215,5 +217,5 @@ function NLPModels.hess_dense!(
     copyto!(m.y, y)
     NLPModels.hess_dense!(m.inner, m.x, m.y, m.hess; obj_weight=obj_weight)
     copyto!(hess, m.hess)
-    return
+    return hess
 end
