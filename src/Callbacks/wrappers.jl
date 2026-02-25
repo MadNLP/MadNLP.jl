@@ -153,7 +153,7 @@ function NLPModels.hess_structure!(
     NLPModels.hess_structure!(m.inner, m.hrows, m.hcols)
     copyto!(rows, m.hrows)
     copyto!(cols, m.hcols)
-    return rows,cols
+    return rows, cols
 end
 
 function NLPModels.jtprod!(
