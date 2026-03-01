@@ -233,9 +233,24 @@ get_kkt(kkt::AbstractKKTSystem) = kkt.aug_com
 get_jacobian(kkt::AbstractKKTSystem) = kkt.jac
 get_hessian(kkt::AbstractKKTSystem) = kkt.hess
 
+"""
+        is inertia_correct(kkt::AbstractKKTSystem, num_pos, num_zero, num_neg)
 
+Check if the inertia ``(num_pos, num_zero, num_neg)`` returned by the linear solver
+ensures the desired conditions
+"""
 function is_inertia_correct(kkt::AbstractKKTSystem, num_pos, num_zero, num_neg)
     return (num_zero == 0) && (num_pos == num_variables(kkt))
+end
+
+"""
+        should_regularize_dual(kkt::AbstractKKTSystem, num_pos, num_zero, num_neg)
+
+Check if the inertia ``(num_pos, num_zero, num_neg)`` returned by the linear solver
+necessitates the dual regularization of the KKT system.
+"""
+function should_regularize_dual(kkt::AbstractKKTSystem, num_pos, num_zero, num_neg)
+    return num_zero != 0
 end
 
 compress_hessian!(kkt::AbstractKKTSystem) = nothing

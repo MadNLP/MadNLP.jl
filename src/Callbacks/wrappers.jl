@@ -39,26 +39,26 @@ DenseWrapperModel can be used to interface GPU-accelerated NLP models with solve
 function DenseWrapperModel(Arr, m::NLPModels.AbstractNLPModel)
     return DenseWrapperModel(
         m,
-        similar(m.meta.x0, m.meta.nvar),
-        similar(m.meta.x0, m.meta.ncon),
-        similar(m.meta.x0, m.meta.ncon),
-        similar(m.meta.x0, m.meta.nvar),
-        similar(m.meta.x0, m.meta.ncon, m.meta.nvar),
-        similar(m.meta.x0, m.meta.nvar, m.meta.nvar),
+        similar(get_x0(m), m.meta.nvar),
+        similar(get_x0(m), get_ncon(m)),
+        similar(get_x0(m), get_ncon(m)),
+        similar(get_x0(m), get_nvar(m)),
+        similar(get_x0(m), get_ncon(m), get_nvar(m)),
+        similar(get_x0(m), get_nvar(m), get_nvar(m)),
         NLPModels.NLPModelMeta(
-            m.meta.nvar,
-            x0 = Arr(m.meta.x0),
-            lvar = Arr(m.meta.lvar),
-            uvar = Arr(m.meta.uvar),
-            ncon = m.meta.ncon,
-            y0 = Arr(m.meta.y0),
-            lcon = Arr(m.meta.lcon),
-            ucon = Arr(m.meta.ucon),
-            nnzj = m.meta.nnzj,
-            nnzh = m.meta.nnzh,
+            get_nvar(m),
+            x0 = Arr(get_x0(m)),
+            lvar = Arr(get_lvar(m)),
+            uvar = Arr(get_uvar(m)),
+            ncon = get_ncon(m),
+            y0 = Arr(get_y0(m)),
+            lcon = Arr(get_lcon(m)),
+            ucon = Arr(get_ucon(m)),
+            nnzj = get_nnzj(m),
+            nnzh = get_nnzh(m),
             sparse_jacobian = false,
             sparse_hessian = false,
-            minimize = m.meta.minimize
+            minimize = get_minimize(m)
         ),
         NLPModels.Counters()
     )
@@ -75,30 +75,30 @@ SparseWrapperModel can be used to interface GPU-accelerated NLP models with solv
 function SparseWrapperModel(Arr, m::NLPModels.AbstractNLPModel)
     return SparseWrapperModel(
         m,
-        similar(m.meta.x0, Int, m.meta.nnzj),
-        similar(m.meta.x0, Int, m.meta.nnzj),
-        similar(m.meta.x0, Int, m.meta.nnzh),
-        similar(m.meta.x0, Int, m.meta.nnzh),
-        similar(m.meta.x0, m.meta.nvar),
-        similar(m.meta.x0, m.meta.ncon),
-        similar(m.meta.x0, m.meta.ncon),
-        similar(m.meta.x0, m.meta.nvar),
-        similar(m.meta.x0, m.meta.nnzj),
-        similar(m.meta.x0, m.meta.nnzh),
+        similar(get_x0(m), Int, get_nnzj(m)),
+        similar(get_x0(m), Int, get_nnzj(m)),
+        similar(get_x0(m), Int, get_nnzh(m)),
+        similar(get_x0(m), Int, get_nnzh(m)),
+        similar(get_x0(m), get_nvar(m)),
+        similar(get_x0(m), get_ncon(m)),
+        similar(get_x0(m), get_ncon(m)),
+        similar(get_x0(m), get_nvar(m)),
+        similar(get_x0(m), get_nnzj(m)),
+        similar(get_x0(m), get_nnzh(m)),
         NLPModels.NLPModelMeta(
-            m.meta.nvar,
-            x0 = Arr(m.meta.x0),
-            lvar = Arr(m.meta.lvar),
-            uvar = Arr(m.meta.uvar),
-            ncon = m.meta.ncon,
-            y0 = Arr(m.meta.y0),
-            lcon = Arr(m.meta.lcon),
-            ucon = Arr(m.meta.ucon),
-            nnzj = m.meta.nnzj,
-            nnzh = m.meta.nnzh,
+            get_nvar(m),
+            x0 = Arr(get_x0(m)),
+            lvar = Arr(get_lvar(m)),
+            uvar = Arr(get_uvar(m)),
+            ncon = get_ncon(m),
+            y0 = Arr(get_y0(m)),
+            lcon = Arr(get_lcon(m)),
+            ucon = Arr(get_ucon(m)),
+            nnzj = get_nnzj(m),
+            nnzh = get_nnzh(m),
             sparse_jacobian = true,
             sparse_hessian = true,
-            minimize = m.meta.minimize
+            minimize = get_minimize(m)
         ),
         NLPModels.Counters()
     )
@@ -120,7 +120,7 @@ function NLPModels.cons!(
     copyto!(m.x, x)
     NLPModels.cons!(m.inner, m.x, m.con)
     copyto!(g, m.con)
-    return
+    return g
 end
 
 function NLPModels.grad!(
@@ -131,7 +131,7 @@ function NLPModels.grad!(
     copyto!(m.x, x)
     NLPModels.grad!(m.inner, m.x, m.grad)
     copyto!(f, m.grad)
-    return
+    return f
 end
 
 function NLPModels.jac_structure!(
@@ -142,6 +142,7 @@ function NLPModels.jac_structure!(
     NLPModels.jac_structure!(m.inner, m.jrows, m.jcols)
     copyto!(rows, m.jrows)
     copyto!(cols, m.jcols)
+    return rows, cols
 end
 
 function NLPModels.hess_structure!(
@@ -152,6 +153,7 @@ function NLPModels.hess_structure!(
     NLPModels.hess_structure!(m.inner, m.hrows, m.hcols)
     copyto!(rows, m.hrows)
     copyto!(cols, m.hcols)
+    return rows, cols
 end
 
 function NLPModels.jtprod!(
@@ -165,7 +167,7 @@ function NLPModels.jtprod!(
     copyto!(m.con, v)
     NLPModels.jtprod!(m.inner, m.x, m.con, m.grad)
     copyto!(jtv, m.grad)
-    return
+    return jtv
 end
 
 function NLPModels.jac_coord!(
@@ -176,7 +178,7 @@ function NLPModels.jac_coord!(
     copyto!(m.x, x)
     NLPModels.jac_coord!(m.inner, m.x, m.jac)
     copyto!(jac, m.jac)
-    return
+    return jac
 end
 
 function NLPModels.hess_coord!(
@@ -190,7 +192,7 @@ function NLPModels.hess_coord!(
     copyto!(m.y, y)
     NLPModels.hess_coord!(m.inner, m.x, m.y, m.hess; obj_weight=obj_weight)
     copyto!(hess, m.hess)
-    return
+    return hess
 end
 
 function NLPModels.jac_dense!(
@@ -201,7 +203,7 @@ function NLPModels.jac_dense!(
     copyto!(m.x, x)
     NLPModels.jac_dense!(m.inner, m.x, m.jac)
     copyto!(jac, m.jac)
-    return
+    return jac
 end
 
 function NLPModels.hess_dense!(
@@ -215,5 +217,5 @@ function NLPModels.hess_dense!(
     copyto!(m.y, y)
     NLPModels.hess_dense!(m.inner, m.x, m.y, m.hess; obj_weight=obj_weight)
     copyto!(hess, m.hess)
-    return
+    return hess
 end

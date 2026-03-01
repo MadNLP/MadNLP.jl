@@ -5,4 +5,3 @@ CurrentModule = MadNLP
 ```@docs
 MadNLPOptions
 ```
-

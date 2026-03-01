@@ -16,13 +16,13 @@ function MadNLP.MadNLPOptions{T}(
         callback = callback,
         kkt_system = kkt_system,
         linear_solver = linear_solver,
-        bound_relax_factor = bound_relax_factor,
+        bound_relax_factor = bound_relax_factor, 
     )
 end
 
 function MadNLP.default_options(::AbstractNLPModel{T,VT}, ::Type{MadNLP.SparseCondensedKKTSystem}, linear_solver::Type{CUDSSSolver}) where {T, VT <: CuVector{T}}
     opt = MadNLP.default_options(linear_solver)
-    MadNLP.set_options!(opt, Dict(:cudss_algorithm => MadNLP.CHOLESKY))
+    # MadNLP.set_options!(opt, Dict(:cudss_algorithm => MadNLP.CHOLESKY)) # commented out due to issue #539
 
     return opt
 end

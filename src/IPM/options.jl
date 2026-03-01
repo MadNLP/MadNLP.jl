@@ -1,6 +1,7 @@
 # Options
 
 parse_option(::Type{Module},str::String) = eval(Symbol(str))
+parse_option(::Type{<:AbstractUserCallback}, f::Any) = f
 parse_option(type::Type{T},i::Int64) where {T<:Enum} = type(i)
 
 function set_options!(opt::AbstractOptions, options)
@@ -33,6 +34,7 @@ __General options__||
 rethrow\\_error                | true                 | rethrow any error encountered during the algorithm
 disable\\_garbage\\_collector  | false                | disable garbage collector in MadNLP
 blas\\_num\\_thread            | 1                    | number of threads to use in the BLAS backend
+intermediate_callback          | AbstractUserCallback | Intermediate callback called at each IPM iteration
 __Output options__||
 ||
 output\\_file                  | `""`                 | if not `""`, the output log is teed to the file at this path
@@ -60,6 +62,8 @@ hessian\\_approximation        | `ExactHessian` | method used to approximate the
 quasi\\_newton\\_options       | QuasiNewtonOptions() | options for quasi-Newton algorithm
 inertia\\_correction\\_method  | InertiaAuto          | inertia correction mechanism
 inertia\\_free\\_tol           | 0.0                  | tolerance for inertia free method
+default\\_primal\\_regularization | 0.0 | default regularization for primal variable blocks in the KKT system
+default\\_dual\\_regularization   | 0.0 | default regularization for dual variable blocks in the KKT system
 ||
 __Initialization__||
 ||
@@ -122,6 +126,7 @@ tau\\_min                      | 0.99                 | lower bound on fraction-
     disable_garbage_collector::Bool = false
     blas_num_threads::Int = 1
     iterator::Type = RichardsonIterator
+    intermediate_callback::AbstractUserCallback = NoUserCallback()
 
     # Output options
     output_file::String = ""
@@ -147,6 +152,8 @@ tau\\_min                      | 0.99                 | lower bound on fraction-
     quasi_newton_options::QuasiNewtonOptions{T} = QuasiNewtonOptions{T}()
     inertia_correction_method::Type = InertiaAuto
     inertia_free_tol::T = 0.
+    default_primal_regularization::T = 0.
+    default_dual_regularization::T = 0.
 
     # initialization options
     dual_initialized::Bool = false
@@ -203,7 +210,7 @@ function MadNLPOptions{T}(
     kkt_system = dense_callback ? DenseCondensedKKTSystem : SparseKKTSystem,
     linear_solver = dense_callback ? LapackCPUSolver : default_sparse_solver(nlp),
     tol = get_tolerance(T,kkt_system)
-) where T
+) where {T}
     return MadNLPOptions{T}(
         tol = tol,
         callback = callback,
@@ -258,6 +265,7 @@ function load_options(nlp::AbstractNLPModel{T,VT}; options...) where {T, VT}
     # Initiate interior-point options
     opt_ipm = MadNLPOptions{T}(nlp; primary_opt...)
     linear_solver_options = set_options!(opt_ipm, options)
+
     check_option_sanity(opt_ipm)
     # Initiate linear-solver options
     opt_linear_solver = default_options(nlp, opt_ipm.kkt_system, opt_ipm.linear_solver)
@@ -283,6 +291,7 @@ function load_options(nlp::AbstractNLPModel{T,VT}; options...) where {T, VT}
         linear_solver=opt_linear_solver,
         iterative_refinement=opt_iterator,
         logger=logger,
+        intermediate_callback=opt_ipm.intermediate_callback,
     )
 end
 
