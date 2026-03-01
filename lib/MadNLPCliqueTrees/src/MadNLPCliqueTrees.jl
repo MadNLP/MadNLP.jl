@@ -108,7 +108,7 @@ introduce(::CliqueTreesSolver{T, <:ChordalLDLt}) where T =
     "CliqueTrees/LDLᵀ v$(pkgversion(CliqueTrees))"
 
 function factorize!(M::CliqueTreesSolver{T, <:ChordalCholesky}) where T
-    cholesky!(copy!(M.F, M.tril), M,opt.cliquetrees_strategy; check=false)
+    cholesky!(copy!(M.F, M.tril), M.opt.cliquetrees_strategy; check=false)
     return M
 end
 
