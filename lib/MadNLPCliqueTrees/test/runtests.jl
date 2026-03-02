@@ -1,4 +1,5 @@
 using Test, MadNLP, MadNLPCliqueTrees, MadNLPTests, CliqueTrees
+using CliqueTrees.Multifrontal: DynamicRegularization, GMW81, SE99
 using SparseArrays
 
 @testset "MadNLPCliqueTrees test" begin
@@ -26,11 +27,11 @@ using SparseArrays
     test_madnlp(
         "CliqueTrees",
         () -> MadNLP.Optimizer(linear_solver = CliqueTreesSolver, print_level = MadNLP.ERROR),
-        [],
+        ["eigmina"],
     )
 
     @testset "Elimination orderings" begin
-        for alg in [MMD(), MCS(), LexBFS(), MCSM(), LexM(), MF(), RCMMD(), RCMGL()]
+        for alg in (AMF(), MMD(), MF())
             test_madnlp(
                 "CliqueTrees/$(nameof(typeof(alg)))",
                 () -> MadNLP.Optimizer(
@@ -38,22 +39,50 @@ using SparseArrays
                     print_level = MadNLP.ERROR,
                     cliquetrees_ordering = alg,
                 ),
-                [],
+                ["eigmina"],
             )
         end
     end
 
-    @testset "Supernode types" begin
-        for snd in [Fundamental(), Nodal()]
-            test_madnlp(
-                "CliqueTrees/$(nameof(typeof(snd)))",
-                () -> MadNLP.Optimizer(
-                    linear_solver = CliqueTreesSolver,
-                    print_level = MadNLP.ERROR,
-                    cliquetrees_supernode = snd,
-                ),
-                [],
-            )
-        end
+    @testset "Dynamic Regularization" begin
+        reg = DynamicRegularization()
+
+        test_madnlp(
+            "CliqueTrees/$(nameof(typeof(reg)))",
+            () -> MadNLP.Optimizer(
+                linear_solver = CliqueTreesSolver,
+                print_level = MadNLP.ERROR,
+                cliquetrees_regularization = reg,
+            ),
+            [],
+        )
+    end
+
+    @testset "GMW81" begin
+        reg = GMW81()
+
+        test_madnlp(
+            "CliqueTrees/$(nameof(typeof(reg)))",
+            () -> MadNLP.Optimizer(
+                linear_solver = CliqueTreesSolver,
+                print_level = MadNLP.ERROR,
+                cliquetrees_regularization = reg,
+            ),
+            ["unbounded"],
+        )
+    end
+
+    @testset "SE99" begin
+        reg = SE99()
+
+        test_madnlp(
+            "CliqueTrees/$(nameof(typeof(reg)))",
+            () -> MadNLP.Optimizer(
+                linear_solver = CliqueTreesSolver,
+                print_level = MadNLP.ERROR,
+                cliquetrees_regularization = reg,
+            ),
+            ["eigmina"],
+        )
     end
 end

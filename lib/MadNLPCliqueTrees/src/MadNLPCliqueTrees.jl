@@ -1,10 +1,9 @@
 module MadNLPCliqueTrees
 
 using CliqueTrees
-using CliqueTrees: EliminationAlgorithm, SupernodeType
+using CliqueTrees: EliminationAlgorithm, DEFAULT_ELIMINATION_ALGORITHM
 using CliqueTrees.Multifrontal
-using CliqueTrees.Multifrontal: FChordalLDLt, FChordalCholesky
-using CliqueTrees: DEFAULT_ELIMINATION_ALGORITHM, DEFAULT_SUPERNODE_TYPE
+using CliqueTrees.Multifrontal: FChordalLDLt, FChordalCholesky, AbstractRegularization, NoRegularization
 using LinearAlgebra
 using LinearAlgebra: PivotingStrategy
 using SparseArrays
@@ -32,8 +31,8 @@ import MadNLP:
 @kwdef mutable struct CliqueTreesOptions <: AbstractOptions
     cliquetrees_algorithm::LinearFactorization = LDL
     cliquetrees_ordering::EliminationAlgorithm = DEFAULT_ELIMINATION_ALGORITHM # AMF
-    cliquetrees_supernode::SupernodeType = DEFAULT_SUPERNODE_TYPE # Maximal
     cliquetrees_strategy::PivotingStrategy = choose_strategy(cliquetrees_algorithm)
+    cliquetrees_regularization::AbstractRegularization = NoRegularization()
 end
 
 function choose_strategy(alg::LinearFactorization)
@@ -51,19 +50,20 @@ end
 mutable struct CliqueTreesSolver{T, F <: Factorization{T}} <: AbstractLinearSolver{T}
     tril::SparseMatrixCSC{T, Int32}
     F::F
+    signs::Vector{Int}
     opt::CliqueTreesOptions
     logger::MadNLPLogger
 end
 
 function _build_factorization(tril::SparseMatrixCSC{T, Int32}, opt::CliqueTreesOptions, ::Val{LDL}) where T
     S = Symmetric(tril, :L)
-    F = ChordalLDLt{:L}(S; alg = opt.cliquetrees_ordering, snd = opt.cliquetrees_supernode)::FChordalLDLt{:L, T, Int32}
+    F = ChordalLDLt{:L}(S; alg = opt.cliquetrees_ordering)::FChordalLDLt{:L, T, Int32}
     return F
 end
 
 function _build_factorization(tril::SparseMatrixCSC{T, Int32}, opt::CliqueTreesOptions, ::Val{CHOLESKY}) where T
     S = Symmetric(tril, :L)
-    F = ChordalCholesky{:L}(S; alg = opt.cliquetrees_ordering, snd = opt.cliquetrees_supernode)::FChordalCholesky{:L, T, Int32}
+    F = ChordalCholesky{:L}(S; alg = opt.cliquetrees_ordering)::FChordalCholesky{:L, T, Int32}
     return F
 end
 
@@ -71,13 +71,15 @@ function CliqueTreesSolver(
     tril::SparseMatrixCSC{T, Int32};
     opt = CliqueTreesOptions(),
     logger = MadNLPLogger(),
+    pos = size(tril, 1),
 ) where T
+    signs = fill(-1, size(tril, 1)); signs[1:pos] .= 1
     F = _build_factorization(tril, opt, Val(opt.cliquetrees_algorithm))
-    return CliqueTreesSolver{T, typeof(F)}(tril, F, opt, logger)
+    return CliqueTreesSolver{T, typeof(F)}(tril, F, signs, opt, logger)
 end
 
 function factorize!(M::CliqueTreesSolver{T, <:ChordalLDLt}) where T
-    ldlt!(copy!(M.F, M.tril), M.opt.cliquetrees_strategy; check=false)
+    ldlt!(copy!(M.F, M.tril), M.opt.cliquetrees_strategy; signs=M.signs, reg=M.opt.cliquetrees_regularization, check=false)
     return M
 end
 
