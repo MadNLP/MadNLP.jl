@@ -20,8 +20,11 @@ import MadNLP:
     @kwdef, MadNLPLogger, @debug, @warn, @error,
     AbstractOptions, AbstractLinearSolver, AbstractNLPModel, set_options!,
     SymbolicException,FactorizationException,SolveException,InertiaException,
-    introduce, factorize!, solve_linear_system!, improve!, is_inertia, inertia, tril_to_full!,
-    LapackOptions, input_type, is_supported, default_options
+    introduce, factorize!, solve!, improve!, is_inertia, inertia, tril_to_full!,
+    LapackOptions, input_type, is_supported, default_options,
+    setup_cholesky!, setup_lu!, setup_qr!, setup_evd!, setup_bunchkaufman!,
+    factorize_cholesky!, factorize_lu!, factorize_qr!, factorize_evd!, factorize_bunchkaufman!,
+    solve_cholesky!, solve_lu!, solve_qr!, solve_evd!, solve_bunchkaufman!
 
 # AMD and Metis
 import AMD, Metis

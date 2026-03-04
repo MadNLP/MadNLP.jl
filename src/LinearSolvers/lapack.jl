@@ -2,7 +2,7 @@
     lapack_algorithm::LinearFactorization = BUNCHKAUFMAN
 end
 
-mutable struct LapackCPUSolver{T, MT} <: AbstractLinearSolver{T}
+mutable struct LapackCPUSolver{T, MT} <: AbstractLapackSolver{T}
     A::MT
     fact::Matrix{T}
     n::Int64
@@ -42,70 +42,9 @@ mutable struct LapackCPUSolver{T, MT} <: AbstractLinearSolver{T}
     end
 end
 
-function setup!(M::LapackCPUSolver)
-    if M.opt.lapack_algorithm == MadNLP.BUNCHKAUFMAN
-        setup_bunchkaufman!(M)
-    elseif M.opt.lapack_algorithm == MadNLP.LU
-        setup_lu!(M)
-    elseif M.opt.lapack_algorithm == MadNLP.QR
-        setup_qr!(M)
-    elseif M.opt.lapack_algorithm == MadNLP.CHOLESKY
-        setup_cholesky!(M)
-    elseif M.opt.lapack_algorithm == MadNLP.EVD
-        setup_evd!(M)
-    else
-        error(M.logger, "Invalid lapack_algorithm")
-    end
-end
-
-function factorize!(M::LapackCPUSolver)
-    copyto!(M.fact, M.A)
-    if M.opt.lapack_algorithm == BUNCHKAUFMAN
-        factorize_bunchkaufman!(M)
-    elseif M.opt.lapack_algorithm == LU
-        tril_to_full!(M.fact)
-        factorize_lu!(M)
-    elseif M.opt.lapack_algorithm == QR
-        tril_to_full!(M.fact)
-        factorize_qr!(M)
-    elseif M.opt.lapack_algorithm == CHOLESKY
-        factorize_cholesky!(M)
-    elseif M.opt.lapack_algorithm == EVD
-        factorize_evd!(M)
-    else
-        error(M.logger, "Invalid lapack_algorithm")
-    end
-end
-
-for T in (:Float32, :Float64)
-    @eval begin
-        function solve_linear_system!(M::LapackCPUSolver{$T}, x::Vector{$T})
-            if M.opt.lapack_algorithm == BUNCHKAUFMAN
-                solve_bunchkaufman!(M, x)
-            elseif M.opt.lapack_algorithm == LU
-                solve_lu!(M, x)
-            elseif M.opt.lapack_algorithm == QR
-                solve_qr!(M, x)
-            elseif M.opt.lapack_algorithm == CHOLESKY
-                solve_cholesky!(M, x)
-            elseif M.opt.lapack_algorithm == EVD
-                solve_evd!(M, x)
-            else
-                error(M.logger, "Invalid lapack_algorithm")
-            end
-        end
-
-        is_supported(::Type{LapackCPUSolver}, ::Type{$T}) = true
-    end
-end
-
-function solve_linear_system!(M::LapackCPUSolver, x::AbstractVector)
-    isempty(M.sol) && resize!(M.sol, M.n)
-    copyto!(M.sol, x)
-    solve_linear_system!(M, M.sol)
-    copyto!(x, M.sol)
-    return x
-end
+solve!(M::LapackCPUSolver{T}, x::Vector{T}) where {T} = _solve_dispatch!(M, x)
+supports_bunchkaufman_inertia(::LapackCPUSolver) = true
+inertia_bunchkaufman(M::LapackCPUSolver) = inertia(M.fact, M.ipiv, M.info[])
 
 for (potrf, potrs, getrf, getrs, sytrf, sytrs, geqrf, ormqr, trsv, syevd, gemv, T) in
     ((:spotrf_, :spotrs_, :sgetrf_, :sgetrs_, :ssytrf_, :ssytrs_, :sgeqrf_, :sormqr_, :strsv_, :ssyevd_, :sgemv_, :Float32),
@@ -295,25 +234,6 @@ for (potrf, potrs, getrf, getrs, sytrf, sytrs, geqrf, ormqr, trsv, syevd, gemv, 
     end
 end
 
-improve!(M::LapackCPUSolver) = false
-is_inertia(M::LapackCPUSolver) = (M.opt.lapack_algorithm == BUNCHKAUFMAN) || (M.opt.lapack_algorithm == CHOLESKY) || (M.opt.lapack_algorithm == MadNLP.EVD)
-function inertia(M::LapackCPUSolver)
-    if M.opt.lapack_algorithm == BUNCHKAUFMAN
-        inertia(M.fact, M.ipiv, M.info[])
-    elseif M.opt.lapack_algorithm == CHOLESKY
-        M.info[] == 0 ? (M.n, 0, 0) : (0, M.n, 0) # later we need to change inertia() to is_inertia_correct() and is_full_rank()
-    elseif M.opt.lapack_algorithm == EVD
-        numpos = count(λ -> λ > 0, M.Λ)
-        numneg = count(λ -> λ < 0, M.Λ)
-        numzero = M.n - numpos - numneg
-        (numpos, numzero, numneg)
-    else
-        error(M.logger, "Invalid lapack_algorithm")
-    end
-end
-
-input_type(::Type{LapackCPUSolver}) = :dense
-default_options(::Type{LapackCPUSolver}) = LapackOptions()
 introduce(M::LapackCPUSolver) = "Lapack-CPU ($(M.opt.lapack_algorithm))"
 
 function inertia(fact, ipiv, info)
