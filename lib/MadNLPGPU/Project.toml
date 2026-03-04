@@ -37,4 +37,4 @@ MadNLPTests = "b52a2a03-04ab-4a5f-9698-6a2deff93217"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [targets]
-test = ["Test", "MadNLPTests", "AMDGPU"]
+test = ["Test", "MadNLPTests"]
