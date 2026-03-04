@@ -47,7 +47,6 @@ function MadNLP.mul!(
             kkt.ext.diag_map_fr;
             ndrange = length(kkt.ext.diag_map_to),
         )
-        synchronize(backend)
     end
 
     MadNLP.mul!(wz, kkt.jt_csc', xx, alpha, one(T))
@@ -89,7 +88,6 @@ function MadNLP.mul_hess_blk!(
             kkt.ext.diag_map_fr;
             ndrange = length(kkt.ext.diag_map_to),
         )
-        synchronize(backend)
     end
 
     fill!(@view(wx[n+1:end]), 0)
@@ -205,7 +203,6 @@ function MadNLP._set_colptr!(colptr::AbstractGPUVector, ptr2, sym2, guide)
             guide;
             ndrange = length(ptr2) - 1,
         )
-        synchronize(backend)
     end
     return
 end
@@ -218,7 +215,6 @@ function MadNLP.tril_to_full!(dense::AbstractGPUMatrix{T}) where {T}
     n = size(dense, 1)
     backend = get_backend(dense)
     _tril_to_full_kernel!(backend)(dense; ndrange = div(n^2 + n, 2))
-    synchronize(backend)
     return
 end
 
@@ -230,7 +226,6 @@ function MadNLP.force_lower_triangular!(I::AbstractGPUVector{T}, J) where {T}
     if !isempty(I)
         backend = get_backend(I)
         _force_lower_triangular_kernel!(backend)(I, J; ndrange = length(I))
-        synchronize(backend)
     end
     return
 end
@@ -259,7 +254,6 @@ function MadNLP._set_con_scale_sparse!(
             jac_buffer;
             ndrange = length(ptr) - 1,
         )
-        synchronize(backend)
     end
     return
 end
@@ -280,6 +274,5 @@ function MadNLP._build_scale_augmented_system_coo!(dest, src, scaling::AbstractG
         m;
         ndrange = nnz(src),
     )
-    synchronize(backend)
     return
 end
