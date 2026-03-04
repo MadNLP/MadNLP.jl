@@ -6,7 +6,7 @@
 # Per-backend stubs for functions needing concrete sparse CSC types
 # (transfer!, nzval, _get_sparse_csc, get_tril_to_full, _sym_length,
 #  _build_condensed_aug_symbolic_hess, _build_condensed_aug_symbolic_jt,
-#  coo_to_csc, build_condensed_aug_coord!, compress_hessian!, compress_jacobian!)
+#  build_condensed_aug_coord!, compress_hessian!, compress_jacobian!)
 # remain in per-extension files.
 
 #=
@@ -256,6 +256,55 @@ function MadNLP._set_con_scale_sparse!(
         )
     end
     return
+end
+
+#=
+    MadNLP.coo_to_csc
+=#
+
+function MadNLP.coo_to_csc(
+    coo::MadNLP.SparseMatrixCOO{T,I,VT,VI},
+) where {T,I,VT<:AbstractGPUArray,VI<:AbstractGPUArray}
+    zvals = similar(coo.I, Int, length(coo.I))
+    copyto!(zvals, 1:length(coo.I))
+    coord = map((i, j, k) -> ((i, j), k), coo.I, coo.J, zvals)
+    if length(coord) > 0
+        sort!(coord, lt = (((i, j), k), ((n, m), l)) -> (j, i) < (m, n))
+    end
+
+    mapptr = MadNLP.getptr(coord; by = ((x1, x2), (y1, y2)) -> x1 != y1)
+
+    colptr = similar(coo.I, size(coo, 2) + 1)
+
+    coord_csc = coord[@view(mapptr[1:end-1])]
+
+    backend = get_backend(coo.I)
+    if length(coord_csc) > 0
+        _set_coo_to_colptr_kernel!(backend)(
+            colptr,
+            coord_csc,
+            ndrange = length(coord_csc),
+        )
+    else
+        fill!(colptr, one(Int))
+    end
+
+    rowval = map(x -> x[1][1], coord_csc)
+    nzval = similar(rowval, T)
+
+    csc = MadNLP._get_sparse_csc(size(coo), colptr, rowval, nzval)
+
+    cscmap = similar(coo.I, Int)
+    if length(mapptr) > 1
+        _set_coo_to_csc_map_kernel!(backend)(
+            cscmap,
+            mapptr,
+            coord,
+            ndrange = length(mapptr) - 1,
+        )
+    end
+
+    return csc, cscmap
 end
 
 #=

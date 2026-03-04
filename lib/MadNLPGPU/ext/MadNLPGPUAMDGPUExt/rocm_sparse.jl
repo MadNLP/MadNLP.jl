@@ -50,50 +50,6 @@ function MadNLP.get_tril_to_full(csc::rocSPARSE.ROCSparseMatrixCSC{Tv,Ti}) where
     view(csc.nzVal, ROCArray(cscind.nzval))
 end
 
-function MadNLP.coo_to_csc(
-    coo::MadNLP.SparseMatrixCOO{T,I,VT,VI},
-) where {T,I,VT<:ROCArray,VI<:ROCArray}
-    zvals = ROCVector{Int}(1:length(coo.I))
-    coord = map((i, j, k) -> ((i, j), k), coo.I, coo.J, zvals)
-    if length(coord) > 0
-        sort!(coord, lt = (((i, j), k), ((n, m), l)) -> (j, i) < (m, n))
-    end
-
-    mapptr = MadNLP.getptr(coord; by = ((x1, x2), (y1, y2)) -> x1 != y1)
-
-    colptr = similar(coo.I, size(coo, 2) + 1)
-
-    coord_csc = coord[@view(mapptr[1:end-1])]
-
-    backend = get_backend(coo.I)
-    if length(coord_csc) > 0
-        MadNLPGPU._set_coo_to_colptr_kernel!(backend)(
-            colptr,
-            coord_csc,
-            ndrange = length(coord_csc),
-        )
-    else
-        fill!(colptr, one(Int))
-    end
-
-    rowval = map(x -> x[1][1], coord_csc)
-    nzval = similar(rowval, T)
-
-    csc = rocSPARSE.ROCSparseMatrixCSC(colptr, rowval, nzval, size(coo))
-
-    cscmap = similar(coo.I, Int)
-    if length(mapptr) > 1
-        MadNLPGPU._set_coo_to_csc_map_kernel!(backend)(
-            cscmap,
-            mapptr,
-            coord,
-            ndrange = length(mapptr) - 1,
-        )
-    end
-
-    return csc, cscmap
-end
-
 function MadNLP.build_condensed_aug_coord!(
     kkt::MadNLP.AbstractCondensedKKTSystem{T,VT,MT},
 ) where {T,VT,MT<:rocSPARSE.ROCSparseMatrixCSC{T}}
