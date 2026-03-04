@@ -1,4 +1,4 @@
-function MadNLP._update_S_and_Y!(qn::MadNLP.CompactLBFGS, s::CuVector, y::CuVector)
+function MadNLP._update_S_and_Y!(qn::MadNLP.CompactLBFGS, s::AbstractGPUVector, y::AbstractGPUVector)
     if qn.current_mem < qn.max_mem
         qn.current_mem += 1
         n, k = size(qn)
@@ -14,7 +14,7 @@ function MadNLP._update_S_and_Y!(qn::MadNLP.CompactLBFGS, s::CuVector, y::CuVect
     else
         n, k = size(qn)
         # Shift
-        backend = CUDABackend()
+        backend = get_backend(s)
         _update_S_and_Y_kernel!(backend)(k, qn.Sk, qn.Yk, ndrange=n)
         # Latest element
         view(qn.Sk, 1:n, k) .= s
@@ -22,15 +22,15 @@ function MadNLP._update_S_and_Y!(qn::MadNLP.CompactLBFGS, s::CuVector, y::CuVect
     end
 end
 
-function MadNLP._update_L_and_D!(qn::MadNLP.CompactLBFGS{T}, sk::CuVector, yk::CuVector) where {T}
+function MadNLP._update_L_and_D!(qn::MadNLP.CompactLBFGS{T}, sk::AbstractGPUVector, yk::AbstractGPUVector) where {T}
     # Update the strict lower triangular part of S'Y
     n, k = size(qn)
     if qn.max_mem_reached
         # shift of all coefficients
         @inbounds for i in 1:k-1
-            CUDA.@allowscalar qn.Dk[i] = qn.Dk[i+1]
+            @allowscalar qn.Dk[i] = qn.Dk[i+1]
             @inbounds for j in 1:i-1
-                CUDA.@allowscalar qn.Lk[i, j] = qn.Lk[i+1, j+1]
+                @allowscalar qn.Lk[i, j] = qn.Lk[i+1, j+1]
             end
         end
         # Compute the new last row of tril(S'Y)
@@ -38,14 +38,14 @@ function MadNLP._update_L_and_D!(qn::MadNLP.CompactLBFGS{T}, sk::CuVector, yk::C
         lk = view(qn.Lk, k, 1:k)
         sk = view(qn.Sk, 1:n, k)
         mul!(lk, qn.Yk', sk)
-        CUDA.@allowscalar qn.Dk[k] = qn.Lk[k,k]
-        CUDA.@allowscalar qn.Lk[k,k] = zero(T)
+        @allowscalar qn.Dk[k] = qn.Lk[k,k]
+        @allowscalar qn.Lk[k,k] = zero(T)
     else
         # To be optimized...
         p = size(qn.Lk, 1)
         mul!(qn.Lk, qn.Sk', qn.Yk)
-        CUDA.@allowscalar push!(qn.Dk, qn.Lk[k,k])
-        backend = CUDABackend()
+        @allowscalar push!(qn.Dk, qn.Lk[k,k])
+        backend = get_backend(sk)
         _update_L_and_D_kernel!(backend)(qn.Lk, ndrange=(p, p))
         if qn.current_mem == qn.max_mem
             qn.max_mem_reached = true

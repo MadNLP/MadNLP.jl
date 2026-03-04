@@ -1,6 +1,4 @@
-import CUDSS
-
-@kwdef mutable struct CudssSolverOptions <: MadNLP.AbstractOptions
+MadNLP.@kwdef mutable struct CudssSolverOptions <: MadNLP.AbstractOptions
     # Use LDLᵀ by default in CUDSS as Cholesky can lead to undefined behavior.
     cudss_algorithm::MadNLP.LinearFactorization = MadNLP.LDL
     cudss_ordering::ORDERING = DEFAULT_ORDERING
@@ -87,7 +85,7 @@ mutable struct CUDSSSolver{T,V} <: MadNLP.AbstractLinearSolver{T}
     buffer::V
 
     opt::CudssSolverOptions
-    logger::MadNLPLogger
+    logger::MadNLP.MadNLPLogger
 end
 
 function CUDSSSolver(
@@ -178,7 +176,7 @@ end
 MadNLP.input_type(::Type{CUDSSSolver}) = :csc
 MadNLP.default_options(::Type{CUDSSSolver}) = CudssSolverOptions()
 MadNLP.is_inertia(M::CUDSSSolver) = (M.inner.matrix.nbatch == 1)  # Uncomment if MadNLP.LU is supported -- (M.opt.cudss_algorithm ∈ (MadNLP.CHOLESKY, MadNLP.LDL))
-function inertia(M::CUDSSSolver)
+function MadNLP.inertia(M::CUDSSSolver)
     @assert M.inner.matrix.nbatch == 1
     n = size(M.tril, 1)
     info = CUDSS.cudss_get(M.inner, "info")

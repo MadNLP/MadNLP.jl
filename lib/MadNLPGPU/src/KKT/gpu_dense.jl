@@ -1,22 +1,22 @@
 ######################################################################
-##### ROCm wrappers for DenseKKTSystem / DenseCondensedKKTSystem #####
+##### GPU wrappers for DenseKKTSystem / DenseCondensedKKTSystem #####
 ######################################################################
 
 #=
     MadNLP._madnlp_unsafe_wrap
 =#
 
-function MadNLP._madnlp_unsafe_wrap(vec::VT, n, shift=1) where {T, VT <: ROCVector{T}}
-    return view(vec,shift:shift+n-1)
+function MadNLP._madnlp_unsafe_wrap(vec::VT, n, shift=1) where {T, VT <: AbstractGPUVector{T}}
+    return view(vec, shift:shift+n-1)
 end
 
 #=
     MadNLP.diag!
 =#
 
-function MadNLP.diag!(dest::ROCVector{T}, src::ROCMatrix{T}) where {T}
+function MadNLP.diag!(dest::AbstractGPUVector{T}, src::AbstractGPUMatrix{T}) where {T}
     @assert length(dest) == size(src, 1)
-    backend = ROCBackend()
+    backend = get_backend(dest)
     MadNLPGPU._copy_diag_kernel!(backend)(dest, src, ndrange = length(dest))
     
     return
@@ -26,8 +26,8 @@ end
     MadNLP.diag_add!
 =#
 
-function MadNLP.diag_add!(dest::ROCMatrix, src1::ROCVector, src2::ROCVector)
-    backend = ROCBackend()
+function MadNLP.diag_add!(dest::AbstractGPUMatrix, src1::AbstractGPUVector, src2::AbstractGPUVector)
+    backend = get_backend(dest)
     MadNLPGPU._add_diagonal_kernel!(backend)(dest, src1, src2, ndrange = size(dest, 1))
     
     return
@@ -37,9 +37,9 @@ end
     MadNLP._set_diag!
 =#
 
-function MadNLP._set_diag!(A::ROCMatrix, inds, a)
+function MadNLP._set_diag!(A::AbstractGPUMatrix, inds, a)
     if !isempty(inds)
-        backend = ROCBackend()
+        backend = get_backend(A)
         MadNLPGPU._set_diag_kernel!(backend)(A, inds, a; ndrange = length(inds))
         
     end
@@ -51,20 +51,21 @@ end
 =#
 
 function MadNLP._build_dense_kkt_system!(
-    dest::ROCMatrix,
-    hess::ROCMatrix,
-    jac::ROCMatrix,
-    pr_diag::ROCVector,
-    du_diag::ROCVector,
-    diag_hess::ROCVector,
+    dest::AbstractGPUMatrix,
+    hess::AbstractGPUMatrix,
+    jac::AbstractGPUMatrix,
+    pr_diag::AbstractGPUVector,
+    du_diag::AbstractGPUVector,
+    diag_hess::AbstractGPUVector,
     ind_ineq::AbstractVector,
     n,
     m,
     ns,
 )
-    ind_ineq_gpu = ROCVector(ind_ineq)
+    ind_ineq_gpu = similar(dest, eltype(ind_ineq), length(ind_ineq))
+    copyto!(ind_ineq_gpu, ind_ineq)
     ndrange = (n + m + ns, n)
-    backend = ROCBackend()
+    backend = get_backend(dest)
     MadNLPGPU._build_dense_kkt_system_kernel!(backend)(
         dest,
         hess,
@@ -87,17 +88,18 @@ end
 =#
 
 function MadNLP._build_ineq_jac!(
-    dest::ROCMatrix,
-    jac::ROCMatrix,
-    diag_buffer::ROCVector,
+    dest::AbstractGPUMatrix,
+    jac::AbstractGPUMatrix,
+    diag_buffer::AbstractGPUVector,
     ind_ineq::AbstractVector,
     n,
     m_ineq,
 )
     (m_ineq == 0) && return # nothing to do if no ineq. constraints
-    ind_ineq_gpu = ROCVector(ind_ineq)
+    ind_ineq_gpu = similar(dest, eltype(ind_ineq), length(ind_ineq))
+    copyto!(ind_ineq_gpu, ind_ineq)
     ndrange = (m_ineq, n)
-    backend = ROCBackend()
+    backend = get_backend(dest)
     MadNLPGPU._build_jacobian_condensed_kernel!(backend)(
         dest,
         jac,
@@ -115,18 +117,19 @@ end
 =#
 
 function MadNLP._build_condensed_kkt_system!(
-    dest::ROCMatrix,
-    hess::ROCMatrix,
-    jac::ROCMatrix,
-    pr_diag::ROCVector,
-    du_diag::ROCVector,
+    dest::AbstractGPUMatrix,
+    hess::AbstractGPUMatrix,
+    jac::AbstractGPUMatrix,
+    pr_diag::AbstractGPUVector,
+    du_diag::AbstractGPUVector,
     ind_eq::AbstractVector,
     n,
     m_eq,
 )
-    ind_eq_gpu = ROCVector(ind_eq)
+    ind_eq_gpu = similar(dest, eltype(ind_eq), length(ind_eq))
+    copyto!(ind_eq_gpu, ind_eq)
     ndrange = (n + m_eq, n)
-    backend = ROCBackend()
+    backend = get_backend(dest)
     MadNLPGPU._build_condensed_kkt_system_kernel!(backend)(
         dest,
         hess,

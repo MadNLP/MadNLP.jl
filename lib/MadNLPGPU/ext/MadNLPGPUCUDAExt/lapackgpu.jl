@@ -12,20 +12,20 @@ mutable struct LapackCUDASolver{T,MT} <: MadNLP.AbstractLapackSolver{T}
     info::CuVector{Cint}
     ipiv::CuVector{Cint}
     ipiv64::CuVector{Int64}
-    opt::LapackOptions
-    logger::MadNLPLogger
+    opt::MadNLP.LapackOptions
+    logger::MadNLP.MadNLPLogger
     legacy::Bool
     params::CuSolverParameters
 
     function LapackCUDASolver(
         A::MT;
         option_dict::Dict{Symbol,Any} = Dict{Symbol,Any}(),
-        opt = LapackOptions(),
-        logger = MadNLPLogger(),
+        opt = MadNLP.LapackOptions(),
+        logger = MadNLP.MadNLPLogger(),
         legacy::Bool = true,
         kwargs...,
     ) where {MT<:AbstractMatrix}
-        set_options!(opt, option_dict, kwargs...)
+        MadNLP.set_options!(opt, option_dict, kwargs...)
         T = eltype(A)
         m,n = size(A)
         @assert m == n
@@ -48,7 +48,7 @@ mutable struct LapackCUDASolver{T,MT} <: MadNLP.AbstractLapackSolver{T}
     end
 end
 
-MadNLP.transfer_matrix!(M::LapackCUDASolver) = gpu_transfer!(M.fact, M.A)
+MadNLP.transfer_matrix!(M::LapackCUDASolver) = MadNLPGPU.gpu_transfer!(M.fact, M.A)
 MadNLP._get_info(M::LapackCUDASolver) = sum(M.info)
-solve!(M::LapackCUDASolver{T}, x::CuVector{T}) where {T} = MadNLP._solve_dispatch!(M, x)
-introduce(M::LapackCUDASolver) = "cuSOLVER v$(CUSOLVER.version()) -- ($(M.opt.lapack_algorithm))"
+MadNLP.solve!(M::LapackCUDASolver{T}, x::CuVector{T}) where {T} = MadNLP._solve_dispatch!(M, x)
+MadNLP.introduce(M::LapackCUDASolver) = "cuSOLVER v$(CUSOLVER.version()) -- ($(M.opt.lapack_algorithm))"

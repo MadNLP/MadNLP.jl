@@ -3,16 +3,11 @@ module MadNLPGPU
 import LinearAlgebra
 import SparseArrays: SparseMatrixCSC, nonzeros, nnz
 import LinearAlgebra: Symmetric, mul!, norm, dot
-# CUDA
-import CUDA: CUDA, CUSPARSE, CUBLAS, CUSOLVER, CuVector, CuMatrix, CuArray,
-    has_cuda, @allowscalar, runtime_version, CUDABackend
-import .CUSOLVER: cusolverStatus_t, CuPtr, cudaDataType, cublasFillMode_t, cusolverDnHandle_t,
-    dense_handle, CuSolverParameters, CUSOLVER_EIG_MODE_VECTOR
-import .CUBLAS: handle, CUBLAS_DIAG_NON_UNIT,
-    CUBLAS_FILL_MODE_LOWER, CUBLAS_FILL_MODE_UPPER, CUBLAS_SIDE_LEFT, CUBLAS_OP_N, CUBLAS_OP_T
 
+# GPU abstractions
+import GPUArraysCore: AbstractGPUVector, AbstractGPUMatrix, AbstractGPUArray, @allowscalar
 # Kernels
-import KernelAbstractions: @kernel, @index, synchronize, @Const
+import KernelAbstractions: @kernel, @index, synchronize, @Const, get_backend
 
 import MadNLP: NLPModels
 import MadNLP
@@ -33,14 +28,12 @@ include("utils.jl")
 include("KKT/kernels_dense.jl")
 include("KKT/kernels_sparse.jl")
 include("KKT/kernels_qn.jl")
-include("KKT/cuda_dense.jl")
-include("KKT/cuda_sparse.jl")
-include("KKT/cuda_qn.jl")
-include("LinearSolvers/lapackgpu.jl")
-include("LinearSolvers/cusolver.jl")
-include("LinearSolvers/cudss.jl")
-include("cuda.jl")
+include("KKT/gpu_dense.jl")
+include("KKT/gpu_sparse.jl")
+include("KKT/gpu_qn.jl")
 
+global LapackCUDASolver
+global CUDSSSolver
 global LapackROCmSolver
 export LapackCUDASolver, CUDSSSolver, LapackROCmSolver
 

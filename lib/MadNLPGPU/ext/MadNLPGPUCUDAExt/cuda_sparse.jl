@@ -1,23 +1,23 @@
 ######################################################
-##### ROCm stubs for SparseCondensedKKTSystem    #####
-##### (functions requiring concrete rocSPARSE types) #
+##### CUDA stubs for SparseCondensedKKTSystem    #####
+##### (functions requiring concrete CUSPARSE types) ##
 ######################################################
 
 function MadNLP.transfer!(
-    dest::rocSPARSE.ROCSparseMatrixCSC,
+    dest::CUSPARSE.CuSparseMatrixCSC,
     src::MadNLP.SparseMatrixCOO,
     map,
 )
     return copyto!(view(dest.nzVal, map), src.V)
 end
 
-MadNLP.nzval(H::rocSPARSE.ROCSparseMatrixCSC) = H.nzVal
+MadNLP.nzval(H::CUSPARSE.CuSparseMatrixCSC) = H.nzVal
 
-function MadNLP._get_sparse_csc(dims, colptr::ROCVector, rowval, nzval)
-    return rocSPARSE.ROCSparseMatrixCSC(colptr, rowval, nzval, dims)
+function MadNLP._get_sparse_csc(dims, colptr::CuVector, rowval, nzval)
+    return CUSPARSE.CuSparseMatrixCSC(colptr, rowval, nzval, dims)
 end
 
-function MadNLP._sym_length(Jt::rocSPARSE.ROCSparseMatrixCSC)
+function MadNLP._sym_length(Jt::CUSPARSE.CuSparseMatrixCSC)
     return mapreduce(
         (x, y) -> begin
             z = x - y
@@ -29,7 +29,7 @@ function MadNLP._sym_length(Jt::rocSPARSE.ROCSparseMatrixCSC)
     )
 end
 
-function MadNLP.get_tril_to_full(csc::rocSPARSE.ROCSparseMatrixCSC{Tv,Ti}) where {Tv,Ti}
+function MadNLP.get_tril_to_full(csc::CUSPARSE.CuSparseMatrixCSC{Tv,Ti}) where {Tv,Ti}
     cscind = MadNLP.SparseMatrixCSC{Int,Ti}(
         Symmetric(
             MadNLP.SparseMatrixCSC{Int,Ti}(
@@ -41,19 +41,19 @@ function MadNLP.get_tril_to_full(csc::rocSPARSE.ROCSparseMatrixCSC{Tv,Ti}) where
             :L,
         ),
     )
-    return rocSPARSE.ROCSparseMatrixCSC{Tv,Ti}(
-        ROCArray(cscind.colptr),
-        ROCArray(cscind.rowval),
-        ROCVector{Tv}(undef, MadNLP.nnz(cscind)),
+    return CUSPARSE.CuSparseMatrixCSC{Tv,Ti}(
+        CuArray(cscind.colptr),
+        CuArray(cscind.rowval),
+        CuVector{Tv}(undef, MadNLP.nnz(cscind)),
         size(csc),
     ),
-    view(csc.nzVal, ROCArray(cscind.nzval))
+    view(csc.nzVal, CuArray(cscind.nzval))
 end
 
 function MadNLP.coo_to_csc(
     coo::MadNLP.SparseMatrixCOO{T,I,VT,VI},
-) where {T,I,VT<:ROCArray,VI<:ROCArray}
-    zvals = ROCVector{Int}(1:length(coo.I))
+) where {T,I,VT<:CuArray,VI<:CuArray}
+    zvals = CuVector{Int}(1:length(coo.I))
     coord = map((i, j, k) -> ((i, j), k), coo.I, coo.J, zvals)
     if length(coord) > 0
         sort!(coord, lt = (((i, j), k), ((n, m), l)) -> (j, i) < (m, n))
@@ -72,6 +72,7 @@ function MadNLP.coo_to_csc(
             coord_csc,
             ndrange = length(coord_csc),
         )
+        synchronize(backend)
     else
         fill!(colptr, one(Int))
     end
@@ -79,7 +80,7 @@ function MadNLP.coo_to_csc(
     rowval = map(x -> x[1][1], coord_csc)
     nzval = similar(rowval, T)
 
-    csc = rocSPARSE.ROCSparseMatrixCSC(colptr, rowval, nzval, size(coo))
+    csc = CUSPARSE.CuSparseMatrixCSC(colptr, rowval, nzval, size(coo))
 
     cscmap = similar(coo.I, Int)
     if length(mapptr) > 1
@@ -89,6 +90,7 @@ function MadNLP.coo_to_csc(
             coord,
             ndrange = length(mapptr) - 1,
         )
+        synchronize(backend)
     end
 
     return csc, cscmap
@@ -96,7 +98,7 @@ end
 
 function MadNLP.build_condensed_aug_coord!(
     kkt::MadNLP.AbstractCondensedKKTSystem{T,VT,MT},
-) where {T,VT,MT<:rocSPARSE.ROCSparseMatrixCSC{T}}
+) where {T,VT,MT<:CUSPARSE.CuSparseMatrixCSC{T}}
     fill!(kkt.aug_com.nzVal, zero(T))
     backend = get_backend(kkt.pr_diag)
     if length(kkt.hptr) > 0
@@ -106,6 +108,7 @@ function MadNLP.build_condensed_aug_coord!(
             kkt.hess_com.nzVal;
             ndrange = length(kkt.hptr),
         )
+        synchronize(backend)
     end
     if length(kkt.dptr) > 0
         MadNLPGPU._transfer_hessian_kernel!(backend)(
@@ -114,6 +117,7 @@ function MadNLP.build_condensed_aug_coord!(
             kkt.pr_diag;
             ndrange = length(kkt.dptr),
         )
+        synchronize(backend)
     end
     if length(kkt.ext.jptrptr) > 1 # otherwise error is thrown
         MadNLPGPU._transfer_jtsj_kernel!(backend)(
@@ -124,13 +128,14 @@ function MadNLP.build_condensed_aug_coord!(
             kkt.diag_buffer;
             ndrange = length(kkt.ext.jptrptr) - 1,
         )
+        synchronize(backend)
     end
     return
 end
 
 function MadNLP.compress_hessian!(
     kkt::MadNLP.AbstractSparseKKTSystem{T,VT,MT},
-) where {T,VT,MT<:rocSPARSE.ROCSparseMatrixCSC{T,Int32}}
+) where {T,VT,MT<:CUSPARSE.CuSparseMatrixCSC{T,Int32}}
     fill!(kkt.hess_com.nzVal, zero(T))
     backend = get_backend(kkt.pr_diag)
     if length(kkt.ext.hess_com_ptrptr) > 1
@@ -141,13 +146,14 @@ function MadNLP.compress_hessian!(
             kkt.hess_raw.V;
             ndrange = length(kkt.ext.hess_com_ptrptr) - 1,
         )
+        synchronize(backend)
     end
     return
 end
 
 function MadNLP.compress_jacobian!(
     kkt::MadNLP.SparseCondensedKKTSystem{T,VT,MT},
-) where {T,VT,MT<:rocSPARSE.ROCSparseMatrixCSC{T,Int32}}
+) where {T,VT,MT<:CUSPARSE.CuSparseMatrixCSC{T,Int32}}
     fill!(kkt.jt_csc.nzVal, zero(T))
     backend = get_backend(kkt.pr_diag)
     if length(kkt.ext.jt_csc_ptrptr) > 1 # otherwise error is thrown
@@ -158,12 +164,13 @@ function MadNLP.compress_jacobian!(
             kkt.jt_coo.V;
             ndrange = length(kkt.ext.jt_csc_ptrptr) - 1,
         )
+        synchronize(backend)
     end
     return
 end
 
 function MadNLP._build_condensed_aug_symbolic_hess(
-    H::rocSPARSE.ROCSparseMatrixCSC{Tv,Ti},
+    H::CUSPARSE.CuSparseMatrixCSC{Tv,Ti},
     sym,
     sym2,
 ) where {Tv,Ti}
@@ -176,12 +183,13 @@ function MadNLP._build_condensed_aug_symbolic_hess(
             H.rowVal;
             ndrange = size(H, 2),
         )
+        synchronize(backend)
     end
     return
 end
 
 function MadNLP._build_condensed_aug_symbolic_jt(
-    Jt::rocSPARSE.ROCSparseMatrixCSC{Tv,Ti},
+    Jt::CUSPARSE.CuSparseMatrixCSC{Tv,Ti},
     sym,
     sym2,
 ) where {Tv,Ti}
@@ -201,6 +209,7 @@ function MadNLP._build_condensed_aug_symbolic_jt(
             offsets;
             ndrange = size(Jt, 2),
         )
+        synchronize(backend)
     end
     return
 end

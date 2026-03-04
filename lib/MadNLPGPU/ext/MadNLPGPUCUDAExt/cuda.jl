@@ -3,7 +3,7 @@
 =#
 
 function MadNLP.MadNLPOptions{T}(
-    nlp::AbstractNLPModel{T,VT};
+    nlp::MadNLP.AbstractNLPModel{T,VT};
     dense_callback = MadNLP.is_dense_callback(nlp),
     callback = dense_callback ? MadNLP.DenseCallback : MadNLP.SparseCallback,
     kkt_system = dense_callback ? MadNLP.DenseCondensedKKTSystem : MadNLP.SparseCondensedKKTSystem,
@@ -20,7 +20,7 @@ function MadNLP.MadNLPOptions{T}(
     )
 end
 
-function MadNLP.default_options(::AbstractNLPModel{T,VT}, ::Type{MadNLP.SparseCondensedKKTSystem}, linear_solver::Type{CUDSSSolver}) where {T, VT <: CuVector{T}}
+function MadNLP.default_options(::MadNLP.AbstractNLPModel{T,VT}, ::Type{MadNLP.SparseCondensedKKTSystem}, linear_solver::Type{CUDSSSolver}) where {T, VT <: CuVector{T}}
     opt = MadNLP.default_options(linear_solver)
     # MadNLP.set_options!(opt, Dict(:cudss_algorithm => MadNLP.CHOLESKY)) # commented out due to issue #539
 
@@ -44,11 +44,12 @@ end
     CuSparseMatrixCSC to CuMatrix
 =#
 
-function gpu_transfer!(y::CuMatrix{T}, x::CUSPARSE.CuSparseMatrixCSC{T}) where {T}
+function MadNLPGPU.gpu_transfer!(y::CuMatrix{T}, x::CUSPARSE.CuSparseMatrixCSC{T}) where {T}
     n = size(y, 2)
     fill!(y, zero(T))
-    backend = CUDABackend()
-    _csc_to_dense_kernel!(backend)(y, x.colPtr, x.rowVal, x.nzVal, ndrange = n)
+    backend = get_backend(y)
+    MadNLPGPU._csc_to_dense_kernel!(backend)(y, x.colPtr, x.rowVal, x.nzVal, ndrange = n)
+    synchronize(backend)
     return
 end
 
