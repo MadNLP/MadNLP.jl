@@ -1,25 +1,72 @@
 
 """
-    SchurComplementKKTSystem{T, VT, MT, QN} <: AbstractCondensedKKTSystem{T, VT, MT, QN}
+    ScenarioBlockMap
+
+Precomputed index mappings for one scenario — maps from global COO indices
+to per-block positions in A_kk (sparse), C_dk (dense), and S (dense).
+"""
+struct ScenarioBlockMap
+    # Hessian diagonal block: global hess COO index → A_kk nzval position
+    hess_Akk_coo::Vector{Int}
+    hess_Akk_nzpos::Vector{Int}
+
+    # Hessian coupling block: global hess COO index → (C_dk row, C_dk col)
+    hess_Cdk_coo::Vector{Int}
+    hess_Cdk_row::Vector{Int}
+    hess_Cdk_col::Vector{Int}
+
+    # Equality Jacobian, scenario vars → A_kk lower triangle only
+    jeq_Akk_coo::Vector{Int}
+    jeq_Akk_nzpos::Vector{Int}
+
+    # Equality Jacobian, design vars → C_dk
+    jeq_Cdk_coo::Vector{Int}
+    jeq_Cdk_row::Vector{Int}   # design var index (1:nd)
+    jeq_Cdk_col::Vector{Int}   # nv + eq_local_idx
+
+    # Inequality condensation → A_kk (lower triangle)
+    ineq_Akk_nzpos::Vector{Int}
+    ineq_Akk_jcoo1::Vector{Int}
+    ineq_Akk_jcoo2::Vector{Int}
+    ineq_Akk_bufidx::Vector{Int}
+
+    # Inequality condensation → C_dk
+    ineq_Cdk_row::Vector{Int}     # design var index (1:nd)
+    ineq_Cdk_col::Vector{Int}     # scenario local var (1:nv)
+    ineq_Cdk_jcoo_d::Vector{Int}  # jac COO for design var
+    ineq_Cdk_jcoo_v::Vector{Int}  # jac COO for scenario var
+    ineq_Cdk_bufidx::Vector{Int}
+
+    # Inequality condensation → S (full, both triangles)
+    ineq_S_row::Vector{Int}
+    ineq_S_col::Vector{Int}
+    ineq_S_jcoo1::Vector{Int}
+    ineq_S_jcoo2::Vector{Int}
+    ineq_S_bufidx::Vector{Int}
+
+    # Diagonal positions in A_kk nzval for pr_diag (nv entries)
+    pr_diag_global::Vector{Int}
+    pr_diag_nzpos::Vector{Int}
+
+    # Diagonal positions in A_kk nzval for du_diag (nc_eq entries)
+    du_diag_global::Vector{Int}
+    du_diag_nzpos::Vector{Int}
+end
+
+"""
+    SchurComplementKKTSystem{T, VT, MT, QN, LS, LS2, VI} <: AbstractCondensedKKTSystem{T, VT, MT, QN}
 
 KKT system exploiting block-arrowhead structure from two-stage stochastic programs
-via Schur complement decomposition.
+via Schur complement decomposition, using sparse COO/CSC storage for the global
+Hessian and Jacobian and sparse per-scenario block solvers.
 
 Variable layout: `[v_1, ..., v_ns, d]` where `v_k ∈ R^nv`, `d ∈ R^nd`.
 Constraint layout: `[c_1, ..., c_ns]` where `c_k ∈ R^nc`.
 
-The augmented per-scenario block is `(nv + nc) × (nv + nc)`:
-```
-A_k = [H_kk + Σx_k + J_kv' diag(db_k) J_kv    J_kv' diag(db_k) J_kd    J_kv_eq' ]
-      [J_kd' diag(db_k) J_kv                    (coupling to S)                     ]
-      [J_kv_eq                                   du_diag_eq_k                        ]
-```
-
-For inequalities, they get condensed (standard MadNLP condensed form).
-For equalities, they enter the augmented blocks.
-
-The Schur complement eliminates `(Δv_k, Δy_eq_k)` per scenario, leaving a dense
-`nd × nd` system on design variables solved by the pluggable linear solver.
+The augmented per-scenario block `A_k` (size `blk_size × blk_size`) is stored
+as a sparse lower-triangular `SparseMatrixCSC` and factored by a configurable
+sparse solver (default `LDLSolver`). The coupling blocks `C_dk` remain dense.
+The Schur complement `S = aug_com` (size `nd × nd`) is dense.
 """
 struct SchurComplementKKTSystem{
     T,
@@ -27,54 +74,68 @@ struct SchurComplementKKTSystem{
     MT <: AbstractMatrix{T},
     QN,
     LS,
+    LS2,
     VI <: AbstractVector{Int}
     } <: AbstractCondensedKKTSystem{T, VT, MT, QN}
 
-    # Full dense Hessian/Jacobian (filled by NLP callback)
-    hess::MT                    # n_total × n_total
-    jac::MT                     # m_total × n_total
+    # COO value buffers (filled by NLP callback via jac_coord!/hess_coord!)
+    hess::VT                        # length cb.nnzh
+    jac::VT                         # length cb.nnzj
+
+    # COO structures (share value buffers above)
+    hess_raw::SparseMatrixCOO{T, Int32, VT, Vector{Int32}}
+    jt_coo::SparseMatrixCOO{T, Int32, VT, Vector{Int32}}
+
+    # CSC representations (for jtprod, mul, dual recovery)
+    hess_csc::SparseMatrixCSC{T, Int32}
+    hess_csc_map::Vector{Int}
+    jt_csc::SparseMatrixCSC{T, Int32}
+    jt_csc_map::Vector{Int}
+
     quasi_newton::QN
 
     # Standard MadNLP diagonal vectors
-    reg::VT                     # n_total + n_ineq
-    pr_diag::VT                 # n_total + n_ineq
-    du_diag::VT                 # m_total
-    l_diag::VT                  # nlb
-    u_diag::VT                  # nub
-    l_lower::VT                 # nlb
-    u_lower::VT                 # nub
+    reg::VT                         # n_total + n_ineq
+    pr_diag::VT                     # n_total + n_ineq
+    du_diag::VT                     # m_total
+    l_diag::VT                      # nlb
+    u_diag::VT                      # nub
+    l_lower::VT                     # nlb
+    u_lower::VT                     # nub
 
     # Two-stage dimensions
-    ns::Int                     # number of scenarios
-    nv::Int                     # recourse variables per scenario
-    nd::Int                     # design variables
-    nc::Int                     # constraints per scenario
+    ns::Int
+    nv::Int
+    nd::Int
+    nc::Int
+    nc_eq_per_s::Int
+    nc_ineq_per_s::Int
+    blk_size::Int                   # = nv + nc_eq_per_s
 
-    # Per-scenario augmented blocks (nv+nc_eq_k) × (nv+nc_eq_k)
-    # We use full nc for simplicity (equality + inequality all per scenario)
-    # Block size = nv + nc_eq_per_s (number of equality constraints per scenario)
-    nc_eq_per_s::Int            # equality constraints per scenario
-    nc_ineq_per_s::Int          # inequality constraints per scenario
-    blk_size::Int               # = nv + nc_eq_per_s
+    # Per-scenario sparse augmented blocks (lower triangle only)
+    A_kk::Vector{SparseMatrixCSC{T, Int32}}
+    C_dk::Vector{MT}                # ns × (nd × blk_size) — dense
 
-    A_kk::Vector{MT}            # ns × (blk_size × blk_size) scenario augmented blocks
-    C_dk::Vector{MT}            # ns × (nd × blk_size) coupling blocks
-    A_kk_work::Vector{MT}       # ns × (blk_size × blk_size) factorization workspace
-    A_kk_ipiv::Vector{Vector{BLAS.BlasInt}}  # pivot arrays for sytrf
-
-    # Schur complement = aug_com (what the linear solver sees)
-    aug_com::MT                 # nd × nd
+    # Schur complement (what the dense linear solver sees)
+    aug_com::MT                     # nd × nd
 
     # Buffers
-    diag_buffer::VT             # n_ineq — condensing diagonal
-    buffer::VT                  # m_total — general
-    rhs_d::VT                   # nd — design RHS
-    rhs_k::Vector{VT}          # ns × blk_size — scenario RHS buffers
-    tmp_blk_nd::Vector{MT}     # ns × (blk_size × nd) — for A_kk^{-1} * C_dk'
+    diag_buffer::VT                 # n_ineq — condensing diagonal
+    buffer::VT                      # m_total — general
+    rhs_d::VT                       # nd — design RHS
+    rhs_k::Vector{VT}              # ns × blk_size — scenario RHS buffers
+    tmp_blk_nd::Vector{MT}         # ns × (blk_size × nd)
+    solve_buffer::VT               # blk_size — for column-by-column solves
 
-    # Mapping: which global equality constraints belong to scenario k
-    eq_per_scenario::Vector{Vector{Int}}  # eq_per_scenario[k] = list of indices into ind_eq
-    ineq_per_scenario::Vector{Vector{Int}}  # ineq_per_scenario[k] = list of indices into ind_ineq
+    # Precomputed index maps
+    block_maps::Vector{ScenarioBlockMap}
+    hess_S_coo::Vector{Int}         # COO indices for design-design Hessian
+    hess_S_row::Vector{Int}         # S row (1:nd)
+    hess_S_col::Vector{Int}         # S col (1:nd)
+
+    # Scenario classification
+    eq_per_scenario::Vector{Vector{Int}}
+    ineq_per_scenario::Vector{Vector{Int}}
 
     # Inequality/equality/bound index info
     n_eq::Int
@@ -84,14 +145,25 @@ struct SchurComplementKKTSystem{
     ind_lb::VI
     ind_ub::VI
 
-    # Linear solver (for Schur complement S)
-    linear_solver::LS
+    # Solvers
+    scenario_solvers::Vector{LS2}
+    linear_solver::LS               # for Schur complement S (dense)
     etc::Dict{Symbol, Any}
+end
+
+# --- Helper: find index of gi in ind_ineq → diag_buffer index ---
+function _ineq_buf_idx(ind_ineq, gi::Int)
+    @inbounds for idx in 1:length(ind_ineq)
+        if ind_ineq[idx] == gi
+            return idx
+        end
+    end
+    return 0
 end
 
 function create_kkt_system(
     ::Type{SchurComplementKKTSystem},
-    cb::AbstractCallback{T,VT},
+    cb::SparseCallback{T,VT},
     linear_solver::Type;
     opt_linear_solver=default_options(linear_solver),
     hessian_approximation=ExactHessian,
@@ -100,6 +172,7 @@ function create_kkt_system(
     schur_nv::Int=0,
     schur_nd::Int=0,
     schur_nc::Int=0,
+    schur_scenario_linear_solver::Type=LDLSolver,
 ) where {T, VT}
 
     n = cb.nvar
@@ -120,7 +193,31 @@ function create_kkt_system(
     nd = schur_nd
     nc = schur_nc
 
-    # Classify constraints per scenario as equality or inequality
+    # --- Get sparsity patterns ---
+    jac_sparsity_I = Vector{Int32}(undef, cb.nnzj)
+    jac_sparsity_J = Vector{Int32}(undef, cb.nnzj)
+    _jac_sparsity_wrapper!(cb, jac_sparsity_I, jac_sparsity_J)
+
+    hess_sparsity_I, hess_sparsity_J = build_hessian_structure(cb, hessian_approximation)
+    force_lower_triangular!(hess_sparsity_I, hess_sparsity_J)
+
+    n_hess = length(hess_sparsity_I)
+    n_jac = length(jac_sparsity_I)
+
+    # --- COO value buffers ---
+    hess = VT(undef, n_hess)
+    jac = VT(undef, n_jac)
+    fill!(hess, zero(T))
+    fill!(jac, zero(T))
+
+    # --- Build global COO + CSC ---
+    hess_raw = SparseMatrixCOO(n, n, hess_sparsity_I, hess_sparsity_J, hess)
+    jt_coo = SparseMatrixCOO(n, m, jac_sparsity_J, jac_sparsity_I, jac)  # transposed
+
+    hess_csc, hess_csc_map = coo_to_csc(hess_raw)
+    jt_csc, jt_csc_map = coo_to_csc(jt_coo)
+
+    # --- Classify constraints per scenario ---
     ind_eq_set = Set(cb.ind_eq)
     ind_ineq_set = Set(cb.ind_ineq)
 
@@ -149,12 +246,331 @@ function create_kkt_system(
 
     blk_size = nv + nc_eq_per_s
 
-    # Dense full matrices
-    hess = create_array(cb, n, n)
-    jac  = create_array(cb, m, n)
-    aug_com = create_array(cb, nd, nd)
+    # --- Build index for quick ineq lookup ---
+    ineq_to_bufidx = Dict{Int,Int}()
+    for idx in 1:length(cb.ind_ineq)
+        ineq_to_bufidx[cb.ind_ineq[idx]] = idx
+    end
 
-    # Diagonal vectors
+    # --- Build Jacobian COO lookup: for each constraint, which COO entries ---
+    # jac_by_constraint[gi] = [(coo_idx, col), ...]
+    jac_by_constraint = Dict{Int, Vector{Tuple{Int,Int}}}()
+    for ci in 1:n_jac
+        row = Int(jac_sparsity_I[ci])
+        col = Int(jac_sparsity_J[ci])
+        entries = get!(Vector{Tuple{Int,Int}}, jac_by_constraint, row)
+        push!(entries, (ci, col))
+    end
+
+    # --- Precompute design variable range ---
+    d_start = ns * nv + 1
+    d_end = ns * nv + nd
+
+    # --- Classify Hessian COO entries ---
+    # hess_S_entries: design-design entries for Schur complement initialization
+    hess_S_coo_list = Int[]
+    hess_S_row_list = Int[]
+    hess_S_col_list = Int[]
+
+    # Per-scenario Hessian classification
+    hess_per_scenario_diag = [Tuple{Int,Int,Int}[] for _ in 1:ns]   # (coo, local_i, local_j)
+    hess_per_scenario_coupling = [Tuple{Int,Int,Int}[] for _ in 1:ns]  # (coo, design_local, var_local)
+
+    for ci in 1:n_hess
+        ri = Int(hess_sparsity_I[ci])
+        rj = Int(hess_sparsity_J[ci])  # lower triangle: ri >= rj
+
+        # Check if both are design vars
+        if ri >= d_start && ri <= d_end && rj >= d_start && rj <= d_end
+            di = ri - d_start + 1
+            dj = rj - d_start + 1
+            # Store both triangles for dense S
+            push!(hess_S_coo_list, ci)
+            push!(hess_S_row_list, di)
+            push!(hess_S_col_list, dj)
+            if di != dj
+                push!(hess_S_coo_list, ci)
+                push!(hess_S_row_list, dj)
+                push!(hess_S_col_list, di)
+            end
+            continue
+        end
+
+        # Check if one is design and one is scenario var
+        # Lower triangle: ri >= rj. Design vars have larger indices.
+        if ri >= d_start && ri <= d_end && rj < d_start
+            di = ri - d_start + 1
+            # Find which scenario rj belongs to
+            k = div(rj - 1, nv) + 1
+            if k >= 1 && k <= ns
+                vj = rj - (k-1)*nv  # local var index
+                push!(hess_per_scenario_coupling[k], (ci, di, vj))
+            end
+            continue
+        end
+
+        # Check if both are in the same scenario
+        if ri < d_start && rj < d_start
+            ki = div(ri - 1, nv) + 1
+            kj = div(rj - 1, nv) + 1
+            if ki == kj && ki >= 1 && ki <= ns
+                li = ri - (ki-1)*nv
+                lj = rj - (ki-1)*nv
+                push!(hess_per_scenario_diag[ki], (ci, li, lj))
+            end
+        end
+    end
+
+    # --- Build per-scenario A_kk sparsity patterns and block maps ---
+    A_kk_vec = Vector{SparseMatrixCSC{T, Int32}}(undef, ns)
+    block_maps = Vector{ScenarioBlockMap}(undef, ns)
+
+    for k in 1:ns
+        vr_start = (k-1)*nv + 1
+        eq_cons = eq_per_scenario[k]
+        ineq_cons = ineq_per_scenario[k]
+
+        # Local equation constraint index mapping: global → local eq index
+        eq_local = Dict{Int,Int}()
+        for (ci, gi) in enumerate(eq_cons)
+            eq_local[gi] = ci
+        end
+
+        # Collect all lower-triangle (row, col) entries for A_kk
+        # Using a dict to map (row,col) → list of sources
+        akk_entries = Dict{Tuple{Int,Int}, Nothing}()
+
+        # 1. Hessian diagonal entries (already lower triangle)
+        for (_, li, lj) in hess_per_scenario_diag[k]
+            akk_entries[(li, lj)] = nothing
+        end
+
+        # 2. Diagonal pr_diag entries
+        for i in 1:nv
+            akk_entries[(i, i)] = nothing
+        end
+
+        # 3. Equality Jacobian: row=nv+eq_local, col=var_local (lower triangle since nv+ci > j)
+        for gi in eq_cons
+            jac_entries = get(jac_by_constraint, gi, Tuple{Int,Int}[])
+            for (_, col) in jac_entries
+                if col >= vr_start && col < vr_start + nv
+                    local_var = col - vr_start + 1
+                    local_eq = eq_local[gi]
+                    # A_kk row = nv + local_eq, col = local_var (always lower triangle)
+                    akk_entries[(nv + local_eq, local_var)] = nothing
+                end
+            end
+        end
+
+        # 4. Diagonal du_diag entries
+        for (ci, _) in enumerate(eq_cons)
+            akk_entries[(nv + ci, nv + ci)] = nothing
+        end
+
+        # 5. Inequality condensation fill-in
+        for gi in ineq_cons
+            jac_entries = get(jac_by_constraint, gi, Tuple{Int,Int}[])
+            # Collect scenario var entries for this constraint
+            local_vars = Int[]
+            for (_, col) in jac_entries
+                if col >= vr_start && col < vr_start + nv
+                    push!(local_vars, col - vr_start + 1)
+                end
+            end
+            # All lower-triangle pairs
+            for a in local_vars
+                for b in local_vars
+                    if a >= b
+                        akk_entries[(a, b)] = nothing
+                    end
+                end
+            end
+        end
+
+        # Build A_kk COO
+        akk_nnz = length(akk_entries)
+        akk_I = Vector{Int32}(undef, akk_nnz)
+        akk_J = Vector{Int32}(undef, akk_nnz)
+        akk_V = Vector{T}(undef, akk_nnz)
+        fill!(akk_V, zero(T))
+
+        for (idx, ((ri, rj), _)) in enumerate(akk_entries)
+            akk_I[idx] = Int32(ri)
+            akk_J[idx] = Int32(rj)
+        end
+
+        akk_coo = SparseMatrixCOO(blk_size, blk_size, akk_I, akk_J, akk_V)
+        akk_csc, akk_csc_map = coo_to_csc(akk_coo)
+
+        # Now we need a way to find nzval position for a given (row, col) in A_kk (lower triangle)
+        # Build a lookup from (row, col) → nzval position in akk_csc
+        akk_lookup = Dict{Tuple{Int,Int}, Int}()
+        for col in 1:blk_size
+            for p in akk_csc.colptr[col]:(akk_csc.colptr[col+1]-1)
+                row = akk_csc.rowval[p]
+                akk_lookup[(Int(row), Int(col))] = Int(p)
+            end
+        end
+
+        # --- Build ScenarioBlockMap ---
+
+        # Hessian diagonal → A_kk
+        hess_Akk_coo_vec = Int[]
+        hess_Akk_nzpos_vec = Int[]
+        for (ci, li, lj) in hess_per_scenario_diag[k]
+            nzpos = akk_lookup[(li, lj)]
+            push!(hess_Akk_coo_vec, ci)
+            push!(hess_Akk_nzpos_vec, nzpos)
+        end
+
+        # Hessian coupling → C_dk
+        hess_Cdk_coo_vec = Int[]
+        hess_Cdk_row_vec = Int[]
+        hess_Cdk_col_vec = Int[]
+        for (ci, di, vj) in hess_per_scenario_coupling[k]
+            push!(hess_Cdk_coo_vec, ci)
+            push!(hess_Cdk_row_vec, di)
+            push!(hess_Cdk_col_vec, vj)
+        end
+
+        # Equality Jacobian → A_kk (lower triangle) and → C_dk
+        jeq_Akk_coo_vec = Int[]
+        jeq_Akk_nzpos_vec = Int[]
+        jeq_Cdk_coo_vec = Int[]
+        jeq_Cdk_row_vec = Int[]
+        jeq_Cdk_col_vec = Int[]
+
+        for gi in eq_cons
+            local_eq = eq_local[gi]
+            jac_entries = get(jac_by_constraint, gi, Tuple{Int,Int}[])
+            for (coo_idx, col) in jac_entries
+                if col >= vr_start && col < vr_start + nv
+                    # Scenario var → A_kk lower triangle
+                    local_var = col - vr_start + 1
+                    nzpos = akk_lookup[(nv + local_eq, local_var)]
+                    push!(jeq_Akk_coo_vec, coo_idx)
+                    push!(jeq_Akk_nzpos_vec, nzpos)
+                elseif col >= d_start && col <= d_end
+                    # Design var → C_dk
+                    di = col - d_start + 1
+                    push!(jeq_Cdk_coo_vec, coo_idx)
+                    push!(jeq_Cdk_row_vec, di)
+                    push!(jeq_Cdk_col_vec, nv + local_eq)
+                end
+            end
+        end
+
+        # pr_diag → A_kk diagonal
+        pr_diag_global_vec = Int[]
+        pr_diag_nzpos_vec = Int[]
+        for i in 1:nv
+            gi = vr_start + i - 1
+            nzpos = akk_lookup[(i, i)]
+            push!(pr_diag_global_vec, gi)
+            push!(pr_diag_nzpos_vec, nzpos)
+        end
+
+        # du_diag → A_kk diagonal
+        du_diag_global_vec = Int[]
+        du_diag_nzpos_vec = Int[]
+        for (ci, gi) in enumerate(eq_cons)
+            nzpos = akk_lookup[(nv + ci, nv + ci)]
+            push!(du_diag_global_vec, gi)
+            push!(du_diag_nzpos_vec, nzpos)
+        end
+
+        # Inequality condensation
+        ineq_Akk_nzpos_vec = Int[]
+        ineq_Akk_jcoo1_vec = Int[]
+        ineq_Akk_jcoo2_vec = Int[]
+        ineq_Akk_bufidx_vec = Int[]
+
+        ineq_Cdk_row_vec = Int[]
+        ineq_Cdk_col_vec = Int[]
+        ineq_Cdk_jcoo_d_vec = Int[]
+        ineq_Cdk_jcoo_v_vec = Int[]
+        ineq_Cdk_bufidx_vec = Int[]
+
+        ineq_S_row_vec = Int[]
+        ineq_S_col_vec = Int[]
+        ineq_S_jcoo1_vec = Int[]
+        ineq_S_jcoo2_vec = Int[]
+        ineq_S_bufidx_vec = Int[]
+
+        for gi in ineq_cons
+            bidx = ineq_to_bufidx[gi]
+            jac_entries = get(jac_by_constraint, gi, Tuple{Int,Int}[])
+
+            # Separate scenario var entries and design var entries
+            v_entries = Tuple{Int,Int}[]  # (jac_coo_idx, local_var)
+            d_entries = Tuple{Int,Int}[]  # (jac_coo_idx, design_local)
+
+            for (coo_idx, col) in jac_entries
+                if col >= vr_start && col < vr_start + nv
+                    push!(v_entries, (coo_idx, col - vr_start + 1))
+                elseif col >= d_start && col <= d_end
+                    push!(d_entries, (coo_idx, col - d_start + 1))
+                end
+            end
+
+            # A_kk condensation: lower-triangle pairs of v_entries
+            for (coo_a, la) in v_entries
+                for (coo_b, lb) in v_entries
+                    if la >= lb
+                        nzpos = akk_lookup[(la, lb)]
+                        push!(ineq_Akk_nzpos_vec, nzpos)
+                        push!(ineq_Akk_jcoo1_vec, coo_a)
+                        push!(ineq_Akk_jcoo2_vec, coo_b)
+                        push!(ineq_Akk_bufidx_vec, bidx)
+                    end
+                end
+            end
+
+            # C_dk condensation: design × scenario pairs
+            for (coo_d, di) in d_entries
+                for (coo_v, lv) in v_entries
+                    push!(ineq_Cdk_row_vec, di)
+                    push!(ineq_Cdk_col_vec, lv)
+                    push!(ineq_Cdk_jcoo_d_vec, coo_d)
+                    push!(ineq_Cdk_jcoo_v_vec, coo_v)
+                    push!(ineq_Cdk_bufidx_vec, bidx)
+                end
+            end
+
+            # S condensation: design × design pairs (full matrix)
+            for (coo_a, da) in d_entries
+                for (coo_b, db) in d_entries
+                    push!(ineq_S_row_vec, da)
+                    push!(ineq_S_col_vec, db)
+                    push!(ineq_S_jcoo1_vec, coo_a)
+                    push!(ineq_S_jcoo2_vec, coo_b)
+                    push!(ineq_S_bufidx_vec, bidx)
+                end
+            end
+        end
+
+        block_maps[k] = ScenarioBlockMap(
+            hess_Akk_coo_vec, hess_Akk_nzpos_vec,
+            hess_Cdk_coo_vec, hess_Cdk_row_vec, hess_Cdk_col_vec,
+            jeq_Akk_coo_vec, jeq_Akk_nzpos_vec,
+            jeq_Cdk_coo_vec, jeq_Cdk_row_vec, jeq_Cdk_col_vec,
+            ineq_Akk_nzpos_vec, ineq_Akk_jcoo1_vec, ineq_Akk_jcoo2_vec, ineq_Akk_bufidx_vec,
+            ineq_Cdk_row_vec, ineq_Cdk_col_vec, ineq_Cdk_jcoo_d_vec, ineq_Cdk_jcoo_v_vec, ineq_Cdk_bufidx_vec,
+            ineq_S_row_vec, ineq_S_col_vec, ineq_S_jcoo1_vec, ineq_S_jcoo2_vec, ineq_S_bufidx_vec,
+            pr_diag_global_vec, pr_diag_nzpos_vec,
+            du_diag_global_vec, du_diag_nzpos_vec,
+        )
+
+        A_kk_vec[k] = akk_csc
+    end
+
+    # --- Dense matrices ---
+    aug_com = Matrix{T}(undef, nd, nd)
+    C_dk = [Matrix{T}(undef, nd, blk_size) for _ in 1:ns]
+    tmp_blk_nd = [Matrix{T}(undef, blk_size, nd) for _ in 1:ns]
+
+    # --- Diagonal vectors ---
     reg     = VT(undef, n + ns_ineq)
     pr_diag = VT(undef, n + ns_ineq)
     du_diag = VT(undef, m)
@@ -163,46 +579,46 @@ function create_kkt_system(
     l_lower = fill!(VT(undef, nlb), zero(T))
     u_lower = fill!(VT(undef, nub), zero(T))
 
-    # Per-scenario augmented blocks
-    A_kk      = [Matrix{T}(undef, blk_size, blk_size) for _ in 1:ns]
-    C_dk      = [Matrix{T}(undef, nd, blk_size) for _ in 1:ns]
-    A_kk_work = [Matrix{T}(undef, blk_size, blk_size) for _ in 1:ns]
-    A_kk_ipiv = [Vector{BLAS.BlasInt}(undef, blk_size) for _ in 1:ns]
-
-    # Buffers
+    # --- Buffers ---
     diag_buffer = VT(undef, ns_ineq)
     buffer      = VT(undef, m)
     rhs_d       = VT(undef, nd)
     rhs_k       = [VT(undef, blk_size) for _ in 1:ns]
-    tmp_blk_nd  = [Matrix{T}(undef, blk_size, nd) for _ in 1:ns]
+    solve_buffer = VT(undef, blk_size)
 
-    # Init
+    # --- Init ---
     fill!(aug_com, zero(T))
-    fill!(hess,    zero(T))
-    fill!(jac,     zero(T))
     fill!(pr_diag, zero(T))
     fill!(du_diag, zero(T))
 
+    # --- Create solvers ---
     quasi_newton = create_quasi_newton(hessian_approximation, cb, n; options=qn_options)
+    scenario_solvers = [schur_scenario_linear_solver(A_kk_vec[k]) for k in 1:ns]
     _linear_solver = linear_solver(aug_com; opt = opt_linear_solver)
 
     return SchurComplementKKTSystem(
-        hess, jac, quasi_newton,
+        hess, jac,
+        hess_raw, jt_coo,
+        hess_csc, hess_csc_map, jt_csc, jt_csc_map,
+        quasi_newton,
         reg, pr_diag, du_diag, l_diag, u_diag, l_lower, u_lower,
         ns, nv, nd, nc,
         nc_eq_per_s, nc_ineq_per_s, blk_size,
-        A_kk, C_dk, A_kk_work, A_kk_ipiv,
+        A_kk_vec, C_dk,
         aug_com,
-        diag_buffer, buffer, rhs_d, rhs_k, tmp_blk_nd,
+        diag_buffer, buffer, rhs_d, rhs_k, tmp_blk_nd, solve_buffer,
+        block_maps,
+        hess_S_coo_list, hess_S_row_list, hess_S_col_list,
         eq_per_scenario, ineq_per_scenario,
         n_eq, cb.ind_eq,
         ns_ineq, cb.ind_ineq, cb.ind_lb, cb.ind_ub,
+        scenario_solvers,
         _linear_solver,
         Dict{Symbol, Any}(),
     )
 end
 
-num_variables(kkt::SchurComplementKKTSystem) = size(kkt.hess, 1)
+num_variables(kkt::SchurComplementKKTSystem) = size(kkt.hess_csc, 1)
 
 function get_slack_regularization(kkt::SchurComplementKKTSystem)
     n = num_variables(kkt)
@@ -211,42 +627,35 @@ function get_slack_regularization(kkt::SchurComplementKKTSystem)
 end
 
 function is_inertia_correct(kkt::SchurComplementKKTSystem, num_pos, num_zero, num_neg)
-    # The Schur complement S is nd × nd and should be positive definite
-    # (equality constraints are absorbed into per-scenario blocks)
     return (num_zero == 0 && num_neg == 0)
 end
 
 function jtprod!(y::AbstractVector, kkt::SchurComplementKKTSystem, x::AbstractVector)
-    nx = size(kkt.hess, 1)
+    nx = num_variables(kkt)
     ns_ineq = kkt.n_ineq
     yx = view(y, 1:nx)
     ys = view(y, 1+nx:nx+ns_ineq)
-    mul!(yx, kkt.jac', x)
+    mul!(yx, kkt.jt_csc, x)
     ys .= -@view(x[kkt.ind_ineq])
     return
 end
 
-compress_jacobian!(kkt::SchurComplementKKTSystem) = nothing
-nnz_jacobian(kkt::SchurComplementKKTSystem) = length(kkt.jac)
-
-# Helper: find index of gi in ind_ineq, return diag_buffer value (0 if not found)
-function _get_ineq_diag(kkt::SchurComplementKKTSystem{T}, gi::Int) where T
-    @inbounds for idx in 1:length(kkt.ind_ineq)
-        if kkt.ind_ineq[idx] == gi
-            return kkt.diag_buffer[idx]
-        end
-    end
-    return zero(T)
+function compress_jacobian!(kkt::SchurComplementKKTSystem)
+    transfer!(kkt.jt_csc, kkt.jt_coo, kkt.jt_csc_map)
 end
+
+function compress_hessian!(kkt::SchurComplementKKTSystem)
+    transfer!(kkt.hess_csc, kkt.hess_raw, kkt.hess_csc_map)
+end
+
+nnz_jacobian(kkt::SchurComplementKKTSystem) = nnz(kkt.jt_coo)
 
 function build_kkt!(kkt::SchurComplementKKTSystem{T, VT, MT}) where {T, VT, MT}
     ns = kkt.ns
     nv = kkt.nv
     nd = kkt.nd
-    nc = kkt.nc
     n = num_variables(kkt)
-    blk = kkt.blk_size  # nv + nc_eq_per_s
-    nc_eq = kkt.nc_eq_per_s
+    blk = kkt.blk_size
 
     # Compute condensing diagonal for inequalities
     if kkt.n_ineq > 0
@@ -255,99 +664,91 @@ function build_kkt!(kkt::SchurComplementKKTSystem{T, VT, MT}) where {T, VT, MT}
         kkt.diag_buffer .= Sigma_s ./ (one(T) .- Sigma_d .* Sigma_s)
     end
 
-    # Initialize Schur complement with design block
+    # Initialize Schur complement S
     S = kkt.aug_com
     fill!(S, zero(T))
 
-    # S starts with H_dd + pr_diag_dd
-    @inbounds for i in 1:nd, j in 1:nd
-        S[i, j] = kkt.hess[ns*nv+i, ns*nv+j]
+    # S += H_dd (from precomputed Hessian design-design entries)
+    @inbounds for idx in 1:length(kkt.hess_S_coo)
+        S[kkt.hess_S_row[idx], kkt.hess_S_col[idx]] += kkt.hess[kkt.hess_S_coo[idx]]
     end
+    # S += pr_diag_dd
     @inbounds for i in 1:nd
         S[i, i] += kkt.pr_diag[ns*nv+i]
     end
 
     for k in 1:ns
-        vr = (k-1)*nv+1 : k*nv    # variable range for scenario k
-        eq_cons = kkt.eq_per_scenario[k]
-        ineq_cons = kkt.ineq_per_scenario[k]
-
+        bm = kkt.block_maps[k]
         A_kk = kkt.A_kk[k]
         C_dk = kkt.C_dk[k]
-        fill!(A_kk, zero(T))
+
+        fill!(A_kk.nzval, zero(T))
         fill!(C_dk, zero(T))
 
-        # === Top-left block of A_kk: H_kk + pr_diag_kk + J_ineq' diag(db) J_ineq ===
-        @inbounds for i in 1:nv, j in 1:nv
-            A_kk[i, j] = kkt.hess[vr[1]+i-1, vr[1]+j-1]
-        end
-        @inbounds for i in 1:nv
-            A_kk[i, i] += kkt.pr_diag[vr[1]+i-1]
+        # Scatter Hessian diagonal entries → A_kk
+        @inbounds for idx in 1:length(bm.hess_Akk_coo)
+            A_kk.nzval[bm.hess_Akk_nzpos[idx]] += kkt.hess[bm.hess_Akk_coo[idx]]
         end
 
-        # Add inequality condensation: J_ineq_k' * diag(db_k) * J_ineq_k to A_kk[1:nv, 1:nv]
-        for gi in ineq_cons
-            db_val = _get_ineq_diag(kkt, gi)
-            if db_val == zero(T)
-                continue
+        # Scatter Hessian coupling entries → C_dk
+        @inbounds for idx in 1:length(bm.hess_Cdk_coo)
+            C_dk[bm.hess_Cdk_row[idx], bm.hess_Cdk_col[idx]] += kkt.hess[bm.hess_Cdk_coo[idx]]
+        end
+
+        # Add pr_diag to A_kk diagonal
+        @inbounds for idx in 1:length(bm.pr_diag_global)
+            A_kk.nzval[bm.pr_diag_nzpos[idx]] += kkt.pr_diag[bm.pr_diag_global[idx]]
+        end
+
+        # Add du_diag to A_kk diagonal
+        @inbounds for idx in 1:length(bm.du_diag_global)
+            A_kk.nzval[bm.du_diag_nzpos[idx]] += kkt.du_diag[bm.du_diag_global[idx]]
+        end
+
+        # Scatter equality Jacobian → A_kk (lower triangle only)
+        @inbounds for idx in 1:length(bm.jeq_Akk_coo)
+            A_kk.nzval[bm.jeq_Akk_nzpos[idx]] += kkt.jac[bm.jeq_Akk_coo[idx]]
+        end
+
+        # Scatter equality Jacobian coupling → C_dk
+        @inbounds for idx in 1:length(bm.jeq_Cdk_coo)
+            C_dk[bm.jeq_Cdk_row[idx], bm.jeq_Cdk_col[idx]] += kkt.jac[bm.jeq_Cdk_coo[idx]]
+        end
+
+        # Inequality condensation → A_kk (lower triangle)
+        @inbounds for idx in 1:length(bm.ineq_Akk_nzpos)
+            A_kk.nzval[bm.ineq_Akk_nzpos[idx]] += kkt.diag_buffer[bm.ineq_Akk_bufidx[idx]] *
+                kkt.jac[bm.ineq_Akk_jcoo1[idx]] * kkt.jac[bm.ineq_Akk_jcoo2[idx]]
+        end
+
+        # Inequality condensation → C_dk
+        @inbounds for idx in 1:length(bm.ineq_Cdk_row)
+            C_dk[bm.ineq_Cdk_row[idx], bm.ineq_Cdk_col[idx]] += kkt.diag_buffer[bm.ineq_Cdk_bufidx[idx]] *
+                kkt.jac[bm.ineq_Cdk_jcoo_d[idx]] * kkt.jac[bm.ineq_Cdk_jcoo_v[idx]]
+        end
+
+        # Inequality condensation → S
+        @inbounds for idx in 1:length(bm.ineq_S_row)
+            S[bm.ineq_S_row[idx], bm.ineq_S_col[idx]] += kkt.diag_buffer[bm.ineq_S_bufidx[idx]] *
+                kkt.jac[bm.ineq_S_jcoo1[idx]] * kkt.jac[bm.ineq_S_jcoo2[idx]]
+        end
+
+        # Factor A_kk
+        factorize!(kkt.scenario_solvers[k])
+
+        # Compute tmp = A_kk^{-1} * C_dk'  (blk × nd)
+        buf = kkt.solve_buffer
+        for j in 1:nd
+            @inbounds for i in 1:blk
+                buf[i] = C_dk[j, i]  # C_dk' column j
             end
-            # Contribution to A_kk (top-left, nv × nv)
-            @inbounds for i in 1:nv
-                jac_i = kkt.jac[gi, vr[1]+i-1]
-                for j in 1:nv
-                    A_kk[i, j] += db_val * jac_i * kkt.jac[gi, vr[1]+j-1]
-                end
-            end
-            # Contribution to C_dk (nd × nv part only) — coupling
-            @inbounds for i in 1:nd
-                jac_di = kkt.jac[gi, ns*nv+i]
-                for j in 1:nv
-                    C_dk[i, j] += db_val * jac_di * kkt.jac[gi, vr[1]+j-1]
-                end
-            end
-            # Contribution to S (nd × nd)
-            @inbounds for i in 1:nd
-                jac_di = kkt.jac[gi, ns*nv+i]
-                for j in 1:nd
-                    S[i, j] += db_val * jac_di * kkt.jac[gi, ns*nv+j]
-                end
+            solve_linear_system!(kkt.scenario_solvers[k], buf)
+            @inbounds for i in 1:blk
+                kkt.tmp_blk_nd[k][i, j] = buf[i]
             end
         end
 
-        # === Bottom-left / top-right blocks of A_kk: J_eq_kv (nc_eq × nv) ===
-        for (ci, gi) in enumerate(eq_cons)
-            @inbounds for j in 1:nv
-                val = kkt.jac[gi, vr[1]+j-1]
-                A_kk[nv+ci, j] = val
-                A_kk[j, nv+ci] = val
-            end
-            # du_diag on the diagonal of the equality block
-            A_kk[nv+ci, nv+ci] = kkt.du_diag[gi]
-        end
-
-        # === C_dk: coupling block (nd × blk_size) ===
-        # C_dk[1:nd, 1:nv] = H_dk (Hessian cross-term) — already has ineq contribution above
-        @inbounds for i in 1:nd, j in 1:nv
-            C_dk[i, j] += kkt.hess[ns*nv+i, vr[1]+j-1]
-        end
-        # C_dk[1:nd, nv+1:nv+nc_eq] = J_eq_kd' (Jacobian of eq constraints w.r.t. design)
-        for (ci, gi) in enumerate(eq_cons)
-            @inbounds for i in 1:nd
-                C_dk[i, nv+ci] = kkt.jac[gi, ns*nv+i]
-            end
-        end
-
-        # === Factor A_kk ===
-        copyto!(kkt.A_kk_work[k], A_kk)
-        LAPACK.sytrf!('L', kkt.A_kk_work[k], kkt.A_kk_ipiv[k])
-
-        # === Compute tmp = A_kk^{-1} * C_dk' (blk × nd) ===
-        @inbounds for i in 1:blk, j in 1:nd
-            kkt.tmp_blk_nd[k][i, j] = C_dk[j, i]  # transpose
-        end
-        LAPACK.sytrs!('L', kkt.A_kk_work[k], kkt.A_kk_ipiv[k], kkt.tmp_blk_nd[k])
-
-        # === S -= C_dk * A_kk^{-1} * C_dk' ===
+        # S -= C_dk * A_kk^{-1} * C_dk'
         mul!(S, C_dk, kkt.tmp_blk_nd[k], -one(T), one(T))
     end
 
@@ -370,63 +771,40 @@ function solve_kkt!(
     n = num_variables(kkt)
     blk = kkt.blk_size
 
-    # Decompose rhs into primal/slack/dual views
     wx = _madnlp_unsafe_wrap(full(w), n)
     ws = view(full(w), n+1:n+kkt.n_ineq)
-    # dual(w) gives the dual part (length m)
     wy = dual(w)
 
     Sigma_s = get_slack_regularization(kkt)
 
     reduce_rhs!(kkt, w)
 
-    # Condense inequalities into primal RHS
-    if kkt.n_ineq > 0
-        wz_ineq = view(full(w), n+kkt.n_ineq+1:n+2*kkt.n_ineq) # This doesn't exist for condensed...
-    end
-
-    # For condensed systems, the rhs layout is different.
-    # With AbstractCondensedKKTSystem, the KKT vector has:
-    #   primal: [x (n), s (n_ineq)]
-    #   dual: [y (m)]
-    #   dual_lb, dual_ub
-    # After reduce_rhs!, bound duals are folded into primal.
-    #
-    # The condensed solve needs to:
-    # 1. Fold inequality info: wx += J' * diag(db) * (wy_ineq + ws / Σs)
-    # 2. Solve the condensed system for Δx (and Δy_eq if n_eq > 0)
-    # 3. Recover: wy = J * Δx (with corrections), ws = (ws + wy_ineq) / Σs
-
     # Step 1: condense inequality contributions
     fill!(kkt.buffer, zero(T))
     if kkt.n_ineq > 0
         kkt.buffer[kkt.ind_ineq] .= kkt.diag_buffer .* (wy[kkt.ind_ineq] .+ ws ./ Sigma_s)
-        mul!(wx, kkt.jac', kkt.buffer, one(T), one(T))
+        # J' * buffer → wx (using sparse jt_csc)
+        mul!(wx, kkt.jt_csc, kkt.buffer, one(T), one(T))
     end
 
     # Step 2: Extract per-scenario RHS blocks
     for k in 1:ns
         vr = (k-1)*nv+1 : k*nv
         rhs = kkt.rhs_k[k]
-        # Primal part
         @inbounds for i in 1:nv
             rhs[i] = wx[vr[1]+i-1]
         end
-        # Equality dual part
         for (ci, gi) in enumerate(kkt.eq_per_scenario[k])
             rhs[nv+ci] = wy[gi]
         end
     end
-    # Design RHS
     @inbounds for i in 1:nd
         kkt.rhs_d[i] = wx[ns*nv+i]
     end
 
     # Step 3: Forward elimination
     for k in 1:ns
-        # Solve A_kk * z_k = rhs_k
-        LAPACK.sytrs!('L', kkt.A_kk_work[k], kkt.A_kk_ipiv[k], kkt.rhs_k[k])
-        # rhs_d -= C_dk * z_k
+        solve_linear_system!(kkt.scenario_solvers[k], kkt.rhs_k[k])
         mul!(kkt.rhs_d, kkt.C_dk[k], kkt.rhs_k[k], -one(T), one(T))
     end
 
@@ -434,8 +812,6 @@ function solve_kkt!(
     solve_linear_system!(kkt.linear_solver, kkt.rhs_d)
 
     # Step 5: Back-substitution
-    # z_k was A_kk^{-1} * rhs_k_orig
-    # Δ_k = z_k - A_kk^{-1} * C_dk' * Δd = rhs_k - tmp_blk_nd * Δd
     for k in 1:ns
         mul!(kkt.rhs_k[k], kkt.tmp_blk_nd[k], kkt.rhs_d, -one(T), one(T))
     end
@@ -444,11 +820,9 @@ function solve_kkt!(
     for k in 1:ns
         vr = (k-1)*nv+1 : k*nv
         rhs = kkt.rhs_k[k]
-        # Primal
         @inbounds for i in 1:nv
             wx[vr[1]+i-1] = rhs[i]
         end
-        # Equality duals
         for (ci, gi) in enumerate(kkt.eq_per_scenario[k])
             wy[gi] = rhs[nv+ci]
         end
@@ -459,15 +833,10 @@ function solve_kkt!(
 
     # Step 7: Recover inequality duals and slacks
     if kkt.n_ineq > 0
-        # wy_ineq = diag(db) * (J * Δx) - buffer
-        # Actually, for condensed form: recover wy[ineq] from J * Δx
-        # Following DenseCondensed pattern:
-        # mul!(dual(w), kkt.jac, wx) replaces all of wy
-        # But we already have equality duals set correctly, so we need to be careful.
-        # Save equality duals
         eq_duals_backup = [wy[gi] for k in 1:ns for (_, gi) in enumerate(kkt.eq_per_scenario[k])]
 
-        mul!(wy, kkt.jac, wx)
+        # J * Δx via sparse: (jt_csc)' * wx
+        mul!(wy, kkt.jt_csc', wx)
 
         # Restore equality duals
         idx = 1
@@ -478,49 +847,51 @@ function solve_kkt!(
             end
         end
 
-        # For inequality constraints (following DenseCondensed pattern):
-        # wz = diag(db) * (J * Δx) - buffer
+        # Inequality dual recovery
         @inbounds for idx in 1:length(kkt.ind_ineq)
             gi = kkt.ind_ineq[idx]
             wy[gi] = kkt.diag_buffer[idx] * wy[gi] - kkt.buffer[gi]
         end
         ws .= (ws .+ view(wy, kkt.ind_ineq)) ./ Sigma_s
-    else
-        # No inequality: equality duals are already set from the Schur complement solve.
-        # No slacks to recover.
     end
 
     finish_aug_solve!(kkt, w)
     return w
 end
 
-# KKT matrix-vector product for iterative refinement (matches AbstractDenseKKTSystem pattern)
+# KKT matrix-vector product for iterative refinement
 function mul!(w::AbstractKKTVector{T}, kkt::SchurComplementKKTSystem{T}, x::AbstractKKTVector, alpha = one(T), beta = zero(T)) where T
-    (m, n) = size(kkt.jac)
+    n = num_variables(kkt)
+    ns_ineq = kkt.n_ineq
     wx = @view(primal(w)[1:n])
     ws = @view(primal(w)[n+1:end])
     wy = dual(w)
-    wz = @view(dual(w)[kkt.ind_ineq])
 
     xx = @view(primal(x)[1:n])
     xs = @view(primal(x)[n+1:end])
     xy = dual(x)
     xz = @view(dual(x)[kkt.ind_ineq])
 
-    _symv!('L', alpha, kkt.hess, xx, beta, wx)
+    # H * xx → wx (using sparse symmetric Hessian)
+    wx .= beta .* wx
+    mul!(wx, Symmetric(kkt.hess_csc, :L), xx, alpha, one(T))
+
+    m = size(kkt.jt_csc, 2)
     if m > 0
-        mul!(wx, kkt.jac', dual(x), alpha, one(T))
-        mul!(wy, kkt.jac,  xx, alpha, beta)
+        mul!(wx, kkt.jt_csc, dual(x), alpha, one(T))       # J' * xy
+        mul!(wy, kkt.jt_csc', xx, alpha, beta)              # J * xx
+    else
+        wy .= beta .* wy
     end
     ws .= beta.*ws .- alpha.* xz
-    wz .-= alpha.* xs
+    @view(dual(w)[kkt.ind_ineq]) .-= alpha.* xs
     _kktmul!(w, x, kkt.reg, kkt.du_diag, kkt.l_lower, kkt.u_lower, kkt.l_diag, kkt.u_diag, alpha, beta)
     return w
 end
 
 function mul_hess_blk!(wx, kkt::SchurComplementKKTSystem, t)
-    n = size(kkt.hess, 1)
-    mul!(@view(wx[1:n]), Symmetric(kkt.hess, :L), @view(t[1:n]))
+    n = num_variables(kkt)
+    mul!(@view(wx[1:n]), Symmetric(kkt.hess_csc, :L), @view(t[1:n]))
     fill!(@view(wx[n+1:end]), 0)
     wx .+= t .* kkt.pr_diag
 end
