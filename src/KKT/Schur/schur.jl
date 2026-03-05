@@ -125,7 +125,7 @@ struct SchurComplementKKTSystem{
     rhs_d::VT                       # nd — design RHS
     rhs_k::Vector{VT}              # ns × blk_size — scenario RHS buffers
     tmp_blk_nd::Vector{MT}         # ns × (blk_size × nd)
-    solve_buffer::VT               # blk_size — for column-by-column solves
+    solve_buffers::Vector{VT}      # ns × blk_size — per-scenario column-by-column solve buffers
 
     # Precomputed index maps
     block_maps::Vector{ScenarioBlockMap}
@@ -584,7 +584,7 @@ function create_kkt_system(
     buffer      = VT(undef, m)
     rhs_d       = VT(undef, nd)
     rhs_k       = [VT(undef, blk_size) for _ in 1:ns]
-    solve_buffer = VT(undef, blk_size)
+    solve_buffers = [VT(undef, blk_size) for _ in 1:ns]
 
     # --- Init ---
     fill!(aug_com, zero(T))
@@ -606,7 +606,7 @@ function create_kkt_system(
         nc_eq_per_s, nc_ineq_per_s, blk_size,
         A_kk_vec, C_dk,
         aug_com,
-        diag_buffer, buffer, rhs_d, rhs_k, tmp_blk_nd, solve_buffer,
+        diag_buffer, buffer, rhs_d, rhs_k, tmp_blk_nd, solve_buffers,
         block_maps,
         hess_S_coo_list, hess_S_row_list, hess_S_col_list,
         eq_per_scenario, ineq_per_scenario,
@@ -677,7 +677,8 @@ function build_kkt!(kkt::SchurComplementKKTSystem{T, VT, MT}) where {T, VT, MT}
         S[i, i] += kkt.pr_diag[ns*nv+i]
     end
 
-    for k in 1:ns
+    # Phase 1 (parallel): assemble per-scenario blocks, factorize, compute A_kk^{-1} * C_dk'
+    @blas_safe_threads for k in 1:ns
         bm = kkt.block_maps[k]
         A_kk = kkt.A_kk[k]
         C_dk = kkt.C_dk[k]
@@ -727,17 +728,11 @@ function build_kkt!(kkt::SchurComplementKKTSystem{T, VT, MT}) where {T, VT, MT}
                 kkt.jac[bm.ineq_Cdk_jcoo_d[idx]] * kkt.jac[bm.ineq_Cdk_jcoo_v[idx]]
         end
 
-        # Inequality condensation → S
-        @inbounds for idx in 1:length(bm.ineq_S_row)
-            S[bm.ineq_S_row[idx], bm.ineq_S_col[idx]] += kkt.diag_buffer[bm.ineq_S_bufidx[idx]] *
-                kkt.jac[bm.ineq_S_jcoo1[idx]] * kkt.jac[bm.ineq_S_jcoo2[idx]]
-        end
-
         # Factor A_kk
         factorize!(kkt.scenario_solvers[k])
 
         # Compute tmp = A_kk^{-1} * C_dk'  (blk × nd)
-        buf = kkt.solve_buffer
+        buf = kkt.solve_buffers[k]
         for j in 1:nd
             @inbounds for i in 1:blk
                 buf[i] = C_dk[j, i]  # C_dk' column j
@@ -747,9 +742,20 @@ function build_kkt!(kkt::SchurComplementKKTSystem{T, VT, MT}) where {T, VT, MT}
                 kkt.tmp_blk_nd[k][i, j] = buf[i]
             end
         end
+    end
+
+    # Phase 2 (sequential): accumulate into shared Schur complement S
+    for k in 1:ns
+        bm = kkt.block_maps[k]
+
+        # Inequality condensation → S
+        @inbounds for idx in 1:length(bm.ineq_S_row)
+            S[bm.ineq_S_row[idx], bm.ineq_S_col[idx]] += kkt.diag_buffer[bm.ineq_S_bufidx[idx]] *
+                kkt.jac[bm.ineq_S_jcoo1[idx]] * kkt.jac[bm.ineq_S_jcoo2[idx]]
+        end
 
         # S -= C_dk * A_kk^{-1} * C_dk'
-        mul!(S, C_dk, kkt.tmp_blk_nd[k], -one(T), one(T))
+        mul!(S, kkt.C_dk[k], kkt.tmp_blk_nd[k], -one(T), one(T))
     end
 
     return
@@ -803,16 +809,20 @@ function solve_kkt!(
     end
 
     # Step 3: Forward elimination
-    for k in 1:ns
+    # Phase 1 (parallel): solve per-scenario systems
+    @blas_safe_threads for k in 1:ns
         solve_linear_system!(kkt.scenario_solvers[k], kkt.rhs_k[k])
+    end
+    # Phase 2 (sequential): accumulate into shared rhs_d
+    for k in 1:ns
         mul!(kkt.rhs_d, kkt.C_dk[k], kkt.rhs_k[k], -one(T), one(T))
     end
 
     # Step 4: Solve Schur complement
     solve_linear_system!(kkt.linear_solver, kkt.rhs_d)
 
-    # Step 5: Back-substitution
-    for k in 1:ns
+    # Step 5: Back-substitution (parallel — reads shared rhs_d, writes per-scenario rhs_k)
+    @blas_safe_threads for k in 1:ns
         mul!(kkt.rhs_k[k], kkt.tmp_blk_nd[k], kkt.rhs_d, -one(T), one(T))
     end
 
