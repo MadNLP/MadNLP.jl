@@ -20,7 +20,7 @@ import MadNLPGPU
 import MadNLPGPU: ORDERING, DEFAULT_ORDERING, METIS_ORDERING, AMD_ORDERING,
     USER_ORDERING, SYMAMD_ORDERING, COLAMD_ORDERING, gpu_transfer!
 
-import KernelAbstractions: synchronize, get_backend
+import KernelAbstractions: @kernel, @index, @Const, synchronize, get_backend
 
 using CUDA
 using CUDA.CUSPARSE, CUDA.CUBLAS, CUDA.CUSOLVER
@@ -44,5 +44,7 @@ include("lapackgpu.jl")
 include("cusolver.jl")
 include("cudss.jl")
 include("cuda.jl")
+include("kernels_schur.jl")
+include("cuda_schur.jl")
 
 end
