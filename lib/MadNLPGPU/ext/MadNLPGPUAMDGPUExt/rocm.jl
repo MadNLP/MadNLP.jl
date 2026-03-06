@@ -34,6 +34,13 @@ function rocSPARSE.ROCSparseMatrixCSC{Tv,Ti}(A::SparseMatrixCSC{Tv,Ti}) where {T
 end
 
 #=
+    ROCSparseMatrixCSC to ROCMatrix
+=#
+
+MadNLPGPU.gpu_transfer!(y::ROCMatrix{T}, x::rocSPARSE.ROCSparseMatrixCSC{T}) where {T} =
+    MadNLPGPU._gpu_sparse_csc_to_dense!(y, x)
+
+#=
     MadNLP._ger!
 =#
 

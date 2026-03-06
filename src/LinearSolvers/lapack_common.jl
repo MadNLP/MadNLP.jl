@@ -99,7 +99,7 @@ function _solve_dispatch!(M::AbstractLapackSolver, x)
     end
 end
 
-function solve!(M::AbstractLapackSolver, x::AbstractVector)
+function solve_linear_system!(M::AbstractLapackSolver, x::AbstractVector)
     isempty(M.sol) && resize!(M.sol, M.n)
     copyto!(M.sol, x)
     _solve_dispatch!(M, M.sol)

@@ -41,6 +41,13 @@ function CUSPARSE.CuSparseMatrixCSC{Tv,Ti}(A::SparseMatrixCSC{Tv,Ti}) where {Tv,
 end
 
 #=
+    CuSparseMatrixCSC to CuMatrix
+=#
+
+MadNLPGPU.gpu_transfer!(y::CuMatrix{T}, x::CUSPARSE.CuSparseMatrixCSC{T}) where {T} =
+    MadNLPGPU._gpu_sparse_csc_to_dense!(y, x)
+
+#=
     MadNLP._ger!
 =#
 

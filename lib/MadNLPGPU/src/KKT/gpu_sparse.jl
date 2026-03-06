@@ -107,14 +107,14 @@ function MadNLP.get_sparse_condensed_ext(
     hess_map,
 ) where {T,VT<:AbstractGPUVector{T}}
     zvals = similar(hess_map, Int, length(hess_map))
-    copyto!(zvals, 1:length(hess_map))
+    copyto!(zvals, collect(1:length(hess_map)))
     hess_com_ptr = map((i, j) -> (i, j), hess_map, zvals)
     if length(hess_com_ptr) > 0 # otherwise error is thrown
         sort!(hess_com_ptr)
     end
 
     jvals = similar(jt_map, Int, length(jt_map))
-    copyto!(jvals, 1:length(jt_map))
+    copyto!(jvals, collect(1:length(jt_map)))
     jt_csc_ptr = map((i, j) -> (i, j), jt_map, jvals)
     if length(jt_csc_ptr) > 0 # otherwise error is thrown
         sort!(jt_csc_ptr)
@@ -240,7 +240,7 @@ function MadNLP._set_con_scale_sparse!(
     jac_buffer,
 ) where {T,VT<:AbstractGPUVector{T}}
     ind_jac = similar(jac_I, Int, length(jac_I))
-    copyto!(ind_jac, 1:length(jac_I))
+    copyto!(ind_jac, collect(1:length(jac_I)))
     inds = map((i, j) -> (i, j), jac_I, ind_jac)
     !isempty(inds) && sort!(inds)
     ptr = MadNLP.getptr(inds; by = ((x1, x2), (y1, y2)) -> x1 != y1)
@@ -266,7 +266,7 @@ function MadNLP.coo_to_csc(
     coo::MadNLP.SparseMatrixCOO{T,I,VT,VI},
 ) where {T,I,VT<:AbstractGPUArray,VI<:AbstractGPUArray}
     zvals = similar(coo.I, Int, length(coo.I))
-    copyto!(zvals, 1:length(coo.I))
+    copyto!(zvals, collect(1:length(coo.I)))
     coord = map((i, j, k) -> ((i, j), k), coo.I, coo.J, zvals)
     if length(coord) > 0
         sort!(coord, lt = (((i, j), k), ((n, m), l)) -> (j, i) < (m, n))
