@@ -4,9 +4,7 @@
 
 # Generic GPU sparse functions dispatching on AbstractGPUVector / AbstractGPUArray.
 # Per-backend stubs for functions needing concrete sparse CSC types
-# (transfer!, nzval, _get_sparse_csc, get_tril_to_full, _sym_length,
-#  _build_condensed_aug_symbolic_hess, _build_condensed_aug_symbolic_jt,
-#  build_condensed_aug_coord!, compress_hessian!, compress_jacobian!)
+# (transfer!, nzval, _get_sparse_csc, get_tril_to_full, _sym_length)
 # remain in per-extension files.
 
 #=
@@ -106,15 +104,13 @@ function MadNLP.get_sparse_condensed_ext(
     jt_map,
     hess_map,
 ) where {T,VT<:AbstractGPUVector{T}}
-    zvals = similar(hess_map, Int, length(hess_map))
-    copyto!(zvals, collect(1:length(hess_map)))
+    zvals = adapt(get_backend(hess_map), collect(1:length(hess_map)))
     hess_com_ptr = map((i, j) -> (i, j), hess_map, zvals)
     if length(hess_com_ptr) > 0 # otherwise error is thrown
         sort!(hess_com_ptr)
     end
 
-    jvals = similar(jt_map, Int, length(jt_map))
-    copyto!(jvals, collect(1:length(jt_map)))
+    jvals = adapt(get_backend(jt_map), collect(1:length(jt_map)))
     jt_csc_ptr = map((i, j) -> (i, j), jt_map, jvals)
     if length(jt_csc_ptr) > 0 # otherwise error is thrown
         sort!(jt_csc_ptr)
@@ -239,8 +235,7 @@ function MadNLP._set_con_scale_sparse!(
     jac_I,
     jac_buffer,
 ) where {T,VT<:AbstractGPUVector{T}}
-    ind_jac = similar(jac_I, Int, length(jac_I))
-    copyto!(ind_jac, collect(1:length(jac_I)))
+    ind_jac = adapt(get_backend(jac_I), collect(1:length(jac_I)))
     inds = map((i, j) -> (i, j), jac_I, ind_jac)
     !isempty(inds) && sort!(inds)
     ptr = MadNLP.getptr(inds; by = ((x1, x2), (y1, y2)) -> x1 != y1)
@@ -265,8 +260,7 @@ end
 function MadNLP.coo_to_csc(
     coo::MadNLP.SparseMatrixCOO{T,I,VT,VI},
 ) where {T,I,VT<:AbstractGPUArray,VI<:AbstractGPUArray}
-    zvals = similar(coo.I, Int, length(coo.I))
-    copyto!(zvals, collect(1:length(coo.I)))
+    zvals = adapt(get_backend(coo.I), collect(1:length(coo.I)))
     coord = map((i, j, k) -> ((i, j), k), coo.I, coo.J, zvals)
     if length(coord) > 0
         sort!(coord, lt = (((i, j), k), ((n, m), l)) -> (j, i) < (m, n))
@@ -305,6 +299,137 @@ function MadNLP.coo_to_csc(
     end
 
     return csc, cscmap
+end
+
+#=
+    MadNLP.build_condensed_aug_coord!
+=#
+
+function MadNLP.build_condensed_aug_coord!(
+    kkt::MadNLP.AbstractCondensedKKTSystem{T,VT},
+) where {T,VT<:AbstractGPUVector{T}}
+    fill!(MadNLP.nzval(kkt.aug_com), zero(T))
+    backend = get_backend(kkt.pr_diag)
+    if length(kkt.hptr) > 0
+        _transfer_hessian_kernel!(backend)(
+            MadNLP.nzval(kkt.aug_com),
+            kkt.hptr,
+            MadNLP.nzval(kkt.hess_com);
+            ndrange = length(kkt.hptr),
+        )
+    end
+    if length(kkt.dptr) > 0
+        _transfer_hessian_kernel!(backend)(
+            MadNLP.nzval(kkt.aug_com),
+            kkt.dptr,
+            kkt.pr_diag;
+            ndrange = length(kkt.dptr),
+        )
+    end
+    if length(kkt.ext.jptrptr) > 1 # otherwise error is thrown
+        _transfer_jtsj_kernel!(backend)(
+            MadNLP.nzval(kkt.aug_com),
+            kkt.jptr,
+            kkt.ext.jptrptr,
+            MadNLP.nzval(kkt.jt_csc),
+            kkt.diag_buffer;
+            ndrange = length(kkt.ext.jptrptr) - 1,
+        )
+    end
+    return
+end
+
+#=
+    MadNLP.compress_hessian!
+=#
+
+function MadNLP.compress_hessian!(
+    kkt::MadNLP.AbstractSparseKKTSystem{T,VT},
+) where {T,VT<:AbstractGPUVector{T}}
+    fill!(MadNLP.nzval(kkt.hess_com), zero(T))
+    backend = get_backend(kkt.pr_diag)
+    if length(kkt.ext.hess_com_ptrptr) > 1
+        _transfer_to_csc_kernel!(backend)(
+            MadNLP.nzval(kkt.hess_com),
+            kkt.ext.hess_com_ptr,
+            kkt.ext.hess_com_ptrptr,
+            kkt.hess_raw.V;
+            ndrange = length(kkt.ext.hess_com_ptrptr) - 1,
+        )
+    end
+    return
+end
+
+#=
+    MadNLP.compress_jacobian!
+=#
+
+function MadNLP.compress_jacobian!(
+    kkt::MadNLP.SparseCondensedKKTSystem{T,VT},
+) where {T,VT<:AbstractGPUVector{T}}
+    fill!(MadNLP.nzval(kkt.jt_csc), zero(T))
+    backend = get_backend(kkt.pr_diag)
+    if length(kkt.ext.jt_csc_ptrptr) > 1 # otherwise error is thrown
+        _transfer_to_csc_kernel!(backend)(
+            MadNLP.nzval(kkt.jt_csc),
+            kkt.ext.jt_csc_ptr,
+            kkt.ext.jt_csc_ptrptr,
+            kkt.jt_coo.V;
+            ndrange = length(kkt.ext.jt_csc_ptrptr) - 1,
+        )
+    end
+    return
+end
+
+#=
+    MadNLP._build_condensed_aug_symbolic_hess
+=#
+
+function MadNLP._build_condensed_aug_symbolic_hess(
+    H,
+    sym,
+    sym2::AbstractGPUVector,
+)
+    if size(H, 2) > 0
+        backend = get_backend(sym2)
+        _build_condensed_aug_symbolic_hess_kernel!(backend)(
+            sym,
+            sym2,
+            H.colPtr,
+            H.rowVal;
+            ndrange = size(H, 2),
+        )
+    end
+    return
+end
+
+#=
+    MadNLP._build_condensed_aug_symbolic_jt
+=#
+
+function MadNLP._build_condensed_aug_symbolic_jt(
+    Jt,
+    sym,
+    sym2::AbstractGPUVector,
+)
+    if size(Jt, 2) > 0
+        _offsets = map(
+            (i, j) -> div((j - i)^2 + (j - i), 2),
+            @view(Jt.colPtr[1:end-1]),
+            @view(Jt.colPtr[2:end])
+        )
+        offsets = cumsum(_offsets)
+        backend = get_backend(sym2)
+        _build_condensed_aug_symbolic_jt_kernel!(backend)(
+            sym,
+            sym2,
+            Jt.colPtr,
+            Jt.rowVal,
+            offsets;
+            ndrange = size(Jt, 2),
+        )
+    end
+    return
 end
 
 #=

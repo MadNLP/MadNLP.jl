@@ -5,6 +5,7 @@ import SparseArrays: SparseMatrixCSC, nonzeros, nnz
 import LinearAlgebra: Symmetric, mul!, norm, dot
 
 # GPU abstractions
+import Adapt: adapt
 import GPUArraysCore: AbstractGPUVector, AbstractGPUMatrix, AbstractGPUArray, @allowscalar
 # Kernels
 import KernelAbstractions: @kernel, @index, synchronize, @Const, get_backend

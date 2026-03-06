@@ -4,6 +4,7 @@ version = "0.8.0"
 
 [deps]
 AMD = "14f7f29c-3bd6-536c-9a0b-7339e30b5a3e"
+Adapt = "79e6a3ab-5dfb-504d-930d-738a2a938a0e"
 GPUArraysCore = "46192b85-c4d5-4398-a991-12ede77f4527"
 KernelAbstractions = "63c18a36-062a-441e-b654-da1e3ab1ce7c"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
@@ -22,6 +23,7 @@ MadNLPGPUCUDAExt = ["CUDA", "CUDSS"]
 
 [compat]
 AMD = "0.5"
+Adapt = "4"
 AMDGPU = "2"
 CUDA = "5.4.0"
 CUDSS = "0.6.4"

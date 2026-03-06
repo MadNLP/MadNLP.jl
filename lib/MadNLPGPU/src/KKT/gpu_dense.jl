@@ -62,10 +62,9 @@ function MadNLP._build_dense_kkt_system!(
     m,
     ns,
 )
-    ind_ineq_gpu = similar(dest, eltype(ind_ineq), length(ind_ineq))
-    copyto!(ind_ineq_gpu, ind_ineq)
-    ndrange = (n + m + ns, n)
     backend = get_backend(dest)
+    ind_ineq_gpu = adapt(backend, ind_ineq)
+    ndrange = (n + m + ns, n)
     MadNLPGPU._build_dense_kkt_system_kernel!(backend)(
         dest,
         hess,
@@ -96,10 +95,9 @@ function MadNLP._build_ineq_jac!(
     m_ineq,
 )
     (m_ineq == 0) && return # nothing to do if no ineq. constraints
-    ind_ineq_gpu = similar(dest, eltype(ind_ineq), length(ind_ineq))
-    copyto!(ind_ineq_gpu, ind_ineq)
-    ndrange = (m_ineq, n)
     backend = get_backend(dest)
+    ind_ineq_gpu = adapt(backend, ind_ineq)
+    ndrange = (m_ineq, n)
     MadNLPGPU._build_jacobian_condensed_kernel!(backend)(
         dest,
         jac,
@@ -126,10 +124,9 @@ function MadNLP._build_condensed_kkt_system!(
     n,
     m_eq,
 )
-    ind_eq_gpu = similar(dest, eltype(ind_eq), length(ind_eq))
-    copyto!(ind_eq_gpu, ind_eq)
-    ndrange = (n + m_eq, n)
     backend = get_backend(dest)
+    ind_eq_gpu = adapt(backend, ind_eq)
+    ndrange = (n + m_eq, n)
     MadNLPGPU._build_condensed_kkt_system_kernel!(backend)(
         dest,
         hess,
