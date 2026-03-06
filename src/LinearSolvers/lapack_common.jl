@@ -43,66 +43,39 @@ CPU uses `M.info[]` (Ref); GPU backends override to `sum(M.info)`.
 """
 _get_info(M::AbstractLapackSolver) = M.info[]
 
-function setup!(M::AbstractLapackSolver)
-    return if M.opt.lapack_algorithm == BUNCHKAUFMAN
-        setup_bunchkaufman!(M)
-    elseif M.opt.lapack_algorithm == LU
-        setup_lu!(M)
-    elseif M.opt.lapack_algorithm == QR
-        setup_qr!(M)
-    elseif M.opt.lapack_algorithm == CHOLESKY
-        setup_cholesky!(M)
-    elseif M.opt.lapack_algorithm == EVD
-        setup_evd!(M)
-    else
-        error(M.logger, "Invalid lapack_algorithm")
-    end
-end
+# setup! dispatch
+setup!(M::AbstractLapackSolver{T, BUNCHKAUFMAN}) where {T} = setup_bunchkaufman!(M)
+setup!(M::AbstractLapackSolver{T, LU}) where {T} = setup_lu!(M)
+setup!(M::AbstractLapackSolver{T, QR}) where {T} = setup_qr!(M)
+setup!(M::AbstractLapackSolver{T, CHOLESKY}) where {T} = setup_cholesky!(M)
+setup!(M::AbstractLapackSolver{T, EVD}) where {T} = setup_evd!(M)
 
-function factorize!(M::AbstractLapackSolver)
+# factorize! dispatch
+factorize!(M::AbstractLapackSolver{T, BUNCHKAUFMAN}) where {T} = (transfer_matrix!(M); factorize_bunchkaufman!(M))
+function factorize!(M::AbstractLapackSolver{T, LU}) where {T}
     transfer_matrix!(M)
-    return if M.opt.lapack_algorithm == BUNCHKAUFMAN
-        factorize_bunchkaufman!(M)
-    elseif M.opt.lapack_algorithm == LU
-        tril_to_full!(M.fact)
-        factorize_lu!(M)
-    elseif M.opt.lapack_algorithm == QR
-        tril_to_full!(M.fact)
-        factorize_qr!(M)
-    elseif M.opt.lapack_algorithm == CHOLESKY
-        factorize_cholesky!(M)
-    elseif M.opt.lapack_algorithm == EVD
-        factorize_evd!(M)
-    else
-        error(M.logger, "Invalid lapack_algorithm")
-    end
+    tril_to_full!(M.fact)
+    factorize_lu!(M)
 end
-
-"""
-    _solve_dispatch!(M::AbstractLapackSolver, x)
-
-Dispatch `solve!` to the correct per-algorithm solve method.
-"""
-function _solve_dispatch!(M::AbstractLapackSolver, x)
-    return if M.opt.lapack_algorithm == BUNCHKAUFMAN
-        solve_bunchkaufman!(M, x)
-    elseif M.opt.lapack_algorithm == LU
-        solve_lu!(M, x)
-    elseif M.opt.lapack_algorithm == QR
-        solve_qr!(M, x)
-    elseif M.opt.lapack_algorithm == CHOLESKY
-        solve_cholesky!(M, x)
-    elseif M.opt.lapack_algorithm == EVD
-        solve_evd!(M, x)
-    else
-        error(M.logger, "Invalid lapack_algorithm")
-    end
+function factorize!(M::AbstractLapackSolver{T, QR}) where {T}
+    transfer_matrix!(M)
+    tril_to_full!(M.fact)
+    factorize_qr!(M)
 end
+factorize!(M::AbstractLapackSolver{T, CHOLESKY}) where {T} = (transfer_matrix!(M); factorize_cholesky!(M))
+factorize!(M::AbstractLapackSolver{T, EVD}) where {T} = (transfer_matrix!(M); factorize_evd!(M))
+
+# solve! dispatch
+_solve!(M::AbstractLapackSolver{T, BUNCHKAUFMAN}, x) where {T} = solve_bunchkaufman!(M, x)
+_solve!(M::AbstractLapackSolver{T, LU}, x) where {T} = solve_lu!(M, x)
+_solve!(M::AbstractLapackSolver{T, QR}, x) where {T} = solve_qr!(M, x)
+_solve!(M::AbstractLapackSolver{T, CHOLESKY}, x) where {T} = solve_cholesky!(M, x)
+_solve!(M::AbstractLapackSolver{T, EVD}, x) where {T} = solve_evd!(M, x)
 
 function solve_linear_system!(M::AbstractLapackSolver, x::AbstractVector)
     isempty(M.sol) && resize!(M.sol, M.n)
     copyto!(M.sol, x)
-    _solve_dispatch!(M, M.sol)
+    _solve!(M, M.sol)
     copyto!(x, M.sol)
     return x
 end
@@ -115,24 +88,14 @@ for T in (:Float32, :Float64)
     @eval is_supported(::Type{<:AbstractLapackSolver}, ::Type{$T}) = true
 end
 
-function is_inertia(M::AbstractLapackSolver)
-    alg = M.opt.lapack_algorithm
-    return (alg == CHOLESKY) ||
-        (alg == EVD) ||
-        (alg == BUNCHKAUFMAN && supports_bunchkaufman_inertia(M))
-end
+is_inertia(::AbstractLapackSolver) = false
+is_inertia(::AbstractLapackSolver{T, CHOLESKY}) where {T} = true
+is_inertia(::AbstractLapackSolver{T, EVD}) where {T} = true
+is_inertia(M::AbstractLapackSolver{T, BUNCHKAUFMAN}) where {T} = supports_bunchkaufman_inertia(M)
 
-function inertia(M::AbstractLapackSolver)
-    if M.opt.lapack_algorithm == CHOLESKY
-        return inertia_cholesky(M)
-    elseif M.opt.lapack_algorithm == EVD
-        return inertia_evd(M)
-    elseif M.opt.lapack_algorithm == BUNCHKAUFMAN && supports_bunchkaufman_inertia(M)
-        return inertia_bunchkaufman(M)
-    else
-        error(M.logger, "Invalid lapack_algorithm")
-    end
-end
+inertia(M::AbstractLapackSolver{T, CHOLESKY}) where {T} = inertia_cholesky(M)
+inertia(M::AbstractLapackSolver{T, EVD}) where {T} = inertia_evd(M)
+inertia(M::AbstractLapackSolver{T, BUNCHKAUFMAN}) where {T} = inertia_bunchkaufman(M)
 
 function inertia_cholesky(M::AbstractLapackSolver)
     return _get_info(M) == 0 ? (M.n, 0, 0) : (0, M.n, 0)

@@ -11,7 +11,7 @@ Abstract type for linear solver targeting
 the resolution of the linear system ``Ax=b``.
 """
 abstract type AbstractLinearSolver{T} end
-abstract type AbstractLapackSolver{T} <: AbstractLinearSolver{T} end
+abstract type AbstractLapackSolver{T, Alg} <: AbstractLinearSolver{T} end
 
 """
     introduce(::AbstractLinearSolver)

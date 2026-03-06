@@ -1,4 +1,4 @@
-mutable struct LapackCUDASolver{T, MT} <: MadNLP.AbstractLapackSolver{T}
+mutable struct LapackCUDASolver{T, MT, Alg} <: MadNLP.AbstractLapackSolver{T, Alg}
     A::MT
     fact::CuMatrix{T}
     n::Int64
@@ -41,7 +41,8 @@ mutable struct LapackCUDASolver{T, MT} <: MadNLP.AbstractLapackSolver{T}
         ipiv = CuVector{Cint}(undef, 0)
         ipiv64 = CuVector{Int64}(undef, 0)
         params = CuSolverParameters()
-        solver = new{T, MT}(
+        alg = opt.lapack_algorithm
+        solver = new{T, MT, alg}(
             A, fact, n, sol, tau, Λ, work_gpu, lwork_gpu, work_cpu, lwork_cpu,
             info, ipiv, ipiv64, opt, logger, legacy, params
         )
@@ -52,5 +53,5 @@ end
 
 MadNLP.transfer_matrix!(M::LapackCUDASolver) = MadNLPGPU.gpu_transfer!(M.fact, M.A)
 MadNLP._get_info(M::LapackCUDASolver) = sum(M.info)
-MadNLP.solve!(M::LapackCUDASolver{T}, x::CuVector{T}) where {T} = MadNLP._solve_dispatch!(M, x)
+MadNLP.solve!(M::LapackCUDASolver{T}, x::CuVector{T}) where {T} = MadNLP._solve!(M, x)
 MadNLP.introduce(M::LapackCUDASolver) = "cuSOLVER v$(CUSOLVER.version()) -- ($(M.opt.lapack_algorithm))"

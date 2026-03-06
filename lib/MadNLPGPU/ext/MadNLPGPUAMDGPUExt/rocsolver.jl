@@ -1,4 +1,4 @@
-mutable struct LapackROCmSolver{T, MT} <: MadNLP.AbstractLapackSolver{T}
+mutable struct LapackROCmSolver{T, MT, Alg} <: MadNLP.AbstractLapackSolver{T, Alg}
     A::MT
     fact::ROCMatrix{T}
     n::Int64
@@ -31,7 +31,8 @@ mutable struct LapackROCmSolver{T, MT} <: MadNLP.AbstractLapackSolver{T}
         ipiv = ROCVector{Int64}(undef, 0)
         alpha = Ref{T}(1)
         beta = Ref{T}(0)
-        solver = new{T,MT}(A, fact, n, sol, tau, Λ, info, ipiv, alpha, beta, opt, logger)
+        alg = opt.lapack_algorithm
+        solver = new{T,MT,alg}(A, fact, n, sol, tau, Λ, info, ipiv, alpha, beta, opt, logger)
         MadNLP.setup!(solver)
         return solver
     end
@@ -41,7 +42,7 @@ MadNLP.transfer_matrix!(M::LapackROCmSolver) = MadNLPGPU.gpu_transfer!(M.fact, M
 MadNLP._get_info(M::LapackROCmSolver) = sum(M.info)
 MadNLP.default_options(::Type{LapackROCmSolver}) = MadNLP.LapackOptions(MadNLP.EVD)
 MadNLP.introduce(M::LapackROCmSolver) = "rocSOLVER v$(rocSOLVER.version()) -- ($(M.opt.lapack_algorithm))"
-MadNLP.solve!(M::LapackROCmSolver{T}, x::ROCVector{T}) where {T} = MadNLP._solve_dispatch!(M, x)
+MadNLP.solve!(M::LapackROCmSolver{T}, x::ROCVector{T}) where {T} = MadNLP._solve!(M, x)
 
 for (potrf, potrs, T) in
     ((:rocsolver_dpotrf_64, :rocsolver_dpotrs_64, :Float64),

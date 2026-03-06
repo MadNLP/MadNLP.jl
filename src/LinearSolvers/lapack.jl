@@ -2,7 +2,7 @@
     lapack_algorithm::LinearFactorization = BUNCHKAUFMAN
 end
 
-mutable struct LapackCPUSolver{T, MT} <: AbstractLapackSolver{T}
+mutable struct LapackCPUSolver{T, MT, Alg} <: AbstractLapackSolver{T, Alg}
     A::MT
     fact::Matrix{T}
     n::Int64
@@ -36,13 +36,14 @@ mutable struct LapackCPUSolver{T, MT} <: AbstractLapackSolver{T}
         liwork = BlasInt(-1)
         info = Ref{BlasInt}(0)
         ipiv = Vector{BlasInt}(undef, 0)
-        solver = new{T,MT}(A, fact, n, sol, tau, Λ, work, lwork, iwork, liwork, info, ipiv, opt, logger)
+        alg = opt.lapack_algorithm
+        solver = new{T,MT,alg}(A, fact, n, sol, tau, Λ, work, lwork, iwork, liwork, info, ipiv, opt, logger)
         setup!(solver)
         return solver
     end
 end
 
-solve!(M::LapackCPUSolver{T}, x::Vector{T}) where {T} = _solve_dispatch!(M, x)
+solve!(M::LapackCPUSolver{T}, x::Vector{T}) where {T} = _solve!(M, x)
 supports_bunchkaufman_inertia(::LapackCPUSolver) = true
 inertia_bunchkaufman(M::LapackCPUSolver) = inertia(M.fact, M.ipiv, M.info[])
 
