@@ -32,7 +32,7 @@ mutable struct LapackROCmSolver{T, MT, Alg} <: MadNLP.AbstractLapackSolver{T, Al
         alpha = Ref{T}(1)
         beta = Ref{T}(0)
         alg = opt.lapack_algorithm
-        solver = new{T,MT,alg}(A, fact, n, sol, tau, Λ, info, ipiv, alpha, beta, opt, logger)
+        solver = new{T, MT, alg}(A, fact, n, sol, tau, Λ, info, ipiv, alpha, beta, opt, logger)
         MadNLP.setup!(solver)
         return solver
     end

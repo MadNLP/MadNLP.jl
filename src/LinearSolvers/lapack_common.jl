@@ -55,12 +55,12 @@ factorize!(M::AbstractLapackSolver{T, BUNCHKAUFMAN}) where {T} = (transfer_matri
 function factorize!(M::AbstractLapackSolver{T, LU}) where {T}
     transfer_matrix!(M)
     tril_to_full!(M.fact)
-    factorize_lu!(M)
+    return factorize_lu!(M)
 end
 function factorize!(M::AbstractLapackSolver{T, QR}) where {T}
     transfer_matrix!(M)
     tril_to_full!(M.fact)
-    factorize_qr!(M)
+    return factorize_qr!(M)
 end
 factorize!(M::AbstractLapackSolver{T, CHOLESKY}) where {T} = (transfer_matrix!(M); factorize_cholesky!(M))
 factorize!(M::AbstractLapackSolver{T, EVD}) where {T} = (transfer_matrix!(M); factorize_evd!(M))

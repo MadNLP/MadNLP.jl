@@ -37,7 +37,7 @@ mutable struct LapackCPUSolver{T, MT, Alg} <: AbstractLapackSolver{T, Alg}
         info = Ref{BlasInt}(0)
         ipiv = Vector{BlasInt}(undef, 0)
         alg = opt.lapack_algorithm
-        solver = new{T,MT,alg}(A, fact, n, sol, tau, Λ, work, lwork, iwork, liwork, info, ipiv, opt, logger)
+        solver = new{T, MT, alg}(A, fact, n, sol, tau, Λ, work, lwork, iwork, liwork, info, ipiv, opt, logger)
         setup!(solver)
         return solver
     end
