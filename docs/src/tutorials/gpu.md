@@ -15,6 +15,7 @@ by importing MadNLPGPU:
 ```@example gpu
 using MadNLPGPU
 using CUDA
+using CUDSS
 
 ```
 
