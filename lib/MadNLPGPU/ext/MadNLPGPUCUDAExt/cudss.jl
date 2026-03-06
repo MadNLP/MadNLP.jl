@@ -4,7 +4,7 @@ MadNLP.@kwdef mutable struct CudssSolverOptions <: MadNLP.AbstractOptions
     cudss_ordering::ORDERING = DEFAULT_ORDERING
     cudss_perm::Vector{Cint} = Cint[]
     cudss_ir::Int = 0
-    cudss_ir_tol::Float64 = 1e-8  # currently ignored in cuDSS 0.7
+    cudss_ir_tol::Float64 = 1.0e-8  # currently ignored in cuDSS 0.7
     cudss_pivot_threshold::Float64 = 0.0
     cudss_pivot_epsilon::Float64 = 0.0
     cudss_matching_alg::String = "default"
@@ -70,16 +70,16 @@ function set_cudss_options!(solver::CUDSS.CudssSolver, opt::CudssSolverOptions)
     if opt.cudss_deterministic
         CUDSS.cudss_set(solver, "deterministic_mode", 1)
     end
-    if !isempty(opt.cudss_device_indices)
+    return if !isempty(opt.cudss_device_indices)
         cudss_device_count = length(opt.cudss_device_indices)
         CUDSS.cudss_set(solver, "device_count", cudss_device_count)
         CUDSS.cudss_set(solver, "device_indices", opt.cudss_device_indices)
     end
 end
 
-mutable struct CUDSSSolver{T,V} <: MadNLP.AbstractLinearSolver{T}
+mutable struct CUDSSSolver{T, V} <: MadNLP.AbstractLinearSolver{T}
     inner::CUDSS.CudssSolver{T}
-    tril::CUSPARSE.CuSparseMatrixCSC{T,Cint}
+    tril::CUSPARSE.CuSparseMatrixCSC{T, Cint}
     x_gpu::CUDSS.CudssMatrix{T}
     b_gpu::CUDSS.CudssMatrix{T}
     buffer::V
@@ -89,10 +89,10 @@ mutable struct CUDSSSolver{T,V} <: MadNLP.AbstractLinearSolver{T}
 end
 
 function CUDSSSolver(
-    csc::CUSPARSE.CuSparseMatrixCSC{T,Cint};
-    opt=CudssSolverOptions(),
-    logger=MadNLP.MadNLPLogger(),
-    ) where T
+        csc::CUSPARSE.CuSparseMatrixCSC{T, Cint};
+        opt = CudssSolverOptions(),
+        logger = MadNLP.MadNLPLogger(),
+    ) where {T}
     n, m = size(csc)
     @assert n == m
 
@@ -110,7 +110,7 @@ function CUDSSSolver(
         if opt.cudss_ordering == METIS_ORDERING
             A = SparseMatrixCSC(csc)
             A = A + A' - LinearAlgebra.Diagonal(A)
-            G = Metis.graph(A, check_hermitian=false)
+            G = Metis.graph(A, check_hermitian = false)
             opt.cudss_perm, _ = Metis.permutation(G)
         elseif opt.cudss_ordering == AMD_ORDERING
             A = SparseMatrixCSC(csc)
@@ -136,9 +136,9 @@ function CUDSSSolver(
     end
 
     # The phase "analysis" is "reordering" combined with "symbolic_factorization"
-    x_gpu = CUDSS.CudssMatrix(T, n; nbatch=nbatch)
-    b_gpu = CUDSS.CudssMatrix(T, n; nbatch=nbatch)
-    CUDSS.cudss("analysis", solver, x_gpu, b_gpu, asynchronous=opt.cudss_asynchronous)
+    x_gpu = CUDSS.CudssMatrix(T, n; nbatch = nbatch)
+    b_gpu = CUDSS.CudssMatrix(T, n; nbatch = nbatch)
+    CUDSS.cudss("analysis", solver, x_gpu, b_gpu, asynchronous = opt.cudss_asynchronous)
 
     # Allocate additional buffer for iterative refinement
     # Always allocate it to support dynamic updates to opt.cudss_ir
@@ -154,14 +154,14 @@ end
 function MadNLP.factorize!(M::CUDSSSolver)
     CUDSS.cudss_update(M.inner.matrix, nonzeros(M.tril))
     if M.inner.fresh_factorization
-        CUDSS.cudss("factorization", M.inner, M.x_gpu, M.b_gpu, asynchronous=M.opt.cudss_asynchronous)
+        CUDSS.cudss("factorization", M.inner, M.x_gpu, M.b_gpu, asynchronous = M.opt.cudss_asynchronous)
     else
-        CUDSS.cudss("refactorization", M.inner, M.x_gpu, M.b_gpu, asynchronous=M.opt.cudss_asynchronous)
+        CUDSS.cudss("refactorization", M.inner, M.x_gpu, M.b_gpu, asynchronous = M.opt.cudss_asynchronous)
     end
     return M
 end
 
-function MadNLP.solve_linear_system!(M::CUDSSSolver{T,V}, xb::V) where {T,V}
+function MadNLP.solve_linear_system!(M::CUDSSSolver{T, V}, xb::V) where {T, V}
     if M.opt.cudss_ir > 0
         copyto!(M.buffer, xb)
         CUDSS.cudss_update(M.b_gpu, M.buffer)
@@ -169,7 +169,7 @@ function MadNLP.solve_linear_system!(M::CUDSSSolver{T,V}, xb::V) where {T,V}
         CUDSS.cudss_update(M.b_gpu, xb)
     end
     CUDSS.cudss_update(M.x_gpu, xb)
-    CUDSS.cudss("solve", M.inner, M.x_gpu, M.b_gpu, asynchronous=M.opt.cudss_asynchronous)
+    CUDSS.cudss("solve", M.inner, M.x_gpu, M.b_gpu, asynchronous = M.opt.cudss_asynchronous)
     return xb
 end
 
@@ -186,11 +186,11 @@ function MadNLP.inertia(M::CUDSSSolver)
     #
     # `buffer` contains the diagonal of the factorized matrix.
 
-    if M.opt.cudss_algorithm == MadNLP.CHOLESKY
+    return if M.opt.cudss_algorithm == MadNLP.CHOLESKY
         if info == 0
             return (n, 0, 0)
         else
-            return (n-2, 1, 1) # if factorization fails, return a dummy inertia
+            return (n - 2, 1, 1) # if factorization fails, return a dummy inertia
         end
     elseif M.opt.cudss_algorithm == MadNLP.LDL
         # N.B.: cuDSS does not always return the correct inertia.
@@ -206,7 +206,7 @@ function MadNLP.inertia(M::CUDSSSolver)
     end
 end
 MadNLP.improve!(M::CUDSSSolver) = false
-MadNLP.is_supported(::Type{CUDSSSolver},::Type{Float32}) = true
-MadNLP.is_supported(::Type{CUDSSSolver},::Type{Float64}) = true
+MadNLP.is_supported(::Type{CUDSSSolver}, ::Type{Float32}) = true
+MadNLP.is_supported(::Type{CUDSSSolver}, ::Type{Float64}) = true
 MadNLP.introduce(M::CUDSSSolver) = "cuDSS v$(CUDSS.version())"
 MadNLP.is_async(M::CUDSSSolver) = M.opt.cudss_asynchronous

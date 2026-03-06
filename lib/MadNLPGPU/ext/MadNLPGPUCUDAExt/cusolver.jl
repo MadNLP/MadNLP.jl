@@ -1,6 +1,8 @@
 for (potrf, potrf_buffer, potrs, nbytes, T) in
-    ((:cusolverDnDpotrf, :cusolverDnDpotrf_bufferSize, :cusolverDnDpotrs, :8, :Float64),
-     (:cusolverDnSpotrf, :cusolverDnSpotrf_bufferSize, :cusolverDnSpotrs, :4, :Float32))
+    (
+        (:cusolverDnDpotrf, :cusolverDnDpotrf_bufferSize, :cusolverDnDpotrs, :8, :Float64),
+        (:cusolverDnSpotrf, :cusolverDnSpotrf_bufferSize, :cusolverDnSpotrs, :4, :Float32),
+    )
     @eval begin
         function MadNLP.setup_cholesky!(M::LapackCUDASolver{$T})
             if M.legacy
@@ -105,8 +107,10 @@ for (potrf, potrf_buffer, potrs, nbytes, T) in
 end
 
 for (sytrf_buffer, sytrf, nbytes, T) in
-    ((:cusolverDnDsytrf_bufferSize, :cusolverDnDsytrf, :8, :Float64),
-     (:cusolverDnSsytrf_bufferSize, :cusolverDnSsytrf, :4, :Float32))
+    (
+        (:cusolverDnDsytrf_bufferSize, :cusolverDnDsytrf, :8, :Float64),
+        (:cusolverDnSsytrf_bufferSize, :cusolverDnSsytrf, :4, :Float32),
+    )
     @eval begin
         function MadNLP.setup_bunchkaufman!(M::LapackCUDASolver{$T})
             resize!(M.ipiv, M.n)
@@ -185,8 +189,10 @@ for (sytrf_buffer, sytrf, nbytes, T) in
 end
 
 for (getrf, getrf_buffer, getrs, nbytes, T) in
-    ((:cusolverDnDgetrf, :cusolverDnDgetrf_bufferSize, :cusolverDnDgetrs, :8, :Float64),
-     (:cusolverDnSgetrf, :cusolverDnSgetrf_bufferSize, :cusolverDnSgetrs, :4, :Float32))
+    (
+        (:cusolverDnDgetrf, :cusolverDnDgetrf_bufferSize, :cusolverDnDgetrs, :8, :Float64),
+        (:cusolverDnSgetrf, :cusolverDnSgetrf_bufferSize, :cusolverDnSgetrs, :4, :Float32),
+    )
     @eval begin
         function MadNLP.setup_lu!(M::LapackCUDASolver{$T})
             if M.legacy
@@ -296,8 +302,10 @@ for (getrf, getrf_buffer, getrs, nbytes, T) in
 end
 
 for (geqrf, geqrf_buffer, ormqr, ormqr_buffer, trsv, nbytes, T) in
-    ((:cusolverDnDgeqrf, :cusolverDnDgeqrf_bufferSize, :cusolverDnDormqr, :cusolverDnDormqr_bufferSize, :cublasDtrsv_v2_64, :8, :Float64),
-     (:cusolverDnSgeqrf, :cusolverDnSgeqrf_bufferSize, :cusolverDnSormqr, :cusolverDnSormqr_bufferSize, :cublasStrsv_v2_64, :4, :Float32))
+    (
+        (:cusolverDnDgeqrf, :cusolverDnDgeqrf_bufferSize, :cusolverDnDormqr, :cusolverDnDormqr_bufferSize, :cublasDtrsv_v2_64, :8, :Float64),
+        (:cusolverDnSgeqrf, :cusolverDnSgeqrf_bufferSize, :cusolverDnSormqr, :cusolverDnSormqr_bufferSize, :cublasStrsv_v2_64, :4, :Float32),
+    )
     @eval begin
         function MadNLP.setup_qr!(M::LapackCUDASolver{$T})
             resize!(M.tau, M.n)
@@ -423,8 +431,10 @@ for (geqrf, geqrf_buffer, ormqr, ormqr_buffer, trsv, nbytes, T) in
 end
 
 for (syevd, syevd_buffer, gemv, nbytes, T) in
-    ((:cusolverDnDsyevd, :cusolverDnDsyevd_bufferSize, :cublasDgemv_v2_64, :8, :Float64),
-     (:cusolverDnSsyevd, :cusolverDnSsyevd_bufferSize, :cublasSgemv_v2_64, :4, :Float32))
+    (
+        (:cusolverDnDsyevd, :cusolverDnDsyevd_bufferSize, :cublasDgemv_v2_64, :8, :Float64),
+        (:cusolverDnSsyevd, :cusolverDnSsyevd_bufferSize, :cublasSgemv_v2_64, :4, :Float32),
+    )
     @eval begin
         function MadNLP.setup_evd!(M::LapackCUDASolver{$T})
             resize!(M.tau, M.n)

@@ -4,10 +4,10 @@
 ######################################################
 
 function MadNLP.transfer!(
-    dest::CUSPARSE.CuSparseMatrixCSC,
-    src::MadNLP.SparseMatrixCOO,
-    map,
-)
+        dest::CUSPARSE.CuSparseMatrixCSC,
+        src::MadNLP.SparseMatrixCOO,
+        map,
+    )
     return copyto!(view(dest.nzVal, map), src.V)
 end
 
@@ -25,14 +25,14 @@ function MadNLP._sym_length(Jt::CUSPARSE.CuSparseMatrixCSC)
         end,
         +,
         @view(Jt.colPtr[2:end]),
-        @view(Jt.colPtr[1:end-1])
+        @view(Jt.colPtr[1:(end - 1)])
     )
 end
 
-function MadNLP.get_tril_to_full(csc::CUSPARSE.CuSparseMatrixCSC{Tv,Ti}) where {Tv,Ti}
-    cscind = MadNLP.SparseMatrixCSC{Int,Ti}(
+function MadNLP.get_tril_to_full(csc::CUSPARSE.CuSparseMatrixCSC{Tv, Ti}) where {Tv, Ti}
+    cscind = MadNLP.SparseMatrixCSC{Int, Ti}(
         Symmetric(
-            MadNLP.SparseMatrixCSC{Int,Ti}(
+            MadNLP.SparseMatrixCSC{Int, Ti}(
                 size(csc)...,
                 Array(csc.colPtr),
                 Array(csc.rowVal),
@@ -41,12 +41,12 @@ function MadNLP.get_tril_to_full(csc::CUSPARSE.CuSparseMatrixCSC{Tv,Ti}) where {
             :L,
         ),
     )
-    return CUSPARSE.CuSparseMatrixCSC{Tv,Ti}(
-        CuArray(cscind.colptr),
-        CuArray(cscind.rowval),
-        CuVector{Tv}(undef, MadNLP.nnz(cscind)),
-        size(csc),
-    ),
-    view(csc.nzVal, CuArray(cscind.nzval))
+    return CUSPARSE.CuSparseMatrixCSC{Tv, Ti}(
+            CuArray(cscind.colptr),
+            CuArray(cscind.rowval),
+            CuVector{Tv}(undef, MadNLP.nnz(cscind)),
+            size(csc),
+        ),
+        view(csc.nzVal, CuArray(cscind.nzval))
 end
 

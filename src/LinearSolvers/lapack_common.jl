@@ -44,7 +44,7 @@ CPU uses `M.info[]` (Ref); GPU backends override to `sum(M.info)`.
 _get_info(M::AbstractLapackSolver) = M.info[]
 
 function setup!(M::AbstractLapackSolver)
-    if M.opt.lapack_algorithm == BUNCHKAUFMAN
+    return if M.opt.lapack_algorithm == BUNCHKAUFMAN
         setup_bunchkaufman!(M)
     elseif M.opt.lapack_algorithm == LU
         setup_lu!(M)
@@ -61,7 +61,7 @@ end
 
 function factorize!(M::AbstractLapackSolver)
     transfer_matrix!(M)
-    if M.opt.lapack_algorithm == BUNCHKAUFMAN
+    return if M.opt.lapack_algorithm == BUNCHKAUFMAN
         factorize_bunchkaufman!(M)
     elseif M.opt.lapack_algorithm == LU
         tril_to_full!(M.fact)
@@ -84,7 +84,7 @@ end
 Dispatch `solve!` to the correct per-algorithm solve method.
 """
 function _solve_dispatch!(M::AbstractLapackSolver, x)
-    if M.opt.lapack_algorithm == BUNCHKAUFMAN
+    return if M.opt.lapack_algorithm == BUNCHKAUFMAN
         solve_bunchkaufman!(M, x)
     elseif M.opt.lapack_algorithm == LU
         solve_lu!(M, x)
@@ -118,8 +118,8 @@ end
 function is_inertia(M::AbstractLapackSolver)
     alg = M.opt.lapack_algorithm
     return (alg == CHOLESKY) ||
-           (alg == EVD) ||
-           (alg == BUNCHKAUFMAN && supports_bunchkaufman_inertia(M))
+        (alg == EVD) ||
+        (alg == BUNCHKAUFMAN && supports_bunchkaufman_inertia(M))
 end
 
 function inertia(M::AbstractLapackSolver)

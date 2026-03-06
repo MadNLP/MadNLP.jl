@@ -1,4 +1,4 @@
-mutable struct LapackCUDASolver{T,MT} <: MadNLP.AbstractLapackSolver{T}
+mutable struct LapackCUDASolver{T, MT} <: MadNLP.AbstractLapackSolver{T}
     A::MT
     fact::CuMatrix{T}
     n::Int64
@@ -18,16 +18,16 @@ mutable struct LapackCUDASolver{T,MT} <: MadNLP.AbstractLapackSolver{T}
     params::CuSolverParameters
 
     function LapackCUDASolver(
-        A::MT;
-        option_dict::Dict{Symbol,Any} = Dict{Symbol,Any}(),
-        opt = MadNLP.LapackOptions(),
-        logger = MadNLP.MadNLPLogger(),
-        legacy::Bool = true,
-        kwargs...,
-    ) where {MT<:AbstractMatrix}
+            A::MT;
+            option_dict::Dict{Symbol, Any} = Dict{Symbol, Any}(),
+            opt = MadNLP.LapackOptions(),
+            logger = MadNLP.MadNLPLogger(),
+            legacy::Bool = true,
+            kwargs...,
+        ) where {MT <: AbstractMatrix}
         MadNLP.set_options!(opt, option_dict, kwargs...)
         T = eltype(A)
-        m,n = size(A)
+        m, n = size(A)
         @assert m == n
         fact = CuMatrix{T}(undef, m, n)
         sol = CuVector{T}(undef, 0)
@@ -41,8 +41,10 @@ mutable struct LapackCUDASolver{T,MT} <: MadNLP.AbstractLapackSolver{T}
         ipiv = CuVector{Cint}(undef, 0)
         ipiv64 = CuVector{Int64}(undef, 0)
         params = CuSolverParameters()
-        solver = new{T,MT}(A, fact, n, sol, tau, Λ, work_gpu, lwork_gpu, work_cpu, lwork_cpu,
-                           info, ipiv, ipiv64, opt, logger, legacy, params)
+        solver = new{T, MT}(
+            A, fact, n, sol, tau, Λ, work_gpu, lwork_gpu, work_cpu, lwork_cpu,
+            info, ipiv, ipiv64, opt, logger, legacy, params
+        )
         MadNLP.setup!(solver)
         return solver
     end

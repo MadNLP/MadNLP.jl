@@ -25,7 +25,7 @@ function MadNLP._sym_length(Jt::rocSPARSE.ROCSparseMatrixCSC)
         end,
         +,
         @view(Jt.colPtr[2:end]),
-        @view(Jt.colPtr[1:end-1])
+        @view(Jt.colPtr[1:(end - 1)])
     )
 end
 

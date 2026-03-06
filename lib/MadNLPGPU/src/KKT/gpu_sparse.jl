@@ -12,24 +12,24 @@
 =#
 
 function MadNLP.mul!(
-    w::MadNLP.AbstractKKTVector{T,VT},
-    kkt::MadNLP.SparseCondensedKKTSystem,
-    x::MadNLP.AbstractKKTVector,
-    alpha = one(T),
-    beta = zero(T),
-) where {T,VT<:AbstractGPUVector{T}}
+        w::MadNLP.AbstractKKTVector{T, VT},
+        kkt::MadNLP.SparseCondensedKKTSystem,
+        x::MadNLP.AbstractKKTVector,
+        alpha = one(T),
+        beta = zero(T),
+    ) where {T, VT <: AbstractGPUVector{T}}
     n = size(kkt.hess_com, 1)
     m = size(kkt.jt_csc, 2)
 
     # Decompose results
     xx = view(MadNLP.full(x), 1:n)
-    xs = view(MadNLP.full(x), n+1:n+m)
-    xz = view(MadNLP.full(x), n+m+1:n+2*m)
+    xs = view(MadNLP.full(x), (n + 1):(n + m))
+    xz = view(MadNLP.full(x), (n + m + 1):(n + 2 * m))
 
     # Decompose buffers
     wx = view(MadNLP.full(w), 1:n)
-    ws = view(MadNLP.full(w), n+1:n+m)
-    wz = view(MadNLP.full(w), n+m+1:n+2*m)
+    ws = view(MadNLP.full(w), (n + 1):(n + m))
+    wz = view(MadNLP.full(w), (n + m + 1):(n + 2 * m))
 
     MadNLP.mul!(wx, kkt.hess_com, xx, alpha, beta)
     MadNLP.mul!(wx, kkt.hess_com', xx, alpha, one(T))
@@ -65,10 +65,10 @@ function MadNLP.mul!(
 end
 
 function MadNLP.mul_hess_blk!(
-    wx::VT,
-    kkt::Union{MadNLP.SparseKKTSystem,MadNLP.SparseCondensedKKTSystem},
-    t,
-) where {T,VT<:AbstractGPUVector{T}}
+        wx::VT,
+        kkt::Union{MadNLP.SparseKKTSystem, MadNLP.SparseCondensedKKTSystem},
+        t,
+    ) where {T, VT <: AbstractGPUVector{T}}
     n = size(kkt.hess_com, 1)
     wxx = @view(wx[1:n])
     tx = @view(t[1:n])
@@ -88,7 +88,7 @@ function MadNLP.mul_hess_blk!(
         )
     end
 
-    fill!(@view(wx[n+1:end]), 0)
+    fill!(@view(wx[(n + 1):end]), 0)
     wx .+= t .* kkt.pr_diag
     return
 end
@@ -98,12 +98,12 @@ end
 =#
 
 function MadNLP.get_sparse_condensed_ext(
-    ::Type{VT},
-    hess_com,
-    jptr,
-    jt_map,
-    hess_map,
-) where {T,VT<:AbstractGPUVector{T}}
+        ::Type{VT},
+        hess_com,
+        jptr,
+        jt_map,
+        hess_map,
+    ) where {T, VT <: AbstractGPUVector{T}}
     zvals = adapt(get_backend(hess_map), collect(1:length(hess_map)))
     hess_com_ptr = map((i, j) -> (i, j), hess_map, zvals)
     if length(hess_com_ptr) > 0 # otherwise error is thrown
@@ -146,7 +146,7 @@ function get_diagonal_mapping(colptr, rowval)
     inds1 = findall(
         map(
             (x, y) -> ((x <= nnz) && (x != y)),
-            @view(colptr[1:end-1]),
+            @view(colptr[1:(end - 1)]),
             @view(colptr[2:end])
         ),
     )
@@ -231,10 +231,10 @@ end
 =#
 
 function MadNLP._set_con_scale_sparse!(
-    con_scale::VT,
-    jac_I,
-    jac_buffer,
-) where {T,VT<:AbstractGPUVector{T}}
+        con_scale::VT,
+        jac_I,
+        jac_buffer,
+    ) where {T, VT <: AbstractGPUVector{T}}
     ind_jac = adapt(get_backend(jac_I), collect(1:length(jac_I)))
     inds = map((i, j) -> (i, j), jac_I, ind_jac)
     !isempty(inds) && sort!(inds)
@@ -258,8 +258,8 @@ end
 =#
 
 function MadNLP.coo_to_csc(
-    coo::MadNLP.SparseMatrixCOO{T,I,VT,VI},
-) where {T,I,VT<:AbstractGPUArray,VI<:AbstractGPUArray}
+        coo::MadNLP.SparseMatrixCOO{T, I, VT, VI},
+    ) where {T, I, VT <: AbstractGPUArray, VI <: AbstractGPUArray}
     zvals = adapt(get_backend(coo.I), collect(1:length(coo.I)))
     coord = map((i, j, k) -> ((i, j), k), coo.I, coo.J, zvals)
     if length(coord) > 0
@@ -270,7 +270,7 @@ function MadNLP.coo_to_csc(
 
     colptr = similar(coo.I, size(coo, 2) + 1)
 
-    coord_csc = coord[@view(mapptr[1:end-1])]
+    coord_csc = coord[@view(mapptr[1:(end - 1)])]
 
     backend = get_backend(coo.I)
     if length(coord_csc) > 0
@@ -306,8 +306,8 @@ end
 =#
 
 function MadNLP.build_condensed_aug_coord!(
-    kkt::MadNLP.AbstractCondensedKKTSystem{T,VT},
-) where {T,VT<:AbstractGPUVector{T}}
+        kkt::MadNLP.AbstractCondensedKKTSystem{T, VT},
+    ) where {T, VT <: AbstractGPUVector{T}}
     fill!(MadNLP.nzval(kkt.aug_com), zero(T))
     backend = get_backend(kkt.pr_diag)
     if length(kkt.hptr) > 0
@@ -344,8 +344,8 @@ end
 =#
 
 function MadNLP.compress_hessian!(
-    kkt::MadNLP.AbstractSparseKKTSystem{T,VT},
-) where {T,VT<:AbstractGPUVector{T}}
+        kkt::MadNLP.AbstractSparseKKTSystem{T, VT},
+    ) where {T, VT <: AbstractGPUVector{T}}
     fill!(MadNLP.nzval(kkt.hess_com), zero(T))
     backend = get_backend(kkt.pr_diag)
     if length(kkt.ext.hess_com_ptrptr) > 1
@@ -365,8 +365,8 @@ end
 =#
 
 function MadNLP.compress_jacobian!(
-    kkt::MadNLP.SparseCondensedKKTSystem{T,VT},
-) where {T,VT<:AbstractGPUVector{T}}
+        kkt::MadNLP.SparseCondensedKKTSystem{T, VT},
+    ) where {T, VT <: AbstractGPUVector{T}}
     fill!(MadNLP.nzval(kkt.jt_csc), zero(T))
     backend = get_backend(kkt.pr_diag)
     if length(kkt.ext.jt_csc_ptrptr) > 1 # otherwise error is thrown
@@ -386,10 +386,10 @@ end
 =#
 
 function MadNLP._build_condensed_aug_symbolic_hess(
-    H,
-    sym,
-    sym2::AbstractGPUVector,
-)
+        H,
+        sym,
+        sym2::AbstractGPUVector,
+    )
     if size(H, 2) > 0
         backend = get_backend(sym2)
         _build_condensed_aug_symbolic_hess_kernel!(backend)(
@@ -408,14 +408,14 @@ end
 =#
 
 function MadNLP._build_condensed_aug_symbolic_jt(
-    Jt,
-    sym,
-    sym2::AbstractGPUVector,
-)
+        Jt,
+        sym,
+        sym2::AbstractGPUVector,
+    )
     if size(Jt, 2) > 0
         _offsets = map(
             (i, j) -> div((j - i)^2 + (j - i), 2),
-            @view(Jt.colPtr[1:end-1]),
+            @view(Jt.colPtr[1:(end - 1)]),
             @view(Jt.colPtr[2:end])
         )
         offsets = cumsum(_offsets)

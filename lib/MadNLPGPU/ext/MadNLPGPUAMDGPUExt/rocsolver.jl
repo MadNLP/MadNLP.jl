@@ -1,4 +1,4 @@
-mutable struct LapackROCmSolver{T,MT} <: MadNLP.AbstractLapackSolver{T}
+mutable struct LapackROCmSolver{T, MT} <: MadNLP.AbstractLapackSolver{T}
     A::MT
     fact::ROCMatrix{T}
     n::Int64
