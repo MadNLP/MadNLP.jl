@@ -1,48 +1,41 @@
 ######################################################
-##### CUDA wrappers for SparseCondensedKKTSystem #####
+##### GPU wrappers for SparseCondensedKKTSystem  #####
 ######################################################
 
-#=
-    SparseMatrixCOO to CuSparseMatrixCSC
-=#
-
-function MadNLP.transfer!(
-    dest::CUSPARSE.CuSparseMatrixCSC,
-    src::MadNLP.SparseMatrixCOO,
-    map,
-)
-    return copyto!(view(dest.nzVal, map), src.V)
-end
+# Generic GPU sparse functions dispatching on AbstractGPUVector / AbstractGPUArray.
+# Per-backend stubs for functions needing concrete sparse CSC types
+# (transfer!, nzval, _get_sparse_csc, get_tril_to_full, _sym_length)
+# remain in per-extension files.
 
 #=
-    MadNLP.mul! with SparseCondensedKKTSystem + CUDA
+    MadNLP.mul! with SparseCondensedKKTSystem + GPU
 =#
 
 function MadNLP.mul!(
-    w::MadNLP.AbstractKKTVector{T,VT},
-    kkt::MadNLP.SparseCondensedKKTSystem,
-    x::MadNLP.AbstractKKTVector,
-    alpha = one(T),
-    beta = zero(T),
-) where {T,VT<:CuVector{T}}
+        w::MadNLP.AbstractKKTVector{T, VT},
+        kkt::MadNLP.SparseCondensedKKTSystem,
+        x::MadNLP.AbstractKKTVector,
+        alpha = one(T),
+        beta = zero(T),
+    ) where {T, VT <: AbstractGPUVector{T}}
     n = size(kkt.hess_com, 1)
     m = size(kkt.jt_csc, 2)
 
     # Decompose results
     xx = view(MadNLP.full(x), 1:n)
-    xs = view(MadNLP.full(x), n+1:n+m)
-    xz = view(MadNLP.full(x), n+m+1:n+2*m)
+    xs = view(MadNLP.full(x), (n + 1):(n + m))
+    xz = view(MadNLP.full(x), (n + m + 1):(n + 2 * m))
 
     # Decompose buffers
     wx = view(MadNLP.full(w), 1:n)
-    ws = view(MadNLP.full(w), n+1:n+m)
-    wz = view(MadNLP.full(w), n+m+1:n+2*m)
+    ws = view(MadNLP.full(w), (n + 1):(n + m))
+    wz = view(MadNLP.full(w), (n + m + 1):(n + 2 * m))
 
     MadNLP.mul!(wx, kkt.hess_com, xx, alpha, beta)
     MadNLP.mul!(wx, kkt.hess_com', xx, alpha, one(T))
     MadNLP.mul!(wx, kkt.jt_csc, xz, alpha, beta)
     if !isempty(kkt.ext.diag_map_to)
-        backend = CUDABackend()
+        backend = get_backend(MadNLP.full(w))
         _diag_operation_kernel!(backend)(
             wx,
             kkt.hess_com.nzVal,
@@ -72,10 +65,10 @@ function MadNLP.mul!(
 end
 
 function MadNLP.mul_hess_blk!(
-    wx::VT,
-    kkt::Union{MadNLP.SparseKKTSystem,MadNLP.SparseCondensedKKTSystem},
-    t,
-) where {T,VT<:CuVector{T}}
+        wx::VT,
+        kkt::Union{MadNLP.SparseKKTSystem, MadNLP.SparseCondensedKKTSystem},
+        t,
+    ) where {T, VT <: AbstractGPUVector{T}}
     n = size(kkt.hess_com, 1)
     wxx = @view(wx[1:n])
     tx = @view(t[1:n])
@@ -83,7 +76,7 @@ function MadNLP.mul_hess_blk!(
     MadNLP.mul!(wxx, kkt.hess_com, tx, one(T), zero(T))
     MadNLP.mul!(wxx, kkt.hess_com', tx, one(T), one(T))
     if !isempty(kkt.ext.diag_map_to)
-        backend = CUDABackend()
+        backend = get_backend(wx)
         _diag_operation_kernel!(backend)(
             wxx,
             kkt.hess_com.nzVal,
@@ -95,46 +88,29 @@ function MadNLP.mul_hess_blk!(
         )
     end
 
-    fill!(@view(wx[n+1:end]), 0)
+    fill!(@view(wx[(n + 1):end]), 0)
     wx .+= t .* kkt.pr_diag
     return
 end
 
-function MadNLP.get_tril_to_full(csc::CUSPARSE.CuSparseMatrixCSC{Tv,Ti}) where {Tv,Ti}
-    cscind = MadNLP.SparseMatrixCSC{Int,Ti}(
-        Symmetric(
-            MadNLP.SparseMatrixCSC{Int,Ti}(
-                size(csc)...,
-                Array(csc.colPtr),
-                Array(csc.rowVal),
-                collect(1:MadNLP.nnz(csc)),
-            ),
-            :L,
-        ),
-    )
-    return CUSPARSE.CuSparseMatrixCSC{Tv,Ti}(
-        CuArray(cscind.colptr),
-        CuArray(cscind.rowval),
-        CuVector{Tv}(undef, MadNLP.nnz(cscind)),
-        size(csc),
-    ),
-    view(csc.nzVal, CuArray(cscind.nzval))
-end
+#=
+    get_sparse_condensed_ext
+=#
 
 function MadNLP.get_sparse_condensed_ext(
-    ::Type{VT},
-    hess_com,
-    jptr,
-    jt_map,
-    hess_map,
-) where {T,VT<:CuVector{T}}
-    zvals = CuVector{Int}(1:length(hess_map))
+        ::Type{VT},
+        hess_com,
+        jptr,
+        jt_map,
+        hess_map,
+    ) where {T, VT <: AbstractGPUVector{T}}
+    zvals = adapt(get_backend(hess_map), collect(1:length(hess_map)))
     hess_com_ptr = map((i, j) -> (i, j), hess_map, zvals)
     if length(hess_com_ptr) > 0 # otherwise error is thrown
         sort!(hess_com_ptr)
     end
 
-    jvals = CuVector{Int}(1:length(jt_map))
+    jvals = adapt(get_backend(jt_map), collect(1:length(jt_map)))
     jt_csc_ptr = map((i, j) -> (i, j), jt_map, jvals)
     if length(jt_csc_ptr) > 0 # otherwise error is thrown
         sort!(jt_csc_ptr)
@@ -158,6 +134,10 @@ function MadNLP.get_sparse_condensed_ext(
     )
 end
 
+#=
+    get_diagonal_mapping
+=#
+
 function get_diagonal_mapping(colptr, rowval)
     nnz = length(rowval)
     if nnz == 0
@@ -166,12 +146,12 @@ function get_diagonal_mapping(colptr, rowval)
     inds1 = findall(
         map(
             (x, y) -> ((x <= nnz) && (x != y)),
-            @view(colptr[1:end-1]),
+            @view(colptr[1:(end - 1)]),
             @view(colptr[2:end])
         ),
     )
     if length(inds1) == 0
-        return similar(rows, 0), similar(ptrs, 0)
+        return similar(rowval, 0), similar(colptr, 0)
     end
     ptrs = colptr[inds1]
     rows = rowval[ptrs]
@@ -183,31 +163,21 @@ function get_diagonal_mapping(colptr, rowval)
     return rows[inds2], ptrs[inds2]
 end
 
-function MadNLP._sym_length(Jt::CUSPARSE.CuSparseMatrixCSC)
-    return mapreduce(
-        (x, y) -> begin
-            z = x - y
-            div(z^2 + z, 2)
-        end,
-        +,
-        @view(Jt.colPtr[2:end]),
-        @view(Jt.colPtr[1:end-1])
-    )
-end
+#=
+    MadNLP._first_and_last_col
+=#
 
-function MadNLP._first_and_last_col(sym2::CuVector, ptr2)
-    CUDA.@allowscalar begin
+function MadNLP._first_and_last_col(sym2::AbstractGPUVector, ptr2)
+    @allowscalar begin
         first = sym2[1][2]
         last = sym2[ptr2[end]][2]
     end
     return (first, last)
 end
 
-MadNLP.nzval(H::CUSPARSE.CuSparseMatrixCSC) = H.nzVal
-
-function MadNLP._get_sparse_csc(dims, colptr::CuVector, rowval, nzval)
-    return CUSPARSE.CuSparseMatrixCSC(colptr, rowval, nzval, dims)
-end
+#=
+    getij helper
+=#
 
 function getij(idx, n)
     j = ceil(Int, ((2n + 1) - sqrt((2n + 1)^2 - 8 * idx)) / 2)
@@ -219,9 +189,9 @@ end
     MadNLP._set_colptr!
 =#
 
-function MadNLP._set_colptr!(colptr::CuVector, ptr2, sym2, guide)
+function MadNLP._set_colptr!(colptr::AbstractGPUVector, ptr2, sym2, guide)
     if length(ptr2) > 1 # otherwise error is thrown
-        backend = CUDABackend()
+        backend = get_backend(colptr)
         _set_colptr_kernel!(backend)(
             colptr,
             sym2,
@@ -233,14 +203,13 @@ function MadNLP._set_colptr!(colptr::CuVector, ptr2, sym2, guide)
     return
 end
 
-
 #=
-    MadNLP.tril_to_full!
+    MadNLP.tril_to_full! (dense GPU matrix version)
 =#
 
-function MadNLP.tril_to_full!(dense::CuMatrix{T}) where {T}
+function MadNLP.tril_to_full!(dense::AbstractGPUMatrix{T}) where {T}
     n = size(dense, 1)
-    backend = CUDABackend()
+    backend = get_backend(dense)
     _tril_to_full_kernel!(backend)(dense; ndrange = div(n^2 + n, 2))
     return
 end
@@ -249,10 +218,37 @@ end
     MadNLP.force_lower_triangular!
 =#
 
-function MadNLP.force_lower_triangular!(I::CuVector{T}, J) where {T}
+function MadNLP.force_lower_triangular!(I::AbstractGPUVector{T}, J) where {T}
     if !isempty(I)
-        backend = CUDABackend()
+        backend = get_backend(I)
         _force_lower_triangular_kernel!(backend)(I, J; ndrange = length(I))
+    end
+    return
+end
+
+#=
+    MadNLP._set_con_scale_sparse!
+=#
+
+function MadNLP._set_con_scale_sparse!(
+        con_scale::VT,
+        jac_I,
+        jac_buffer,
+    ) where {T, VT <: AbstractGPUVector{T}}
+    ind_jac = adapt(get_backend(jac_I), collect(1:length(jac_I)))
+    inds = map((i, j) -> (i, j), jac_I, ind_jac)
+    !isempty(inds) && sort!(inds)
+    ptr = MadNLP.getptr(inds; by = ((x1, x2), (y1, y2)) -> x1 != y1)
+    if length(ptr) > 1
+        backend = get_backend(con_scale)
+        _set_con_scale_sparse_kernel!(backend)(
+            con_scale,
+            ptr,
+            inds,
+            jac_I,
+            jac_buffer;
+            ndrange = length(ptr) - 1,
+        )
     end
     return
 end
@@ -262,9 +258,9 @@ end
 =#
 
 function MadNLP.coo_to_csc(
-    coo::MadNLP.SparseMatrixCOO{T,I,VT,VI},
-) where {T,I,VT<:CuArray,VI<:CuArray}
-    zvals = CuVector{Int}(1:length(coo.I))
+        coo::MadNLP.SparseMatrixCOO{T, I, VT, VI},
+    ) where {T, I, VT <: AbstractGPUArray, VI <: AbstractGPUArray}
+    zvals = adapt(get_backend(coo.I), collect(1:length(coo.I)))
     coord = map((i, j, k) -> ((i, j), k), coo.I, coo.J, zvals)
     if length(coord) > 0
         sort!(coord, lt = (((i, j), k), ((n, m), l)) -> (j, i) < (m, n))
@@ -274,9 +270,9 @@ function MadNLP.coo_to_csc(
 
     colptr = similar(coo.I, size(coo, 2) + 1)
 
-    coord_csc = coord[@view(mapptr[1:end-1])]
+    coord_csc = coord[@view(mapptr[1:(end - 1)])]
 
-    backend = CUDABackend()
+    backend = get_backend(coo.I)
     if length(coord_csc) > 0
         _set_coo_to_colptr_kernel!(backend)(
             colptr,
@@ -290,7 +286,7 @@ function MadNLP.coo_to_csc(
     rowval = map(x -> x[1][1], coord_csc)
     nzval = similar(rowval, T)
 
-    csc = CUSPARSE.CuSparseMatrixCSC(colptr, rowval, nzval, size(coo))
+    csc = MadNLP._get_sparse_csc(size(coo), colptr, rowval, nzval)
 
     cscmap = similar(coo.I, Int)
     if length(mapptr) > 1
@@ -310,21 +306,21 @@ end
 =#
 
 function MadNLP.build_condensed_aug_coord!(
-    kkt::MadNLP.AbstractCondensedKKTSystem{T,VT,MT},
-) where {T,VT,MT<:CUSPARSE.CuSparseMatrixCSC{T}}
-    fill!(kkt.aug_com.nzVal, zero(T))
-    backend = CUDABackend()
+        kkt::MadNLP.AbstractCondensedKKTSystem{T, VT},
+    ) where {T, VT <: AbstractGPUVector{T}}
+    fill!(MadNLP.nzval(kkt.aug_com), zero(T))
+    backend = get_backend(kkt.pr_diag)
     if length(kkt.hptr) > 0
         _transfer_hessian_kernel!(backend)(
-            kkt.aug_com.nzVal,
+            MadNLP.nzval(kkt.aug_com),
             kkt.hptr,
-            kkt.hess_com.nzVal;
+            MadNLP.nzval(kkt.hess_com);
             ndrange = length(kkt.hptr),
         )
     end
     if length(kkt.dptr) > 0
         _transfer_hessian_kernel!(backend)(
-            kkt.aug_com.nzVal,
+            MadNLP.nzval(kkt.aug_com),
             kkt.dptr,
             kkt.pr_diag;
             ndrange = length(kkt.dptr),
@@ -332,10 +328,10 @@ function MadNLP.build_condensed_aug_coord!(
     end
     if length(kkt.ext.jptrptr) > 1 # otherwise error is thrown
         _transfer_jtsj_kernel!(backend)(
-            kkt.aug_com.nzVal,
+            MadNLP.nzval(kkt.aug_com),
             kkt.jptr,
             kkt.ext.jptrptr,
-            kkt.jt_csc.nzVal,
+            MadNLP.nzval(kkt.jt_csc),
             kkt.diag_buffer;
             ndrange = length(kkt.ext.jptrptr) - 1,
         )
@@ -344,17 +340,17 @@ function MadNLP.build_condensed_aug_coord!(
 end
 
 #=
-    MadNLP.compress_hessian! / MadNLP.compress_jacobian!
+    MadNLP.compress_hessian!
 =#
 
 function MadNLP.compress_hessian!(
-    kkt::MadNLP.AbstractSparseKKTSystem{T,VT,MT},
-) where {T,VT,MT<:CUSPARSE.CuSparseMatrixCSC{T,Int32}}
-    fill!(kkt.hess_com.nzVal, zero(T))
-    backend = CUDABackend()
+        kkt::MadNLP.AbstractSparseKKTSystem{T, VT},
+    ) where {T, VT <: AbstractGPUVector{T}}
+    fill!(MadNLP.nzval(kkt.hess_com), zero(T))
+    backend = get_backend(kkt.pr_diag)
     if length(kkt.ext.hess_com_ptrptr) > 1
         _transfer_to_csc_kernel!(backend)(
-            kkt.hess_com.nzVal,
+            MadNLP.nzval(kkt.hess_com),
             kkt.ext.hess_com_ptr,
             kkt.ext.hess_com_ptrptr,
             kkt.hess_raw.V;
@@ -364,14 +360,18 @@ function MadNLP.compress_hessian!(
     return
 end
 
+#=
+    MadNLP.compress_jacobian!
+=#
+
 function MadNLP.compress_jacobian!(
-    kkt::MadNLP.SparseCondensedKKTSystem{T,VT,MT},
-) where {T,VT,MT<:CUSPARSE.CuSparseMatrixCSC{T,Int32}}
-    fill!(kkt.jt_csc.nzVal, zero(T))
-    backend = CUDABackend()
+        kkt::MadNLP.SparseCondensedKKTSystem{T, VT},
+    ) where {T, VT <: AbstractGPUVector{T}}
+    fill!(MadNLP.nzval(kkt.jt_csc), zero(T))
+    backend = get_backend(kkt.pr_diag)
     if length(kkt.ext.jt_csc_ptrptr) > 1 # otherwise error is thrown
         _transfer_to_csc_kernel!(backend)(
-            kkt.jt_csc.nzVal,
+            MadNLP.nzval(kkt.jt_csc),
             kkt.ext.jt_csc_ptr,
             kkt.ext.jt_csc_ptrptr,
             kkt.jt_coo.V;
@@ -382,43 +382,16 @@ function MadNLP.compress_jacobian!(
 end
 
 #=
-    MadNLP._set_con_scale_sparse!
-=#
-
-function MadNLP._set_con_scale_sparse!(
-    con_scale::VT,
-    jac_I,
-    jac_buffer,
-) where {T,VT<:CuVector{T}}
-    ind_jac = CuVector{Int}(1:length(jac_I))
-    inds = map((i, j) -> (i, j), jac_I, ind_jac)
-    !isempty(inds) && sort!(inds)
-    ptr = MadNLP.getptr(inds; by = ((x1, x2), (y1, y2)) -> x1 != y1)
-    if length(ptr) > 1
-        backend = CUDABackend()
-        _set_con_scale_sparse_kernel!(backend)(
-            con_scale,
-            ptr,
-            inds,
-            jac_I,
-            jac_buffer;
-            ndrange = length(ptr) - 1,
-        )
-    end
-    return
-end
-
-#=
     MadNLP._build_condensed_aug_symbolic_hess
 =#
 
 function MadNLP._build_condensed_aug_symbolic_hess(
-    H::CUSPARSE.CuSparseMatrixCSC{Tv,Ti},
-    sym,
-    sym2,
-) where {Tv,Ti}
+        H,
+        sym,
+        sym2::AbstractGPUVector,
+    )
     if size(H, 2) > 0
-        backend = CUDABackend()
+        backend = get_backend(sym2)
         _build_condensed_aug_symbolic_hess_kernel!(backend)(
             sym,
             sym2,
@@ -435,18 +408,18 @@ end
 =#
 
 function MadNLP._build_condensed_aug_symbolic_jt(
-    Jt::CUSPARSE.CuSparseMatrixCSC{Tv,Ti},
-    sym,
-    sym2,
-) where {Tv,Ti}
+        Jt,
+        sym,
+        sym2::AbstractGPUVector,
+    )
     if size(Jt, 2) > 0
         _offsets = map(
             (i, j) -> div((j - i)^2 + (j - i), 2),
-            @view(Jt.colPtr[1:end-1]),
+            @view(Jt.colPtr[1:(end - 1)]),
             @view(Jt.colPtr[2:end])
         )
         offsets = cumsum(_offsets)
-        backend = CUDABackend()
+        backend = get_backend(sym2)
         _build_condensed_aug_symbolic_jt_kernel!(backend)(
             sym,
             sym2,
@@ -463,8 +436,8 @@ end
     MadNLP._build_scale_augmented_system_coo!
 =#
 
-function MadNLP._build_scale_augmented_system_coo!(dest, src, scaling::CuArray, n, m)
-    backend = CUDABackend()
+function MadNLP._build_scale_augmented_system_coo!(dest, src, scaling::AbstractGPUArray, n, m)
+    backend = get_backend(scaling)
     _scale_augmented_system_coo_kernel!(backend)(
         dest.V,
         src.I,

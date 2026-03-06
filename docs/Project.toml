@@ -1,5 +1,6 @@
 [deps]
 CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
+CUDSS = "45b445bb-4962-46a0-9369-b4df9d0f772e"
 Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
 ExaModels = "1037b233-b668-4ce9-9b63-f9f681f55dd2"
 JuMP = "4076af6c-e467-56ae-b986-b466b2749572"
