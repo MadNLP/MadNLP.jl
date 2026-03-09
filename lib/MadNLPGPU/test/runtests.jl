@@ -1,4 +1,4 @@
-using Test, CUDA, AMDGPU, MadNLP, MadNLPGPU, MadNLPTests
+using Test, CUDA, AMDGPU, MadNLP, MadNLPGPU, MadNLPTests, ExaModels
 
 @testset "MadNLPGPU test" begin
     include("madnlpgpu_test.jl")
@@ -6,6 +6,7 @@ using Test, CUDA, AMDGPU, MadNLP, MadNLPGPU, MadNLPTests
         include("densekkt_cuda.jl")
         # Need to add support for CompactLBFGS in SparseCondensedKKTSystem (Issue #563)
         # include("sparsekkt_cuda.jl")
+        include("schur_cuda_test.jl")
     end
     if AMDGPU.functional()
         include("densekkt_rocm.jl")

@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - master
+      - schur-complement-kkt
   pull_request:
     types: [opened, synchronize, reopened]
 
@@ -34,6 +35,7 @@ jobs:
           using MadNLP
           PATH_MADNLP = dirname(pathof(MadNLP))
           Pkg.develop(path=joinpath(PATH_MADNLP, "..", "lib", "MadNLPTests"))
+          Pkg.add(url="https://github.com/exanauts/ExaModels.jl", rev="ms/two-stage")
           Pkg.test("MadNLP", coverage=true)
       - uses: julia-actions/julia-processcoverage@v1
         with:
@@ -128,6 +130,7 @@ jobs:
           using MadNLP
           PATH_MADNLP = dirname(pathof(MadNLP))
           Pkg.develop(path=joinpath(PATH_MADNLP, "..", "lib", "MadNLPTests"))
+          Pkg.add(url="https://github.com/exanauts/ExaModels.jl", rev="ms/two-stage")
           Pkg.test("MadNLPGPU", coverage=true)
       - uses: julia-actions/julia-processcoverage@v1
         with:
