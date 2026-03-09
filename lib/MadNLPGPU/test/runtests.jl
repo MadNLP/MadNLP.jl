@@ -21,6 +21,7 @@ end
         include("densekkt_cuda.jl")
         # Need to add support for CompactLBFGS in SparseCondensedKKTSystem (Issue #563)
         # include("sparsekkt_cuda.jl")
+        include("schur_cuda_test.jl")
     end
     if HAS_AMDGPU && AMDGPU.functional()
         include("densekkt_rocm.jl")
