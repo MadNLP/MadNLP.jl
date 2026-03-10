@@ -182,7 +182,20 @@ function create_kkt_system(
     nlb = length(cb.ind_lb)
     nub = length(cb.ind_ub)
 
-    @assert schur_ns > 0 "schur_ns must be specified and positive"
+    # Auto-detect dimensions from TwoStageTags if not provided
+    if schur_ns == 0 && hasproperty(cb.nlp, :tags)
+        tags = cb.nlp.tags
+        if hasproperty(tags, :ns) && hasproperty(tags, :var_scenario) && hasproperty(tags, :con_scenario)
+            schur_ns = tags.ns
+            var_scen = Array(tags.var_scenario)
+            con_scen = Array(tags.con_scenario)
+            schur_nd = count(==(0), var_scen)
+            schur_nv = count(==(1), var_scen)
+            schur_nc = count(==(1), con_scen)
+        end
+    end
+
+    @assert schur_ns > 0 "schur_ns must be specified and positive (or use TwoStageTags for auto-detection)"
     @assert schur_nv > 0 "schur_nv must be specified and positive"
     @assert schur_nd > 0 "schur_nd must be specified and positive"
     @assert n == schur_ns * schur_nv + schur_nd "Variable count mismatch: n=$n != ns*nv+nd=$(schur_ns*schur_nv+schur_nd)"

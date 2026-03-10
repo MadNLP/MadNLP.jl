@@ -4,81 +4,69 @@ using MadNLP
 using MadNLPGPU
 using ExaModels
 
+# Helper to build a two-stage model using TwoStageExaCore + EachScenario
+function build_schur_model(;ns, nv, nd, θ_vals, build_fn, vlvar=-100.0, vuvar=100.0, dlvar=-100.0, duvar=100.0, backend=nothing)
+    core = TwoStageExaCore(ns; backend=backend)
+    v = variable(core, nv, EachScenario(); lvar=vlvar, uvar=vuvar)
+    d = variable(core, nd; lvar=dlvar, uvar=duvar)
+    θ = parameter(core, θ_vals)
+    build_fn(core, d, v, θ, ns, nv)
+    return ExaModel(core)
+end
+
 @testset "GPUSchurComplementKKTSystem" begin
 
     @testset "Basic convergence — quadratic with coupling" begin
-        ns, nv, nd = 3, 1, 1
-        nc = 1
-        θ_sets = [[4.0], [6.0], [8.0]]
+        model = build_schur_model(
+            ns=3, nv=1, nd=1,
+            θ_vals=[4.0, 6.0, 8.0],
+            backend=CUDABackend(),
+            build_fn=(c, d, v, θ, ns, nv) -> begin
+                objective(c, (v[i] - θ[i])^2 for i in 1:ns)
+                objective(c, (d[1] - 1.0)^2 for _ in 1:1)
+                constraint(c, (v[i] + d[1] for i in 1:ns), EachScenario(); lcon=0.0)
+            end,
+        )
 
-        tsm = TwoStageExaModel(nd, nv, ns, θ_sets;
-            v_lvar = -100.0, v_uvar = 100.0,
-            d_lvar = -100.0, d_uvar = 100.0,
-            backend = CUDABackend(),
-        ) do c, d, v, θ, ns, nv, nθ
-            obj_data = [(i, (i-1)*nv+1, (i-1)*nθ+1) for i in 1:ns]
-            objective(c, (v[vi] - θ[θi])^2 for (i, vi, θi) in obj_data)
-            objective(c, (d[1] - 1.0)^2 for _ in 1:1)
-            con_data = [(i, (i-1)*nv+1) for i in 1:ns]
-            constraint(c, v[vi] + d[1] for (i, vi) in con_data; lcon = 0.0)
-        end
-
-        result = madnlp(tsm.model;
+        result = madnlp(model;
             kkt_system=SchurComplementKKTSystem,
             linear_solver=LapackCUDASolver,
-            kkt_options=Dict{Symbol,Any}(:schur_ns=>ns, :schur_nv=>nv, :schur_nd=>nd, :schur_nc=>nc),
             print_level=MadNLP.ERROR,
         )
         @test result.status == MadNLP.SOLVE_SUCCEEDED
     end
 
     @testset "Match CPU reference" begin
-        ns, nv, nd = 2, 2, 1
-        nc = 1
-        θ_sets = [[1.0, 2.0], [3.0, 4.0]]
-
-        function build_model_cpu()
-            TwoStageExaModel(nd, nv, ns, θ_sets;
-                v_lvar = -50.0, v_uvar = 50.0,
-                d_lvar = -50.0, d_uvar = 50.0,
-            ) do c, d, v, θ, ns, nv, nθ
-                obj_data = [(i, (i-1)*nv+j, (i-1)*2+j) for i in 1:ns for j in 1:nv]
-                objective(c, (v[vi] - θ[θi])^2 for (i, vi, θi) in obj_data)
-                objective(c, d[1]^2 for _ in 1:1)
-                con_data = [(i, (i-1)*nv+1, (i-1)*nv+2) for i in 1:ns]
-                constraint(c, v[v1] + v[v2] + d[1] for (i, v1, v2) in con_data; lcon = 0.0)
-            end
+        build_fn = (c, d, v, θ, ns, nv) -> begin
+            obj_data = [(i, (i-1)*nv+j, (i-1)*2+j) for i in 1:ns for j in 1:nv]
+            objective(c, (v[vi] - θ[θi])^2 for (i, vi, θi) in obj_data)
+            objective(c, d[1]^2 for _ in 1:1)
+            con_data = [(i, (i-1)*nv+1, (i-1)*nv+2) for i in 1:ns]
+            constraint(c, (v[v1] + v[v2] + d[1] for (i, v1, v2) in con_data), EachScenario(); lcon=0.0)
         end
 
-        function build_model_gpu()
-            TwoStageExaModel(nd, nv, ns, θ_sets;
-                v_lvar = -50.0, v_uvar = 50.0,
-                d_lvar = -50.0, d_uvar = 50.0,
-                backend = CUDABackend(),
-            ) do c, d, v, θ, ns, nv, nθ
-                obj_data = [(i, (i-1)*nv+j, (i-1)*2+j) for i in 1:ns for j in 1:nv]
-                objective(c, (v[vi] - θ[θi])^2 for (i, vi, θi) in obj_data)
-                objective(c, d[1]^2 for _ in 1:1)
-                con_data = [(i, (i-1)*nv+1, (i-1)*nv+2) for i in 1:ns]
-                constraint(c, v[v1] + v[v2] + d[1] for (i, v1, v2) in con_data; lcon = 0.0)
-            end
-        end
-
-        # CPU reference
-        tsm_cpu = build_model_cpu()
-        ref = madnlp(tsm_cpu.model;
+        model_cpu = build_schur_model(
+            ns=2, nv=2, nd=1,
+            θ_vals=[1.0, 2.0, 3.0, 4.0],
+            vlvar=-50.0, vuvar=50.0, dlvar=-50.0, duvar=50.0,
+            build_fn=build_fn,
+        )
+        ref = madnlp(model_cpu;
             kkt_system=SchurComplementKKTSystem,
             linear_solver=LapackCPUSolver,
-            kkt_options=Dict{Symbol,Any}(:schur_ns=>ns, :schur_nv=>nv, :schur_nd=>nd, :schur_nc=>nc),
             print_level=MadNLP.ERROR,
         )
 
-        # GPU
-        tsm_gpu = build_model_gpu()
-        gpu_result = madnlp(tsm_gpu.model;
+        model_gpu = build_schur_model(
+            ns=2, nv=2, nd=1,
+            θ_vals=[1.0, 2.0, 3.0, 4.0],
+            vlvar=-50.0, vuvar=50.0, dlvar=-50.0, duvar=50.0,
+            backend=CUDABackend(),
+            build_fn=build_fn,
+        )
+        gpu_result = madnlp(model_gpu;
             kkt_system=SchurComplementKKTSystem,
             linear_solver=LapackCUDASolver,
-            kkt_options=Dict{Symbol,Any}(:schur_ns=>ns, :schur_nv=>nv, :schur_nd=>nd, :schur_nc=>nc),
             print_level=MadNLP.ERROR,
         )
 
@@ -89,52 +77,43 @@ using ExaModels
     end
 
     @testset "Multiple recourse vars and design vars" begin
-        ns, nv, nd = 2, 2, 2
-        nc = 1
-        θ_sets = [[1.0], [2.0]]
+        model = build_schur_model(
+            ns=2, nv=2, nd=2,
+            θ_vals=[1.0, 2.0],
+            vlvar=-50.0, vuvar=50.0, dlvar=-50.0, duvar=50.0,
+            backend=CUDABackend(),
+            build_fn=(c, d, v, θ, ns, nv) -> begin
+                obj_data = [(i, (i-1)*nv+j, i) for i in 1:ns for j in 1:nv]
+                objective(c, θ[θi] * v[vi]^2 for (i, vi, θi) in obj_data)
+                objective(c, d[j]^2 for j in 1:2)
+                con_data = [(i, (i-1)*nv+1, (i-1)*nv+2) for i in 1:ns]
+                constraint(c, (v[v1] + v[v2] + d[1] + d[2] for (i, v1, v2) in con_data), EachScenario(); lcon=1.0, ucon=1.0)
+            end,
+        )
 
-        tsm = TwoStageExaModel(nd, nv, ns, θ_sets;
-            v_lvar = -50.0, v_uvar = 50.0,
-            d_lvar = -50.0, d_uvar = 50.0,
-            backend = CUDABackend(),
-        ) do c, d, v, θ, ns, nv, nθ
-            obj_data = [(i, (i-1)*nv+j, (i-1)*nθ+1) for i in 1:ns for j in 1:nv]
-            objective(c, θ[θi] * v[vi]^2 for (i, vi, θi) in obj_data)
-            objective(c, d[j]^2 for j in 1:nd)
-            con_data = [(i, (i-1)*nv+1, (i-1)*nv+2) for i in 1:ns]
-            constraint(c, v[v1] + v[v2] + d[1] + d[2] for (i, v1, v2) in con_data; lcon = 1.0, ucon = 1.0)
-        end
-
-        result = madnlp(tsm.model;
+        result = madnlp(model;
             kkt_system=SchurComplementKKTSystem,
             linear_solver=LapackCUDASolver,
-            kkt_options=Dict{Symbol,Any}(:schur_ns=>ns, :schur_nv=>nv, :schur_nd=>nd, :schur_nc=>nc),
             print_level=MadNLP.ERROR,
         )
         @test result.status == MadNLP.SOLVE_SUCCEEDED
     end
 
     @testset "Known solution with inactive constraints" begin
-        ns, nv, nd = 2, 1, 1
-        nc = 1
-        θ_sets = [[3.0], [7.0]]
+        model = build_schur_model(
+            ns=2, nv=1, nd=1,
+            θ_vals=[3.0, 7.0],
+            backend=CUDABackend(),
+            build_fn=(c, d, v, θ, ns, nv) -> begin
+                objective(c, (v[i] - θ[i])^2 for i in 1:ns)
+                objective(c, (d[1] - 5.0)^2 for _ in 1:1)
+                constraint(c, (v[i] + d[1] for i in 1:ns), EachScenario(); lcon=-100.0, ucon=100.0)
+            end,
+        )
 
-        tsm = TwoStageExaModel(nd, nv, ns, θ_sets;
-            v_lvar = -100.0, v_uvar = 100.0,
-            d_lvar = -100.0, d_uvar = 100.0,
-            backend = CUDABackend(),
-        ) do c, d, v, θ, ns, nv, nθ
-            obj_data = [(i, (i-1)*nv+1, (i-1)*nθ+1) for i in 1:ns]
-            objective(c, (v[vi] - θ[θi])^2 for (i, vi, θi) in obj_data)
-            objective(c, (d[1] - 5.0)^2 for _ in 1:1)
-            con_data = [(i, (i-1)*nv+1) for i in 1:ns]
-            constraint(c, v[vi] + d[1] for (i, vi) in con_data; lcon = -100.0, ucon = 100.0)
-        end
-
-        result = madnlp(tsm.model;
+        result = madnlp(model;
             kkt_system=SchurComplementKKTSystem,
             linear_solver=LapackCUDASolver,
-            kkt_options=Dict{Symbol,Any}(:schur_ns=>ns, :schur_nv=>nv, :schur_nd=>nd, :schur_nc=>nc),
             print_level=MadNLP.ERROR,
         )
         @test result.status == MadNLP.SOLVE_SUCCEEDED
