@@ -119,16 +119,31 @@ jobs:
         with:
           channel: ${{ matrix.julia-version }}
       - uses: julia-actions/cache@v1
-      - name: test MadNLPGPU
-        shell: julia --project=./lib/MadNLPGPU --color=yes {0}
+      - name: Setup test environment
+        shell: julia --project=./lib/MadNLPGPU/test --color=yes {0}
         run: |
           using Pkg
           Pkg.Registry.update()
           Pkg.develop(path=".")
-          using MadNLP
-          PATH_MADNLP = dirname(pathof(MadNLP))
-          Pkg.develop(path=joinpath(PATH_MADNLP, "..", "lib", "MadNLPTests"))
-          Pkg.test("MadNLPGPU", coverage=true)
+          Pkg.develop(path="./lib/MadNLPGPU")
+          Pkg.develop(path="./lib/MadNLPTests")
+      - name: Add CUDA and CUDSS
+        if: matrix.gpu == 'cuda'
+        shell: julia --project=./lib/MadNLPGPU/test --color=yes {0}
+        run: |
+          using Pkg
+          Pkg.add("CUDA")
+          Pkg.add("CUDSS")
+      - name: Add AMDGPU
+        if: matrix.gpu == 'amdgpu'
+        shell: julia --project=./lib/MadNLPGPU/test --color=yes {0}
+        run: |
+          using Pkg
+          Pkg.add("AMDGPU")
+      - name: test MadNLPGPU
+        env:
+          MADNLP_GPU_BACKEND: ${{ matrix.gpu }}
+        run: julia --project=./lib/MadNLPGPU/test --code-coverage=user --color=yes -e 'include("lib/MadNLPGPU/test/runtests.jl")'
       - uses: julia-actions/julia-processcoverage@v1
         with:
           directories: lib/MadNLPGPU/src

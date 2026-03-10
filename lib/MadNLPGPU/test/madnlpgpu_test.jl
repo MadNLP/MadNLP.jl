@@ -176,7 +176,7 @@ rocm_testset = [
 ]
 
 @testset "MadNLPGPU test" begin
-    if CUDA.functional()
+    if HAS_CUDA && CUDA.functional()
         MadNLPTests.test_linear_solver(LapackCUDASolver,Float32)
         MadNLPTests.test_linear_solver(LapackCUDASolver,Float64)
         # Test LapackGPU wrapper
@@ -184,7 +184,7 @@ rocm_testset = [
             test_madnlp(name,optimizer_constructor,exclude; Arr=CuArray)
         end
     end
-    if AMDGPU.functional()
+    if HAS_AMDGPU && AMDGPU.functional()
         MadNLPTests.test_linear_solver(LapackROCmSolver,Float32)
         MadNLPTests.test_linear_solver(LapackROCmSolver,Float64)
         for (name,optimizer_constructor,exclude) in rocm_testset
