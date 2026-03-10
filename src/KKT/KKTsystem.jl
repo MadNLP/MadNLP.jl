@@ -264,4 +264,5 @@ include("Sparse/augmented.jl")
 include("Sparse/condensed.jl")
 include("Sparse/scaled_augmented.jl")
 include("Sparse/utils.jl")
+include("Schur/schur.jl")
 

@@ -37,6 +37,8 @@ include("LinearSolvers/lapackgpu.jl")
 include("LinearSolvers/cusolver.jl")
 include("LinearSolvers/cudss.jl")
 include("cuda.jl")
+include("KKT/kernels_schur.jl")
+include("KKT/cuda_schur.jl")
 
 global LapackROCmSolver
 export LapackCUDASolver, CUDSSSolver, LapackROCmSolver
