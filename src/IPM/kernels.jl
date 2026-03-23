@@ -21,8 +21,8 @@ end
 
 function _set_aug_diagonal!(kkt::AbstractKKTSystem)
     copyto!(kkt.pr_diag, kkt.reg)
-    kkt.pr_diag[kkt.ind_lb] .-= kkt.l_lower ./ kkt.l_diag
-    kkt.pr_diag[kkt.ind_ub] .-= kkt.u_lower ./ kkt.u_diag
+    @views kkt.pr_diag[kkt.ind_lb] .-= kkt.l_lower ./ kkt.l_diag
+    @views kkt.pr_diag[kkt.ind_ub] .-= kkt.u_lower ./ kkt.u_diag
     return
 end
 
@@ -49,19 +49,19 @@ function _set_aug_diagonal!(kkt::ScaledSparseKKTSystem{T}) where T
     xuzl = kkt.buffer2
     fill!(xlzu, zero(T))
     fill!(xuzl, zero(T))
+    @views begin
+        xlzu[kkt.ind_ub] .= kkt.u_lower    # zᵘ
+        xlzu[kkt.ind_lb] .*= kkt.l_diag    # (X - Xˡ) zᵘ
 
-    xlzu[kkt.ind_ub] .= kkt.u_lower    # zᵘ
-    xlzu[kkt.ind_lb] .*= kkt.l_diag    # (X - Xˡ) zᵘ
+        xuzl[kkt.ind_lb] .= kkt.l_lower    # zˡ
+        xuzl[kkt.ind_ub] .*= kkt.u_diag    # (Xᵘ - X) zˡ
 
-    xuzl[kkt.ind_lb] .= kkt.l_lower    # zˡ
-    xuzl[kkt.ind_ub] .*= kkt.u_diag    # (Xᵘ - X) zˡ
+        kkt.pr_diag .= xlzu .+ xuzl
 
-    kkt.pr_diag .= xlzu .+ xuzl
-
-    fill!(kkt.scaling_factor, one(T))
-    kkt.scaling_factor[kkt.ind_lb] .*= sqrt.(kkt.l_diag)
-    kkt.scaling_factor[kkt.ind_ub] .*= sqrt.(kkt.u_diag)
-
+        fill!(kkt.scaling_factor, one(T))
+        kkt.scaling_factor[kkt.ind_lb] .*= sqrt.(kkt.l_diag)
+        kkt.scaling_factor[kkt.ind_ub] .*= sqrt.(kkt.u_diag)
+    end
     # Scale regularization by scaling factor.
     kkt.pr_diag .+= kkt.reg .* kkt.scaling_factor.^2
     return
@@ -207,11 +207,11 @@ function set_initial_bounds!(xl::AbstractVector{T}, xu::AbstractVector{T}, tol) 
     # If `tol` is set to zero, keep the bounds unchanged.
     if tol > zero(T)
         map!(
-            x->x - max(one(T), abs(x)) .* tol,
+            x->x - max(one(T), abs(x)) * tol,
             xl, xl
         )
         map!(
-            x->x + max(one(T), abs(x)) .* tol,
+            x->x + max(one(T), abs(x)) * tol,
             xu, xu
         )
     end
@@ -270,34 +270,37 @@ function _get_varphi(x1::T, x2::T, mu::T) where T
 end
 
 function get_varphi(obj_val, x_lr, xl_r, xu_r, x_ur, mu)
-    return obj_val + mapreduce(
-        (x1,x2) -> _get_varphi(x1,x2,mu), +, x_lr, xl_r
-    ) + mapreduce(
-        (x1,x2) -> _get_varphi(x1,x2,mu), +, xu_r, x_ur
-    )
+    varphi = obj_val
+    # TODO(@anton) Check if we can @simd this
+    for ii in eachindex(x_lr)
+        varphi += _get_varphi(x_lr[ii],xl_r[ii],mu)
+    end
+    for ii in eachindex(xu_r)
+        varphi += _get_varphi(xu_r[ii],x_ur[ii],mu)
+    end
+    return varphi
 end
 
 @inline get_inf_pr(c::AbstractVector) = norm(c, Inf)
 
 function get_inf_du(f, zl, zu, jacl, sd)
-    return mapreduce((f,zl,zu,jacl) -> abs(f-zl+zu+jacl), max, f, zl, zu, jacl; init = zero(eltype(f))) / sd
+    inf_du = zero(eltype(f))
+    for ii in eachindex(f)
+        inf_du = max(inf_du, abs(f[ii]-zl[ii]+zu[ii]+jacl[ii]))
+    end
+    return inf_du / sd
 end
 
 function get_inf_compl(x_lr, xl_r, zl_r, xu_r, x_ur, zu_r, mu, sc)
-    return max(
-        mapreduce(
-            (x_lr, xl_r, zl_r) -> abs((x_lr-xl_r)*zl_r-mu),
-            max,
-            x_lr, xl_r, zl_r;
-            init = zero(eltype(x_lr))
-        ),
-        mapreduce(
-            (xu_r, x_ur, zu_r) -> abs((xu_r-x_ur)*zu_r-mu),
-            max,
-            xu_r, x_ur, zu_r;
-            init = zero(eltype(x_lr))
-        )
-    ) / sc
+    inf_compl = zero(eltype(x_lr))
+    for ii in eachindex(x_lr)
+        inf_compl = max(inf_compl, abs((x_lr[ii]-xl_r[ii])*zl_r[ii]-mu))
+    end
+    for ii in eachindex(xu_r)
+        inf_compl = max(inf_compl, abs((xu_r[ii]-x_ur[ii])*zu_r[ii]-mu))
+    end
+
+    return inf_compl / sc
 end
 
 function get_average_complementarity(x_lr, xl_r, zl_r, x_ur, xu_r, zu_r)
@@ -319,9 +322,14 @@ end
 
 function get_min_complementarity(x_lr::AbstractVector{T}, xl_r::AbstractVector{T}, zl_r::AbstractVector{T},
                                  x_ur::AbstractVector{T}, xu_r::AbstractVector{T}, zu_r::AbstractVector{T}) where T
-    cc_lb = mapreduce((x_l, xl, zl) -> (x_l-xl)*zl, min, x_lr, xl_r, zl_r, init=T(Inf))
-    cc_ub = mapreduce((x_u, xu, zu) -> (xu-x_u)*zu, min, x_ur, xu_r, zu_r, init=T(Inf))
-    return min(cc_lb,cc_ub)
+    min_comp = T(Inf)
+    for ii in eachindex(x_lr)
+        min_comp = min(min_comp, (x_lr[ii]-xl_r[ii])*zl_r[ii])
+    end
+    for ii in eachindex(x_lr)
+        min_comp = min(min_comp, (xu_r[ii]-x_ur[ii])*zu_r[ii])
+    end
+    return min_comp
 end
 
 function get_min_complementarity(solver::AbstractMadNLPSolver)
@@ -339,12 +347,11 @@ function get_varphi_d(
     dx::AbstractVector{T},
     mu,
 ) where T
-    return mapreduce(
-        (f,x,xl,xu,dx)-> (f - mu/(x-xl) + mu/(xu-x)) * dx,
-        +,
-        f, x, xl, xu, dx;
-        init = zero(T)
-    )
+    varphi_d = zero(T)
+    @simd for ii in eachindex(f)
+        varphi_d += (f[ii] - mu/(x[ii]-xl[ii]) + mu/(xu[ii]-x[ii])) * dx[ii]
+    end
+    return varphi_d
 end
 
 function get_alpha_max(
@@ -354,21 +361,14 @@ function get_alpha_max(
     dx::AbstractVector{T},
     tau,
 ) where T
-    return min(
-        mapreduce(
-            (x, xl, dx) -> dx < 0 ? (-x+xl)*tau/dx : T(Inf),
-            min,
-
-            x, xl, dx,
-            init = one(T)
-        ),
-        mapreduce(
-            (x, xu, dx) -> dx > 0 ? (-x+xu)*tau/dx : T(Inf),
-            min,
-            x, xu, dx,
-            init = one(T)
-        )
-    )
+    alpha_max = one(T)
+    for ii in eachindex(x)
+        alpha_max = min(alpha_max,
+                        dx[ii] < 0 ? (-x[ii]+xl[ii])*tau/dx[ii] : T(Inf),
+                        dx[ii] > 0 ? (-x[ii]+xu[ii])*tau/dx[ii] : T(Inf),
+                        )
+    end
+    return alpha_max
 end
 
 function get_alpha_z(
@@ -378,20 +378,14 @@ function get_alpha_z(
     dzu::AbstractVector{T},
     tau,
 )  where T
-    return min(
-        mapreduce(
-            (zl_r, dzl) -> dzl < 0 ? (-zl_r)*tau/dzl : T(Inf),
-            min,
-            zl_r, dzl,
-            init = one(T)
-        ),
-        mapreduce(
-            (zu_r, dzu) -> dzu < 0 ? (-zu_r)*tau/dzu : T(Inf),
-            min,
-            zu_r, dzu,
-            init = one(T)
-        )
-    )
+    alpha_z = one(T)
+    for ii in eachindex(zl_r)
+        alpha_z = min(alpha_z, dzl[ii] < 0 ? (-zl_r[ii])*tau/dzl[ii] : T(Inf))
+    end
+    for ii in eachindex(zu_r)
+        alpha_z = min(alpha_z, dzu[ii] < 0 ? (-zu_r[ii])*tau/dzu[ii] : T(Inf))
+    end
+    return alpha_z
 end
 
 function get_obj_val_R(
@@ -403,12 +397,11 @@ function get_obj_val_R(
     rho,
     zeta,
 ) where T
-    return mapreduce(
-        (p,n,D_R,x,x_ref) -> rho*(p+n) .+ zeta/2*D_R^2*(x-x_ref)^2,
-        +,
-        p,n,D_R,x,x_ref;
-        init = zero(T)
-    )
+    obj_val_R = zero(T)
+    for ii in eachindex(p)
+        obj_val += rho*(p[ii]+n[ii]) .+ zeta/2*D_R[ii]^2*(x[ii]-x_ref[ii])^2
+    end
+    return obj_val
 end
 
 @inline get_theta(c) = norm(c, 1)
@@ -418,12 +411,11 @@ function get_theta_R(
     p::AbstractVector{T},
     n::AbstractVector{T},
 ) where T
-    return mapreduce(
-        (c,p,n) -> abs(c-p+n),
-        +,
-        c,p,n;
-        init = zero(T)
-    )
+    theta_R = zero(T)
+    for ii in eachindex(c)
+        theta_R += abs(c[ii]-p[ii]+n[ii])
+    end
+    return theta_R
 end
 
 function get_inf_pr_R(
@@ -431,12 +423,11 @@ function get_inf_pr_R(
     p::AbstractVector{T},
     n::AbstractVector{T},
 ) where T
-    return mapreduce(
-        (c,p,n) -> abs(c-p+n),
-        max,
-        c,p,n;
-        init = zero(T)
-    )
+    theta_R = zero(T)
+    for ii in eachindex(c)
+        theta_R = max(theta_R, abs(c[ii]-p[ii]+n[ii]))
+    end
+    return theta_R
 end
 
 function get_inf_du_R(
@@ -449,27 +440,15 @@ function get_inf_du_R(
     zn::AbstractVector{T},
     rho,
     sd,
-)  where T
-    return max(
-        mapreduce(
-            (f_R, zl, zu, jacl) -> abs(f_R-zl+zu+jacl),
-            max,
-            f_R, zl, zu, jacl;
-            init = zero(T)
-        ),
-        mapreduce(
-            (l, zp) -> abs(rho-l-zp),
-            max,
-            l, zp;
-            init = zero(T)
-        ),
-        mapreduce(
-            (l, zn) -> abs(rho+l-zn),
-            max,
-            l, zn;
-            init = zero(T)
-        )
-    ) / sd
+) where T
+    inf_du_R = zero(T)
+    for ii in eachinex(f_R)
+        inf_du_R = max(inf_du_R, abs(f_R[ii]-zl[ii]+zu[ii]+jacl[ii]))
+    end
+    for ii in eachindex(l)
+        inf_du_R = max(inf_du_R, abs(rho-l[ii]-zp[ii]), abs(rho+l[ii]-zn[ii]))
+    end
+    return inf_du_R / sd
 end
 
 function get_inf_compl_R(
@@ -486,32 +465,20 @@ function get_inf_compl_R(
     mu_R,
     sc
 ) where {T, VT <: AbstractVector{T}, VI}
-    return max(
-        mapreduce(
-            (x_lr, xl_r, zl_r) -> abs((x_lr-xl_r)*zl_r-mu_R),
-            max,
-            x_lr, xl_r, zl_r;
-            init = zero(T)
-        ),
-        mapreduce(
-            (xu_r, x_ur, zu_r) -> abs((xu_r-x_ur)*zu_r-mu_R),
-            max,
-            xu_r, x_ur, zu_r;
-            init = zero(T)
-        ),
-        mapreduce(
-            (pp, zp) -> abs(pp*zp-mu_R),
-            max,
-            pp, zp;
-            init = zero(T)
-        ),
-        mapreduce(
-            (nn, zn) -> abs(nn*zn-mu_R),
-            max,
-            nn, zn;
-            init = zero(T)
-        ),
-    ) / sc
+    inf_compl_R = zero(T)
+    for ii in eachindex(x_lr)
+        inf_compl_R = max(inf_compl_R, abs((x_lr[ii]-xl_r[ii])*zl_r[ii]-mu_R))
+    end
+    for ii in eachindex(xu_r)
+        inf_compl_R = max(inf_compl_R, abs((xu_r[ii]-x_ur[ii])*zu_r[ii]-mu_R))
+    end
+    for ii in eachindex(pp)
+        inf_compl_R = max(inf_compl_R, abs(pp[ii]*zp[ii]-mu_R))
+    end
+    for ii in eachindex(nn)
+        inf_compl_R = max(inf_compl_R, abs(nn[ii]*zn[ii]-mu_R))
+    end
+    return inf_compl_R / sc
 end
 
 function get_alpha_max_R(
@@ -525,40 +492,24 @@ function get_alpha_max_R(
     dnn::AbstractVector{T},
     tau_R,
 ) where T
-    return min(
-        mapreduce(
-            (x,xl,xu,dx) -> if dx < 0
-                (-x+xl)*tau_R/dx
-            elseif dx > 0
-                (-x+xu)*tau_R/dx
-            else
-                T(Inf)
-            end,
-            min,
-            x,xl,xu,dx;
-            init = one(T)
-        ),
-        mapreduce(
-            (pp, dpp)-> if dpp < 0
-                -pp*tau_R/dpp
-            else
-                T(Inf)
-            end,
-            min,
-            pp, dpp;
-            init = one(T)
-        ),
-        mapreduce(
-            (nn, dnn)-> if dnn < 0
-                -nn*tau_R/dnn
-            else
-                T(Inf)
-            end,
-            min,
-            nn, dnn;
-            init = one(T)
-        )
-    )
+    alpha_max_R = one(T)
+    for ii in eachindex(x)
+        candidate = if dx[ii] < 0
+            (-x[ii]+xl[ii])*tau_R/dx[ii]
+        elseif dx > 0
+            (-x[ii]+xu[ii])*tau_R/dx[ii]
+        else
+            T(Inf)
+        end
+        alpha_max_R = min(alpha_max_R, candidate)
+    end
+    for ii in eachindex(pp)
+        alpha_max_R = min(alpha_max_R, dpp[ii] < 0 ? -pp[ii]*tau_R/dpp[ii] : T(inf))
+    end
+    for ii in eachindex(nn)
+        alpha_max_R = min(alpha_max_R, dnn[ii] < 0 ? -nn[ii]*tau_R/dnn[ii] : T(inf))
+    end
+    return alpha_max_R
 end
 
 function get_alpha_z_R(
@@ -572,34 +523,21 @@ function get_alpha_z_R(
     dzn,
     tau_R,
 ) where {T, VT <: AbstractVector{T}, VI}
-
+    alpha_z_R = one(T)
     f(d,z) = d < 0 ? -z*tau_R/d : T(Inf)
-    return min(
-        mapreduce(
-            f,
-            min,
-            dzl, zl_r;
-            init = one(T)
-        ),
-        mapreduce(
-            f,
-            min,
-            dzu, zu_r;
-            init = one(T)
-        ),
-        mapreduce(
-            f,
-            min,
-            dzp, zp;
-            init = one(T)
-        ),
-        mapreduce(
-            f,
-            min,
-            dzn, zn;
-            init = one(T)
-        )
-    )
+    for ii in eachindex(dzl)
+        alpha_z_R = min(alpha_z_R, f(dzl[ii], zl_r[ii]))
+    end
+    for ii in eachindex(dzu)
+        alpha_z_R = min(alpha_z_R, f(dzu[ii], zu_r[ii]))
+    end
+    for ii in eachindex(dzp)
+        alpha_z_R = min(alpha_z_R, f(dzp[ii], zp[ii]))
+    end
+    for ii in eachindex(dzn)
+        alpha_z_R = min(alpha_z_R, f(dzn[ii], zn[ii]))
+    end
+    return alpha_z_R
 end
 
 function get_varphi_R(
@@ -618,33 +556,19 @@ function get_varphi_R(
         d = x - y
         d < 0 ? T(Inf) : mu_R * log(d)
     end
-
-    return obj_val - +(
-        mapreduce(
-            f2,
-            +,
-            x_lr, xl_r;
-            init = zero(T)
-        ),
-        mapreduce(
-            f2,
-            +,
-            xu_r, x_ur;
-            init = zero(T)
-        ),
-        mapreduce(
-            f1,
-            +,
-            pp;
-            init = zero(T)
-        ),
-        mapreduce(
-            f1,
-            +,
-            nn;
-            init = zero(T)
-        )
-    )
+    for ii in eachindex(x_lr)
+        varphi_R -= f2(x_lr[ii], xl_r[ii])
+    end
+    for ii in eachindex(xu_r)
+        varphi_R -= f2(xu_r[ii], x_ur[ii])
+    end
+    for ii in eachindex(pp)
+        varphi_R -= f1(pp)
+    end
+    for ii in eachindex(nn)
+        varphi_R -= f1(nn)
+    end
+    return varphi_R
 end
 
 function get_F(
@@ -661,30 +585,29 @@ function get_F(
     zu_r,
     mu,
 ) where T
+    # NOTE: Does not allocate
     F1 = mapreduce(
         abs,
         +,
         c;
         init = zero(T)
     )
-    F2 = mapreduce(
-        (f,zl,zu,jacl) -> abs(f-zl+zu+jacl),
-        +,
-        f,zl,zu,jacl;
-        init = zero(T)
-    )
-    F3 = mapreduce(
-        (x_lr,xl_r,zl_r) -> (x_lr >= xl_r && zl_r >= 0) ? abs((x_lr-xl_r)*zl_r-mu) : T(Inf),
-        +,
-        x_lr,xl_r,zl_r;
-        init = zero(T)
-    )
-    F4 = mapreduce(
-        (xu_r,x_ur,zu_r) -> (xu_r >= x_ur && zu_r >= 0) ? abs((xu_r-xu_r)*zu_r-mu) : T(Inf),
-        +,
-        xu_r,xu_r,zu_r;
-        init = zero(T)
-    )
+
+    F2 = zero(T)
+    for ii in eachindex(f)
+        F2 += abs(f[ii]-zl[ii]+zu[ii]+jacl[ii])
+    end
+
+    F3 = zero(T)
+    for ii in eachindex(x_lr)
+        F3 += (x_lr[ii] >= xl_r[ii] && zl_r[ii] >= 0) ? abs((x_lr[ii]-xl_r[ii])*zl_r[ii]-mu) : T(Inf)
+    end
+
+    F4 = zero(T)
+    for ii in eachindex(xu_r)
+        F4 += (xu_r[ii] >= x_ur[ii] && zu_r[ii] >= 0) ? abs((xu_r[ii]-xu_r[ii])*zu_r[ii]-mu) : T(Inf)
+    end
+
     return F1 + F2 + F3 + F4
 end
 
@@ -702,26 +625,17 @@ function get_varphi_d_R(
     rho,
 ) where T
     f(x,dx) = (rho - mu_R/x) * dx
-    return +(
-        mapreduce(
-            (f_R, x, xl, xu, dx) -> (f_R - mu_R/(x-xl) + mu_R/(xu-x)) * dx,
-            +,
-            f_R, x, xl, xu, dx;
-            init = zero(T)
-        ),
-        mapreduce(
-            f,
-            +,
-            pp,dpp;
-            init = zero(T)
-        ),
-        mapreduce(
-            f,
-            +,
-            nn,dnn;
-            init = zero(T)
-        ),
-    )
+    varphi_d = zero(T)
+    for ii in eachindex(f_R)
+        varphi_d += (f_R[ii] - mu_R/(x[ii]-xl[ii]) + mu_R/(xu[ii]-x[ii])) * dx[ii]
+    end
+    for ii in eachindex(pp)
+        varphi_d += f(pp[ii],dpp[ii])
+    end
+    for ii in eachindex(nn)
+        varphi_d += f(nn[ii],dnn[ii])
+    end
+    return varphi_d
 end
 
 function _initialize_variables!(x::T, xl, xu, bound_push, bound_fac) where T
@@ -762,11 +676,11 @@ function adjust_boundary!(
 end
 
 function get_rel_search_norm(x::AbstractVector{T}, dx::AbstractVector{T}) where T
-    return mapreduce(
-        (x,dx) -> abs(dx) / (one(T) + abs(x)),
-        max,
-        x, dx
-    )
+    rel_search_norm = zero(T)
+    for ii in eachindex(x)
+        rel_search_norm = max(rel_search_norm, abs(dx[ii]) / (one(T) + abs(x[ii])))
+    end
+    return rel_search_norm
 end
 
 # Utility functions
@@ -905,7 +819,9 @@ function get_ftype(filter,theta,theta_trial,varphi,varphi_trial,switching_condit
 end
 
 function dual_inf_perturbation!(px, ind_llb, ind_uub, mu, kappa_d)
-    px[ind_llb] .-= mu*kappa_d
-    px[ind_uub] .+= mu*kappa_d
+    @views begin
+        px[ind_llb] .-= mu*kappa_d
+        px[ind_uub] .+= mu*kappa_d
+    end
 end
 

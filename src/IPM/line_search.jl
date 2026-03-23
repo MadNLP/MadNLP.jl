@@ -52,7 +52,7 @@ function filter_line_search!(solver::AbstractMadNLPSolver{T}) where T
             solver.theta_min,solver.opt.obj_max_inc,solver.opt.gamma_theta,solver.opt.gamma_phi,
             has_constraints(solver))
 
-        if solver.ftype in ["f","h"]
+        if solver.ftype in ("f","h")
             @trace(solver.logger,"Step accepted with type $(solver.ftype)")
             break
         end
