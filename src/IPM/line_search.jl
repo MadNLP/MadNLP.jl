@@ -51,8 +51,9 @@ function filter_line_search!(solver::AbstractMadNLPSolver{T}) where T
             get_filter(solver),theta,theta_trial,varphi,varphi_trial,switching_condition,armijo_condition,
             get_theta_min(solver),get_opt(solver).obj_max_inc,get_opt(solver).gamma_theta,get_opt(solver).gamma_phi,
             has_constraints(solver))
-                )
-        if get_ftype(solver) in ["f","h"]
+                   )
+
+        if get_ftype(solver) in ("f","h")
             @trace(get_logger(solver),"Step accepted with type $(get_ftype(solver))")
             break
         end
