@@ -1,7 +1,10 @@
 # TODO(@anton): All of these could probably be made more efficient via custom kernels.
 #               For now I am just returning the mapreduce functionality here so MadNLPGPU works again.
 
-function get_varphi(obj_val, x_lr::VT, xl_r::VT, xu_r::VT, x_ur::VT, mu) where {VT <: AbstractGPUVector}
+const AbstractGPUVectorOrSubVector{T,VT<:AbstractGPUVector{T}} = Union{AbstractGPUVector{T}, SubVector{T, VT}}
+
+function get_varphi(obj_val, x_lr::VT, xl_r::VT, xu_r::VT, x_ur::VT, mu)
+    where {T, VT <: AbstractGPUVectorOrSubVector{T}}
     return obj_val + mapreduce(
         (x1,x2) -> _get_varphi(x1,x2,mu), +, x_lr, xl_r
     ) + mapreduce(
@@ -9,12 +12,12 @@ function get_varphi(obj_val, x_lr::VT, xl_r::VT, xu_r::VT, x_ur::VT, mu) where {
     )
 end
 
-function get_inf_du(f::VT, zl::VT, zu::VT, jacl::VT, sd) where {VT <: AbstractGPUVector}
+function get_inf_du(f::VT, zl::VT, zu::VT, jacl::VT, sd) where {VT <: AbstractGPUVectorOrSubVector}
     return mapreduce((f,zl,zu,jacl) -> abs(f-zl+zu+jacl), max, f, zl, zu, jacl; init = zero(eltype(f))) / sd
 end
 
 
-function get_inf_compl(x_lr::VT, xl_r::VT, zl_r::VT, xu_r::VT, x_ur::VT, zu_r::VT, mu, sc) where {VT <: AbstractGPUVector}
+function get_inf_compl(x_lr::VT, xl_r::VT, zl_r::VT, xu_r::VT, x_ur::VT, zu_r::VT, mu, sc) where {VT <: AbstractGPUVectorOrSubVector}
     return max(
         mapreduce(
             (x_lr, xl_r, zl_r) -> abs((x_lr-xl_r)*zl_r-mu),
@@ -31,19 +34,19 @@ function get_inf_compl(x_lr::VT, xl_r::VT, zl_r::VT, xu_r::VT, x_ur::VT, zu_r::V
     ) / sc
 end
 
-function get_min_complementarity(x_lr::AbstractGPUVector{T}, xl_r::AbstractGPUVector{T}, zl_r::AbstractGPUVector{T},
-                                 x_ur::AbstractGPUVector{T}, xu_r::AbstractGPUVector{T}, zu_r::AbstractGPUVector{T}) where T
+function get_min_complementarity(x_lr::AbstractGPUVectorOrSubVector{T}, xl_r::AbstractGPUVectorOrSubVector{T}, zl_r::AbstractGPUVectorOrSubVector{T},
+                                 x_ur::AbstractGPUVectorOrSubVector{T}, xu_r::AbstractGPUVectorOrSubVector{T}, zu_r::AbstractGPUVectorOrSubVector{T}) where T
     cc_lb = mapreduce((x_l, xl, zl) -> (x_l-xl)*zl, min, x_lr, xl_r, zl_r, init=T(Inf))
     cc_ub = mapreduce((x_u, xu, zu) -> (xu-x_u)*zu, min, x_ur, xu_r, zu_r, init=T(Inf))
     return min(cc_lb,cc_ub)
 end
 
 function get_varphi_d(
-    f::AbstractGPUVector{T},
-    x::AbstractGPUVector{T},
-    xl::AbstractGPUVector{T},
-    xu::AbstractGPUVector{T},
-    dx::AbstractGPUVector{T},
+    f::AbstractGPUVectorOrSubVector{T},
+    x::AbstractGPUVectorOrSubVector{T},
+    xl::AbstractGPUVectorOrSubVector{T},
+    xu::AbstractGPUVectorOrSubVector{T},
+    dx::AbstractGPUVectorOrSubVector{T},
     mu,
 ) where T
     return mapreduce(
@@ -55,10 +58,10 @@ function get_varphi_d(
 end
 
 function get_alpha_max(
-    x::AbstractGPUVector{T},
-    xl::AbstractGPUVector{T},
-    xu::AbstractGPUVector{T},
-    dx::AbstractGPUVector{T},
+    x::AbstractGPUVectorOrSubVector{T},
+    xl::AbstractGPUVectorOrSubVector{T},
+    xu::AbstractGPUVectorOrSubVector{T},
+    dx::AbstractGPUVectorOrSubVector{T},
     tau,
 ) where T
     return min(
@@ -79,10 +82,10 @@ function get_alpha_max(
 end
 
 function get_alpha_z(
-    zl_r::AbstractGPUVector{T},
-    zu_r::AbstractGPUVector{T},
-    dzl::AbstractGPUVector{T},
-    dzu::AbstractGPUVector{T},
+    zl_r::AbstractGPUVectorOrSubVector{T},
+    zu_r::AbstractGPUVectorOrSubVector{T},
+    dzl::AbstractGPUVectorOrSubVector{T},
+    dzu::AbstractGPUVectorOrSubVector{T},
     tau,
 )  where T
     return min(
@@ -102,11 +105,11 @@ function get_alpha_z(
 end
 
 function get_obj_val_R(
-    p::AbstractGPUVector{T},
-    n::AbstractGPUVector{T},
-    D_R::AbstractGPUVector{T},
-    x::AbstractGPUVector{T},
-    x_ref::AbstractGPUVector{T},
+    p::AbstractGPUVectorOrSubVector{T},
+    n::AbstractGPUVectorOrSubVector{T},
+    D_R::AbstractGPUVectorOrSubVector{T},
+    x::AbstractGPUVectorOrSubVector{T},
+    x_ref::AbstractGPUVectorOrSubVector{T},
     rho,
     zeta,
 ) where T
@@ -119,9 +122,9 @@ function get_obj_val_R(
 end
 
 function get_theta_R(
-    c::AbstractGPUVector{T},
-    p::AbstractGPUVector{T},
-    n::AbstractGPUVector{T},
+    c::AbstractGPUVectorOrSubVector{T},
+    p::AbstractGPUVectorOrSubVector{T},
+    n::AbstractGPUVectorOrSubVector{T},
 ) where T
     return mapreduce(
         (c,p,n) -> abs(c-p+n),
@@ -132,9 +135,9 @@ function get_theta_R(
 end
 
 function get_inf_pr_R(
-    c::AbstractGPUVector{T},
-    p::AbstractGPUVector{T},
-    n::AbstractGPUVector{T},
+    c::AbstractGPUVectorOrSubVector{T},
+    p::AbstractGPUVectorOrSubVector{T},
+    n::AbstractGPUVectorOrSubVector{T},
 ) where T
     return mapreduce(
         (c,p,n) -> abs(c-p+n),
@@ -145,13 +148,13 @@ function get_inf_pr_R(
 end
 
 function get_inf_du_R(
-    f_R::AbstractGPUVector{T},
-    l::AbstractGPUVector{T},
-    zl::AbstractGPUVector{T},
-    zu::AbstractGPUVector{T},
-    jacl::AbstractGPUVector{T},
-    zp::AbstractGPUVector{T},
-    zn::AbstractGPUVector{T},
+    f_R::AbstractGPUVectorOrSubVector{T},
+    l::AbstractGPUVectorOrSubVector{T},
+    zl::AbstractGPUVectorOrSubVector{T},
+    zu::AbstractGPUVectorOrSubVector{T},
+    jacl::AbstractGPUVectorOrSubVector{T},
+    zp::AbstractGPUVectorOrSubVector{T},
+    zn::AbstractGPUVectorOrSubVector{T},
     rho,
     sd,
 )  where T
@@ -179,7 +182,7 @@ end
 
 
 function get_inf_compl_R(
-    x_lr::SubVector{T, VT, VI},
+    x_lr::AbstractGPUVectorOrSubVector{T},
     xl_r,
     zl_r,
     xu_r,
@@ -191,7 +194,7 @@ function get_inf_compl_R(
     zn,
     mu_R,
     sc
-) where {T, VT <: AbstractGPUVector{T}, VI}
+) where {T}
     return max(
         mapreduce(
             (x_lr, xl_r, zl_r) -> abs((x_lr-xl_r)*zl_r-mu_R),
@@ -221,14 +224,14 @@ function get_inf_compl_R(
 end
 
 function get_alpha_max_R(
-    x::AbstractGPUVector{T},
-    xl::AbstractGPUVector{T},
-    xu::AbstractGPUVector{T},
-    dx::AbstractGPUVector{T},
-    pp::AbstractGPUVector{T},
-    dpp::AbstractGPUVector{T},
-    nn::AbstractGPUVector{T},
-    dnn::AbstractGPUVector{T},
+    x::AbstractGPUVectorOrSubVector{T},
+    xl::AbstractGPUVectorOrSubVector{T},
+    xu::AbstractGPUVectorOrSubVector{T},
+    dx::AbstractGPUVectorOrSubVector{T},
+    pp::AbstractGPUVectorOrSubVector{T},
+    dpp::AbstractGPUVectorOrSubVector{T},
+    nn::AbstractGPUVectorOrSubVector{T},
+    dnn::AbstractGPUVectorOrSubVector{T},
     tau_R,
 ) where T
     return min(
@@ -268,7 +271,7 @@ function get_alpha_max_R(
 end
 
 function get_alpha_z_R(
-    zl_r::SubVector{T, VT, VI},
+    zl_r::AbstractGPUVectorOrSubVector{T},
     zu_r,
     dzl,
     dzu,
@@ -277,7 +280,7 @@ function get_alpha_z_R(
     zn,
     dzn,
     tau_R,
-) where {T, VT <: AbstractGPUVector{T}, VI}
+) where {T}
 
     f(d,z) = d < 0 ? -z*tau_R/d : T(Inf)
     return min(
@@ -310,14 +313,14 @@ end
 
 function get_varphi_R(
     obj_val,
-    x_lr::SubVector{T, VT, VI},
+    x_lr::AbstractGPUVectorOrSubVector{T},
     xl_r,
     xu_r,
     x_ur,
     pp,
     nn,
     mu_R,
-)  where {T, VT <: AbstractGPUVector{T}, VI}
+)  where {T}
     varphi_R = obj_val
     f1(x) = x < 0 ? T(Inf) : mu_R*log(x)
     function f2(x,y)
@@ -354,7 +357,7 @@ function get_varphi_R(
 end
 
 function get_F(
-    c::AbstractGPUVector{T},
+    c::AbstractGPUVectorOrSubVector{T},
     f,
     zl,
     zu,
@@ -395,15 +398,15 @@ function get_F(
 end
 
 function get_varphi_d_R(
-    f_R::AbstractGPUVector{T},
-    x::AbstractGPUVector{T},
-    xl::AbstractGPUVector{T},
-    xu::AbstractGPUVector{T},
-    dx::AbstractGPUVector{T},
-    pp::AbstractGPUVector{T},
-    nn::AbstractGPUVector{T},
-    dpp::AbstractGPUVector{T},
-    dnn::AbstractGPUVector{T},
+    f_R::AbstractGPUVectorOrSubVector{T},
+    x::AbstractGPUVectorOrSubVector{T},
+    xl::AbstractGPUVectorOrSubVector{T},
+    xu::AbstractGPUVectorOrSubVector{T},
+    dx::AbstractGPUVectorOrSubVector{T},
+    pp::AbstractGPUVectorOrSubVector{T},
+    nn::AbstractGPUVectorOrSubVector{T},
+    dpp::AbstractGPUVectorOrSubVector{T},
+    dnn::AbstractGPUVectorOrSubVector{T},
     mu_R,
     rho,
 ) where T
@@ -430,7 +433,7 @@ function get_varphi_d_R(
     )
 end
 
-function get_rel_search_norm(x::AbstractGPUVector{T}, dx::AbstractGPUVector{T}) where T
+function get_rel_search_norm(x::AbstractGPUVectorOrSubVector{T}, dx::AbstractGPUVectorOrSubVector{T}) where T
     return mapreduce(
         (x,dx) -> abs(dx) / (one(T) + abs(x)),
         max,
