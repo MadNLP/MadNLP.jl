@@ -710,8 +710,9 @@ function set_scaling!(
     grad_buffer = cb.grad_buffer
 
     # Set scaling
-    _eval_jac_wrapper!(cb, x0, cb.jac_buffer)
-    set_con_scale_sparse!(con_scale, cb.jac_I, cb.jac_buffer, nlp_scaling_max_gradient)
+    jac = similar(con_buffer, cb.nnzj)
+    _eval_jac_wrapper!(cb, x0, jac)
+    set_con_scale_sparse!(con_scale, cb.jac_I, jac, nlp_scaling_max_gradient)
     set_jac_scale_sparse!(jac_scale, con_scale, cb.jac_I)
 
     _eval_grad_f_wrapper!(cb, x0, grad_buffer)
