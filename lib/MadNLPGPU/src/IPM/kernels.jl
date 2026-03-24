@@ -3,8 +3,14 @@
 
 const AbstractGPUVectorOrSubVector{T,VT<:AbstractGPUVector{T}} = Union{AbstractGPUVector{T}, SubVector{T, VT}}
 
-function get_varphi(obj_val, x_lr::VT, xl_r::VT, xu_r::VT, x_ur::VT, mu)
-    where {T, VT <: AbstractGPUVectorOrSubVector{T}}
+function get_varphi(
+    obj_val,
+    x_lr::VT,
+    xl_r::VT,
+    xu_r::VT,
+    x_ur::VT,
+    mu
+) where {T, VT <: AbstractGPUVectorOrSubVector{T}}
     return obj_val + mapreduce(
         (x1,x2) -> _get_varphi(x1,x2,mu), +, x_lr, xl_r
     ) + mapreduce(
@@ -34,8 +40,14 @@ function get_inf_compl(x_lr::VT, xl_r::VT, zl_r::VT, xu_r::VT, x_ur::VT, zu_r::V
     ) / sc
 end
 
-function get_min_complementarity(x_lr::AbstractGPUVectorOrSubVector{T}, xl_r::AbstractGPUVectorOrSubVector{T}, zl_r::AbstractGPUVectorOrSubVector{T},
-                                 x_ur::AbstractGPUVectorOrSubVector{T}, xu_r::AbstractGPUVectorOrSubVector{T}, zu_r::AbstractGPUVectorOrSubVector{T}) where T
+function get_min_complementarity(
+    x_lr::AbstractGPUVectorOrSubVector{T},
+    xl_r::AbstractGPUVectorOrSubVector{T},
+    zl_r::AbstractGPUVectorOrSubVector{T},
+    x_ur::AbstractGPUVectorOrSubVector{T},
+    xu_r::AbstractGPUVectorOrSubVector{T},
+    zu_r::AbstractGPUVectorOrSubVector{T}
+) where T
     cc_lb = mapreduce((x_l, xl, zl) -> (x_l-xl)*zl, min, x_lr, xl_r, zl_r, init=T(Inf))
     cc_ub = mapreduce((x_u, xu, zu) -> (xu-x_u)*zu, min, x_ur, xu_r, zu_r, init=T(Inf))
     return min(cc_lb,cc_ub)
