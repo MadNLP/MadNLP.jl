@@ -326,7 +326,7 @@ function get_min_complementarity(x_lr::AbstractVector{T}, xl_r::AbstractVector{T
     for ii in eachindex(x_lr)
         min_comp = min(min_comp, (x_lr[ii]-xl_r[ii])*zl_r[ii])
     end
-    for ii in eachindex(x_lr)
+    for ii in eachindex(xu_r)
         min_comp = min(min_comp, (xu_r[ii]-x_ur[ii])*zu_r[ii])
     end
     return min_comp
@@ -399,9 +399,9 @@ function get_obj_val_R(
 ) where T
     obj_val_R = zero(T)
     for ii in eachindex(p)
-        obj_val += rho*(p[ii]+n[ii]) .+ zeta/2*D_R[ii]^2*(x[ii]-x_ref[ii])^2
+        obj_val_R += rho*(p[ii]+n[ii]) .+ zeta/2*D_R[ii]^2*(x[ii]-x_ref[ii])^2
     end
-    return obj_val
+    return obj_val_R
 end
 
 @inline get_theta(c) = norm(c, 1)
@@ -423,11 +423,11 @@ function get_inf_pr_R(
     p::AbstractVector{T},
     n::AbstractVector{T},
 ) where T
-    theta_R = zero(T)
+    inf_pr_R = zero(T)
     for ii in eachindex(c)
-        theta_R = max(theta_R, abs(c[ii]-p[ii]+n[ii]))
+        inf_pr_R = max(inf_pr_R, abs(c[ii]-p[ii]+n[ii]))
     end
-    return theta_R
+    return inf_pr_R
 end
 
 function get_inf_du_R(
@@ -442,7 +442,7 @@ function get_inf_du_R(
     sd,
 ) where T
     inf_du_R = zero(T)
-    for ii in eachinex(f_R)
+    for ii in eachindex(f_R)
         inf_du_R = max(inf_du_R, abs(f_R[ii]-zl[ii]+zu[ii]+jacl[ii]))
     end
     for ii in eachindex(l)
@@ -496,7 +496,7 @@ function get_alpha_max_R(
     for ii in eachindex(x)
         candidate = if dx[ii] < 0
             (-x[ii]+xl[ii])*tau_R/dx[ii]
-        elseif dx > 0
+        elseif dx[ii] > 0
             (-x[ii]+xu[ii])*tau_R/dx[ii]
         else
             T(Inf)
@@ -504,10 +504,10 @@ function get_alpha_max_R(
         alpha_max_R = min(alpha_max_R, candidate)
     end
     for ii in eachindex(pp)
-        alpha_max_R = min(alpha_max_R, dpp[ii] < 0 ? -pp[ii]*tau_R/dpp[ii] : T(inf))
+        alpha_max_R = min(alpha_max_R, dpp[ii] < 0 ? -pp[ii]*tau_R/dpp[ii] : T(Inf))
     end
     for ii in eachindex(nn)
-        alpha_max_R = min(alpha_max_R, dnn[ii] < 0 ? -nn[ii]*tau_R/dnn[ii] : T(inf))
+        alpha_max_R = min(alpha_max_R, dnn[ii] < 0 ? -nn[ii]*tau_R/dnn[ii] : T(Inf))
     end
     return alpha_max_R
 end
@@ -524,7 +524,7 @@ function get_alpha_z_R(
     tau_R,
 ) where {T, VT <: AbstractVector{T}, VI}
     alpha_z_R = one(T)
-    f(d,z) = d < 0 ? -z*tau_R/d : T(Inf)
+    f(d,z) = d < 0.0 ? -z*tau_R/d : T(Inf)
     for ii in eachindex(dzl)
         alpha_z_R = min(alpha_z_R, f(dzl[ii], zl_r[ii]))
     end
@@ -551,10 +551,10 @@ function get_varphi_R(
     mu_R,
 )  where {T, VT <: AbstractVector{T}, VI}
     varphi_R = obj_val
-    f1(x) = x < 0 ? T(Inf) : mu_R*log(x)
+    f1(x) = x < 0.0 ? T(Inf) : mu_R*log(x)
     function f2(x,y)
         d = x - y
-        d < 0 ? T(Inf) : mu_R * log(d)
+        d < 0.0 ? T(Inf) : mu_R * log(d)
     end
     for ii in eachindex(x_lr)
         varphi_R -= f2(x_lr[ii], xl_r[ii])
@@ -563,10 +563,10 @@ function get_varphi_R(
         varphi_R -= f2(xu_r[ii], x_ur[ii])
     end
     for ii in eachindex(pp)
-        varphi_R -= f1(pp)
+        varphi_R -= f1(pp[ii])
     end
     for ii in eachindex(nn)
-        varphi_R -= f1(nn)
+        varphi_R -= f1(nn[ii])
     end
     return varphi_R
 end
