@@ -36,6 +36,7 @@ include("utils.jl")
 include("KKT/gpu_dense.jl")
 include("KKT/gpu_sparse.jl")
 include("KKT/gpu_qn.jl")
+include("IPM/kernels.jl")
 
 global LapackCUDASolver
 global CUDSSSolver
