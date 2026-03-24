@@ -25,7 +25,7 @@ import MadNLP:
     _get_varphi, get_varphi, get_inf_du, get_inf_compl, get_min_complementarity,
     get_varphi_d, get_alpha_max, get_alpha_z, get_obj_val_R, get_theta_R, get_inf_pr_R,
     get_inf_du_R, get_inf_compl_R, get_alpha_max_R, get_alpha_z_R, get_varphi_R, get_F,
-    get_varphi_d_R, get_rel_search_norm
+    get_varphi_d_R, get_rel_search_norm, SubVector
 # AMD and Metis
 import AMD, Metis
 
