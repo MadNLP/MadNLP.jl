@@ -524,18 +524,17 @@ function get_alpha_z_R(
     tau_R,
 ) where {T, VT <: AbstractVector{T}, VI}
     alpha_z_R = one(T)
-    f(d,z) = d < 0.0 ? -z*tau_R/d : T(Inf)
     for ii in eachindex(dzl)
-        alpha_z_R = min(alpha_z_R, f(dzl[ii], zl_r[ii]))
+        alpha_z_R = min(alpha_z_R, dzl[ii] < 0.0 ? -zl_r[ii]*tau_R/dzl[ii] : T(Inf))
     end
     for ii in eachindex(dzu)
-        alpha_z_R = min(alpha_z_R, f(dzu[ii], zu_r[ii]))
+        alpha_z_R = min(alpha_z_R, dzu[ii] < 0.0 ? -zu_r[ii]*tau_R/dzu[ii] : T(Inf))
     end
     for ii in eachindex(dzp)
-        alpha_z_R = min(alpha_z_R, f(dzp[ii], zp[ii]))
+        alpha_z_R = min(alpha_z_R, dzp[ii] < 0.0 ? -zp[ii]*tau_R/dzp[ii] : T(Inf))
     end
     for ii in eachindex(dzn)
-        alpha_z_R = min(alpha_z_R, f(dzn[ii], zn[ii]))
+        alpha_z_R = min(alpha_z_R, dzn[ii] < 0.0 ? -zn[ii]*tau_R/dzn[ii] : T(Inf))
     end
     return alpha_z_R
 end
@@ -551,22 +550,19 @@ function get_varphi_R(
     mu_R,
 )  where {T, VT <: AbstractVector{T}, VI}
     varphi_R = obj_val
-    f1(x) = x < 0.0 ? T(Inf) : mu_R*log(x)
-    function f2(x,y)
-        d = x - y
-        d < 0.0 ? T(Inf) : mu_R * log(d)
-    end
     for ii in eachindex(x_lr)
-        varphi_R -= f2(x_lr[ii], xl_r[ii])
+        d = x_lr[ii] - xl_r[ii]
+        varphi_R -= d < 0.0 ? T(Inf) : mu_R * log(d)
     end
     for ii in eachindex(xu_r)
-        varphi_R -= f2(xu_r[ii], x_ur[ii])
+        d = xu_r[ii] - x_ur[ii]
+        varphi_R -= d < 0.0 ? T(Inf) : mu_R * log(d)
     end
     for ii in eachindex(pp)
-        varphi_R -= f1(pp[ii])
+        varphi_R -= pp[ii] < 0.0 ? T(Inf) : mu_R*log(pp[ii])
     end
     for ii in eachindex(nn)
-        varphi_R -= f1(nn[ii])
+        varphi_R -= nn[ii] < 0.0 ? T(Inf) : mu_R*log(nn[ii])
     end
     return varphi_R
 end
@@ -624,16 +620,15 @@ function get_varphi_d_R(
     mu_R,
     rho,
 ) where T
-    f(x,dx) = (rho - mu_R/x) * dx
     varphi_d = zero(T)
     for ii in eachindex(f_R)
         varphi_d += (f_R[ii] - mu_R/(x[ii]-xl[ii]) + mu_R/(xu[ii]-x[ii])) * dx[ii]
     end
     for ii in eachindex(pp)
-        varphi_d += f(pp[ii],dpp[ii])
+        varphi_d += (rho - mu_R/pp[ii]) * dpp[ii]
     end
     for ii in eachindex(nn)
-        varphi_d += f(nn[ii],dnn[ii])
+        varphi_d += (rho - mu_R/nn[ii]) * dnn[ii]
     end
     return varphi_d
 end
