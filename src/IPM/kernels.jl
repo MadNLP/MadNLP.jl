@@ -348,7 +348,7 @@ function get_varphi_d(
     mu,
 ) where T
     varphi_d = zero(T)
-    @simd for ii in eachindex(f)
+    for ii in eachindex(f)
         varphi_d += (f[ii] - mu/(x[ii]-xl[ii]) + mu/(xu[ii]-x[ii])) * dx[ii]
     end
     return varphi_d
