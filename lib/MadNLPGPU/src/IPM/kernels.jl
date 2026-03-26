@@ -453,6 +453,6 @@ function get_rel_search_norm(x::AbstractGPUVectorOrSubVector{T}, dx::AbstractGPU
     )
 end
 
-function populate_RR_nn!(nn, c, mu, rho)
+function populate_RR_nn!(nn::AbstractGPUVectorOrSubVector{T}, c::AbstractGPUVectorOrSubVector{T}, mu, rho) where T
     map!((c) -> (mu - rho*c)/(2*rho)+sqrt(((mu-rho*c)/(2*rho))^2 + mu*c/(2*rho)))
 end
