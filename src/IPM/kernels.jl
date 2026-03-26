@@ -399,7 +399,10 @@ function get_obj_val_R(
 ) where T
     obj_val_R = zero(T)
     for ii in eachindex(p)
-        obj_val_R += rho*(p[ii]+n[ii]) .+ zeta/2*D_R[ii]^2*(x[ii]-x_ref[ii])^2
+        obj_val_R += rho*(p[ii]+n[ii])
+    end
+    for ii in eachindex(x)
+        obj_val_R += zeta/2*D_R[ii]^2*(x[ii]-x_ref[ii])^2
     end
     return obj_val_R
 end
