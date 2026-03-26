@@ -126,11 +126,17 @@ function get_obj_val_R(
     zeta,
 ) where T
     return mapreduce(
-        (p,n,D_R,x,x_ref) -> rho*(p+n) .+ zeta/2*D_R^2*(x-x_ref)^2,
+        (p,n) -> rho*(p+n),
         +,
-        p,n,D_R,x,x_ref;
+        p,n;
         init = zero(T)
-    )
+    ) +
+        mapreduce(
+            (D_R,x,x_ref) -> zeta/2*D_R^2*(x-x_ref)^2,
+            +,
+            D_R,x,x_ref;
+            init = zero(T)
+        )
 end
 
 function get_theta_R(
