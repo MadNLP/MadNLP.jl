@@ -820,3 +820,8 @@ function dual_inf_perturbation!(px, ind_llb, ind_uub, mu, kappa_d)
     end
 end
 
+function populate_RR_nn!(nn, c, mu, rho)
+    for ii in eachindex(nn)
+        nn[ii] = (mu - rho*c[ii])/(2*rho)+ sqrt(((mu-rho*c[ii])/(2*rho))^2 + mu*c[ii]/(2*rho))
+    end
+end
