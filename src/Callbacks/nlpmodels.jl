@@ -519,8 +519,6 @@ function create_callback(
     x0 = similar(get_x0(nlp))
     con_buffer = similar(x0, m)
     fill!(con_buffer, zero(T))
-    jac_buffer = similar(x0, m, n)
-    fill!(jac_buffer, zero(T))
     grad_buffer = similar(x0, n)
     fill!(grad_buffer, zero(T))
     obj_scale = Ref(one(T))

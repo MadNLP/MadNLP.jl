@@ -86,8 +86,13 @@ function get_vars_info(solver)
     num_var = get_nvar(nlp) - num_fixed
     num_llb_vars = length(solver.ind_llb)
 
-    # TODO make this non-allocating
-    num_lu_vars = sum((x_lb .!=-Inf) .& (x_ub .!= Inf)) - num_fixed
+    num_lu_vars = 0
+    for ii in eachindex(x_lb)
+        if (x_lb !=-Inf) && (x_ub != Inf)
+            num_lu_vars += 1
+        end
+    end
+    num_lu_vars = num_lu_vars - num_fixed
     num_uub_vars = length(solver.ind_uub)
     return (
         n_free=num_var,
@@ -104,11 +109,17 @@ function get_cons_info(solver)
     g_lb = get_lcon(nlp)
     g_ub = get_ucon(nlp)
 
-    # TODO make this non-allocating
-    num_eq_cons = sum(g_lb .== g_ub)
-    num_ineq_cons = length(g_lb) - num_eq_cons
-    num_le_cons = sum((g_lb .!= -Inf) .& (g_ub .==  Inf))
-    num_ue_cons = sum((g_ub .!=  Inf) .& (g_lb .== -Inf))
+    num_eq_cons = length(solver.cb.ind_eq)
+    num_ineq_cons = length(solver.cb.ind_ineq)
+    num_le_cons = 0
+    num_ue_cons = 0
+    for ii in eachindex(g_lb)
+        if (g_lb != -Inf) && (g_ub ==  Inf)
+            num_le_cons += 1
+        elseif (g_ub !=  Inf) && (g_lb == -Inf)
+            num_ue_cons += 1
+        end
+    end
     num_lu_cons = num_ineq_cons - num_le_cons - num_ue_cons
 
     return (

@@ -100,7 +100,7 @@ mutable struct MadNLPSolver{
     filter::Vector{Tuple{T,T}}
 
     inertia_corrector::IC
-    RR::Union{Nothing,RobustRestorer{T}}
+    RR::Union{Nothing,RobustRestorer{T,VT}}
     intermediate_callback::ICB
     status::Status
     output::Dict
