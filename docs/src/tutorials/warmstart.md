@@ -79,13 +79,15 @@ results_new = madnlp(nlp)
 nothing
 
 ```
-By decreasing the initial barrier parameter, we can reduce the total number
+By decreasing the initial barrier parameter , we can reduce the total number
 of iterations to 5:
 ```@example warmstart
-results_new = madnlp(nlp; mu_init=1e-7)
+results_new = madnlp(nlp; barrier=MadNLP.MonotoneUpdate(; mu_init=1e-7))
 nothing
 
 ```
+The struct [`MonotoneUpdate`](@ref) implements the barrier strategy used by default in MadNLP,
+and has an explicit attribute `mu_init` to define the initial barrier parameter.
 
 The solution with the new parameters is slightly different from the former one:
 ```@example warmstart
@@ -153,7 +155,7 @@ As before, it is advised to decrease the initial barrier parameter:
 if the initial point is close enough to the solution, this reduces drastically
 the total number of iterations. We solve the problem again using:
 ```@example warmstart
-MadNLP.solve!(solver; mu_init=1e-7)
+MadNLP.solve!(solver; barrier=MadNLP.MonotoneUpdate(; mu_init=1e-7)))
 nothing
 ```
 Three observations are in order:
