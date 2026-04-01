@@ -55,7 +55,7 @@ We solve the problem starting from this point using the function [`madnlp`](@ref
 results = madnlp(nlp)
 nothing
 ```
-MadNLP converges in 19 barrier iterations.  The solution is:
+MadNLP converges in a bit less than 20 barrier iterations.  The solution is:
 ```@example warmstart
 println("Objective: ", results.objective)
 println("Solution:  ", results.solution)
@@ -155,7 +155,7 @@ As before, it is advised to decrease the initial barrier parameter:
 if the initial point is close enough to the solution, this reduces drastically
 the total number of iterations. We solve the problem again using:
 ```@example warmstart
-MadNLP.solve!(solver; barrier=MadNLP.MonotoneUpdate(; mu_init=1e-7)))
+MadNLP.solve!(solver; barrier=MadNLP.MonotoneUpdate(; mu_init=1e-7))
 nothing
 ```
 Three observations are in order:
