@@ -33,41 +33,14 @@ include("KKT/gpu_dense.jl")
 include("KKT/gpu_sparse.jl")
 include("KKT/gpu_qn.jl")
 
-# GPU solver types are provided by backend extensions (CUDA, ROCm).
-# We store them in typed Refs to avoid untyped globals (AOT-incompatible).
-const _LapackCUDASolver_type = Ref{Type}(Nothing)
-const _CUDSSSolver_type = Ref{Type}(Nothing)
-const _LapackROCmSolver_type = Ref{Type}(Nothing)
-
-"""
-    LapackCUDASolver(args...; kwargs...)
-Construct a CUDA-based Lapack solver (requires CUDA.jl to be loaded).
-"""
-function LapackCUDASolver(args...; kwargs...)
-    T = _LapackCUDASolver_type[]
-    T === Nothing && error("LapackCUDASolver requires CUDA.jl. Please run `using CUDA` first.")
-    return T(args...; kwargs...)
-end
-
-"""
-    CUDSSSolver(args...; kwargs...)
-Construct a CUDSS solver (requires CUDA.jl to be loaded).
-"""
-function CUDSSSolver(args...; kwargs...)
-    T = _CUDSSSolver_type[]
-    T === Nothing && error("CUDSSSolver requires CUDA.jl. Please run `using CUDA` first.")
-    return T(args...; kwargs...)
-end
-
-"""
-    LapackROCmSolver(args...; kwargs...)
-Construct an ROCm-based Lapack solver (requires AMDGPU.jl to be loaded).
-"""
-function LapackROCmSolver(args...; kwargs...)
-    T = _LapackROCmSolver_type[]
-    T === Nothing && error("LapackROCmSolver requires AMDGPU.jl. Please run `using AMDGPU` first.")
-    return T(args...; kwargs...)
-end
+# GPU solver placeholder types. These are abstract types defined here
+# so they can be referenced as `linear_solver=LapackCUDASolver` in the
+# options system, and support dispatch via `is_supported`, `input_type`,
+# `default_options`, etc. Backend extensions (CUDA, ROCm) define concrete
+# subtypes with the actual implementations.
+abstract type LapackCUDASolver{T, MT, Alg} <: MadNLP.AbstractLapackSolver{T, Alg} end
+abstract type CUDSSSolver{T, V} <: MadNLP.AbstractLinearSolver{T} end
+abstract type LapackROCmSolver{T, MT, Alg} <: MadNLP.AbstractLapackSolver{T, Alg} end
 
 export LapackCUDASolver, CUDSSSolver, LapackROCmSolver
 
