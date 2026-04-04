@@ -117,18 +117,29 @@ barrier                        | [`MonotoneUpdate`](@ref) | algorithm to update 
 tau\\_min                      | 0.99                 | lower bound on fraction-to-the-boundary parameter tau
 ||
 """
-@kwdef mutable struct MadNLPOptions{T} <: AbstractOptions
+@kwdef mutable struct MadNLPOptions{
+    T,
+    CB,     # callback type
+    KKT,    # KKT system type
+    LS,     # linear solver type
+    IT,     # iterator type
+    FVT,    # fixed variable treatment type
+    ET,     # equality treatment type
+    HA,     # hessian approximation type
+    ICM,    # inertia correction method type
+    DIM,    # dual initialization method type
+} <: AbstractOptions
     # Primary options
     tol::T
-    callback::Type
-    kkt_system::Type
-    linear_solver::Type
+    callback::Type{CB}
+    kkt_system::Type{KKT}
+    linear_solver::Type{LS}
 
     # General options
     rethrow_error::Bool = true
     disable_garbage_collector::Bool = false
     blas_num_threads::Int = 1
-    iterator::Type = RichardsonIterator
+    iterator::Type{IT} = RichardsonIterator
     intermediate_callback::AbstractUserCallback = NoUserCallback()
 
     # Output options
@@ -146,21 +157,21 @@ tau\\_min                      | 0.99                 | lower bound on fraction-
 
     # NLP options
     kappa_d::T = 1e-5
-    fixed_variable_treatment::Type = kkt_system <: MadNLP.SparseCondensedKKTSystem ? MadNLP.RelaxBound : MadNLP.MakeParameter
-    equality_treatment::Type = kkt_system <: MadNLP.SparseCondensedKKTSystem ? MadNLP.RelaxEquality : MadNLP.EnforceEquality
+    fixed_variable_treatment::Type{FVT} = kkt_system <: MadNLP.SparseCondensedKKTSystem ? MadNLP.RelaxBound : MadNLP.MakeParameter
+    equality_treatment::Type{ET} = kkt_system <: MadNLP.SparseCondensedKKTSystem ? MadNLP.RelaxEquality : MadNLP.EnforceEquality
     bound_relax_factor::T = 1e-8
     jacobian_constant::Bool = false
     hessian_constant::Bool = false
-    hessian_approximation::Type = ExactHessian
+    hessian_approximation::Type{HA} = ExactHessian
     quasi_newton_options::QuasiNewtonOptions{T} = QuasiNewtonOptions{T}()
-    inertia_correction_method::Type = InertiaAuto
+    inertia_correction_method::Type{ICM} = InertiaAuto
     inertia_free_tol::T = 0.
     default_primal_regularization::T = 0.
     default_dual_regularization::T = 0.
 
     # initialization options
     dual_initialized::Bool = false
-    dual_initialization_method::Type = kkt_system <: MadNLP.SparseCondensedKKTSystem ? DualInitializeSetZero : DualInitializeLeastSquares
+    dual_initialization_method::Type{DIM} = kkt_system <: MadNLP.SparseCondensedKKTSystem ? DualInitializeSetZero : DualInitializeLeastSquares
     constr_mult_init_max::T = 1e3
     bound_push::T = 1e-2
     bound_fac::T = 1e-2
@@ -192,7 +203,7 @@ tau\\_min                      | 0.99                 | lower bound on fraction-
     kappa_soc::T = 0.99
     gamma_theta::T = 1e-5
     gamma_phi::T = 1e-5
-    delta::T = 1
+    delta::T = 1.
     kappa_sigma::T = 1e10
     barrier_tol_factor::T = 10.
     rho::T = 1000.
@@ -206,19 +217,35 @@ end
 is_dense_callback(nlp) = !nlp.meta.sparse_jacobian && !nlp.meta.sparse_hessian
 
 # smart option presets
-function MadNLPOptions{T}(
+function MadNLPOptions(
     nlp::AbstractNLPModel{T};
     dense_callback = MadNLP.is_dense_callback(nlp),
     callback = dense_callback ? DenseCallback : SparseCallback,
     kkt_system = dense_callback ? DenseCondensedKKTSystem : SparseKKTSystem,
     linear_solver = dense_callback ? LapackCPUSolver : default_sparse_solver(nlp),
-    tol = get_tolerance(T,kkt_system)
+    tol = get_tolerance(T,kkt_system),
+    iterator = RichardsonIterator,
+    fixed_variable_treatment = kkt_system <: MadNLP.SparseCondensedKKTSystem ? MadNLP.RelaxBound : MadNLP.MakeParameter,
+    equality_treatment = kkt_system <: MadNLP.SparseCondensedKKTSystem ? MadNLP.RelaxEquality : MadNLP.EnforceEquality,
+    hessian_approximation = ExactHessian,
+    inertia_correction_method = InertiaAuto,
+    dual_initialization_method = kkt_system <: MadNLP.SparseCondensedKKTSystem ? DualInitializeSetZero : DualInitializeLeastSquares,
 ) where {T}
-    return MadNLPOptions{T}(
+    return MadNLPOptions(
         tol = tol,
         callback = callback,
         kkt_system = kkt_system,
         linear_solver = linear_solver,
+        iterator = iterator,
+        fixed_variable_treatment = fixed_variable_treatment,
+        equality_treatment = equality_treatment,
+        hessian_approximation = hessian_approximation,
+        inertia_correction_method = inertia_correction_method,
+        dual_initialization_method = dual_initialization_method,
+        # Explicit T-dependent defaults (T can't be inferred by @kwdef
+        # until tol is known, but these defaults need T at evaluation time)
+        quasi_newton_options = QuasiNewtonOptions{T}(),
+        barrier = MonotoneUpdate(T(tol), T(10.)),
     )
 end
 
@@ -247,27 +274,35 @@ function print_ignored_options(logger,option_dict)
     end
 end
 
-function _get_primary_options(options)
-    primary_opt = Dict{Symbol,Any}()
-    remaining_opt = Dict{Symbol,Any}()
+# Type-valued option keys in MadNLPOptions. These must be set at construction
+# time because they are encoded as type parameters (for AOT trim-safety).
+const _TYPE_OPTION_KEYS = Set([
+    :callback, :kkt_system, :linear_solver, :iterator,
+    :fixed_variable_treatment, :equality_treatment,
+    :hessian_approximation, :inertia_correction_method,
+    :dual_initialization_method,
+])
+
+function _split_options(options)
+    type_opt = Dict{Symbol,Any}()
+    scalar_opt = Dict{Symbol,Any}()
     for (k,v) in options
-        if k in [:tol, :linear_solver, :callback, :kkt_system]
-            primary_opt[k] = v
+        if k in _TYPE_OPTION_KEYS || k == :tol
+            type_opt[k] = v
         else
-            remaining_opt[k] = v
+            scalar_opt[k] = v
         end
     end
-
-    return primary_opt, remaining_opt
+    return type_opt, scalar_opt
 end
 
 function load_options(nlp::AbstractNLPModel{T,VT}; options...) where {T, VT}
 
-    primary_opt, options = _get_primary_options(options)
+    type_opt, scalar_opt = _split_options(options)
 
-    # Initiate interior-point options
-    opt_ipm = MadNLPOptions{T}(nlp; primary_opt...)
-    linear_solver_options = set_options!(opt_ipm, options)
+    # Initiate interior-point options (all Type fields set at construction)
+    opt_ipm = MadNLPOptions(nlp; type_opt...)
+    linear_solver_options = set_options!(opt_ipm, scalar_opt)
 
     check_option_sanity(opt_ipm)
     # Initiate linear-solver options
