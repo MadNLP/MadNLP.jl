@@ -1,4 +1,4 @@
-mutable struct LapackROCmSolver{T, MT, Alg} <: MadNLP.AbstractLapackSolver{T, Alg}
+mutable struct LapackROCmSolverImpl{T, MT, Alg} <: MadNLPGPU.LapackROCmSolver{T, MT, Alg}
     A::MT
     fact::ROCMatrix{T}
     n::Int64
@@ -11,31 +11,31 @@ mutable struct LapackROCmSolver{T, MT, Alg} <: MadNLP.AbstractLapackSolver{T, Al
     beta::Base.RefValue{T}
     opt::MadNLP.LapackOptions
     logger::MadNLP.MadNLPLogger
+end
 
-    function LapackROCmSolver(
-        A::MT;
-        option_dict::Dict{Symbol,Any} = Dict{Symbol,Any}(),
-        opt = MadNLP.LapackOptions(),
-        logger = MadNLP.MadNLPLogger(),
-        kwargs...,
-    ) where {MT<:AbstractMatrix}
-        MadNLP.set_options!(opt, option_dict, kwargs...)
-        T = eltype(A)
-        m,n = size(A)
-        @assert m == n
-        fact = ROCMatrix{T}(undef, m, n)
-        sol = ROCVector{T}(undef, 0)
-        tau = ROCVector{T}(undef, 0)
-        Λ = ROCVector{T}(undef, 0)
-        info = ROCVector{Cint}(undef, 1)
-        ipiv = ROCVector{Int64}(undef, 0)
-        alpha = Ref{T}(1)
-        beta = Ref{T}(0)
-        alg = opt.lapack_algorithm
-        solver = new{T, MT, alg}(A, fact, n, sol, tau, Λ, info, ipiv, alpha, beta, opt, logger)
-        MadNLP.setup!(solver)
-        return solver
-    end
+function MadNLPGPU.LapackROCmSolver(
+    A::MT;
+    option_dict::Dict{Symbol,Any} = Dict{Symbol,Any}(),
+    opt = MadNLP.LapackOptions(),
+    logger = MadNLP.MadNLPLogger(),
+    kwargs...,
+) where {MT<:AbstractMatrix}
+    MadNLP.set_options!(opt, option_dict, kwargs...)
+    T = eltype(A)
+    m,n = size(A)
+    @assert m == n
+    fact = ROCMatrix{T}(undef, m, n)
+    sol = ROCVector{T}(undef, 0)
+    tau = ROCVector{T}(undef, 0)
+    Λ = ROCVector{T}(undef, 0)
+    info = ROCVector{Cint}(undef, 1)
+    ipiv = ROCVector{Int64}(undef, 0)
+    alpha = Ref{T}(1)
+    beta = Ref{T}(0)
+    alg = opt.lapack_algorithm
+    solver = LapackROCmSolverImpl{T, MT, alg}(A, fact, n, sol, tau, Λ, info, ipiv, alpha, beta, opt, logger)
+    MadNLP.setup!(solver)
+    return solver
 end
 
 MadNLP.transfer_matrix!(M::LapackROCmSolver) = MadNLPGPU.gpu_transfer!(M.fact, M.A)

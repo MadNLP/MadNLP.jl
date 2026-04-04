@@ -1,6 +1,5 @@
 module MadNLP
 
-import Pkg.TOML: parsefile
 import Printf: @sprintf
 import LinearAlgebra: BLAS, LAPACK, Adjoint, Symmetric, Diagonal, mul!, ldiv!, rdiv!, lmul!, rmul!, norm, dot, diagind, normInf, transpose!, issuccess
 import LinearAlgebra: BlasReal, bunchkaufman, cholesky, qr, lu, bunchkaufman!, cholesky!, axpy!, LowerTriangular
@@ -18,9 +17,15 @@ export MadNLPSolver, MadNLPOptions, LDLSolver, LapackCPUSolver, MumpsSolver, Mad
 Base.USE_GPL_LIBS && export UmfpackSolver, CHOLMODSolver
 
 function __init__()
-    config = BLAS.lbt_get_config()
-    if !any(lib -> lib.interface == :lp64, config.loaded_libs)
-        BLAS.lbt_forward(OpenBLAS32_jll.libopenblas_path)
+    try
+        config = BLAS.lbt_get_config()
+        if !any(lib -> lib.interface == :lp64, config.loaded_libs)
+            BLAS.lbt_forward(OpenBLAS32_jll.libopenblas_path)
+        end
+    catch e
+        # In AOT-compiled binaries, JLL artifacts may not be available.
+        # BLAS should already be linked statically in that case.
+        @debug "BLAS lbt_forward skipped: $e"
     end
 end
 using PrecompileTools: @setup_workload, @compile_workload
@@ -42,6 +47,21 @@ include("precompile.jl")
 
 madsuite(::Val{:madnlp}, args...; kwargs...) = madnlp(args...; kwargs...)
 
-global Optimizer
+# The Optimizer type is provided by the MadNLPMOI extension.
+# We store it in a typed Ref to avoid untyped globals (AOT-incompatible).
+const _optimizer_type = Ref{Type}(Nothing)
+
+"""
+    Optimizer(args...; kwargs...)
+
+Create a MadNLP optimizer (requires MathOptInterface to be loaded).
+"""
+function Optimizer(args...; kwargs...)
+    T = _optimizer_type[]
+    if T === Nothing
+        error("MadNLP.Optimizer requires MathOptInterface. Please run `using MathOptInterface` first.")
+    end
+    return T(args...; kwargs...)
+end
 
 end # end module

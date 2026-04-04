@@ -33,12 +33,20 @@ include("KKT/gpu_dense.jl")
 include("KKT/gpu_sparse.jl")
 include("KKT/gpu_qn.jl")
 
-global LapackCUDASolver
-global CUDSSSolver
-global LapackROCmSolver
+# GPU solver placeholder types. These are abstract types defined here
+# so they can be referenced as `linear_solver=LapackCUDASolver` in the
+# options system, and support dispatch via `is_supported`, `input_type`,
+# `default_options`, etc. Backend extensions (CUDA, ROCm) define concrete
+# subtypes with the actual implementations.
+abstract type LapackCUDASolver{T, MT, Alg} <: MadNLP.AbstractLapackSolver{T, Alg} end
+abstract type CUDSSSolver{T, V} <: MadNLP.AbstractLinearSolver{T} end
+abstract type LapackROCmSolver{T, MT, Alg} <: MadNLP.AbstractLapackSolver{T, Alg} end
+
 export LapackCUDASolver, CUDSSSolver, LapackROCmSolver
 
-# re-export MadNLP, including deprecated names
+# Re-export all exported names from MadNLP.
+# Using a loop with @eval at module-definition time is AOT-safe since
+# it runs during precompilation, not at runtime.
 for name in names(MadNLP, all=true)
     if Base.isexported(MadNLP, name)
         @eval using MadNLP: $(name)
