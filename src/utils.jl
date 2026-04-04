@@ -26,42 +26,33 @@ get_file_level(logger::MadNLPLogger) = logger.file_print_level
 get_file(logger::MadNLPLogger) = logger.file
 finalize(logger::MadNLPLogger) = logger.file != nothing && close(logger.file)
 
-# Logging macros — explicitly defined for AOT compatibility.
-# Each macro checks the logger's print level before printing.
-
-macro trace(logger, str)
-    _make_log_expr(get_level, get_file_level, get_file, TRACE, 7, logger, str)
-end
-macro debug(logger, str)
-    _make_log_expr(get_level, get_file_level, get_file, DEBUG, 6, logger, str)
-end
-macro info(logger, str)
-    _make_log_expr(get_level, get_file_level, get_file, INFO, 256, logger, str)
-end
-macro notice(logger, str)
-    _make_log_expr(get_level, get_file_level, get_file, NOTICE, 256, logger, str)
-end
-macro warn(logger, str)
-    _make_log_expr(get_level, get_file_level, get_file, WARN, 5, logger, str)
-end
-macro error(logger, str)
-    _make_log_expr(get_level, get_file_level, get_file, ERROR, 9, logger, str)
-end
-
-function _make_log_expr(gl, gfl, gf, l, c, logger, str)
-    code = quote
-        if $gl($logger) <= $l
-            if $c == 256
-                println($str)
-            else
-                printstyled($str, "\n", color=$c)
+# Logging macros — generated via @eval at module-definition time.
+# This is AOT-safe (runs during precompilation, not at runtime).
+# Using @eval is required here because the macro names (debug, info, warn,
+# error) would conflict with Base's logging macros if defined directly.
+for (name,level,color) in [(:trace,TRACE,7),(:debug,DEBUG,6),(:info,INFO,256),(:notice,NOTICE,256),(:warn,WARN,5),(:error,ERROR,9)]
+    @eval begin
+        macro $name(logger,str)
+            gl = $get_level
+            gfl= $get_file_level
+            gf = $get_file
+            l = $level
+            c = $color
+            code = quote
+                if $gl($logger) <= $l
+                    if $c == 256
+                        println($str)
+                    else
+                        printstyled($str,"\n",color=$c)
+                    end
+                end
+                if $gf($logger) != nothing && $gfl($logger) <= $l
+                    println($gf($logger),$str)
+                end
             end
-        end
-        if $gf($logger) != nothing && $gfl($logger) <= $l
-            println($gf($logger), $str)
+            esc(code)
         end
     end
-    return esc(code)
 end
 
 # Two-arguments BLAS.scal! is not supported in Julia 1.6.

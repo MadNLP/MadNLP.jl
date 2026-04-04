@@ -37,4 +37,4 @@ deps/build.log
 benchmark/Project.toml
 benchmark/Manifest.toml
 benchmark/*.csv
-benchmark/*.pdf
+benchmark/*.pdfaot/madnlp_solve
