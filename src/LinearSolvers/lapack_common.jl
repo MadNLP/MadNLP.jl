@@ -84,9 +84,8 @@ improve!(M::AbstractLapackSolver) = false
 input_type(::Type{<:AbstractLapackSolver}) = :dense
 default_options(::Type{<:AbstractLapackSolver}) = LapackOptions()
 
-for T in (:Float32, :Float64)
-    @eval is_supported(::Type{<:AbstractLapackSolver}, ::Type{$T}) = true
-end
+is_supported(::Type{<:AbstractLapackSolver}, ::Type{Float32}) = true
+is_supported(::Type{<:AbstractLapackSolver}, ::Type{Float64}) = true
 
 is_inertia(::AbstractLapackSolver) = false
 is_inertia(::AbstractLapackSolver{T, CHOLESKY}) where {T} = true

@@ -1,6 +1,9 @@
 # Options
 
-parse_option(::Type{Module},str::String) = eval(Symbol(str))
+# NOTE: We intentionally do NOT support parse_option(::Type{Module}, ::String)
+# which previously used `eval(Symbol(str))`. That pattern is incompatible with
+# AOT compilation. Users must pass actual type objects (not strings) for options
+# like `linear_solver`, `kkt_system`, `callback`, etc.
 parse_option(::Type{<:AbstractUserCallback}, f::Any) = f
 parse_option(type::Type{T},i::Int64) where {T<:Enum} = type(i)
 

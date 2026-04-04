@@ -34,8 +34,8 @@ import .CUBLAS: handle, CUBLAS_DIAG_NON_UNIT,
     CUBLAS_FILL_MODE_LOWER, CUBLAS_FILL_MODE_UPPER, CUBLAS_SIDE_LEFT, CUBLAS_OP_N, CUBLAS_OP_T
 
 function __init__()
-    setglobal!(MadNLPGPU, :LapackCUDASolver, LapackCUDASolver)
-    setglobal!(MadNLPGPU, :CUDSSSolver, CUDSSSolver)
+    MadNLPGPU._LapackCUDASolver_type[] = LapackCUDASolver
+    MadNLPGPU._CUDSSSolver_type[] = CUDSSSolver
     return
 end
 
