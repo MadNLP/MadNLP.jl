@@ -140,7 +140,7 @@ function solve!(
     end
 
     # If the problem has no free variable, do nothing
-    if solver.n == 0
+    if get_n(solver) == 0
         update!(stats, solver)
         return stats
     end
@@ -246,20 +246,20 @@ function regular!(solver::AbstractMadNLPSolver{T}) where T
         time()-get_cnt(solver).start_time>=get_opt(solver).max_wall_time && return MAXIMUM_WALLTIME_EXCEEDED
 
         # evaluate Hessian
-        if (solver.cnt.k!=0 && !solver.opt.hessian_constant)
-            eval_lag_hess_wrapper!(solver, solver.kkt, solver.x, solver.y)
+        if (get_cnt(solver).k!=0 && !get_opt(solver).hessian_constant)
+            eval_lag_hess_wrapper!(solver, get_kkt(solver), get_x(solver), get_y(solver))
         end
 
         # update the barrier parameter
-        @trace(solver.logger,"Updating the barrier parameter.")
-        update_barrier!(solver.opt.barrier, solver, sc)
+        @trace(get_logger(solver),"Updating the barrier parameter.")
+        update_barrier!(get_opt(solver).barrier, solver, sc)
 
         # factorize the KKT system and solve Newton step
-        @trace(solver.logger,"Computing the Newton step.")
-        set_aug_diagonal!(solver.kkt,solver)
-        set_aug_rhs!(solver, solver.kkt, solver.c, solver.mu)
-        dual_inf_perturbation!(primal(solver.p),solver.ind_llb,solver.ind_uub,solver.mu,solver.opt.kappa_d)
-        inertia_correction!(solver.inertia_corrector, solver) || return ROBUST
+        @trace(get_logger(solver),"Computing the Newton step.")
+        set_aug_diagonal!(get_kkt(solver),solver)
+        set_aug_rhs!(solver, get_kkt(solver), get_c(solver), get_mu(solver))
+        dual_inf_perturbation!(primal(get_p(solver)),get_ind_llb(solver),get_ind_uub(solver),get_mu(solver),get_opt(solver).kappa_d)
+        inertia_correction!(get_inertia_corrector(solver), solver) || return ROBUST
 
         @trace(get_logger(solver),"Backtracking line search initiated.")
         status = filter_line_search!(solver)
@@ -440,26 +440,26 @@ function robust!(solver::AbstractMadNLPSolver{T}) where T
             get_x_lr(solver),get_xl_r(solver),get_zl_r(solver),get_xu_r(solver),get_x_ur(solver),get_zu_r(solver),RR.pp,RR.zp,RR.nn,RR.zn,zero(T),sc)
 
         print_iter(solver;is_resto=true)
-        !(solver.intermediate_callback(solver, UserCallbackRobust()) :: Bool) && return USER_REQUESTED_STOP
+        !(get_intermediate_callback(solver)(solver, UserCallbackRobust()) :: Bool) && return USER_REQUESTED_STOP
 
         max(RR.inf_pr_R,RR.inf_du_R,RR.inf_compl_R) <= get_opt(solver).tol && return INFEASIBLE_PROBLEM_DETECTED
         get_cnt(solver).k>=get_opt(solver).max_iter && return MAXIMUM_ITERATIONS_EXCEEDED
         time()-get_cnt(solver).start_time>=get_opt(solver).max_wall_time && return MAXIMUM_WALLTIME_EXCEEDED
 
         # update the barrier parameter
-        @trace(solver.logger,"Updating restoration phase barrier parameter.")
-        _update_monotone_RR!(solver.opt.barrier, solver, sc)
+        @trace(get_logger(solver),"Updating restoration phase barrier parameter.")
+        _update_monotone_RR!(get_opt(solver).barrier, solver, sc)
 
         # compute the Newton step
-        if !solver.opt.hessian_constant
-            eval_lag_hess_wrapper!(solver, solver.kkt, solver.x, solver.y; is_resto=true)
+        if !get_opt(solver).hessian_constant
+            eval_lag_hess_wrapper!(solver, get_kkt(solver), get_x(solver), get_y(solver); is_resto=true)
         end
 
         # without inertia correction,
         @trace(get_logger(solver),"Solving restoration phase primal-dual system.")
         set_aug_RR!(get_kkt(solver), solver, RR)
-        set_aug_rhs_RR!(solver, solver.kkt, RR, solver.opt.rho)
-        inertia_correction!(solver.inertia_corrector, solver) || return RESTORATION_FAILED
+        set_aug_rhs_RR!(solver, get_kkt(solver), RR, get_opt(solver).rho)
+        inertia_correction!(get_inertia_corrector(solver), solver) || return RESTORATION_FAILED
         finish_aug_solve_RR!(
             RR.dpp,RR.dnn,RR.dzp,RR.dzn,get_y(solver),dual(get_d(solver)),
             RR.pp,RR.nn,RR.zp,RR.zn,RR.mu_R,get_opt(solver).rho
@@ -648,7 +648,7 @@ function inertia_correction!(
                 return false
             end
         end
-        set_del_c!(should_regularize_dual(get_kkt(solver), num_pos, num_zero, num_neg) ? solver.opt.jacobian_regularization_value * get_mu(solver)^(get_opt(solver).jacobian_regularization_exponent) : zero(T))
+        set_del_c!(solver, should_regularize_dual(get_kkt(solver), num_pos, num_zero, num_neg) ? get_opt(solver).jacobian_regularization_value * get_mu(solver)^(get_opt(solver).jacobian_regularization_exponent) : zero(T))
         regularize_diagonal!(get_kkt(solver), get_del_w(solver) - del_w_prev, get_del_c(solver) - del_c_prev)
         del_w_prev = get_del_w(solver)
         del_c_prev = get_del_c(solver)

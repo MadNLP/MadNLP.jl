@@ -13,8 +13,8 @@ function solve_refine_wrapper!(d, solver, p, w)
         end
     end
     # Get number of iterations in Richardson's iterative refinement
-    iter_richardson = solver.cnt.ir
-    solver.cnt.backsolve_cnt += iter_richardson
+    iter_richardson = get_cnt(solver).ir
+    get_cnt(solver).backsolve_cnt += iter_richardson
     return result
 end
 
@@ -51,8 +51,8 @@ function solve_kkt!(kkt::ScaledSparseKKTSystem, w::AbstractKKTVector)
     fill!(r3, 0.0)
     fill!(r4, 0.0)
 
-    wzl = dual_lb(w)  # size nlb
-    wzu = dual_ub(w)  # size nub
+    wzl = dual_lb(w)  size nlb
+    wzu = dual_ub(w)  size nub
 
     r3[kkt.ind_lb] .= wzl
     r3[kkt.ind_ub] .*= sqrt.(kkt.u_diag)
@@ -60,12 +60,12 @@ function solve_kkt!(kkt::ScaledSparseKKTSystem, w::AbstractKKTVector)
     r4[kkt.ind_ub] .= wzu
     r4[kkt.ind_lb] .*= sqrt.(kkt.l_diag)
     r4[kkt.ind_ub] ./= sqrt.(kkt.u_diag)
-    # Build RHS
+    Build RHS
     w.xp .*= kkt.scaling_factor
     w.xp .+= (r3 .+ r4)
-    # Backsolve
+    Backsolve
     solve_linear_system!(kkt.linear_solver, primal_dual(w))
-    # Unpack solution
+    Unpack solution
     w.xp .*= kkt.scaling_factor
 
     wzl .= (wzl .- kkt.l_lower .* w.xp_lr) ./ kkt.l_diag
@@ -80,7 +80,7 @@ function solve_kkt!(
 
     qn = kkt.quasi_newton
     n, p = size(qn)
-    # Load buffers
+    Load buffers
     xr = qn._w2
     Tk = qn.Tk
     w_ = primal_dual(w)
@@ -89,7 +89,7 @@ function solve_kkt!(
     fill!(Tk, zero(T))
     reduce_rhs!(kkt, w)
 
-    # Resize arrays with correct dimension
+    Resize arrays with correct dimension
     if size(qn.E) != (nn, 2*p)
         qn.E = zeros(T, nn, 2*p)
         qn.H = zeros(T, nn, 2*p)
@@ -98,16 +98,16 @@ function solve_kkt!(
         fill!(qn.H, zero(T))
     end
 
-    # Solve LBFGS system with Sherman-Morrison-Woodbury formula
-    # (C + E P Eᵀ)⁻¹ = C⁻¹ - C⁻¹ E (P + Eᵀ C⁻¹ E) Eᵀ C⁻¹
-    #
-    # P = [ -Iₚ  0  ] (size 2p × 2p) and E = [ U  V ] (size (n+m) × 2p)
-    #     [  0   Iₚ ]                        [ 0  0 ]
+    Solve LBFGS system with Sherman-Morrison-Woodbury formula
+    (C + E P Eᵀ)⁻¹ = C⁻¹ - C⁻¹ E (P + Eᵀ C⁻¹ E) Eᵀ C⁻¹
+    
+    P = [ -Iₚ  0  ] (size 2p × 2p) and E = [ U  V ] (size (n+m) × 2p)
+        [  0   Iₚ ]                        [ 0  0 ]
 
-    # Solve linear system without low-rank part
-    solve_linear_system!(kkt.linear_solver, w_)  # w_ stores the solution of Cx = b
+    Solve linear system without low-rank part
+    solve_linear_system!(kkt.linear_solver, w_)  w_ stores the solution of Cx = b
 
-    # Add low-rank correction
+    Add low-rank correction
     if p > 0
         @inbounds for i in 1:n, j in 1:p
             qn.E[i, j] = qn.U[i, j]
@@ -115,24 +115,24 @@ function solve_kkt!(
         end
         copyto!(qn.H, qn.E)
 
-        solve_linear_system!(kkt.linear_solver, qn.H)  # H = C⁻¹ E
+        solve_linear_system!(kkt.linear_solver, qn.H)  H = C⁻¹ E
 
         for i = 1:p
-            Tk[i,i] = -one(T)                  # Tₖ = P
+            Tk[i,i] = -one(T)                  Tₖ = P
             Tk[i+p,i+p] = one(T)
         end
-        mul!(Tk, qn.E', qn.H, one(T), one(T))  # Tₖ = (P + Eᵀ C⁻¹ E)
-        mul!(xr, qn.E', w_)                    # xᵣ = Eᵀ C⁻¹ b
+        mul!(Tk, qn.E', qn.H, one(T), one(T))  Tₖ = (P + Eᵀ C⁻¹ E)
+        mul!(xr, qn.E', w_)                    xᵣ = Eᵀ C⁻¹ b
 
         if T <: BlasReal
-            F, ipiv, info = LAPACK.sytrf!('L', Tk)  # Tₖ⁻¹
-            LAPACK.sytrs!('L', F, ipiv, xr)         # xᵣ = (P + Eᵀ C⁻¹ E)⁻¹ Eᵀ C⁻¹ b
+            F, ipiv, info = LAPACK.sytrf!('L', Tk)  Tₖ⁻¹
+            LAPACK.sytrs!('L', F, ipiv, xr)         xᵣ = (P + Eᵀ C⁻¹ E)⁻¹ Eᵀ C⁻¹ b
         else
-            F = bunchkaufman!(Symmetric(Tk, :L))    # Tₖ⁻¹
-            ldiv!(F, xr)                            # xᵣ = (P + Eᵀ C⁻¹ E)⁻¹ Eᵀ C⁻¹ b
+            F = bunchkaufman!(Symmetric(Tk, :L))    Tₖ⁻¹
+            ldiv!(F, xr)                            xᵣ = (P + Eᵀ C⁻¹ E)⁻¹ Eᵀ C⁻¹ b
         end
 
-        mul!(w_, qn.H, xr, -one(T), one(T))    # x = x - C⁻¹ E xᵣ
+        mul!(w_, qn.H, xr, -one(T), one(T))    x = x - C⁻¹ E xᵣ
     end
 
     finish_aug_solve!(kkt, w)
@@ -144,7 +144,7 @@ function solve_kkt!(kkt::SparseCondensedKKTSystem{T}, w::AbstractKKTVector)  whe
 
     (n,m) = size(kkt.jt_csc)
 
-    # Decompose buffers
+    Decompose buffers
     wx = _madnlp_unsafe_wrap(full(w), n)
     ws = view(full(w), n+1:n+m)
     wz = view(full(w), n+m+1:n+2*m)
@@ -157,7 +157,7 @@ function solve_kkt!(kkt::SparseCondensedKKTSystem{T}, w::AbstractKKTVector)  whe
     mul!(wx, kkt.jt_csc, kkt.buffer, one(T), one(T))
     solve_linear_system!(kkt.linear_solver, wx)
 
-    mul!(kkt.buffer2, kkt.jt_csc', wx) # TODO: investigate why directly using wz here is causing an error
+    mul!(kkt.buffer2, kkt.jt_csc', wx) TODO: investigate why directly using wz here is causing an error
 
     wz .= .- kkt.buffer .+ kkt.diag_buffer .* kkt.buffer2
     ws .= (ws .+ wz) ./ Σs
@@ -196,7 +196,7 @@ function solve_kkt!(
     n_eq, ns = kkt.n_eq, kkt.n_ineq
     n_condensed = n + n_eq
 
-    # Decompose rhs
+    Decompose rhs
     wx = view(full(w), 1:n)
     ws = view(full(w), n+1:n+ns)
     wy = view(full(w), kkt.ind_eq_shifted)
@@ -240,7 +240,7 @@ function mul!(w::AbstractKKTVector{T}, kkt::ScaledSparseKKTSystem{T,VT,MT,QN}, x
     mul!(primal(w), Symmetric(kkt.hess_com, :L), primal(x), alpha, beta)
     mul!(primal(w), kkt.jac_com', dual(x), alpha, one(T))
     mul!(dual(w), kkt.jac_com,  primal(x), alpha, beta)
-    # Custom reduction
+    Custom reduction
     primal(w) .+= alpha .* kkt.reg .* primal(x)
     dual(w) .+= alpha .* kkt.du_diag .* dual(x)
     w.xp_lr .-= alpha .* dual_lb(x)
@@ -254,15 +254,15 @@ function mul!(w::AbstractKKTVector{T}, kkt::Union{SparseKKTSystem{T,VT,MT,QN},Sp
     qn = kkt.quasi_newton
     n, p = size(qn)
     nn = length(primal_dual(w))
-    # Load buffers (size: 2p)
+    Load buffers (size: 2p)
     vx = qn._w2
-    # Reset E
+    Reset E
     fill!(qn.E, zero(T))
     @inbounds for i in 1:n, j in 1:p
         qn.E[i, j] = qn.U[i, j]
         qn.E[i, j+p] = qn.V[i, j]
     end
-    # Upper-left block is B = ξI - UUᵀ + VVᵀ
+    Upper-left block is B = ξI - UUᵀ + VVᵀ
     mul!(primal(w), Symmetric(kkt.hess_com, :L), primal(x), alpha, beta)
     mul!(primal(w), kkt.jac_com', dual(x), alpha, one(T))
     mul!(dual(w), kkt.jac_com,  primal(x), alpha, beta)
@@ -279,17 +279,17 @@ function mul!(w::AbstractKKTVector{T}, kkt::SparseCondensedKKTSystem, x::Abstrac
     n = size(kkt.hess_com, 1)
     m = size(kkt.jt_csc, 2)
 
-    # Decompose results
+    Decompose results
     xx = view(full(x), 1:n)
     xs = view(full(x), n+1:n+m)
     xz = view(full(x), n+m+1:n+2*m)
 
-    # Decompose buffers
+    Decompose buffers
     wx = _madnlp_unsafe_wrap(full(w), n)
     ws = view(full(w), n+1:n+m)
     wz = view(full(w), n+m+1:n+2*m)
 
-    mul!(wx, Symmetric(kkt.hess_com, :L), xx, alpha, beta) # TODO: make this symmetric
+    mul!(wx, Symmetric(kkt.hess_com, :L), xx, alpha, beta) TODO: make this symmetric
 
     mul!(wx, kkt.jt_csc,  xz, alpha, one(T))
     mul!(wz, kkt.jt_csc', xx, alpha, beta)
@@ -313,7 +313,7 @@ function mul!(w::AbstractKKTVector{T}, kkt::AbstractDenseKKTSystem, x::AbstractK
     xz = @view(dual(x)[kkt.ind_ineq])
 
     _symv!('L', alpha, kkt.hess, xx, beta, wx)
-    if m > 0  # otherwise, CUDA causes an error
+    if m > 0  otherwise, CUDA causes an error
         mul!(wx, kkt.jac', dual(x), alpha, one(T))
         mul!(wy, kkt.jac,  xx, alpha, beta)
     end

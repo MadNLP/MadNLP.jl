@@ -8,12 +8,12 @@ function set_aug_diagonal!(kkt::AbstractKKTSystem{T}, solver::AbstractMadNLPSolv
     zl = full(get_zl(solver))
     zu = full(get_zu(solver))
 
-    fill!(kkt.reg, solver.opt.default_primal_regularization)
-    fill!(kkt.du_diag, -solver.opt.default_dual_regularization)
-    kkt.l_diag .= solver.xl_r .- solver.x_lr   # (Xˡ - X)
-    kkt.u_diag .= solver.x_ur .- solver.xu_r   # (X - Xᵘ)
-    copyto!(kkt.l_lower, solver.zl_r)
-    copyto!(kkt.u_lower, solver.zu_r)
+    fill!(kkt.reg, get_opt(solver).default_primal_regularization)
+    fill!(kkt.du_diag, -get_opt(solver).default_dual_regularization)
+    kkt.l_diag .= get_xl_r(solver) .- get_x_lr(solver)   # (Xˡ - X)
+    kkt.u_diag .= get_x_ur(solver) .- get_xu_r(solver)   # (X - Xᵘ)
+    copyto!(kkt.l_lower, get_zl_r(solver))
+    copyto!(kkt.u_lower, get_zu_r(solver))
 
     _set_aug_diagonal!(kkt)
     return
@@ -34,8 +34,8 @@ function _set_aug_diagonal!(kkt::AbstractUnreducedKKTSystem)
 end
 
 function set_aug_diagonal!(kkt::ScaledSparseKKTSystem{T}, solver::AbstractMadNLPSolver{T}) where T
-    fill!(kkt.reg, solver.opt.default_primal_regularization)
-    fill!(kkt.du_diag, -solver.opt.default_dual_regularization)
+    fill!(kkt.reg, get_opt(solver).default_primal_regularization)
+    fill!(kkt.du_diag, -get_opt(solver).default_dual_regularization)
     # Ensure l_diag and u_diag have only non negative entries
     kkt.l_diag .= get_x_lr(solver) .- get_xl_r(solver)   # (X - Xˡ)
     kkt.u_diag .= get_xu_r(solver) .- get_x_ur(solver)   # (Xᵘ - X)
@@ -70,34 +70,34 @@ end
 
 # Robust restoration
 function set_aug_RR!(kkt::AbstractKKTSystem, solver::AbstractMadNLPSolver, RR::RobustRestorer)
-    x = full(solver.x)
-    xl = full(solver.xl)
-    xu = full(solver.xu)
-    zl = full(solver.zl)
-    zu = full(solver.zu)
-    kkt.reg .= solver.opt.default_primal_regularization .+ RR.zeta .* RR.D_R .^ 2
-    kkt.du_diag .= .- solver.opt.default_dual_regularization .- RR.pp ./ RR.zp .- RR.nn ./ RR.zn
-    copyto!(kkt.l_lower, solver.zl_r)
-    copyto!(kkt.u_lower, solver.zu_r)
-    kkt.l_diag .= solver.xl_r .- solver.x_lr
-    kkt.u_diag .= solver.x_ur .- solver.xu_r
+    x = full(get_x(solver))
+    xl = full(get_xl(solver))
+    xu = full(get_xu(solver))
+    zl = full(get_zl(solver))
+    zu = full(get_zu(solver))
+    kkt.reg .= get_opt(solver).default_primal_regularization .+ RR.zeta .* RR.D_R .^ 2
+    kkt.du_diag .= .- get_opt(solver).default_dual_regularization .- RR.pp ./ RR.zp .- RR.nn ./ RR.zn
+    copyto!(kkt.l_lower, get_zl_r(solver))
+    copyto!(kkt.u_lower, get_zu_r(solver))
+    kkt.l_diag .= get_xl_r(solver) .- get_x_lr(solver)
+    kkt.u_diag .= get_x_ur(solver) .- get_xu_r(solver)
 
     _set_aug_diagonal!(kkt)
     return
 end
 
 function set_aug_RR!(kkt::ScaledSparseKKTSystem, solver::AbstractMadNLPSolver, RR::RobustRestorer)
-    x = full(solver.x)
-    xl = full(solver.xl)
-    xu = full(solver.xu)
-    zl = full(solver.zl)
-    zu = full(solver.zu)
-    kkt.reg .= solver.opt.default_primal_regularization .+ RR.zeta .* RR.D_R .^ 2
-    kkt.du_diag .= .- solver.opt.default_dual_regularization .- RR.pp ./ RR.zp .- RR.nn ./ RR.zn
-    copyto!(kkt.l_lower, solver.zl_r)
-    copyto!(kkt.u_lower, solver.zu_r)
-    kkt.l_diag .= solver.x_lr .- solver.xl_r
-    kkt.u_diag .= solver.xu_r .- solver.x_ur
+    x = full(get_x(solver))
+    xl = full(get_xl(solver))
+    xu = full(get_xu(solver))
+    zl = full(get_zl(solver))
+    zu = full(get_zu(solver))
+    kkt.reg .= get_opt(solver).default_primal_regularization .+ RR.zeta .* RR.D_R .^ 2
+    kkt.du_diag .= .- get_opt(solver).default_dual_regularization .- RR.pp ./ RR.zp .- RR.nn ./ RR.zn
+    copyto!(kkt.l_lower, get_zl_r(solver))
+    copyto!(kkt.u_lower, get_zu_r(solver))
+    kkt.l_diag .= get_x_lr(solver) .- get_xl_r(solver)
+    kkt.u_diag .= get_xu_r(solver) .- get_x_ur(solver)
 
     _set_aug_diagonal!(kkt)
     return
@@ -312,8 +312,8 @@ function get_average_complementarity(x_lr, xl_r, zl_r, x_ur, xu_r, zu_r)
 end
 function get_average_complementarity(solver::AbstractMadNLPSolver)
     return get_average_complementarity(
-        solver.x_lr, solver.xl_r, solver.zl_r,
-        solver.x_ur, solver.xu_r, solver.zu_r,
+        get_x_lr(solver), get_xl_r(solver), get_zl_r(solver),
+        get_x_ur(solver), get_xu_r(solver), get_zu_r(solver),
     )
 end
 
@@ -326,8 +326,8 @@ end
 
 function get_min_complementarity(solver::AbstractMadNLPSolver)
     return get_min_complementarity(
-        solver.x_lr, solver.xl_r, solver.zl_r,
-        solver.x_ur, solver.xu_r, solver.zu_r,
+        get_x_lr(solver), get_xl_r(solver), get_zl_r(solver),
+        get_x_ur(solver), get_xu_r(solver), get_zu_r(solver),
     )
 end
 

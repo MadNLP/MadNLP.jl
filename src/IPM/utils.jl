@@ -21,46 +21,46 @@ mutable struct MadNLPExecutionStats{T, VT} <: AbstractExecutionStats
 end
 
 function MadNLPExecutionStats(solver::AbstractMadNLPSolver{T}) where {T}
-    n, m = get_nvar(solver.nlp), get_ncon(solver.nlp)
-    VT = typeof(get_x0(solver.nlp))
+    n, m = get_nvar(get_nlp(solver)), get_ncon(get_nlp(solver))
+    VT = typeof(get_x0(get_nlp(solver)))
     x = similar(VT, n)
     zl = similar(VT, n)
     zu = similar(VT, n)
     c = similar(VT, m)
-    unpack_cons!(c, solver.cb, solver.c)
-    unpack_x!(x, solver.cb, variable(solver.x))
-    unpack_z!(zl, solver.cb, variable(solver.zl))
-    unpack_z!(zu, solver.cb, variable(solver.zu))
+    unpack_cons!(c, get_cb(solver), get_c(solver))
+    unpack_x!(x, get_cb(solver), variable(get_x(solver)))
+    unpack_z!(zl, get_cb(solver), variable(get_zl(solver)))
+    unpack_z!(zu, get_cb(solver), variable(get_zu(solver)))
     return MadNLPExecutionStats(
-        solver.opt,
-        solver.status,
+        get_opt(solver),
+        get_status(solver),
         x,
-        unpack_obj(solver.cb, solver.obj_val),
+        unpack_obj(get_cb(solver), get_obj_val(solver)),
         c,
-        solver.inf_du,
-        solver.inf_pr,
-        copy(solver.y),
+        get_inf_du(solver),
+        get_inf_pr(solver),
+        copy(get_y(solver)),
         zl,
         zu,
         0,
-        solver.cnt,
+        get_cnt(solver),
     )
 end
 
 function update!(stats::MadNLPExecutionStats, solver::AbstractMadNLPSolver)
-    stats.status = solver.status
-    unpack_x!(stats.solution, solver.cb, variable(solver.x))
-    unpack_y!(stats.multipliers, solver.cb, solver.y)
-    unpack_z!(stats.multipliers_L, solver.cb, variable(solver.zl))
-    unpack_z!(stats.multipliers_U, solver.cb, variable(solver.zu))
-    stats.objective = unpack_obj(solver.cb, solver.obj_val)
-    unpack_cons!(stats.constraints, solver.cb, solver.c)
-    stats.constraints .+= solver.rhs
-    stats.constraints[solver.ind_ineq] .+= slack(solver.x)
-    stats.dual_feas = solver.inf_du
-    stats.primal_feas = solver.inf_pr
-    update_z!(solver.cb, stats.solution, stats.multipliers, stats.multipliers_L, stats.multipliers_U, solver.jacl)
-    stats.iter = solver.cnt.k
+    stats.status = get_status(solver)
+    unpack_x!(stats.solution, get_cb(solver), variable(get_x(solver)))
+    unpack_y!(stats.multipliers, get_cb(solver), get_y(solver))
+    unpack_z!(stats.multipliers_L, get_cb(solver), variable(get_zl(solver)))
+    unpack_z!(stats.multipliers_U, get_cb(solver), variable(get_zu(solver)))
+    stats.objective = unpack_obj(get_cb(solver), get_obj_val(solver))
+    unpack_cons!(stats.constraints, get_cb(solver), get_c(solver))
+    stats.constraints .+= get_rhs(solver)
+    stats.constraints[get_ind_ineq(solver)] .+= slack(get_x(solver))
+    stats.dual_feas = get_inf_du(solver)
+    stats.primal_feas = get_inf_pr(solver)
+    update_z!(get_cb(solver), stats.solution, stats.multipliers, stats.multipliers_L, stats.multipliers_U, get_jacl(solver))
+    stats.iter = get_cnt(solver).k
     return stats
 end
 
@@ -189,18 +189,18 @@ function print_summary(solver::AbstractMadNLPSolver)
                                 max(get_inf_du(solver)*obj_scale,norm(get_c(solver),Inf),get_inf_compl(solver)),
                                 max(get_inf_du(solver),get_inf_pr(solver),get_inf_compl(solver))))
 
-    @notice(solver.logger,"Number of objective function evaluations              = $(solver.cnt.obj_cnt)")
-    @notice(solver.logger,"Number of objective gradient evaluations              = $(solver.cnt.obj_grad_cnt)")
-    @notice(solver.logger,"Number of constraint evaluations                      = $(solver.cnt.con_cnt)")
-    @notice(solver.logger,"Number of constraint Jacobian evaluations             = $(solver.cnt.con_jac_cnt)")
-    @notice(solver.logger,"Number of Lagrangian Hessian evaluations              = $(solver.cnt.lag_hess_cnt)")
-    @notice(solver.logger,"Number of KKT factorizations                          = $(solver.cnt.factorization_cnt)")
-    @notice(solver.logger,"Number of KKT backsolves                              = $(solver.cnt.backsolve_cnt)\n")
-    @notice(solver.logger,"Total wall secs in initialization                     = $(format_time(solver.cnt.init_time))")
-    @notice(solver.logger,"Total wall secs in linear solver                      = $(format_time(solver.cnt.linear_solver_time))")
-    @notice(solver.logger,"Total wall secs in NLP function evaluations           = $(format_time(solver.cnt.eval_function_time))")
-    @notice(solver.logger,"Total wall secs in solver (w/o init./fun./lin. alg.)  = $(format_time(solver.cnt.total_time - solver.cnt.init_time - solver.cnt.linear_solver_time - solver.cnt.eval_function_time))")
-    @notice(solver.logger,"Total wall secs                                       = $(format_time(solver.cnt.total_time))\n")
+    @notice(get_logger(solver),"Number of objective function evaluations              = $(get_cnt(solver).obj_cnt)")
+    @notice(get_logger(solver),"Number of objective gradient evaluations              = $(get_cnt(solver).obj_grad_cnt)")
+    @notice(get_logger(solver),"Number of constraint evaluations                      = $(get_cnt(solver).con_cnt)")
+    @notice(get_logger(solver),"Number of constraint Jacobian evaluations             = $(get_cnt(solver).con_jac_cnt)")
+    @notice(get_logger(solver),"Number of Lagrangian Hessian evaluations              = $(get_cnt(solver).lag_hess_cnt)")
+    @notice(get_logger(solver),"Number of KKT factorizations                          = $(get_cnt(solver).factorization_cnt)")
+    @notice(get_logger(solver),"Number of KKT backsolves                              = $(get_cnt(solver).backsolve_cnt)\n")
+    @notice(get_logger(solver),"Total wall secs in initialization                     = $(format_time(get_cnt(solver).init_time))")
+    @notice(get_logger(solver),"Total wall secs in linear solver                      = $(format_time(get_cnt(solver).linear_solver_time))")
+    @notice(get_logger(solver),"Total wall secs in NLP function evaluations           = $(format_time(get_cnt(solver).eval_function_time))")
+    @notice(get_logger(solver),"Total wall secs in solver (w/o init./fun./lin. alg.)  = $(format_time(get_cnt(solver).total_time - get_cnt(solver).init_time - get_cnt(solver).linear_solver_time - get_cnt(solver).eval_function_time))")
+    @notice(get_logger(solver),"Total wall secs                                       = $(format_time(get_cnt(solver).total_time))\n")
 end
 
 format_time(t::Float64) = isnan(t) ? " unavailable" : @sprintf("%6.3f s", t)
