@@ -156,7 +156,7 @@ function solve!(
 
         if is_async(get_kkt(solver).linear_solver)
             @trace(get_logger(solver), "linear solver time is not available for asynchronous linear solvers.")
-            geT_cnt(solver).linear_solver_time = NaN
+            get_cnt(solver).linear_solver_time = NaN
         end
 
         while get_status(solver) >= REGULAR
