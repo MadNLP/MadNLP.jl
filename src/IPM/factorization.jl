@@ -1,28 +1,28 @@
 function solve_refine_wrapper!(d, solver, p, w)
     result = false
 
-    solver.cnt.linear_solver_time += @elapsed begin
-        if solve_refine!(d, solver.iterator, p, w)
+    get_cnt(solver).linear_solver_time += @elapsed begin
+        if solve_refine!(d, get_iterator(solver), p, w)
             result = true
         else
-            if improve!(solver.kkt.linear_solver)
-                if solve_refine!(d, solver.iterator, p, w)
+            if improve!(get_kkt(solver).linear_solver)
+                if solve_refine!(d, get_iterator(solver), p, w)
                     result = true
                 end
             end
         end
     end
     # Get number of iterations in Richardson's iterative refinement
-    iter_richardson = solver.cnt.ir
-    solver.cnt.backsolve_cnt += iter_richardson
+    iter_richardson = get_cnt(solver).ir
+    get_cnt(solver).backsolve_cnt += iter_richardson
     return result
 end
 
 function factorize_wrapper!(solver::AbstractMadNLPSolver)
-    @trace(solver.logger,"Factorization started.")
-    build_kkt!(solver.kkt)
-    solver.cnt.linear_solver_time += @elapsed factorize_kkt!(solver.kkt)
-    solver.cnt.factorization_cnt += 1
+    @trace(get_logger(solver),"Factorization started.")
+    build_kkt!(get_kkt(solver))
+    get_cnt(solver).linear_solver_time += @elapsed factorize!(get_kkt(solver).linear_solver)
+    get_cnt(solver).factorization_cnt += 1
     return
 end
 
