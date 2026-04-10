@@ -26,6 +26,10 @@ get_file_level(logger::MadNLPLogger) = logger.file_print_level
 get_file(logger::MadNLPLogger) = logger.file
 finalize(logger::MadNLPLogger) = logger.file != nothing && close(logger.file)
 
+# Logging macros — generated via @eval at module-definition time.
+# This is AOT-safe (runs during precompilation, not at runtime).
+# Using @eval is required here because the macro names (debug, info, warn,
+# error) would conflict with Base's logging macros if defined directly.
 for (name,level,color) in [(:trace,TRACE,7),(:debug,DEBUG,6),(:info,INFO,256),(:notice,NOTICE,256),(:warn,WARN,5),(:error,ERROR,9)]
     @eval begin
         macro $name(logger,str)

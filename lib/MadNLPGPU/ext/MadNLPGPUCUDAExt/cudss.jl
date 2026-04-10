@@ -77,7 +77,7 @@ function set_cudss_options!(solver::CUDSS.CudssSolver, opt::CudssSolverOptions)
     end
 end
 
-mutable struct CUDSSSolver{T, V} <: MadNLP.AbstractLinearSolver{T}
+mutable struct CUDSSSolverImpl{T, V} <: MadNLPGPU.CUDSSSolver{T, V}
     inner::CUDSS.CudssSolver{T}
     tril::CUSPARSE.CuSparseMatrixCSC{T, Cint}
     x_gpu::CUDSS.CudssMatrix{T}
@@ -88,7 +88,7 @@ mutable struct CUDSSSolver{T, V} <: MadNLP.AbstractLinearSolver{T}
     logger::MadNLP.MadNLPLogger
 end
 
-function CUDSSSolver(
+function MadNLPGPU.CUDSSSolver(
         csc::CUSPARSE.CuSparseMatrixCSC{T, Cint};
         opt = CudssSolverOptions(),
         logger = MadNLP.MadNLPLogger(),
@@ -144,7 +144,7 @@ function CUDSSSolver(
     # Always allocate it to support dynamic updates to opt.cudss_ir
     buffer = CuVector{T}(undef, n * nbatch)
 
-    return CUDSSSolver(
+    return CUDSSSolverImpl(
         solver, csc,
         x_gpu, b_gpu, buffer,
         opt, logger,
