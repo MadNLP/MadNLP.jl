@@ -69,10 +69,11 @@ function RobustRestorer(solver::AbstractMadNLPSolver{T}) where {T}
     )
 end
 
-function initialize_robust_restorer!(solver::AbstractMadNLPSolver{T}) where T
+function initialize_robust_restorer!(solver::AbstractMadNLPSolver{T}) where {T}
     @trace(solver.logger,"Initializing restoration phase variables.")
     solver.RR == nothing && (solver.RR = RobustRestorer(solver))
-    RR = solver.RR
+    # Explicitly type otherwise we get type instability because compiler can't know RR != nothing
+    RR::RobustRestorer = solver.RR
 
     copyto!(RR.x_ref, full(solver.x))
     RR.theta_ref = get_theta(solver.c)
@@ -84,11 +85,7 @@ function initialize_robust_restorer!(solver::AbstractMadNLPSolver{T}) where T
 
     rho = solver.opt.rho
     mu = RR.mu_R
-    RR.nn .=
-        (mu .- rho*solver.c)./2 ./rho .+
-        sqrt.(
-            ((mu.-rho*solver.c)./2 ./rho).^2 + mu.*solver.c./2 ./rho
-        )
+    populate_RR_nn!(RR.nn, solver.c, mu, rho)
     RR.pp .= solver.c .+ RR.nn
     RR.zp .= RR.mu_R ./ RR.pp
     RR.zn .= RR.mu_R ./ RR.nn
