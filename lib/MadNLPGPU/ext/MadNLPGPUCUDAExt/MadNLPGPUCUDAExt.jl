@@ -18,7 +18,8 @@ import MadNLP:
 
 import MadNLPGPU
 import MadNLPGPU: ORDERING, DEFAULT_ORDERING, METIS_ORDERING, AMD_ORDERING,
-    USER_ORDERING, SYMAMD_ORDERING, COLAMD_ORDERING, gpu_transfer!
+    USER_ORDERING, SYMAMD_ORDERING, COLAMD_ORDERING, gpu_transfer!,
+    LapackCUDASolver, CUDSSSolver
 
 import KernelAbstractions: synchronize, get_backend
 
@@ -32,12 +33,6 @@ import .CUSOLVER: cusolverStatus_t, CuPtr, cudaDataType, cublasFillMode_t, cusol
     dense_handle, CuSolverParameters, CUSOLVER_EIG_MODE_VECTOR
 import .CUBLAS: handle, CUBLAS_DIAG_NON_UNIT,
     CUBLAS_FILL_MODE_LOWER, CUBLAS_FILL_MODE_UPPER, CUBLAS_SIDE_LEFT, CUBLAS_OP_N, CUBLAS_OP_T
-
-function __init__()
-    setglobal!(MadNLPGPU, :LapackCUDASolver, LapackCUDASolver)
-    setglobal!(MadNLPGPU, :CUDSSSolver, CUDSSSolver)
-    return
-end
 
 include("cuda_sparse.jl")
 include("lapackgpu.jl")

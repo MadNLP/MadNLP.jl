@@ -2,7 +2,7 @@
     MadNLP.MadNLPOptions
 =#
 
-function MadNLP.MadNLPOptions{T}(
+function MadNLP.MadNLPOptions(
     nlp::MadNLP.AbstractNLPModel{T,VT};
     dense_callback = MadNLP.is_dense_callback(nlp),
     callback = dense_callback ? MadNLP.DenseCallback : MadNLP.SparseCallback,
@@ -11,7 +11,7 @@ function MadNLP.MadNLPOptions{T}(
     tol = MadNLP.get_tolerance(T,kkt_system),
     bound_relax_factor = tol,
 ) where {T, VT <: ROCVector{T}}
-    return MadNLP.MadNLPOptions{T}(
+    return MadNLP.MadNLPOptions(
         tol = tol,
         callback = callback,
         kkt_system = kkt_system,

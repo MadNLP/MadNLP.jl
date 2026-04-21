@@ -25,7 +25,7 @@ mutable struct MadNLPSolver{
     cb::CB
     kkt::KKTSystem
 
-    opt::MadNLPOptions{T}
+    opt::MadNLPOptions
     cnt::MadNLPCounters
     logger::MadNLPLogger
 
@@ -120,9 +120,19 @@ function MadNLPSolver(nlp::AbstractNLPModel{T,VT}; kwargs...) where {T, VT}
 
     options = load_options(nlp; kwargs...)
 
-    ipm_opt = options.interior_point
+    # Function barrier: _build_solver dispatches on the fully-parameterized
+    # MadNLPOptions type, enabling the compiler/trimmer to see concrete types
+    # for all Type-valued fields (callback, kkt_system, linear_solver, etc.).
+    return _build_solver(nlp, options.interior_point, options)
+end
+
+function _build_solver(
+    nlp::AbstractNLPModel{T,VT},
+    ipm_opt::MadNLPOptions{T, CB, KKT, LS, IT, FVT, ET, HA, ICM, DIM},
+    options,
+) where {T, VT, CB, KKT, LS, IT, FVT, ET, HA, ICM, DIM}
     logger = options.logger
-    @assert is_supported(ipm_opt.linear_solver, T)
+    @assert is_supported(LS, T)
 
     cnt = MadNLPCounters(start_time=time())
     cb = create_callback(

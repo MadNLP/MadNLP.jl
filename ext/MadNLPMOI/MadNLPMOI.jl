@@ -6,7 +6,7 @@ import MathOptInterface as MOI
 import MathOptInterface.Utilities as MOIU
 
 function __init__()
-    setglobal!(MadNLP, :Optimizer, Optimizer)
+    MadNLP._optimizer_type[] = Optimizer
     return
 end
 
