@@ -212,6 +212,433 @@ end
     end
 end
 
+"""
+    _build_schur_symbolic(T, n, m, ns, nv, nd, nc,
+                          hess_I, hess_J, jac_I, jac_J,
+                          ind_eq, ind_ineq) -> NamedTuple
+
+Pure-CPU symbolic construction shared by the CPU `SchurComplementKKTSystem`
+and GPU `GPUSchurComplementKKTSystem` constructors. Inputs are CPU-resident
+sparsity arrays (the GPU side downloads its sparsity before calling).
+
+**Assumes uniform per-scenario structure** (same A_kk pattern for every k).
+This matches typical two-stage stochastic models and is what the GPU batched
+cuDSS path requires; CPU follows the same assumption.
+
+Returns a NamedTuple with:
+- `eq_per_scenario`, `ineq_per_scenario` — `Vector{Vector{Int}}` of global indices
+- `nc_eq_per_s`, `nc_ineq_per_s`, `blk_size` — per-scenario sizes
+- `block_maps::Vector{ScenarioBlockMap}` — per-scenario index maps
+- `hess_S_coo`, `hess_S_row`, `hess_S_col` — design-design Hessian COO maps
+- `akk_csc_template::SparseMatrixCSC{T, Int32}` — shared A_kk sparsity (zero values)
+- `nnz_per_scenario::Int`
+- `eq_global_flat::Vector{Int}` — flattened eq indices in scenario order (for GPU)
+"""
+function _build_schur_symbolic(
+        ::Type{T},
+        n::Int, m::Int, ns::Int, nv::Int, nd::Int, nc::Int,
+        hess_I::AbstractVector{<:Integer}, hess_J::AbstractVector{<:Integer},
+        jac_I::AbstractVector{<:Integer}, jac_J::AbstractVector{<:Integer},
+        ind_eq::AbstractVector{<:Integer},
+        ind_ineq::AbstractVector{<:Integer},
+    ) where {T}
+
+    n_hess = length(hess_I)
+    n_jac = length(jac_I)
+
+    # --- Classify constraints per scenario ---
+    ind_eq_set = Set(ind_eq)
+    ind_ineq_set = Set(ind_ineq)
+
+    eq_per_scenario = Vector{Vector{Int}}(undef, ns)
+    ineq_per_scenario = Vector{Vector{Int}}(undef, ns)
+
+    nc_eq_per_s = 0
+    nc_ineq_per_s = 0
+    for k in 1:ns
+        cr = (k-1)*nc+1 : k*nc
+        eq_per_scenario[k] = Int[]
+        ineq_per_scenario[k] = Int[]
+        for gi in cr
+            if gi in ind_eq_set
+                push!(eq_per_scenario[k], gi)
+            end
+            if gi in ind_ineq_set
+                push!(ineq_per_scenario[k], gi)
+            end
+        end
+        if k == 1
+            nc_eq_per_s = length(eq_per_scenario[k])
+            nc_ineq_per_s = length(ineq_per_scenario[k])
+        end
+    end
+
+    blk_size = nv + nc_eq_per_s
+
+    # Lookup: global ineq index → diag_buffer index
+    ineq_to_bufidx = Dict{Int,Int}()
+    for idx in 1:length(ind_ineq)
+        ineq_to_bufidx[Int(ind_ineq[idx])] = idx
+    end
+
+    # Lookup: constraint global row → list of (jac_coo_idx, col)
+    jac_by_constraint = Dict{Int, Vector{Tuple{Int,Int}}}()
+    for ci in 1:n_jac
+        row = Int(jac_I[ci])
+        col = Int(jac_J[ci])
+        entries = get!(Vector{Tuple{Int,Int}}, jac_by_constraint, row)
+        push!(entries, (ci, col))
+    end
+
+    d_start = ns * nv + 1
+    d_end = ns * nv + nd
+
+    # --- Classify Hessian COO entries ---
+    hess_S_coo = Int[]
+    hess_S_row = Int[]
+    hess_S_col = Int[]
+
+    hess_per_scenario_diag = [Tuple{Int,Int,Int}[] for _ in 1:ns]      # (coo, local_i, local_j)
+    hess_per_scenario_coupling = [Tuple{Int,Int,Int}[] for _ in 1:ns]  # (coo, design_local, var_local)
+
+    for ci in 1:n_hess
+        ri = Int(hess_I[ci])
+        rj = Int(hess_J[ci])  # lower triangle: ri >= rj
+
+        # Both design vars → S entry (write both triangles for dense S)
+        if ri >= d_start && ri <= d_end && rj >= d_start && rj <= d_end
+            di = ri - d_start + 1
+            dj = rj - d_start + 1
+            push!(hess_S_coo, ci); push!(hess_S_row, di); push!(hess_S_col, dj)
+            if di != dj
+                push!(hess_S_coo, ci); push!(hess_S_row, dj); push!(hess_S_col, di)
+            end
+            continue
+        end
+
+        # One design + one scenario var → coupling block
+        if ri >= d_start && ri <= d_end && rj < d_start
+            di = ri - d_start + 1
+            k = div(rj - 1, nv) + 1
+            if k >= 1 && k <= ns
+                vj = rj - (k-1)*nv
+                push!(hess_per_scenario_coupling[k], (ci, di, vj))
+            end
+            continue
+        end
+
+        # Both within the same scenario → A_kk diagonal block
+        if ri < d_start && rj < d_start
+            ki = div(ri - 1, nv) + 1
+            kj = div(rj - 1, nv) + 1
+            if ki == kj && ki >= 1 && ki <= ns
+                li = ri - (ki-1)*nv
+                lj = rj - (ki-1)*nv
+                push!(hess_per_scenario_diag[ki], (ci, li, lj))
+            end
+        end
+    end
+
+    # --- Build shared A_kk template from scenario 1 ---
+    eq_cons_1 = eq_per_scenario[1]
+    ineq_cons_1 = ineq_per_scenario[1]
+    eq_local_1 = Dict{Int,Int}()
+    for (ci, gi) in enumerate(eq_cons_1)
+        eq_local_1[gi] = ci
+    end
+
+    akk_entries = Dict{Tuple{Int,Int}, Nothing}()
+
+    # Hessian diagonal
+    for (_, li, lj) in hess_per_scenario_diag[1]
+        akk_entries[(li, lj)] = nothing
+    end
+    # pr_diag (always nv diagonal entries)
+    for i in 1:nv
+        akk_entries[(i, i)] = nothing
+    end
+    # Equality Jacobian: row = nv + eq_local, col = local_var
+    for gi in eq_cons_1
+        for (_, col) in get(jac_by_constraint, gi, Tuple{Int,Int}[])
+            if col >= 1 && col <= nv
+                akk_entries[(nv + eq_local_1[gi], col)] = nothing
+            end
+        end
+    end
+    # du_diag for eq constraints
+    for ci in 1:length(eq_cons_1)
+        akk_entries[(nv + ci, nv + ci)] = nothing
+    end
+    # Inequality condensation fill-in (lower triangle pairs of scenario vars)
+    for gi in ineq_cons_1
+        local_vars = Int[]
+        for (_, col) in get(jac_by_constraint, gi, Tuple{Int,Int}[])
+            if col >= 1 && col <= nv
+                push!(local_vars, col)
+            end
+        end
+        for a in local_vars, b in local_vars
+            if a >= b
+                akk_entries[(a, b)] = nothing
+            end
+        end
+    end
+
+    akk_nnz = length(akk_entries)
+    akk_I = Vector{Int32}(undef, akk_nnz)
+    akk_J = Vector{Int32}(undef, akk_nnz)
+    akk_V = zeros(T, akk_nnz)
+    for (idx, ((ri, rj), _)) in enumerate(akk_entries)
+        akk_I[idx] = Int32(ri)
+        akk_J[idx] = Int32(rj)
+    end
+    akk_coo = SparseMatrixCOO(blk_size, blk_size, akk_I, akk_J, akk_V)
+    akk_csc_template, _ = coo_to_csc(akk_coo)
+
+    # nzval position lookup, shared across scenarios (uniform structure)
+    akk_lookup = Dict{Tuple{Int,Int}, Int}()
+    for col in 1:blk_size
+        for p in akk_csc_template.colptr[col]:(akk_csc_template.colptr[col+1]-1)
+            row = akk_csc_template.rowval[p]
+            akk_lookup[(Int(row), Int(col))] = Int(p)
+        end
+    end
+
+    nnz_per_scenario = length(akk_csc_template.nzval)
+
+    # --- Build per-scenario ScenarioBlockMaps ---
+    block_maps = Vector{ScenarioBlockMap}(undef, ns)
+    eq_global_flat = Int[]
+
+    for k in 1:ns
+        vr_start = (k-1)*nv + 1
+        eq_cons = eq_per_scenario[k]
+        ineq_cons = ineq_per_scenario[k]
+
+        eq_local = Dict{Int,Int}()
+        for (ci, gi) in enumerate(eq_cons)
+            eq_local[gi] = ci
+        end
+
+        # Hessian diagonal → A_kk
+        hess_Akk_coo_vec = Int[]
+        hess_Akk_nzpos_vec = Int[]
+        for (ci, li, lj) in hess_per_scenario_diag[k]
+            push!(hess_Akk_coo_vec, ci)
+            push!(hess_Akk_nzpos_vec, akk_lookup[(li, lj)])
+        end
+
+        # Hessian coupling → C_dk
+        hess_Cdk_coo_vec = Int[]
+        hess_Cdk_row_vec = Int[]
+        hess_Cdk_col_vec = Int[]
+        for (ci, di, vj) in hess_per_scenario_coupling[k]
+            push!(hess_Cdk_coo_vec, ci)
+            push!(hess_Cdk_row_vec, di)
+            push!(hess_Cdk_col_vec, vj)
+        end
+
+        # Equality Jacobian → A_kk and C_dk
+        jeq_Akk_coo_vec = Int[]
+        jeq_Akk_nzpos_vec = Int[]
+        jeq_Cdk_coo_vec = Int[]
+        jeq_Cdk_row_vec = Int[]
+        jeq_Cdk_col_vec = Int[]
+
+        for gi in eq_cons
+            local_eq = eq_local[gi]
+            for (coo_idx, col) in get(jac_by_constraint, gi, Tuple{Int,Int}[])
+                if col >= vr_start && col < vr_start + nv
+                    local_var = col - vr_start + 1
+                    push!(jeq_Akk_coo_vec, coo_idx)
+                    push!(jeq_Akk_nzpos_vec, akk_lookup[(nv + local_eq, local_var)])
+                elseif col >= d_start && col <= d_end
+                    di = col - d_start + 1
+                    push!(jeq_Cdk_coo_vec, coo_idx)
+                    push!(jeq_Cdk_row_vec, di)
+                    push!(jeq_Cdk_col_vec, nv + local_eq)
+                end
+            end
+        end
+
+        # pr_diag → A_kk diagonal
+        pr_diag_global_vec = Int[]
+        pr_diag_nzpos_vec = Int[]
+        for i in 1:nv
+            push!(pr_diag_global_vec, vr_start + i - 1)
+            push!(pr_diag_nzpos_vec, akk_lookup[(i, i)])
+        end
+
+        # du_diag → A_kk diagonal
+        du_diag_global_vec = Int[]
+        du_diag_nzpos_vec = Int[]
+        for (ci, gi) in enumerate(eq_cons)
+            push!(du_diag_global_vec, gi)
+            push!(du_diag_nzpos_vec, akk_lookup[(nv + ci, nv + ci)])
+        end
+
+        # Inequality condensation
+        ineq_Akk_nzpos_vec = Int[]
+        ineq_Akk_jcoo1_vec = Int[]
+        ineq_Akk_jcoo2_vec = Int[]
+        ineq_Akk_bufidx_vec = Int[]
+
+        ineq_Cdk_row_vec = Int[]
+        ineq_Cdk_col_vec = Int[]
+        ineq_Cdk_jcoo_d_vec = Int[]
+        ineq_Cdk_jcoo_v_vec = Int[]
+        ineq_Cdk_bufidx_vec = Int[]
+
+        ineq_S_row_vec = Int[]
+        ineq_S_col_vec = Int[]
+        ineq_S_jcoo1_vec = Int[]
+        ineq_S_jcoo2_vec = Int[]
+        ineq_S_bufidx_vec = Int[]
+
+        for gi in ineq_cons
+            bidx = ineq_to_bufidx[gi]
+            v_entries = Tuple{Int,Int}[]
+            d_entries = Tuple{Int,Int}[]
+
+            for (coo_idx, col) in get(jac_by_constraint, gi, Tuple{Int,Int}[])
+                if col >= vr_start && col < vr_start + nv
+                    push!(v_entries, (coo_idx, col - vr_start + 1))
+                elseif col >= d_start && col <= d_end
+                    push!(d_entries, (coo_idx, col - d_start + 1))
+                end
+            end
+
+            # A_kk: lower-triangle pairs of scenario vars
+            for (coo_a, la) in v_entries, (coo_b, lb) in v_entries
+                if la >= lb
+                    push!(ineq_Akk_nzpos_vec, akk_lookup[(la, lb)])
+                    push!(ineq_Akk_jcoo1_vec, coo_a)
+                    push!(ineq_Akk_jcoo2_vec, coo_b)
+                    push!(ineq_Akk_bufidx_vec, bidx)
+                end
+            end
+
+            # C_dk: design × scenario
+            for (coo_d, di) in d_entries, (coo_v, lv) in v_entries
+                push!(ineq_Cdk_row_vec, di)
+                push!(ineq_Cdk_col_vec, lv)
+                push!(ineq_Cdk_jcoo_d_vec, coo_d)
+                push!(ineq_Cdk_jcoo_v_vec, coo_v)
+                push!(ineq_Cdk_bufidx_vec, bidx)
+            end
+
+            # S: design × design (full)
+            for (coo_a, da) in d_entries, (coo_b, db) in d_entries
+                push!(ineq_S_row_vec, da)
+                push!(ineq_S_col_vec, db)
+                push!(ineq_S_jcoo1_vec, coo_a)
+                push!(ineq_S_jcoo2_vec, coo_b)
+                push!(ineq_S_bufidx_vec, bidx)
+            end
+        end
+
+        block_maps[k] = ScenarioBlockMap(
+            hess_Akk_coo_vec, hess_Akk_nzpos_vec,
+            hess_Cdk_coo_vec, hess_Cdk_row_vec, hess_Cdk_col_vec,
+            jeq_Akk_coo_vec, jeq_Akk_nzpos_vec,
+            jeq_Cdk_coo_vec, jeq_Cdk_row_vec, jeq_Cdk_col_vec,
+            ineq_Akk_nzpos_vec, ineq_Akk_jcoo1_vec, ineq_Akk_jcoo2_vec, ineq_Akk_bufidx_vec,
+            ineq_Cdk_row_vec, ineq_Cdk_col_vec, ineq_Cdk_jcoo_d_vec, ineq_Cdk_jcoo_v_vec, ineq_Cdk_bufidx_vec,
+            ineq_S_row_vec, ineq_S_col_vec, ineq_S_jcoo1_vec, ineq_S_jcoo2_vec, ineq_S_bufidx_vec,
+            pr_diag_global_vec, pr_diag_nzpos_vec,
+            du_diag_global_vec, du_diag_nzpos_vec,
+        )
+
+        append!(eq_global_flat, eq_cons)
+    end
+
+    return (
+        eq_per_scenario = eq_per_scenario,
+        ineq_per_scenario = ineq_per_scenario,
+        nc_eq_per_s = nc_eq_per_s,
+        nc_ineq_per_s = nc_ineq_per_s,
+        blk_size = blk_size,
+        block_maps = block_maps,
+        hess_S_coo = hess_S_coo,
+        hess_S_row = hess_S_row,
+        hess_S_col = hess_S_col,
+        akk_csc_template = akk_csc_template,
+        nnz_per_scenario = nnz_per_scenario,
+        eq_global_flat = eq_global_flat,
+    )
+end
+
+"""
+    _flatten_block_maps(block_maps) -> NamedTuple
+
+Flatten `Vector{ScenarioBlockMap}` into the per-field concatenated CPU
+`Vector{Int}`s the GPU constructor uploads to device. Also returns the
+per-scenario count (`n_per_s_*`) for each map type, taken from scenario 1
+under the uniform-structure assumption.
+"""
+function _flatten_block_maps(block_maps::Vector{ScenarioBlockMap})
+    bm1 = block_maps[1]
+    n_per_s_hess_Akk = length(bm1.hess_Akk_coo)
+    n_per_s_hess_Cdk = length(bm1.hess_Cdk_coo)
+    n_per_s_pr_diag  = length(bm1.pr_diag_global)
+    n_per_s_du_diag  = length(bm1.du_diag_global)
+    n_per_s_jeq_Akk  = length(bm1.jeq_Akk_coo)
+    n_per_s_jeq_Cdk  = length(bm1.jeq_Cdk_coo)
+    n_per_s_ineq_Akk = length(bm1.ineq_Akk_nzpos)
+    n_per_s_ineq_Cdk = length(bm1.ineq_Cdk_row)
+    n_per_s_ineq_S   = length(bm1.ineq_S_row)
+
+    cat_int(get) = reduce(vcat, (get(bm) for bm in block_maps); init = Int[])
+
+    return (
+        n_per_s_hess_Akk = n_per_s_hess_Akk,
+        all_hess_Akk_coo   = cat_int(bm -> bm.hess_Akk_coo),
+        all_hess_Akk_nzpos = cat_int(bm -> bm.hess_Akk_nzpos),
+
+        n_per_s_hess_Cdk = n_per_s_hess_Cdk,
+        all_hess_Cdk_coo = cat_int(bm -> bm.hess_Cdk_coo),
+        all_hess_Cdk_row = cat_int(bm -> bm.hess_Cdk_row),
+        all_hess_Cdk_col = cat_int(bm -> bm.hess_Cdk_col),
+
+        n_per_s_pr_diag    = n_per_s_pr_diag,
+        all_pr_diag_global = cat_int(bm -> bm.pr_diag_global),
+        all_pr_diag_nzpos  = cat_int(bm -> bm.pr_diag_nzpos),
+
+        n_per_s_du_diag    = n_per_s_du_diag,
+        all_du_diag_global = cat_int(bm -> bm.du_diag_global),
+        all_du_diag_nzpos  = cat_int(bm -> bm.du_diag_nzpos),
+
+        n_per_s_jeq_Akk   = n_per_s_jeq_Akk,
+        all_jeq_Akk_coo   = cat_int(bm -> bm.jeq_Akk_coo),
+        all_jeq_Akk_nzpos = cat_int(bm -> bm.jeq_Akk_nzpos),
+
+        n_per_s_jeq_Cdk = n_per_s_jeq_Cdk,
+        all_jeq_Cdk_coo = cat_int(bm -> bm.jeq_Cdk_coo),
+        all_jeq_Cdk_row = cat_int(bm -> bm.jeq_Cdk_row),
+        all_jeq_Cdk_col = cat_int(bm -> bm.jeq_Cdk_col),
+
+        n_per_s_ineq_Akk    = n_per_s_ineq_Akk,
+        all_ineq_Akk_nzpos  = cat_int(bm -> bm.ineq_Akk_nzpos),
+        all_ineq_Akk_jcoo1  = cat_int(bm -> bm.ineq_Akk_jcoo1),
+        all_ineq_Akk_jcoo2  = cat_int(bm -> bm.ineq_Akk_jcoo2),
+        all_ineq_Akk_bufidx = cat_int(bm -> bm.ineq_Akk_bufidx),
+
+        n_per_s_ineq_Cdk    = n_per_s_ineq_Cdk,
+        all_ineq_Cdk_row    = cat_int(bm -> bm.ineq_Cdk_row),
+        all_ineq_Cdk_col    = cat_int(bm -> bm.ineq_Cdk_col),
+        all_ineq_Cdk_jcoo_d = cat_int(bm -> bm.ineq_Cdk_jcoo_d),
+        all_ineq_Cdk_jcoo_v = cat_int(bm -> bm.ineq_Cdk_jcoo_v),
+        all_ineq_Cdk_bufidx = cat_int(bm -> bm.ineq_Cdk_bufidx),
+
+        n_per_s_ineq_S     = n_per_s_ineq_S,
+        all_ineq_S_row     = cat_int(bm -> bm.ineq_S_row),
+        all_ineq_S_col     = cat_int(bm -> bm.ineq_S_col),
+        all_ineq_S_jcoo1   = cat_int(bm -> bm.ineq_S_jcoo1),
+        all_ineq_S_jcoo2   = cat_int(bm -> bm.ineq_S_jcoo2),
+        all_ineq_S_bufidx  = cat_int(bm -> bm.ineq_S_bufidx),
+    )
+end
+
 function create_kkt_system(
     ::Type{SchurComplementKKTSystem},
     cb::SparseCallback{T,VT},
@@ -259,353 +686,22 @@ function create_kkt_system(
     hess_csc, hess_csc_map = coo_to_csc(hess_raw)
     jt_csc, jt_csc_map = coo_to_csc(jt_coo)
 
-    # --- Classify constraints per scenario ---
-    ind_eq_set = Set(cb.ind_eq)
-    ind_ineq_set = Set(cb.ind_ineq)
+    # --- Shared symbolic construction (constraints, Hessian classification, A_kk template, block_maps) ---
+    sym = _build_schur_symbolic(
+        T, n, m, ns, nv, nd, nc,
+        hess_sparsity_I, hess_sparsity_J,
+        jac_sparsity_I, jac_sparsity_J,
+        cb.ind_eq, cb.ind_ineq,
+    )
+    nc_eq_per_s = sym.nc_eq_per_s
+    nc_ineq_per_s = sym.nc_ineq_per_s
+    blk_size = sym.blk_size
+    block_maps = sym.block_maps
+    eq_per_scenario = sym.eq_per_scenario
+    ineq_per_scenario = sym.ineq_per_scenario
 
-    eq_per_scenario = Vector{Vector{Int}}(undef, ns)
-    ineq_per_scenario = Vector{Vector{Int}}(undef, ns)
-
-    nc_eq_per_s = 0
-    nc_ineq_per_s = 0
-    for k in 1:ns
-        cr = (k-1)*nc+1 : k*nc
-        eq_per_scenario[k] = Int[]
-        ineq_per_scenario[k] = Int[]
-        for gi in cr
-            if gi in ind_eq_set
-                push!(eq_per_scenario[k], gi)
-            end
-            if gi in ind_ineq_set
-                push!(ineq_per_scenario[k], gi)
-            end
-        end
-        if k == 1
-            nc_eq_per_s = length(eq_per_scenario[k])
-            nc_ineq_per_s = length(ineq_per_scenario[k])
-        end
-    end
-
-    blk_size = nv + nc_eq_per_s
-
-    # --- Build index for quick ineq lookup ---
-    ineq_to_bufidx = Dict{Int,Int}()
-    for idx in 1:length(cb.ind_ineq)
-        ineq_to_bufidx[cb.ind_ineq[idx]] = idx
-    end
-
-    # --- Build Jacobian COO lookup: for each constraint, which COO entries ---
-    # jac_by_constraint[gi] = [(coo_idx, col), ...]
-    jac_by_constraint = Dict{Int, Vector{Tuple{Int,Int}}}()
-    for ci in 1:n_jac
-        row = Int(jac_sparsity_I[ci])
-        col = Int(jac_sparsity_J[ci])
-        entries = get!(Vector{Tuple{Int,Int}}, jac_by_constraint, row)
-        push!(entries, (ci, col))
-    end
-
-    # --- Precompute design variable range ---
-    d_start = ns * nv + 1
-    d_end = ns * nv + nd
-
-    # --- Classify Hessian COO entries ---
-    # hess_S_entries: design-design entries for Schur complement initialization
-    hess_S_coo_list = Int[]
-    hess_S_row_list = Int[]
-    hess_S_col_list = Int[]
-
-    # Per-scenario Hessian classification
-    hess_per_scenario_diag = [Tuple{Int,Int,Int}[] for _ in 1:ns]   # (coo, local_i, local_j)
-    hess_per_scenario_coupling = [Tuple{Int,Int,Int}[] for _ in 1:ns]  # (coo, design_local, var_local)
-
-    for ci in 1:n_hess
-        ri = Int(hess_sparsity_I[ci])
-        rj = Int(hess_sparsity_J[ci])  # lower triangle: ri >= rj
-
-        # Check if both are design vars
-        if ri >= d_start && ri <= d_end && rj >= d_start && rj <= d_end
-            di = ri - d_start + 1
-            dj = rj - d_start + 1
-            # Store both triangles for dense S
-            push!(hess_S_coo_list, ci)
-            push!(hess_S_row_list, di)
-            push!(hess_S_col_list, dj)
-            if di != dj
-                push!(hess_S_coo_list, ci)
-                push!(hess_S_row_list, dj)
-                push!(hess_S_col_list, di)
-            end
-            continue
-        end
-
-        # Check if one is design and one is scenario var
-        # Lower triangle: ri >= rj. Design vars have larger indices.
-        if ri >= d_start && ri <= d_end && rj < d_start
-            di = ri - d_start + 1
-            # Find which scenario rj belongs to
-            k = div(rj - 1, nv) + 1
-            if k >= 1 && k <= ns
-                vj = rj - (k-1)*nv  # local var index
-                push!(hess_per_scenario_coupling[k], (ci, di, vj))
-            end
-            continue
-        end
-
-        # Check if both are in the same scenario
-        if ri < d_start && rj < d_start
-            ki = div(ri - 1, nv) + 1
-            kj = div(rj - 1, nv) + 1
-            if ki == kj && ki >= 1 && ki <= ns
-                li = ri - (ki-1)*nv
-                lj = rj - (ki-1)*nv
-                push!(hess_per_scenario_diag[ki], (ci, li, lj))
-            end
-        end
-    end
-
-    # --- Build per-scenario A_kk sparsity patterns and block maps ---
-    A_kk_vec = Vector{SparseMatrixCSC{T, Int32}}(undef, ns)
-    block_maps = Vector{ScenarioBlockMap}(undef, ns)
-
-    for k in 1:ns
-        vr_start = (k-1)*nv + 1
-        eq_cons = eq_per_scenario[k]
-        ineq_cons = ineq_per_scenario[k]
-
-        # Local equation constraint index mapping: global → local eq index
-        eq_local = Dict{Int,Int}()
-        for (ci, gi) in enumerate(eq_cons)
-            eq_local[gi] = ci
-        end
-
-        # Collect all lower-triangle (row, col) entries for A_kk
-        # Using a dict to map (row,col) → list of sources
-        akk_entries = Dict{Tuple{Int,Int}, Nothing}()
-
-        # 1. Hessian diagonal entries (already lower triangle)
-        for (_, li, lj) in hess_per_scenario_diag[k]
-            akk_entries[(li, lj)] = nothing
-        end
-
-        # 2. Diagonal pr_diag entries
-        for i in 1:nv
-            akk_entries[(i, i)] = nothing
-        end
-
-        # 3. Equality Jacobian: row=nv+eq_local, col=var_local (lower triangle since nv+ci > j)
-        for gi in eq_cons
-            jac_entries = get(jac_by_constraint, gi, Tuple{Int,Int}[])
-            for (_, col) in jac_entries
-                if col >= vr_start && col < vr_start + nv
-                    local_var = col - vr_start + 1
-                    local_eq = eq_local[gi]
-                    # A_kk row = nv + local_eq, col = local_var (always lower triangle)
-                    akk_entries[(nv + local_eq, local_var)] = nothing
-                end
-            end
-        end
-
-        # 4. Diagonal du_diag entries
-        for (ci, _) in enumerate(eq_cons)
-            akk_entries[(nv + ci, nv + ci)] = nothing
-        end
-
-        # 5. Inequality condensation fill-in
-        for gi in ineq_cons
-            jac_entries = get(jac_by_constraint, gi, Tuple{Int,Int}[])
-            # Collect scenario var entries for this constraint
-            local_vars = Int[]
-            for (_, col) in jac_entries
-                if col >= vr_start && col < vr_start + nv
-                    push!(local_vars, col - vr_start + 1)
-                end
-            end
-            # All lower-triangle pairs
-            for a in local_vars
-                for b in local_vars
-                    if a >= b
-                        akk_entries[(a, b)] = nothing
-                    end
-                end
-            end
-        end
-
-        # Build A_kk COO
-        akk_nnz = length(akk_entries)
-        akk_I = Vector{Int32}(undef, akk_nnz)
-        akk_J = Vector{Int32}(undef, akk_nnz)
-        akk_V = Vector{T}(undef, akk_nnz)
-        fill!(akk_V, zero(T))
-
-        for (idx, ((ri, rj), _)) in enumerate(akk_entries)
-            akk_I[idx] = Int32(ri)
-            akk_J[idx] = Int32(rj)
-        end
-
-        akk_coo = SparseMatrixCOO(blk_size, blk_size, akk_I, akk_J, akk_V)
-        akk_csc, akk_csc_map = coo_to_csc(akk_coo)
-
-        # Now we need a way to find nzval position for a given (row, col) in A_kk (lower triangle)
-        # Build a lookup from (row, col) → nzval position in akk_csc
-        akk_lookup = Dict{Tuple{Int,Int}, Int}()
-        for col in 1:blk_size
-            for p in akk_csc.colptr[col]:(akk_csc.colptr[col+1]-1)
-                row = akk_csc.rowval[p]
-                akk_lookup[(Int(row), Int(col))] = Int(p)
-            end
-        end
-
-        # --- Build ScenarioBlockMap ---
-
-        # Hessian diagonal → A_kk
-        hess_Akk_coo_vec = Int[]
-        hess_Akk_nzpos_vec = Int[]
-        for (ci, li, lj) in hess_per_scenario_diag[k]
-            nzpos = akk_lookup[(li, lj)]
-            push!(hess_Akk_coo_vec, ci)
-            push!(hess_Akk_nzpos_vec, nzpos)
-        end
-
-        # Hessian coupling → C_dk
-        hess_Cdk_coo_vec = Int[]
-        hess_Cdk_row_vec = Int[]
-        hess_Cdk_col_vec = Int[]
-        for (ci, di, vj) in hess_per_scenario_coupling[k]
-            push!(hess_Cdk_coo_vec, ci)
-            push!(hess_Cdk_row_vec, di)
-            push!(hess_Cdk_col_vec, vj)
-        end
-
-        # Equality Jacobian → A_kk (lower triangle) and → C_dk
-        jeq_Akk_coo_vec = Int[]
-        jeq_Akk_nzpos_vec = Int[]
-        jeq_Cdk_coo_vec = Int[]
-        jeq_Cdk_row_vec = Int[]
-        jeq_Cdk_col_vec = Int[]
-
-        for gi in eq_cons
-            local_eq = eq_local[gi]
-            jac_entries = get(jac_by_constraint, gi, Tuple{Int,Int}[])
-            for (coo_idx, col) in jac_entries
-                if col >= vr_start && col < vr_start + nv
-                    # Scenario var → A_kk lower triangle
-                    local_var = col - vr_start + 1
-                    nzpos = akk_lookup[(nv + local_eq, local_var)]
-                    push!(jeq_Akk_coo_vec, coo_idx)
-                    push!(jeq_Akk_nzpos_vec, nzpos)
-                elseif col >= d_start && col <= d_end
-                    # Design var → C_dk
-                    di = col - d_start + 1
-                    push!(jeq_Cdk_coo_vec, coo_idx)
-                    push!(jeq_Cdk_row_vec, di)
-                    push!(jeq_Cdk_col_vec, nv + local_eq)
-                end
-            end
-        end
-
-        # pr_diag → A_kk diagonal
-        pr_diag_global_vec = Int[]
-        pr_diag_nzpos_vec = Int[]
-        for i in 1:nv
-            gi = vr_start + i - 1
-            nzpos = akk_lookup[(i, i)]
-            push!(pr_diag_global_vec, gi)
-            push!(pr_diag_nzpos_vec, nzpos)
-        end
-
-        # du_diag → A_kk diagonal
-        du_diag_global_vec = Int[]
-        du_diag_nzpos_vec = Int[]
-        for (ci, gi) in enumerate(eq_cons)
-            nzpos = akk_lookup[(nv + ci, nv + ci)]
-            push!(du_diag_global_vec, gi)
-            push!(du_diag_nzpos_vec, nzpos)
-        end
-
-        # Inequality condensation
-        ineq_Akk_nzpos_vec = Int[]
-        ineq_Akk_jcoo1_vec = Int[]
-        ineq_Akk_jcoo2_vec = Int[]
-        ineq_Akk_bufidx_vec = Int[]
-
-        ineq_Cdk_row_vec = Int[]
-        ineq_Cdk_col_vec = Int[]
-        ineq_Cdk_jcoo_d_vec = Int[]
-        ineq_Cdk_jcoo_v_vec = Int[]
-        ineq_Cdk_bufidx_vec = Int[]
-
-        ineq_S_row_vec = Int[]
-        ineq_S_col_vec = Int[]
-        ineq_S_jcoo1_vec = Int[]
-        ineq_S_jcoo2_vec = Int[]
-        ineq_S_bufidx_vec = Int[]
-
-        for gi in ineq_cons
-            bidx = ineq_to_bufidx[gi]
-            jac_entries = get(jac_by_constraint, gi, Tuple{Int,Int}[])
-
-            # Separate scenario var entries and design var entries
-            v_entries = Tuple{Int,Int}[]  # (jac_coo_idx, local_var)
-            d_entries = Tuple{Int,Int}[]  # (jac_coo_idx, design_local)
-
-            for (coo_idx, col) in jac_entries
-                if col >= vr_start && col < vr_start + nv
-                    push!(v_entries, (coo_idx, col - vr_start + 1))
-                elseif col >= d_start && col <= d_end
-                    push!(d_entries, (coo_idx, col - d_start + 1))
-                end
-            end
-
-            # A_kk condensation: lower-triangle pairs of v_entries
-            for (coo_a, la) in v_entries
-                for (coo_b, lb) in v_entries
-                    if la >= lb
-                        nzpos = akk_lookup[(la, lb)]
-                        push!(ineq_Akk_nzpos_vec, nzpos)
-                        push!(ineq_Akk_jcoo1_vec, coo_a)
-                        push!(ineq_Akk_jcoo2_vec, coo_b)
-                        push!(ineq_Akk_bufidx_vec, bidx)
-                    end
-                end
-            end
-
-            # C_dk condensation: design × scenario pairs
-            for (coo_d, di) in d_entries
-                for (coo_v, lv) in v_entries
-                    push!(ineq_Cdk_row_vec, di)
-                    push!(ineq_Cdk_col_vec, lv)
-                    push!(ineq_Cdk_jcoo_d_vec, coo_d)
-                    push!(ineq_Cdk_jcoo_v_vec, coo_v)
-                    push!(ineq_Cdk_bufidx_vec, bidx)
-                end
-            end
-
-            # S condensation: design × design pairs (full matrix)
-            for (coo_a, da) in d_entries
-                for (coo_b, db) in d_entries
-                    push!(ineq_S_row_vec, da)
-                    push!(ineq_S_col_vec, db)
-                    push!(ineq_S_jcoo1_vec, coo_a)
-                    push!(ineq_S_jcoo2_vec, coo_b)
-                    push!(ineq_S_bufidx_vec, bidx)
-                end
-            end
-        end
-
-        block_maps[k] = ScenarioBlockMap(
-            hess_Akk_coo_vec, hess_Akk_nzpos_vec,
-            hess_Cdk_coo_vec, hess_Cdk_row_vec, hess_Cdk_col_vec,
-            jeq_Akk_coo_vec, jeq_Akk_nzpos_vec,
-            jeq_Cdk_coo_vec, jeq_Cdk_row_vec, jeq_Cdk_col_vec,
-            ineq_Akk_nzpos_vec, ineq_Akk_jcoo1_vec, ineq_Akk_jcoo2_vec, ineq_Akk_bufidx_vec,
-            ineq_Cdk_row_vec, ineq_Cdk_col_vec, ineq_Cdk_jcoo_d_vec, ineq_Cdk_jcoo_v_vec, ineq_Cdk_bufidx_vec,
-            ineq_S_row_vec, ineq_S_col_vec, ineq_S_jcoo1_vec, ineq_S_jcoo2_vec, ineq_S_bufidx_vec,
-            pr_diag_global_vec, pr_diag_nzpos_vec,
-            du_diag_global_vec, du_diag_nzpos_vec,
-        )
-
-        A_kk_vec[k] = akk_csc
-    end
+    # Per-scenario A_kk: independent copies of the shared template (same sparsity, fresh nzval).
+    A_kk_vec = [copy(sym.akk_csc_template) for _ in 1:ns]
 
     # --- Dense matrices ---
     aug_com = Matrix{T}(undef, nd, nd)
@@ -651,7 +747,7 @@ function create_kkt_system(
         aug_com,
         diag_buffer, buffer, wy_eq_buf, rhs_d, rhs_k, tmp_blk_nd, solve_buffers,
         block_maps,
-        hess_S_coo_list, hess_S_row_list, hess_S_col_list,
+        sym.hess_S_coo, sym.hess_S_row, sym.hess_S_col,
         eq_per_scenario, ineq_per_scenario,
         n_eq, cb.ind_eq,
         ns_ineq, cb.ind_ineq, cb.ind_lb, cb.ind_ub,
@@ -800,6 +896,8 @@ function solve_kkt!(
     end
 
     # Step 2: Extract per-scenario RHS blocks
+    # NOTE: writes to disjoint slices of wx/wy → safe to @blas_safe_threads,
+    # but per-iteration work is just a few scalar copies; profile before threading.
     for k in 1:ns
         vr = (k-1)*nv+1 : k*nv
         rhs = kkt.rhs_k[k]
@@ -832,7 +930,7 @@ function solve_kkt!(
         mul!(kkt.rhs_k[k], kkt.tmp_blk_nd[k], kkt.rhs_d, -one(T), one(T))
     end
 
-    # Step 6: Write back to w
+    # Step 6: Write back to w (same threading note as Step 2 above)
     for k in 1:ns
         vr = (k-1)*nv+1 : k*nv
         rhs = kkt.rhs_k[k]

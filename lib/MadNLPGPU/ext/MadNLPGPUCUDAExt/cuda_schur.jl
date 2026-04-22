@@ -208,333 +208,29 @@ function MadNLP.create_kkt_system(
     hess_csc, hess_csc_map = MadNLP.coo_to_csc(hess_raw)
     jt_csc, jt_csc_map = MadNLP.coo_to_csc(jt_coo)
 
-    # --- Classify constraints per scenario (on CPU) ---
-    # Transfer index arrays to CPU for construction-time classification
+    # --- Classify constraints per scenario and build per-scenario maps (CPU) ---
     cpu_ind_eq = Array(cb.ind_eq)
     cpu_ind_ineq = Array(cb.ind_ineq)
     cpu_ind_lb = Array(cb.ind_lb)
     cpu_ind_ub = Array(cb.ind_ub)
-    ind_eq_set = Set(cpu_ind_eq)
-    ind_ineq_set = Set(cpu_ind_ineq)
 
-    eq_per_scenario = Vector{Vector{Int}}(undef, ns)
-    ineq_per_scenario = Vector{Vector{Int}}(undef, ns)
+    sym = MadNLP._build_schur_symbolic(
+        T, n, m, ns, nv, nd, nc,
+        hess_sparsity_I, hess_sparsity_J,
+        jac_sparsity_I, jac_sparsity_J,
+        cpu_ind_eq, cpu_ind_ineq,
+    )
+    nc_eq_per_s = sym.nc_eq_per_s
+    nc_ineq_per_s = sym.nc_ineq_per_s
+    blk_size = sym.blk_size
+    nnz_per_scenario = sym.nnz_per_scenario
+    akk_csc_cpu = sym.akk_csc_template
 
-    nc_eq_per_s = 0
-    nc_ineq_per_s = 0
-    for k in 1:ns
-        cr = (k-1)*nc+1 : k*nc
-        eq_per_scenario[k] = Int[]
-        ineq_per_scenario[k] = Int[]
-        for gi in cr
-            gi in ind_eq_set && push!(eq_per_scenario[k], gi)
-            gi in ind_ineq_set && push!(ineq_per_scenario[k], gi)
-        end
-        if k == 1
-            nc_eq_per_s = length(eq_per_scenario[k])
-            nc_ineq_per_s = length(ineq_per_scenario[k])
-        end
-    end
+    # Flatten per-scenario block_maps into the per-field concatenated CPU vectors
+    # the GPU struct stores (one upload per field below).
+    flat = MadNLP._flatten_block_maps(sym.block_maps)
 
-    blk_size = nv + nc_eq_per_s
-
-    # --- Build ineq lookup ---
-    ineq_to_bufidx = Dict{Int,Int}()
-    for idx in 1:length(cpu_ind_ineq)
-        ineq_to_bufidx[cpu_ind_ineq[idx]] = idx
-    end
-
-    # --- Build Jacobian COO lookup ---
-    jac_by_constraint = Dict{Int, Vector{Tuple{Int,Int}}}()
-    for ci in 1:n_jac
-        row = Int(jac_sparsity_I[ci])
-        col = Int(jac_sparsity_J[ci])
-        entries = get!(Vector{Tuple{Int,Int}}, jac_by_constraint, row)
-        push!(entries, (ci, col))
-    end
-
-    d_start = ns * nv + 1
-    d_end = ns * nv + nd
-
-    # --- Classify Hessian COO entries (CPU) ---
-    hess_S_coo_list = Int[]
-    hess_S_row_list = Int[]
-    hess_S_col_list = Int[]
-
-    hess_per_scenario_diag = [Tuple{Int,Int,Int}[] for _ in 1:ns]
-    hess_per_scenario_coupling = [Tuple{Int,Int,Int}[] for _ in 1:ns]
-
-    for ci in 1:n_hess
-        ri = Int(hess_sparsity_I[ci])
-        rj = Int(hess_sparsity_J[ci])
-
-        if ri >= d_start && ri <= d_end && rj >= d_start && rj <= d_end
-            di = ri - d_start + 1
-            dj = rj - d_start + 1
-            push!(hess_S_coo_list, ci)
-            push!(hess_S_row_list, di)
-            push!(hess_S_col_list, dj)
-            if di != dj
-                push!(hess_S_coo_list, ci)
-                push!(hess_S_row_list, dj)
-                push!(hess_S_col_list, di)
-            end
-            continue
-        end
-
-        if ri >= d_start && ri <= d_end && rj < d_start
-            di = ri - d_start + 1
-            k2 = div(rj - 1, nv) + 1
-            if k2 >= 1 && k2 <= ns
-                vj = rj - (k2-1)*nv
-                push!(hess_per_scenario_coupling[k2], (ci, di, vj))
-            end
-            continue
-        end
-
-        if ri < d_start && rj < d_start
-            ki = div(ri - 1, nv) + 1
-            kj = div(rj - 1, nv) + 1
-            if ki == kj && ki >= 1 && ki <= ns
-                li = ri - (ki-1)*nv
-                lj = rj - (ki-1)*nv
-                push!(hess_per_scenario_diag[ki], (ci, li, lj))
-            end
-        end
-    end
-
-    # --- Build scenario-1 A_kk sparsity (shared structure for all scenarios) ---
-    vr_start_1 = 1
-    eq_cons_1 = eq_per_scenario[1]
-    ineq_cons_1 = ineq_per_scenario[1]
-
-    eq_local_1 = Dict{Int,Int}()
-    for (ci, gi) in enumerate(eq_cons_1)
-        eq_local_1[gi] = ci
-    end
-
-    akk_entries = Dict{Tuple{Int,Int}, Nothing}()
-    for (_, li, lj) in hess_per_scenario_diag[1]
-        akk_entries[(li, lj)] = nothing
-    end
-    for i in 1:nv
-        akk_entries[(i, i)] = nothing
-    end
-    for gi in eq_cons_1
-        for (_, col) in get(jac_by_constraint, gi, Tuple{Int,Int}[])
-            if col >= vr_start_1 && col < vr_start_1 + nv
-                akk_entries[(nv + eq_local_1[gi], col - vr_start_1 + 1)] = nothing
-            end
-        end
-    end
-    for (ci, _) in enumerate(eq_cons_1)
-        akk_entries[(nv + ci, nv + ci)] = nothing
-    end
-    for gi in ineq_cons_1
-        local_vars = Int[]
-        for (_, col) in get(jac_by_constraint, gi, Tuple{Int,Int}[])
-            if col >= vr_start_1 && col < vr_start_1 + nv
-                push!(local_vars, col - vr_start_1 + 1)
-            end
-        end
-        for a in local_vars, b in local_vars
-            a >= b && (akk_entries[(a, b)] = nothing)
-        end
-    end
-
-    akk_nnz = length(akk_entries)
-    akk_I = Vector{Int32}(undef, akk_nnz)
-    akk_J = Vector{Int32}(undef, akk_nnz)
-    akk_V = zeros(T, akk_nnz)
-    for (idx, ((ri, rj), _)) in enumerate(akk_entries)
-        akk_I[idx] = Int32(ri)
-        akk_J[idx] = Int32(rj)
-    end
-
-    akk_coo_cpu = MadNLP.SparseMatrixCOO(blk_size, blk_size, akk_I, akk_J, akk_V)
-    akk_csc_cpu, _ = MadNLP.coo_to_csc(akk_coo_cpu)
-
-    akk_lookup = Dict{Tuple{Int,Int}, Int}()
-    for col in 1:blk_size
-        for p in akk_csc_cpu.colptr[col]:(akk_csc_cpu.colptr[col+1]-1)
-            row = akk_csc_cpu.rowval[p]
-            akk_lookup[(Int(row), Int(col))] = Int(p)
-        end
-    end
-
-    nnz_per_scenario = length(akk_csc_cpu.nzval)
-
-    # --- Build FLATTENED per-scenario index maps (all ns scenarios) ---
-    # Each map type: concatenate scenario 1..ns entries
-    all_hess_Akk_coo = Int[]
-    all_hess_Akk_nzpos = Int[]
-    all_hess_Cdk_coo = Int[]
-    all_hess_Cdk_row = Int[]
-    all_hess_Cdk_col = Int[]
-    all_pr_global = Int[]
-    all_pr_nzpos = Int[]
-    all_du_global = Int[]
-    all_du_nzpos = Int[]
-    all_jeq_Akk_coo = Int[]
-    all_jeq_Akk_nzpos = Int[]
-    all_jeq_Cdk_coo = Int[]
-    all_jeq_Cdk_row = Int[]
-    all_jeq_Cdk_col = Int[]
-    all_ineq_Akk_nzpos = Int[]
-    all_ineq_Akk_jcoo1 = Int[]
-    all_ineq_Akk_jcoo2 = Int[]
-    all_ineq_Akk_bufidx = Int[]
-    all_ineq_Cdk_row = Int[]
-    all_ineq_Cdk_col = Int[]
-    all_ineq_Cdk_jcoo_d = Int[]
-    all_ineq_Cdk_jcoo_v = Int[]
-    all_ineq_Cdk_bufidx = Int[]
-    all_ineq_S_row = Int[]
-    all_ineq_S_col = Int[]
-    all_ineq_S_jcoo1 = Int[]
-    all_ineq_S_jcoo2 = Int[]
-    all_ineq_S_bufidx = Int[]
-
-    n_per_s_hess_Akk = 0
-    n_per_s_hess_Cdk = 0
-    n_per_s_pr_diag = 0
-    n_per_s_du_diag = 0
-    n_per_s_jeq_Akk = 0
-    n_per_s_jeq_Cdk = 0
-    n_per_s_ineq_Akk = 0
-    n_per_s_ineq_Cdk = 0
-    n_per_s_ineq_S = 0
-
-    eq_global_flat = Int[]
-
-    for k in 1:ns
-        vr_start = (k-1)*nv + 1
-        eq_cons = eq_per_scenario[k]
-        ineq_cons = ineq_per_scenario[k]
-
-        eq_local = Dict{Int,Int}()
-        for (ci, gi) in enumerate(eq_cons)
-            eq_local[gi] = ci
-        end
-
-        # Hessian diagonal → A_kk
-        for (ci, li, lj) in hess_per_scenario_diag[k]
-            push!(all_hess_Akk_coo, ci)
-            push!(all_hess_Akk_nzpos, akk_lookup[(li, lj)])
-        end
-        if k == 1
-            n_per_s_hess_Akk = length(hess_per_scenario_diag[k])
-        end
-
-        # Hessian coupling → C_dk
-        for (ci, di, vj) in hess_per_scenario_coupling[k]
-            push!(all_hess_Cdk_coo, ci)
-            push!(all_hess_Cdk_row, di)
-            push!(all_hess_Cdk_col, vj)
-        end
-        if k == 1
-            n_per_s_hess_Cdk = length(hess_per_scenario_coupling[k])
-        end
-
-        # pr_diag → A_kk
-        for i in 1:nv
-            push!(all_pr_global, vr_start + i - 1)
-            push!(all_pr_nzpos, akk_lookup[(i, i)])
-        end
-        if k == 1
-            n_per_s_pr_diag = nv
-        end
-
-        # du_diag → A_kk
-        for (ci, gi) in enumerate(eq_cons)
-            push!(all_du_global, gi)
-            push!(all_du_nzpos, akk_lookup[(nv + ci, nv + ci)])
-        end
-        if k == 1
-            n_per_s_du_diag = length(eq_cons)
-        end
-
-        # Equality Jacobian → A_kk and C_dk
-        jeq_Akk_count = 0
-        jeq_Cdk_count = 0
-        for gi in eq_cons
-            leq = eq_local[gi]
-            for (coo_idx, col) in get(jac_by_constraint, gi, Tuple{Int,Int}[])
-                if col >= vr_start && col < vr_start + nv
-                    push!(all_jeq_Akk_coo, coo_idx)
-                    push!(all_jeq_Akk_nzpos, akk_lookup[(nv + leq, col - vr_start + 1)])
-                    jeq_Akk_count += 1
-                elseif col >= d_start && col <= d_end
-                    push!(all_jeq_Cdk_coo, coo_idx)
-                    push!(all_jeq_Cdk_row, col - d_start + 1)
-                    push!(all_jeq_Cdk_col, nv + leq)
-                    jeq_Cdk_count += 1
-                end
-            end
-        end
-        if k == 1
-            n_per_s_jeq_Akk = jeq_Akk_count
-            n_per_s_jeq_Cdk = jeq_Cdk_count
-        end
-
-        # Inequality condensation
-        ineq_Akk_count = 0
-        ineq_Cdk_count = 0
-        ineq_S_count = 0
-
-        for gi in ineq_cons
-            bidx = ineq_to_bufidx[gi]
-            jac_entries = get(jac_by_constraint, gi, Tuple{Int,Int}[])
-
-            v_entries = Tuple{Int,Int}[]
-            d_entries = Tuple{Int,Int}[]
-            for (coo_idx, col) in jac_entries
-                if col >= vr_start && col < vr_start + nv
-                    push!(v_entries, (coo_idx, col - vr_start + 1))
-                elseif col >= d_start && col <= d_end
-                    push!(d_entries, (coo_idx, col - d_start + 1))
-                end
-            end
-
-            for (coo_a, la) in v_entries, (coo_b, lb) in v_entries
-                if la >= lb
-                    push!(all_ineq_Akk_nzpos, akk_lookup[(la, lb)])
-                    push!(all_ineq_Akk_jcoo1, coo_a)
-                    push!(all_ineq_Akk_jcoo2, coo_b)
-                    push!(all_ineq_Akk_bufidx, bidx)
-                    ineq_Akk_count += 1
-                end
-            end
-
-            for (coo_d, di) in d_entries, (coo_v, lv) in v_entries
-                push!(all_ineq_Cdk_row, di)
-                push!(all_ineq_Cdk_col, lv)
-                push!(all_ineq_Cdk_jcoo_d, coo_d)
-                push!(all_ineq_Cdk_jcoo_v, coo_v)
-                push!(all_ineq_Cdk_bufidx, bidx)
-                ineq_Cdk_count += 1
-            end
-
-            for (coo_a, da) in d_entries, (coo_b, db) in d_entries
-                push!(all_ineq_S_row, da)
-                push!(all_ineq_S_col, db)
-                push!(all_ineq_S_jcoo1, coo_a)
-                push!(all_ineq_S_jcoo2, coo_b)
-                push!(all_ineq_S_bufidx, bidx)
-                ineq_S_count += 1
-            end
-        end
-        if k == 1
-            n_per_s_ineq_Akk = ineq_Akk_count
-            n_per_s_ineq_Cdk = ineq_Cdk_count
-            n_per_s_ineq_S = ineq_S_count
-        end
-
-        # Eq global indices
-        append!(eq_global_flat, eq_cons)
-    end
-
-    # --- Create batched CSC on GPU ---
+    # --- Create batched CSC on GPU (shared colptr/rowval, per-scenario nzval slabs) ---
     batched_colPtr = CuVector{Cint}(Vector{Cint}(akk_csc_cpu.colptr))
     batched_rowVal = CuVector{Cint}(Vector{Cint}(akk_csc_cpu.rowval))
     batched_nzVal = CUDA.fill(zero(T), ns * nnz_per_scenario)
@@ -572,38 +268,38 @@ function MadNLP.create_kkt_system(
     solve_buffer = CuVector{T}(undef, blk_size * ns)
 
     # --- Transfer flattened index maps to GPU ---
-    gpu_hess_Akk_coo = CuVector{Int}(all_hess_Akk_coo)
-    gpu_hess_Akk_nzpos = CuVector{Int}(all_hess_Akk_nzpos)
-    gpu_hess_Cdk_coo = CuVector{Int}(all_hess_Cdk_coo)
-    gpu_hess_Cdk_row = CuVector{Int}(all_hess_Cdk_row)
-    gpu_hess_Cdk_col = CuVector{Int}(all_hess_Cdk_col)
-    gpu_pr_diag_global = CuVector{Int}(all_pr_global)
-    gpu_pr_diag_nzpos = CuVector{Int}(all_pr_nzpos)
-    gpu_du_diag_global = CuVector{Int}(all_du_global)
-    gpu_du_diag_nzpos = CuVector{Int}(all_du_nzpos)
-    gpu_jeq_Akk_coo = CuVector{Int}(all_jeq_Akk_coo)
-    gpu_jeq_Akk_nzpos = CuVector{Int}(all_jeq_Akk_nzpos)
-    gpu_jeq_Cdk_coo = CuVector{Int}(all_jeq_Cdk_coo)
-    gpu_jeq_Cdk_row = CuVector{Int}(all_jeq_Cdk_row)
-    gpu_jeq_Cdk_col = CuVector{Int}(all_jeq_Cdk_col)
-    gpu_ineq_Akk_nzpos = CuVector{Int}(all_ineq_Akk_nzpos)
-    gpu_ineq_Akk_jcoo1 = CuVector{Int}(all_ineq_Akk_jcoo1)
-    gpu_ineq_Akk_jcoo2 = CuVector{Int}(all_ineq_Akk_jcoo2)
-    gpu_ineq_Akk_bufidx = CuVector{Int}(all_ineq_Akk_bufidx)
-    gpu_ineq_Cdk_row = CuVector{Int}(all_ineq_Cdk_row)
-    gpu_ineq_Cdk_col = CuVector{Int}(all_ineq_Cdk_col)
-    gpu_ineq_Cdk_jcoo_d = CuVector{Int}(all_ineq_Cdk_jcoo_d)
-    gpu_ineq_Cdk_jcoo_v = CuVector{Int}(all_ineq_Cdk_jcoo_v)
-    gpu_ineq_Cdk_bufidx = CuVector{Int}(all_ineq_Cdk_bufidx)
-    gpu_ineq_S_row = CuVector{Int}(all_ineq_S_row)
-    gpu_ineq_S_col = CuVector{Int}(all_ineq_S_col)
-    gpu_ineq_S_jcoo1 = CuVector{Int}(all_ineq_S_jcoo1)
-    gpu_ineq_S_jcoo2 = CuVector{Int}(all_ineq_S_jcoo2)
-    gpu_ineq_S_bufidx = CuVector{Int}(all_ineq_S_bufidx)
-    gpu_hess_S_coo = CuVector{Int}(hess_S_coo_list)
-    gpu_hess_S_row = CuVector{Int}(hess_S_row_list)
-    gpu_hess_S_col = CuVector{Int}(hess_S_col_list)
-    gpu_eq_global_indices = CuVector{Int}(eq_global_flat)
+    gpu_hess_Akk_coo    = CuVector{Int}(flat.all_hess_Akk_coo)
+    gpu_hess_Akk_nzpos  = CuVector{Int}(flat.all_hess_Akk_nzpos)
+    gpu_hess_Cdk_coo    = CuVector{Int}(flat.all_hess_Cdk_coo)
+    gpu_hess_Cdk_row    = CuVector{Int}(flat.all_hess_Cdk_row)
+    gpu_hess_Cdk_col    = CuVector{Int}(flat.all_hess_Cdk_col)
+    gpu_pr_diag_global  = CuVector{Int}(flat.all_pr_diag_global)
+    gpu_pr_diag_nzpos   = CuVector{Int}(flat.all_pr_diag_nzpos)
+    gpu_du_diag_global  = CuVector{Int}(flat.all_du_diag_global)
+    gpu_du_diag_nzpos   = CuVector{Int}(flat.all_du_diag_nzpos)
+    gpu_jeq_Akk_coo     = CuVector{Int}(flat.all_jeq_Akk_coo)
+    gpu_jeq_Akk_nzpos   = CuVector{Int}(flat.all_jeq_Akk_nzpos)
+    gpu_jeq_Cdk_coo     = CuVector{Int}(flat.all_jeq_Cdk_coo)
+    gpu_jeq_Cdk_row     = CuVector{Int}(flat.all_jeq_Cdk_row)
+    gpu_jeq_Cdk_col     = CuVector{Int}(flat.all_jeq_Cdk_col)
+    gpu_ineq_Akk_nzpos  = CuVector{Int}(flat.all_ineq_Akk_nzpos)
+    gpu_ineq_Akk_jcoo1  = CuVector{Int}(flat.all_ineq_Akk_jcoo1)
+    gpu_ineq_Akk_jcoo2  = CuVector{Int}(flat.all_ineq_Akk_jcoo2)
+    gpu_ineq_Akk_bufidx = CuVector{Int}(flat.all_ineq_Akk_bufidx)
+    gpu_ineq_Cdk_row    = CuVector{Int}(flat.all_ineq_Cdk_row)
+    gpu_ineq_Cdk_col    = CuVector{Int}(flat.all_ineq_Cdk_col)
+    gpu_ineq_Cdk_jcoo_d = CuVector{Int}(flat.all_ineq_Cdk_jcoo_d)
+    gpu_ineq_Cdk_jcoo_v = CuVector{Int}(flat.all_ineq_Cdk_jcoo_v)
+    gpu_ineq_Cdk_bufidx = CuVector{Int}(flat.all_ineq_Cdk_bufidx)
+    gpu_ineq_S_row      = CuVector{Int}(flat.all_ineq_S_row)
+    gpu_ineq_S_col      = CuVector{Int}(flat.all_ineq_S_col)
+    gpu_ineq_S_jcoo1    = CuVector{Int}(flat.all_ineq_S_jcoo1)
+    gpu_ineq_S_jcoo2    = CuVector{Int}(flat.all_ineq_S_jcoo2)
+    gpu_ineq_S_bufidx   = CuVector{Int}(flat.all_ineq_S_bufidx)
+    gpu_hess_S_coo      = CuVector{Int}(sym.hess_S_coo)
+    gpu_hess_S_row      = CuVector{Int}(sym.hess_S_row)
+    gpu_hess_S_col      = CuVector{Int}(sym.hess_S_col)
+    gpu_eq_global_indices = CuVector{Int}(sym.eq_global_flat)
 
     # --- Create solvers ---
     quasi_newton = MadNLP.create_quasi_newton(hessian_approximation, cb, n; options=qn_options)
@@ -620,15 +316,15 @@ function MadNLP.create_kkt_system(
         A_kk_batched, nnz_per_scenario,
         C_dk_batched, aug_com,
         diag_buffer, buffer, wy_eq_buf, rhs_d, rhs_k_batched, tmp_blk_nd_batched, S_contrib, solve_buffer,
-        n_per_s_hess_Akk, gpu_hess_Akk_coo, gpu_hess_Akk_nzpos,
-        n_per_s_hess_Cdk, gpu_hess_Cdk_coo, gpu_hess_Cdk_row, gpu_hess_Cdk_col,
-        n_per_s_pr_diag, gpu_pr_diag_global, gpu_pr_diag_nzpos,
-        n_per_s_du_diag, gpu_du_diag_global, gpu_du_diag_nzpos,
-        n_per_s_jeq_Akk, gpu_jeq_Akk_coo, gpu_jeq_Akk_nzpos,
-        n_per_s_jeq_Cdk, gpu_jeq_Cdk_coo, gpu_jeq_Cdk_row, gpu_jeq_Cdk_col,
-        n_per_s_ineq_Akk, gpu_ineq_Akk_nzpos, gpu_ineq_Akk_jcoo1, gpu_ineq_Akk_jcoo2, gpu_ineq_Akk_bufidx,
-        n_per_s_ineq_Cdk, gpu_ineq_Cdk_row, gpu_ineq_Cdk_col, gpu_ineq_Cdk_jcoo_d, gpu_ineq_Cdk_jcoo_v, gpu_ineq_Cdk_bufidx,
-        n_per_s_ineq_S, gpu_ineq_S_row, gpu_ineq_S_col, gpu_ineq_S_jcoo1, gpu_ineq_S_jcoo2, gpu_ineq_S_bufidx,
+        flat.n_per_s_hess_Akk, gpu_hess_Akk_coo, gpu_hess_Akk_nzpos,
+        flat.n_per_s_hess_Cdk, gpu_hess_Cdk_coo, gpu_hess_Cdk_row, gpu_hess_Cdk_col,
+        flat.n_per_s_pr_diag, gpu_pr_diag_global, gpu_pr_diag_nzpos,
+        flat.n_per_s_du_diag, gpu_du_diag_global, gpu_du_diag_nzpos,
+        flat.n_per_s_jeq_Akk, gpu_jeq_Akk_coo, gpu_jeq_Akk_nzpos,
+        flat.n_per_s_jeq_Cdk, gpu_jeq_Cdk_coo, gpu_jeq_Cdk_row, gpu_jeq_Cdk_col,
+        flat.n_per_s_ineq_Akk, gpu_ineq_Akk_nzpos, gpu_ineq_Akk_jcoo1, gpu_ineq_Akk_jcoo2, gpu_ineq_Akk_bufidx,
+        flat.n_per_s_ineq_Cdk, gpu_ineq_Cdk_row, gpu_ineq_Cdk_col, gpu_ineq_Cdk_jcoo_d, gpu_ineq_Cdk_jcoo_v, gpu_ineq_Cdk_bufidx,
+        flat.n_per_s_ineq_S, gpu_ineq_S_row, gpu_ineq_S_col, gpu_ineq_S_jcoo1, gpu_ineq_S_jcoo2, gpu_ineq_S_bufidx,
         gpu_hess_S_coo, gpu_hess_S_row, gpu_hess_S_col,
         gpu_eq_global_indices,
         n_eq_total, CuVector{Int}(cpu_ind_eq),
