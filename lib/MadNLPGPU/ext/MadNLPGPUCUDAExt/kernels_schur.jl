@@ -1,92 +1,45 @@
 ##################################################
 ##### GPU kernels for GPUSchurComplementKKT #####
 ##################################################
+#
+# Index convention: index maps for all scenarios are stored in flat arrays of
+# length `ns * n_per_s`, concatenated in scenario order. Per-scenario A_kk
+# blocks share row/col structure, so each scenario writes into its own slice
+# of the batched nzval at offset `(k-1) * nnz_per_block`. The kernel global
+# index `i` directly indexes the flat input arrays; the scenario index is
+# `k = (i-1) ÷ n_per_s + 1`.
 
-# Scatter Hessian diagonal entries → batched A_kk nzval
-# Flattened: index i maps to entry i in a flat array of (coo, nzpos) pairs across all scenarios
-@kernel function _scatter_hess_Akk_kernel!(
+# Scatter src[src_idx[i]] into batched A_kk nzval at the matching scenario slot.
+# Used for: Hessian diagonal entries, equality Jacobian entries, pr_diag, du_diag.
+@kernel function _scatter_to_Akk_batched!(
     nzval,
-    @Const(hess),
-    @Const(coo_flat),        # flat: scenario 1 entries, then scenario 2, etc.
-    @Const(nzpos_flat),      # flat nzpos
-    @Const(nnz_per_block),
-    @Const(n_per_s),         # entries per scenario
-)
-    i = @index(Global)
-    k = (i - 1) ÷ n_per_s + 1
-    idx = (i - 1) % n_per_s + 1
-    flat = (k - 1) * n_per_s + idx
-    offset = (k - 1) * nnz_per_block
-    @inbounds nzval[offset + nzpos_flat[flat]] += hess[coo_flat[flat]]
-end
-
-# Scatter Hessian coupling entries → C_dk_batched (nd × blk_size × ns)
-@kernel function _scatter_hess_Cdk_kernel!(
-    C_dk,                    # (nd, blk_size, ns)
-    @Const(hess),
-    @Const(coo_flat),
-    @Const(row_flat),        # design var index (1:nd)
-    @Const(col_flat),        # scenario local var (1:nv)
-    @Const(n_per_s),
-)
-    i = @index(Global)
-    k = (i - 1) ÷ n_per_s + 1
-    idx = (i - 1) % n_per_s + 1
-    flat = (k - 1) * n_per_s + idx
-    @inbounds C_dk[row_flat[flat], col_flat[flat], k] += hess[coo_flat[flat]]
-end
-
-# Scatter pr_diag or du_diag → batched A_kk diagonal
-@kernel function _scatter_diag_Akk_kernel!(
-    nzval,
-    @Const(diag_vals),       # global pr_diag or du_diag
-    @Const(global_flat),     # global index into diag_vals
-    @Const(nzpos_flat),      # A_kk nzval position
-    @Const(nnz_per_block),
-    @Const(n_per_s),
-)
-    i = @index(Global)
-    k = (i - 1) ÷ n_per_s + 1
-    idx = (i - 1) % n_per_s + 1
-    flat = (k - 1) * n_per_s + idx
-    offset = (k - 1) * nnz_per_block
-    @inbounds nzval[offset + nzpos_flat[flat]] += diag_vals[global_flat[flat]]
-end
-
-# Scatter equality Jacobian → A_kk lower triangle
-@kernel function _scatter_jeq_Akk_kernel!(
-    nzval,
-    @Const(jac),
-    @Const(coo_flat),
+    @Const(src),
+    @Const(src_idx),
     @Const(nzpos_flat),
     @Const(nnz_per_block),
     @Const(n_per_s),
 )
     i = @index(Global)
-    k = (i - 1) ÷ n_per_s + 1
-    idx = (i - 1) % n_per_s + 1
-    flat = (k - 1) * n_per_s + idx
-    offset = (k - 1) * nnz_per_block
-    @inbounds nzval[offset + nzpos_flat[flat]] += jac[coo_flat[flat]]
+    offset = ((i - 1) ÷ n_per_s) * nnz_per_block
+    @inbounds nzval[offset + nzpos_flat[i]] += src[src_idx[i]]
 end
 
-# Scatter equality Jacobian coupling → C_dk_batched
-@kernel function _scatter_jeq_Cdk_kernel!(
-    C_dk,                    # (nd, blk_size, ns)
-    @Const(jac),
-    @Const(coo_flat),
+# Scatter src[src_idx[i]] into C_dk[row, col, k] (nd × blk_size × ns).
+# Used for: Hessian coupling entries, equality Jacobian coupling entries.
+@kernel function _scatter_to_Cdk_batched!(
+    C_dk,
+    @Const(src),
+    @Const(src_idx),
     @Const(row_flat),
     @Const(col_flat),
     @Const(n_per_s),
 )
     i = @index(Global)
     k = (i - 1) ÷ n_per_s + 1
-    idx = (i - 1) % n_per_s + 1
-    flat = (k - 1) * n_per_s + idx
-    @inbounds C_dk[row_flat[flat], col_flat[flat], k] += jac[coo_flat[flat]]
+    @inbounds C_dk[row_flat[i], col_flat[i], k] += src[src_idx[i]]
 end
 
-# Inequality condensation → A_kk (lower triangle)
+# Inequality condensation → A_kk (lower triangle).
 @kernel function _ineq_condense_Akk_kernel!(
     nzval,
     @Const(jac),
@@ -99,12 +52,9 @@ end
     @Const(n_per_s),
 )
     i = @index(Global)
-    k = (i - 1) ÷ n_per_s + 1
-    idx = (i - 1) % n_per_s + 1
-    flat = (k - 1) * n_per_s + idx
-    offset = (k - 1) * nnz_per_block
-    @inbounds nzval[offset + nzpos_flat[flat]] += diag_buffer[bufidx_flat[flat]] *
-        jac[jcoo1_flat[flat]] * jac[jcoo2_flat[flat]]
+    offset = ((i - 1) ÷ n_per_s) * nnz_per_block
+    @inbounds nzval[offset + nzpos_flat[i]] += diag_buffer[bufidx_flat[i]] *
+        jac[jcoo1_flat[i]] * jac[jcoo2_flat[i]]
 end
 
 # Inequality condensation → C_dk
@@ -121,13 +71,12 @@ end
 )
     i = @index(Global)
     k = (i - 1) ÷ n_per_s + 1
-    idx = (i - 1) % n_per_s + 1
-    flat = (k - 1) * n_per_s + idx
-    @inbounds C_dk[row_flat[flat], col_flat[flat], k] += diag_buffer[bufidx_flat[flat]] *
-        jac[jcoo_d_flat[flat]] * jac[jcoo_v_flat[flat]]
+    @inbounds C_dk[row_flat[i], col_flat[i], k] += diag_buffer[bufidx_flat[i]] *
+        jac[jcoo_d_flat[i]] * jac[jcoo_v_flat[i]]
 end
 
-# Inequality condensation → S (uses CUDA.@atomic for concurrent writes to small nd×nd matrix)
+# Inequality condensation → S (atomic adds since multiple scenarios target the
+# same nd × nd dense matrix).
 @kernel function _ineq_condense_S_kernel!(
     S,
     @Const(jac),
@@ -137,19 +86,11 @@ end
     @Const(jcoo1_flat),
     @Const(jcoo2_flat),
     @Const(bufidx_flat),
-    @Const(n_per_s),
-    @Const(ns),
 )
     i = @index(Global)
-    k = (i - 1) ÷ n_per_s + 1
-    idx = (i - 1) % n_per_s + 1
-    flat = (k - 1) * n_per_s + idx
-    if k <= ns
-        @inbounds begin
-            val = diag_buffer[bufidx_flat[flat]] *
-                jac[jcoo1_flat[flat]] * jac[jcoo2_flat[flat]]
-            CUDA.@atomic S[row_flat[flat], col_flat[flat]] += val
-        end
+    @inbounds begin
+        val = diag_buffer[bufidx_flat[i]] * jac[jcoo1_flat[i]] * jac[jcoo2_flat[i]]
+        CUDA.@atomic S[row_flat[i], col_flat[i]] += val
     end
 end
 

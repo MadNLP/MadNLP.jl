@@ -5,9 +5,20 @@
 """
     GPUSchurComplementKKTSystem
 
-GPU-native Schur complement KKT system. Uses a single batched CuSparseMatrixCSC
-for all scenario blocks (factored by CUDSSSolver with uniform batching) and
-CUBLAS strided batched GEMM for the Schur complement accumulation.
+GPU-native Schur complement KKT system, the CUDA counterpart of CPU
+[`MadNLP.SchurComplementKKTSystem`](@ref). Uses a single batched
+`CuSparseMatrixCSC` holding all `ns` scenario blocks (factored by `CUDSSSolver`
+with uniform batching) and CUBLAS strided batched GEMM for the Schur complement
+accumulation.
+
+Variable layout: `[v_1, ..., v_ns, d]`, `v_k ∈ R^nv`, `d ∈ R^nd`.
+Constraint layout: `[c_1, ..., c_ns]`, `c_k ∈ R^nc`.
+
+The CPU version's `Vector{ScenarioBlockMap}` is flattened here into a set of
+device vectors, one per (block-target × source-tensor) pair, with all `ns`
+scenarios concatenated in scenario order. Each `n_per_s_*` field stores the
+per-scenario length; the matching `gpu_*` vector then has length `ns * n_per_s_*`
+and is indexed directly by the kernel global index.
 """
 struct GPUSchurComplementKKTSystem{
     T,
@@ -67,14 +78,15 @@ struct GPUSchurComplementKKTSystem{
     # Buffers
     diag_buffer::VT
     buffer::VT
+    wy_eq_buf::VT                       # n_eq — preserves eq duals across J*Δx round-trip
     rhs_d::VT
     rhs_k_batched::MT                   # (blk_size, ns)
     tmp_blk_nd_batched::CuArray{T, 3}   # (blk_size, nd, ns)
     S_contrib::CuArray{T, 3}            # (nd, nd, ns)
     solve_buffer::VT                    # blk_size * ns
 
-    # Flattened GPU index maps (all scenarios concatenated)
-    # n_per_s_* fields store entries-per-scenario for kernel dispatch
+    # Flattened GPU index maps (all scenarios concatenated in scenario order).
+    # See struct docstring for the layout convention.
     n_per_s_hess_Akk::Int
     gpu_hess_Akk_coo::VI
     gpu_hess_Akk_nzpos::VI
@@ -138,7 +150,6 @@ struct GPUSchurComplementKKTSystem{
     # Solvers
     scenario_solver::LS2
     linear_solver::LS
-    etc::Dict{Symbol, Any}
 end
 
 # --- Dispatch: GPU path when callback uses CuVector ---
@@ -163,29 +174,7 @@ function MadNLP.create_kkt_system(
     nlb = length(cb.ind_lb)
     nub = length(cb.ind_ub)
 
-    # Auto-detect dimensions from TwoStageTags if not provided
-    if schur_ns == 0 && hasproperty(cb.nlp, :tags)
-        tags = cb.nlp.tags
-        if hasproperty(tags, :ns) && hasproperty(tags, :var_scenario) && hasproperty(tags, :con_scenario)
-            schur_ns = tags.ns
-            var_scen = Array(tags.var_scenario)
-            con_scen = Array(tags.con_scenario)
-            schur_nd = count(==(0), var_scen)
-            schur_nv = count(==(1), var_scen)
-            schur_nc = count(==(1), con_scen)
-        end
-    end
-
-    @assert schur_ns > 0 "schur_ns must be specified and positive (or use TwoStageTags for auto-detection)"
-    @assert schur_nv > 0 "schur_nv must be specified and positive"
-    @assert schur_nd > 0 "schur_nd must be specified and positive"
-    @assert n == schur_ns * schur_nv + schur_nd
-    @assert m == schur_ns * schur_nc
-
-    ns = schur_ns
-    nv = schur_nv
-    nd = schur_nd
-    nc = schur_nc
+    ns, nv, nd, nc = MadNLP._resolve_schur_dims(cb, n, m, schur_ns, schur_nv, schur_nd, schur_nc)
 
     # --- Get sparsity patterns on CPU ---
     jac_sparsity_I = Vector{Int32}(undef, cb.nnzj)
@@ -577,6 +566,7 @@ function MadNLP.create_kkt_system(
     # --- Buffers ---
     diag_buffer = CuVector{T}(undef, max(ns_ineq, 1))
     buffer      = CuVector{T}(undef, m)
+    wy_eq_buf   = CuVector{T}(undef, n_eq_total)
     rhs_d       = CuVector{T}(undef, nd)
     rhs_k_batched = CuMatrix{T}(undef, blk_size, ns)
     solve_buffer = CuVector{T}(undef, blk_size * ns)
@@ -629,7 +619,7 @@ function MadNLP.create_kkt_system(
         ns, nv, nd, nc, nc_eq_per_s, nc_ineq_per_s, blk_size,
         A_kk_batched, nnz_per_scenario,
         C_dk_batched, aug_com,
-        diag_buffer, buffer, rhs_d, rhs_k_batched, tmp_blk_nd_batched, S_contrib, solve_buffer,
+        diag_buffer, buffer, wy_eq_buf, rhs_d, rhs_k_batched, tmp_blk_nd_batched, S_contrib, solve_buffer,
         n_per_s_hess_Akk, gpu_hess_Akk_coo, gpu_hess_Akk_nzpos,
         n_per_s_hess_Cdk, gpu_hess_Cdk_coo, gpu_hess_Cdk_row, gpu_hess_Cdk_col,
         n_per_s_pr_diag, gpu_pr_diag_global, gpu_pr_diag_nzpos,
@@ -644,7 +634,6 @@ function MadNLP.create_kkt_system(
         n_eq_total, CuVector{Int}(cpu_ind_eq),
         ns_ineq, CuVector{Int}(cpu_ind_ineq), CuVector{Int}(cpu_ind_lb), CuVector{Int}(cpu_ind_ub),
         scenario_solver, _linear_solver,
-        Dict{Symbol, Any}(),
     )
 end
 
@@ -657,8 +646,10 @@ function MadNLP.get_slack_regularization(kkt::GPUSchurComplementKKTSystem)
 end
 
 function MadNLP.is_inertia_correct(kkt::GPUSchurComplementKKTSystem, num_pos, num_zero, num_neg)
-    return (num_zero == 0 && num_neg == 0)
+    return (num_zero == 0) && (num_pos == size(kkt.aug_com, 1))
 end
+
+MadNLP.should_regularize_dual(kkt::GPUSchurComplementKKTSystem, num_pos, num_zero, num_neg) = true
 
 MadNLP.nnz_jacobian(kkt::GPUSchurComplementKKTSystem) = MadNLP.nnz(kkt.jt_coo)
 
@@ -718,7 +709,7 @@ function MadNLP.build_kkt!(kkt::GPUSchurComplementKKTSystem{T}) where T
     # Scatter Hessian diagonal → A_kk (flattened maps)
     n_hA = kkt.n_per_s_hess_Akk
     if n_hA > 0
-        _scatter_hess_Akk_kernel!(backend)(
+        _scatter_to_Akk_batched!(backend)(
             nzval, kkt.hess, kkt.gpu_hess_Akk_coo, kkt.gpu_hess_Akk_nzpos,
             nnz_s, n_hA;
             ndrange=ns * n_hA,
@@ -728,7 +719,7 @@ function MadNLP.build_kkt!(kkt::GPUSchurComplementKKTSystem{T}) where T
     # Scatter Hessian coupling → C_dk
     n_hC = kkt.n_per_s_hess_Cdk
     if n_hC > 0
-        _scatter_hess_Cdk_kernel!(backend)(
+        _scatter_to_Cdk_batched!(backend)(
             kkt.C_dk_batched, kkt.hess, kkt.gpu_hess_Cdk_coo,
             kkt.gpu_hess_Cdk_row, kkt.gpu_hess_Cdk_col, n_hC;
             ndrange=ns * n_hC,
@@ -738,7 +729,7 @@ function MadNLP.build_kkt!(kkt::GPUSchurComplementKKTSystem{T}) where T
     # Scatter pr_diag → A_kk diagonal
     n_pr = kkt.n_per_s_pr_diag
     if n_pr > 0
-        _scatter_diag_Akk_kernel!(backend)(
+        _scatter_to_Akk_batched!(backend)(
             nzval, kkt.pr_diag, kkt.gpu_pr_diag_global, kkt.gpu_pr_diag_nzpos,
             nnz_s, n_pr;
             ndrange=ns * n_pr,
@@ -748,7 +739,7 @@ function MadNLP.build_kkt!(kkt::GPUSchurComplementKKTSystem{T}) where T
     # Scatter du_diag → A_kk diagonal
     n_du = kkt.n_per_s_du_diag
     if n_du > 0
-        _scatter_diag_Akk_kernel!(backend)(
+        _scatter_to_Akk_batched!(backend)(
             nzval, kkt.du_diag, kkt.gpu_du_diag_global, kkt.gpu_du_diag_nzpos,
             nnz_s, n_du;
             ndrange=ns * n_du,
@@ -758,7 +749,7 @@ function MadNLP.build_kkt!(kkt::GPUSchurComplementKKTSystem{T}) where T
     # Scatter equality Jacobian → A_kk
     n_jA = kkt.n_per_s_jeq_Akk
     if n_jA > 0
-        _scatter_jeq_Akk_kernel!(backend)(
+        _scatter_to_Akk_batched!(backend)(
             nzval, kkt.jac, kkt.gpu_jeq_Akk_coo, kkt.gpu_jeq_Akk_nzpos,
             nnz_s, n_jA;
             ndrange=ns * n_jA,
@@ -768,7 +759,7 @@ function MadNLP.build_kkt!(kkt::GPUSchurComplementKKTSystem{T}) where T
     # Scatter equality Jacobian coupling → C_dk
     n_jC = kkt.n_per_s_jeq_Cdk
     if n_jC > 0
-        _scatter_jeq_Cdk_kernel!(backend)(
+        _scatter_to_Cdk_batched!(backend)(
             kkt.C_dk_batched, kkt.jac, kkt.gpu_jeq_Cdk_coo,
             kkt.gpu_jeq_Cdk_row, kkt.gpu_jeq_Cdk_col, n_jC;
             ndrange=ns * n_jC,
@@ -806,7 +797,7 @@ function MadNLP.build_kkt!(kkt::GPUSchurComplementKKTSystem{T}) where T
             kkt.aug_com, kkt.jac, kkt.diag_buffer,
             kkt.gpu_ineq_S_row, kkt.gpu_ineq_S_col,
             kkt.gpu_ineq_S_jcoo1, kkt.gpu_ineq_S_jcoo2,
-            kkt.gpu_ineq_S_bufidx, n_iS, ns;
+            kkt.gpu_ineq_S_bufidx;
             ndrange=ns * n_iS,
         )
     end
@@ -923,29 +914,15 @@ function MadNLP.solve_kkt!(
 
     # Step 7: Recover inequality duals and slacks
     if kkt.n_ineq > 0
-        # Save equality duals
-        eq_backup = similar(wy, nc_eq * ns)
-        flat_idx = 1
-        for k in 1:ns
-            for eq_i in 1:nc_eq
-                gi_idx = (k-1)*nc_eq + eq_i
-                CUDA.@allowscalar eq_backup[flat_idx] = wy[kkt.eq_global_indices[gi_idx]]
-                flat_idx += 1
-            end
-        end
+        # Stash eq duals; mul! below overwrites all of wy.
+        # Vectorized GPU gather/scatter — no @allowscalar.
+        copyto!(kkt.wy_eq_buf, view(wy, kkt.eq_global_indices))
 
         # J * Δx
         mul!(wy, kkt.jt_csc', wx)
 
         # Restore equality duals
-        flat_idx = 1
-        for k in 1:ns
-            for eq_i in 1:nc_eq
-                gi_idx = (k-1)*nc_eq + eq_i
-                CUDA.@allowscalar wy[kkt.eq_global_indices[gi_idx]] = eq_backup[flat_idx]
-                flat_idx += 1
-            end
-        end
+        view(wy, kkt.eq_global_indices) .= kkt.wy_eq_buf
 
         # Inequality dual recovery
         wy[kkt.ind_ineq] .= kkt.diag_buffer .* wy[kkt.ind_ineq] .- kkt.buffer[kkt.ind_ineq]

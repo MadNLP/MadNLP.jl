@@ -122,6 +122,7 @@ struct SchurComplementKKTSystem{
     # Buffers
     diag_buffer::VT                 # n_ineq — condensing diagonal
     buffer::VT                      # m_total — general
+    wy_eq_buf::VT                   # n_eq — preserves eq duals across J*Δx round-trip
     rhs_d::VT                       # nd — design RHS
     rhs_k::Vector{VT}              # ns × blk_size — scenario RHS buffers
     tmp_blk_nd::Vector{MT}         # ns × (blk_size × nd)
@@ -148,17 +149,67 @@ struct SchurComplementKKTSystem{
     # Solvers
     scenario_solvers::Vector{LS2}
     linear_solver::LS               # for Schur complement S (dense)
-    etc::Dict{Symbol, Any}
 end
 
-# --- Helper: find index of gi in ind_ineq → diag_buffer index ---
-function _ineq_buf_idx(ind_ineq, gi::Int)
-    @inbounds for idx in 1:length(ind_ineq)
-        if ind_ineq[idx] == gi
-            return idx
+"""
+    _resolve_schur_dims(cb, n, m, schur_ns, schur_nv, schur_nd, schur_nc)
+    -> (ns, nv, nd, nc)
+
+Resolve two-stage stochastic dimensions for a SchurComplementKKTSystem.
+
+If `schur_ns == 0`, attempt to auto-detect from `cb.nlp.tags::TwoStageTags`
+(an ExaModel convention): `tags.var_scenario[i] == 0` flags design variables,
+`== 1` flags scenario variables; same encoding for `con_scenario`.
+
+Asserts that the resolved dimensions are consistent with `n` and `m`.
+"""
+function _resolve_schur_dims(cb, n, m, schur_ns, schur_nv, schur_nd, schur_nc)
+    if schur_ns == 0 && hasproperty(cb.nlp, :tags)
+        tags = cb.nlp.tags
+        if hasproperty(tags, :ns) && hasproperty(tags, :var_scenario) && hasproperty(tags, :con_scenario)
+            schur_ns = tags.ns
+            var_scen = Array(tags.var_scenario)
+            con_scen = Array(tags.con_scenario)
+            schur_nd = count(==(0), var_scen)
+            schur_nv = count(==(1), var_scen)
+            schur_nc = count(==(1), con_scen)
         end
     end
-    return 0
+
+    @assert schur_ns > 0 "schur_ns must be specified and positive (or use TwoStageTags for auto-detection)"
+    @assert schur_nv > 0 "schur_nv must be specified and positive"
+    @assert schur_nd > 0 "schur_nd must be specified and positive"
+    @assert n == schur_ns * schur_nv + schur_nd "Variable count mismatch: n=$n != ns*nv+nd=$(schur_ns*schur_nv+schur_nd)"
+    @assert m == schur_ns * schur_nc "Constraint count mismatch: m=$m != ns*nc=$(schur_ns*schur_nc)"
+
+    return schur_ns, schur_nv, schur_nd, schur_nc
+end
+
+# --- Index-driven scatter helpers used by build_kkt! ---
+# Each call site reads as a one-liner instead of an open-coded for loop.
+
+@inline function _scatter_add!(dst::AbstractVector, src::AbstractVector, src_idx, dst_idx)
+    @inbounds for i in eachindex(src_idx)
+        dst[dst_idx[i]] += src[src_idx[i]]
+    end
+end
+
+@inline function _scatter_add!(dst::AbstractMatrix, src::AbstractVector, src_idx, row, col)
+    @inbounds for i in eachindex(src_idx)
+        dst[row[i], col[i]] += src[src_idx[i]]
+    end
+end
+
+@inline function _scatter_quad_add!(dst::AbstractVector, src::AbstractVector, diag, dst_idx, idx1, idx2, bufidx)
+    @inbounds for i in eachindex(dst_idx)
+        dst[dst_idx[i]] += diag[bufidx[i]] * src[idx1[i]] * src[idx2[i]]
+    end
+end
+
+@inline function _scatter_quad_add!(dst::AbstractMatrix, src::AbstractVector, diag, row, col, idx1, idx2, bufidx)
+    @inbounds for i in eachindex(row)
+        dst[row[i], col[i]] += diag[bufidx[i]] * src[idx1[i]] * src[idx2[i]]
+    end
 end
 
 function create_kkt_system(
@@ -182,29 +233,7 @@ function create_kkt_system(
     nlb = length(cb.ind_lb)
     nub = length(cb.ind_ub)
 
-    # Auto-detect dimensions from TwoStageTags if not provided
-    if schur_ns == 0 && hasproperty(cb.nlp, :tags)
-        tags = cb.nlp.tags
-        if hasproperty(tags, :ns) && hasproperty(tags, :var_scenario) && hasproperty(tags, :con_scenario)
-            schur_ns = tags.ns
-            var_scen = Array(tags.var_scenario)
-            con_scen = Array(tags.con_scenario)
-            schur_nd = count(==(0), var_scen)
-            schur_nv = count(==(1), var_scen)
-            schur_nc = count(==(1), con_scen)
-        end
-    end
-
-    @assert schur_ns > 0 "schur_ns must be specified and positive (or use TwoStageTags for auto-detection)"
-    @assert schur_nv > 0 "schur_nv must be specified and positive"
-    @assert schur_nd > 0 "schur_nd must be specified and positive"
-    @assert n == schur_ns * schur_nv + schur_nd "Variable count mismatch: n=$n != ns*nv+nd=$(schur_ns*schur_nv+schur_nd)"
-    @assert m == schur_ns * schur_nc "Constraint count mismatch: m=$m != ns*nc=$(schur_ns*schur_nc)"
-
-    ns = schur_ns
-    nv = schur_nv
-    nd = schur_nd
-    nc = schur_nc
+    ns, nv, nd, nc = _resolve_schur_dims(cb, n, m, schur_ns, schur_nv, schur_nd, schur_nc)
 
     # --- Get sparsity patterns ---
     jac_sparsity_I = Vector{Int32}(undef, cb.nnzj)
@@ -595,6 +624,7 @@ function create_kkt_system(
     # --- Buffers ---
     diag_buffer = VT(undef, ns_ineq)
     buffer      = VT(undef, m)
+    wy_eq_buf   = VT(undef, n_eq)
     rhs_d       = VT(undef, nd)
     rhs_k       = [VT(undef, blk_size) for _ in 1:ns]
     solve_buffers = [VT(undef, blk_size) for _ in 1:ns]
@@ -619,7 +649,7 @@ function create_kkt_system(
         nc_eq_per_s, nc_ineq_per_s, blk_size,
         A_kk_vec, C_dk,
         aug_com,
-        diag_buffer, buffer, rhs_d, rhs_k, tmp_blk_nd, solve_buffers,
+        diag_buffer, buffer, wy_eq_buf, rhs_d, rhs_k, tmp_blk_nd, solve_buffers,
         block_maps,
         hess_S_coo_list, hess_S_row_list, hess_S_col_list,
         eq_per_scenario, ineq_per_scenario,
@@ -627,7 +657,6 @@ function create_kkt_system(
         ns_ineq, cb.ind_ineq, cb.ind_lb, cb.ind_ub,
         scenario_solvers,
         _linear_solver,
-        Dict{Symbol, Any}(),
     )
 end
 
@@ -640,8 +669,10 @@ function get_slack_regularization(kkt::SchurComplementKKTSystem)
 end
 
 function is_inertia_correct(kkt::SchurComplementKKTSystem, num_pos, num_zero, num_neg)
-    return (num_zero == 0 && num_neg == 0)
+    return (num_zero == 0) && (num_pos == size(kkt.aug_com, 1))
 end
+
+should_regularize_dual(kkt::SchurComplementKKTSystem, num_pos, num_zero, num_neg) = true
 
 function jtprod!(y::AbstractVector, kkt::SchurComplementKKTSystem, x::AbstractVector)
     nx = num_variables(kkt)
@@ -677,15 +708,10 @@ function build_kkt!(kkt::SchurComplementKKTSystem{T, VT, MT}) where {T, VT, MT}
         kkt.diag_buffer .= Sigma_s ./ (one(T) .- Sigma_d .* Sigma_s)
     end
 
-    # Initialize Schur complement S
+    # Initialize Schur complement S = H_dd + diag(pr_diag_dd)
     S = kkt.aug_com
     fill!(S, zero(T))
-
-    # S += H_dd (from precomputed Hessian design-design entries)
-    @inbounds for idx in 1:length(kkt.hess_S_coo)
-        S[kkt.hess_S_row[idx], kkt.hess_S_col[idx]] += kkt.hess[kkt.hess_S_coo[idx]]
-    end
-    # S += pr_diag_dd
+    _scatter_add!(S, kkt.hess, kkt.hess_S_coo, kkt.hess_S_row, kkt.hess_S_col)
     @inbounds for i in 1:nd
         S[i, i] += kkt.pr_diag[ns*nv+i]
     end
@@ -695,51 +721,22 @@ function build_kkt!(kkt::SchurComplementKKTSystem{T, VT, MT}) where {T, VT, MT}
         bm = kkt.block_maps[k]
         A_kk = kkt.A_kk[k]
         C_dk = kkt.C_dk[k]
+        nz = A_kk.nzval
 
-        fill!(A_kk.nzval, zero(T))
+        fill!(nz, zero(T))
         fill!(C_dk, zero(T))
 
-        # Scatter Hessian diagonal entries → A_kk
-        @inbounds for idx in 1:length(bm.hess_Akk_coo)
-            A_kk.nzval[bm.hess_Akk_nzpos[idx]] += kkt.hess[bm.hess_Akk_coo[idx]]
-        end
-
-        # Scatter Hessian coupling entries → C_dk
-        @inbounds for idx in 1:length(bm.hess_Cdk_coo)
-            C_dk[bm.hess_Cdk_row[idx], bm.hess_Cdk_col[idx]] += kkt.hess[bm.hess_Cdk_coo[idx]]
-        end
-
-        # Add pr_diag to A_kk diagonal
-        @inbounds for idx in 1:length(bm.pr_diag_global)
-            A_kk.nzval[bm.pr_diag_nzpos[idx]] += kkt.pr_diag[bm.pr_diag_global[idx]]
-        end
-
-        # Add du_diag to A_kk diagonal
-        @inbounds for idx in 1:length(bm.du_diag_global)
-            A_kk.nzval[bm.du_diag_nzpos[idx]] += kkt.du_diag[bm.du_diag_global[idx]]
-        end
-
-        # Scatter equality Jacobian → A_kk (lower triangle only)
-        @inbounds for idx in 1:length(bm.jeq_Akk_coo)
-            A_kk.nzval[bm.jeq_Akk_nzpos[idx]] += kkt.jac[bm.jeq_Akk_coo[idx]]
-        end
-
-        # Scatter equality Jacobian coupling → C_dk
-        @inbounds for idx in 1:length(bm.jeq_Cdk_coo)
-            C_dk[bm.jeq_Cdk_row[idx], bm.jeq_Cdk_col[idx]] += kkt.jac[bm.jeq_Cdk_coo[idx]]
-        end
-
-        # Inequality condensation → A_kk (lower triangle)
-        @inbounds for idx in 1:length(bm.ineq_Akk_nzpos)
-            A_kk.nzval[bm.ineq_Akk_nzpos[idx]] += kkt.diag_buffer[bm.ineq_Akk_bufidx[idx]] *
-                kkt.jac[bm.ineq_Akk_jcoo1[idx]] * kkt.jac[bm.ineq_Akk_jcoo2[idx]]
-        end
-
-        # Inequality condensation → C_dk
-        @inbounds for idx in 1:length(bm.ineq_Cdk_row)
-            C_dk[bm.ineq_Cdk_row[idx], bm.ineq_Cdk_col[idx]] += kkt.diag_buffer[bm.ineq_Cdk_bufidx[idx]] *
-                kkt.jac[bm.ineq_Cdk_jcoo_d[idx]] * kkt.jac[bm.ineq_Cdk_jcoo_v[idx]]
-        end
+        _scatter_add!(nz,   kkt.hess,    bm.hess_Akk_coo,    bm.hess_Akk_nzpos)
+        _scatter_add!(C_dk, kkt.hess,    bm.hess_Cdk_coo,    bm.hess_Cdk_row, bm.hess_Cdk_col)
+        _scatter_add!(nz,   kkt.pr_diag, bm.pr_diag_global,  bm.pr_diag_nzpos)
+        _scatter_add!(nz,   kkt.du_diag, bm.du_diag_global,  bm.du_diag_nzpos)
+        _scatter_add!(nz,   kkt.jac,     bm.jeq_Akk_coo,     bm.jeq_Akk_nzpos)
+        _scatter_add!(C_dk, kkt.jac,     bm.jeq_Cdk_coo,     bm.jeq_Cdk_row, bm.jeq_Cdk_col)
+        _scatter_quad_add!(nz,   kkt.jac, kkt.diag_buffer,
+                           bm.ineq_Akk_nzpos, bm.ineq_Akk_jcoo1, bm.ineq_Akk_jcoo2, bm.ineq_Akk_bufidx)
+        _scatter_quad_add!(C_dk, kkt.jac, kkt.diag_buffer,
+                           bm.ineq_Cdk_row, bm.ineq_Cdk_col,
+                           bm.ineq_Cdk_jcoo_d, bm.ineq_Cdk_jcoo_v, bm.ineq_Cdk_bufidx)
 
         # Factor A_kk
         factorize!(kkt.scenario_solvers[k])
@@ -760,13 +757,9 @@ function build_kkt!(kkt::SchurComplementKKTSystem{T, VT, MT}) where {T, VT, MT}
     # Phase 2 (sequential): accumulate into shared Schur complement S
     for k in 1:ns
         bm = kkt.block_maps[k]
-
-        # Inequality condensation → S
-        @inbounds for idx in 1:length(bm.ineq_S_row)
-            S[bm.ineq_S_row[idx], bm.ineq_S_col[idx]] += kkt.diag_buffer[bm.ineq_S_bufidx[idx]] *
-                kkt.jac[bm.ineq_S_jcoo1[idx]] * kkt.jac[bm.ineq_S_jcoo2[idx]]
-        end
-
+        _scatter_quad_add!(S, kkt.jac, kkt.diag_buffer,
+                           bm.ineq_S_row, bm.ineq_S_col,
+                           bm.ineq_S_jcoo1, bm.ineq_S_jcoo2, bm.ineq_S_bufidx)
         # S -= C_dk * A_kk^{-1} * C_dk'
         mul!(S, kkt.C_dk[k], kkt.tmp_blk_nd[k], -one(T), one(T))
     end
@@ -856,19 +849,14 @@ function solve_kkt!(
 
     # Step 7: Recover inequality duals and slacks
     if kkt.n_ineq > 0
-        eq_duals_backup = [wy[gi] for k in 1:ns for (_, gi) in enumerate(kkt.eq_per_scenario[k])]
+        # Stash eq duals; mul! below overwrites all of wy
+        copyto!(kkt.wy_eq_buf, view(wy, kkt.ind_eq))
 
         # J * Δx via sparse: (jt_csc)' * wx
         mul!(wy, kkt.jt_csc', wx)
 
         # Restore equality duals
-        idx = 1
-        for k in 1:ns
-            for (_, gi) in enumerate(kkt.eq_per_scenario[k])
-                wy[gi] = eq_duals_backup[idx]
-                idx += 1
-            end
-        end
+        view(wy, kkt.ind_eq) .= kkt.wy_eq_buf
 
         # Inequality dual recovery
         @inbounds for idx in 1:length(kkt.ind_ineq)
