@@ -89,8 +89,7 @@ nothing
 [`SchurComplementKKTSystem`](@ref) needs to know the four scenario dimensions
 `(ns, nv, nd, nc)` so it can carve the global sparsity into per-scenario
 blocks. They are passed through the `kkt_options` argument of `madnlp`. The
-helper [`MadNLPTests.schur_opts`](@ref) just packs them into the expected
-dictionary.
+helper `MadNLPTests.schur_opts` just packs them into the expected dictionary.
 
 ```@example schur
 results = madnlp(
@@ -123,7 +122,7 @@ nothing
 
 ### Choosing the per-scenario solver
 
-By default each per-scenario block is factored by [`LDLSolver`](@ref). On the
+By default each per-scenario block is factored by `MadNLP.LDLSolver`. On the
 CPU you can swap in any sparse solver (e.g. an HSL solver) via the
 `schur_scenario_linear_solver` option; the dense Schur factor is controlled by
 the usual `linear_solver` argument:
