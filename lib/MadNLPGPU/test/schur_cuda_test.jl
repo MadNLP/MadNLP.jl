@@ -104,6 +104,52 @@ using MadNLPTests
         @test result.status == MadNLP.SOLVE_SUCCEEDED
     end
 
+    @testset "cuDSS IR + multi-RHS invariant tripwire" begin
+        # The GPU Schur path re-analyzes the scenario cuDSS handle with a
+        # (blk × nd) × ns multi-RHS descriptor, and then does two solves
+        # per IPM iteration: a (blk × 1) × ns single-RHS solve (forward
+        # elimination) and a (blk × nd) × ns multi-RHS solve. Correctness
+        # relies on "analyze with larger RHS, solve with smaller RHS". The
+        # config most likely to surface a regression in that invariant is
+        # iterative refinement, which in some sparse solvers keeps per-
+        # column state sized from the analysis shape. Enabling cuDSS IR on
+        # the scenario solver exercises that code path end-to-end; a future
+        # cuDSS change that violated the invariant should trip this test.
+        ns, nv, nd, nc = 2, 2, 2, 1
+        θ = [1.0, 2.0]
+        H_v = zeros(nv, ns)
+        for k in 1:ns, j in 1:nv
+            H_v[j, k] = 2θ[k]
+        end
+
+        scenario_opt = MadNLP.default_options(CUDSSSolver)
+        scenario_opt.cudss_ir = 2
+
+        nlp = build_twostage_qp(
+            CUDA.zeros(Float64, ns * nv + nd);
+            ns, nv, nd, nc,
+            hess_v = H_v, hess_d = fill(2.0, nd),
+            g_v = zeros(nv, ns), g_d = zeros(nd),
+            A_v = fill(1.0, nc, nv, ns), A_d = fill(1.0, nc, nd, ns),
+            lcon = ones(nc, ns), ucon = ones(nc, ns),
+            lvar_v = fill(-50.0, nv, ns), uvar_v = fill(50.0, nv, ns),
+            lvar_d = fill(-50.0, nd), uvar_d = fill(50.0, nd),
+        )
+
+        opts = schur_opts(; ns, nv, nd, nc)
+        opts[:schur_scenario_opt_linear_solver] = scenario_opt
+
+        result = madnlp(
+            nlp;
+            callback = MadNLP.SparseCallback,
+            kkt_system = SchurComplementKKTSystem,
+            linear_solver = LapackCUDASolver,
+            kkt_options = opts,
+            print_level = MadNLP.ERROR,
+        )
+        @test result.status == MadNLP.SOLVE_SUCCEEDED
+    end
+
     @testset "Known solution with inactive constraints" begin
         ns, nv, nd, nc = 2, 1, 1, 1
         θ = [3.0, 7.0]

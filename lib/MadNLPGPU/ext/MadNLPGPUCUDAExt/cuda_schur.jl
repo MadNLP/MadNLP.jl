@@ -72,7 +72,10 @@ struct GPUSchurComplementKKTSystem{
     nnz_per_scenario::Int
 
     # Dense blocks
-    C_dk_batched::CuArray{T, 3}     # (nd, blk_size, ns)
+    C_dk_batched::CuArray{T, 3}     # (blk_size, nd, ns) — per-scenario cross-block stored
+                                    # with scenario-var dim first, so each slice
+                                    # C_dk[:, :, k] is directly usable as the cuDSS
+                                    # multi-RHS input for `A_kk \ C_dk'`.
     aug_com::MT                     # (nd, nd) — Schur complement S
 
     # Buffers
@@ -150,6 +153,13 @@ struct GPUSchurComplementKKTSystem{
     # Solvers
     scenario_solver::LS2
     linear_solver::LS
+
+    # Multi-RHS descriptors over `C_dk_batched` / `tmp_blk_nd_batched`, used to
+    # solve A_kk * tmp[:, :, k] = C_dk[:, :, k] for all k in a single cuDSS
+    # call (nd right-hand sides per scenario, ns batch). Zero-copy: both are
+    # `cudss_update`'d onto the existing `(blk, nd, ns)` buffers each iteration.
+    scenario_x_multi::CUDSS.CudssMatrix{T}
+    scenario_b_multi::CUDSS.CudssMatrix{T}
 end
 
 # --- Dispatch: GPU path when callback uses CuVector ---
@@ -165,6 +175,7 @@ function MadNLP.create_kkt_system(
     schur_nd::Int=0,
     schur_nc::Int=0,
     schur_scenario_linear_solver::Type=CUDSSSolver,
+    schur_scenario_opt_linear_solver=MadNLP.default_options(schur_scenario_linear_solver),
 ) where {T, VT <: CuVector{T}}
 
     n = cb.nvar
@@ -242,7 +253,7 @@ function MadNLP.create_kkt_system(
     # --- Dense arrays on GPU ---
     aug_com = CuMatrix{T}(undef, nd, nd)
     fill!(aug_com, zero(T))
-    C_dk_batched = CuArray{T, 3}(undef, nd, blk_size, ns)
+    C_dk_batched = CuArray{T, 3}(undef, blk_size, nd, ns)
     fill!(C_dk_batched, zero(T))
     tmp_blk_nd_batched = CuArray{T, 3}(undef, blk_size, nd, ns)
     S_contrib = CuArray{T, 3}(undef, nd, nd, ns)
@@ -303,8 +314,32 @@ function MadNLP.create_kkt_system(
 
     # --- Create solvers ---
     quasi_newton = MadNLP.create_quasi_newton(hessian_approximation, cb, n; options=qn_options)
-    scenario_solver = schur_scenario_linear_solver(A_kk_batched)
+    scenario_solver = schur_scenario_linear_solver(A_kk_batched; opt=schur_scenario_opt_linear_solver)
     _linear_solver = linear_solver(aug_com; opt=opt_linear_solver)
+
+    # --- Multi-RHS cuDSS descriptors for batched A_kk \ C_dk' ---
+    # Requires the scenario solver to be cuDSS; the descriptors hold the shape
+    # (blk × nd) per scenario and point at the existing buffers each iteration.
+    scenario_solver isa CUDSSSolver || error(
+        "Schur scenario solver must be CUDSSSolver for the multi-RHS solve path; " *
+        "got $(typeof(scenario_solver))"
+    )
+    scenario_b_multi = CUDSS.CudssMatrix(T, blk_size, nd; nbatch=ns)
+    scenario_x_multi = CUDSS.CudssMatrix(T, blk_size, nd; nbatch=ns)
+    # Re-analyze for the multi-RHS shape so cuDSS plans enough workspace.
+    # This is the LARGEST RHS shape we will ever solve with on this handle;
+    # the later single-RHS solve at `solve_kkt!` step 3 reuses the same handle
+    # with a (blk × 1) × ns descriptor, which relies on the invariant that
+    # "analysis planned for a larger RHS accepts a smaller RHS at solve time".
+    # If that breaks on a future cuDSS version (e.g. a strict shape check or
+    # per-column IR state), the single-RHS path would need its own handle or
+    # padding. The `schur_cudss_ir` test exercises `cudss_ir > 0` — the config
+    # most likely to surface such a regression — as a tripwire.
+    CUDSS.cudss(
+        "analysis", scenario_solver.inner,
+        scenario_x_multi, scenario_b_multi;
+        asynchronous=scenario_solver.opt.cudss_asynchronous,
+    )
 
     return GPUSchurComplementKKTSystem(
         hess, jac,
@@ -330,6 +365,7 @@ function MadNLP.create_kkt_system(
         n_eq_total, CuVector{Int}(cpu_ind_eq),
         ns_ineq, CuVector{Int}(cpu_ind_ineq), CuVector{Int}(cpu_ind_lb), CuVector{Int}(cpu_ind_ub),
         scenario_solver, _linear_solver,
+        scenario_x_multi, scenario_b_multi,
     )
 end
 
@@ -417,7 +453,7 @@ function MadNLP.build_kkt!(kkt::GPUSchurComplementKKTSystem{T}) where T
     if n_hC > 0
         _scatter_to_Cdk_batched!(backend)(
             kkt.C_dk_batched, kkt.hess, kkt.gpu_hess_Cdk_coo,
-            kkt.gpu_hess_Cdk_row, kkt.gpu_hess_Cdk_col, n_hC;
+            kkt.gpu_hess_Cdk_col, kkt.gpu_hess_Cdk_row, n_hC;
             ndrange=ns * n_hC,
         )
     end
@@ -457,7 +493,7 @@ function MadNLP.build_kkt!(kkt::GPUSchurComplementKKTSystem{T}) where T
     if n_jC > 0
         _scatter_to_Cdk_batched!(backend)(
             kkt.C_dk_batched, kkt.jac, kkt.gpu_jeq_Cdk_coo,
-            kkt.gpu_jeq_Cdk_row, kkt.gpu_jeq_Cdk_col, n_jC;
+            kkt.gpu_jeq_Cdk_col, kkt.gpu_jeq_Cdk_row, n_jC;
             ndrange=ns * n_jC,
         )
     end
@@ -479,7 +515,7 @@ function MadNLP.build_kkt!(kkt::GPUSchurComplementKKTSystem{T}) where T
     if n_iC > 0
         _ineq_condense_Cdk_kernel!(backend)(
             kkt.C_dk_batched, kkt.jac, kkt.diag_buffer,
-            kkt.gpu_ineq_Cdk_row, kkt.gpu_ineq_Cdk_col,
+            kkt.gpu_ineq_Cdk_col, kkt.gpu_ineq_Cdk_row,
             kkt.gpu_ineq_Cdk_jcoo_d, kkt.gpu_ineq_Cdk_jcoo_v,
             kkt.gpu_ineq_Cdk_bufidx, n_iC;
             ndrange=ns * n_iC,
@@ -503,24 +539,23 @@ function MadNLP.build_kkt!(kkt::GPUSchurComplementKKTSystem{T}) where T
     # Factorize all scenario blocks in one batched cuDSS call
     MadNLP.factorize!(kkt.scenario_solver)
 
-    # Compute tmp = A_kk^{-1} * C_dk' column by column (nd batched solves)
-    for j in 1:nd
-        # C_dk'[:,j] for all k: extract C_dk[j, :, k] → solve_buffer columns
-        for k_idx in 1:ns
-            src = view(kkt.C_dk_batched, j, :, k_idx)
-            dst = view(kkt.solve_buffer, (k_idx-1)*blk + 1 : k_idx*blk)
-            copyto!(dst, src)
-        end
-        MadNLP.solve_linear_system!(kkt.scenario_solver, kkt.solve_buffer)
-        for k_idx in 1:ns
-            src = view(kkt.solve_buffer, (k_idx-1)*blk + 1 : k_idx*blk)
-            dst = view(kkt.tmp_blk_nd_batched, :, j, k_idx)
-            copyto!(dst, src)
-        end
-    end
+    # Compute tmp = A_kk^{-1} * C_dk' in one batched multi-RHS cuDSS solve:
+    # for each scenario k, solve the (blk × blk) system with nd right-hand sides
+    # packed as the columns of C_dk_batched[:, :, k]. The (blk, nd, ns) layouts
+    # of both buffers line up directly with a cuDSS batched dense descriptor, so
+    # this is zero-copy — we only retarget the matrix descriptors each iteration.
+    CUDSS.cudss_update(kkt.scenario_b_multi, kkt.C_dk_batched)
+    CUDSS.cudss_update(kkt.scenario_x_multi, kkt.tmp_blk_nd_batched)
+    CUDSS.cudss(
+        "solve", kkt.scenario_solver.inner,
+        kkt.scenario_x_multi, kkt.scenario_b_multi;
+        asynchronous=kkt.scenario_solver.opt.cudss_asynchronous,
+    )
 
-    # S -= C_dk * tmp_blk_nd via strided batched GEMM
-    CUBLAS.gemm_strided_batched!('N', 'N', -one(T),
+    # S -= Σ_k C_dk[:,:,k]' * tmp[:,:,k]  via strided batched GEMM.
+    # With the (blk, nd, ns) layout both operands are (blk × nd) per batch;
+    # the transpose on the first operand produces the (nd × nd) contribution.
+    CUBLAS.gemm_strided_batched!('T', 'N', -one(T),
         kkt.C_dk_batched, kkt.tmp_blk_nd_batched, zero(T), kkt.S_contrib)
 
     # Accumulate: S += sum(S_contrib, dims=3)
@@ -580,11 +615,12 @@ function MadNLP.solve_kkt!(
     MadNLP.solve_linear_system!(kkt.scenario_solver, kkt.solve_buffer)
     copyto!(vec(kkt.rhs_k_batched), kkt.solve_buffer)
 
-    # rhs_d -= sum_k C_dk * rhs_k
+    # rhs_d -= Σ_k C_dk[:,:,k]' * rhs_k[:,k]  — C_dk stored (blk, nd, ns), so each
+    # slice is (blk × nd) and we transpose to get the (nd,) update.
     for k in 1:ns
         C_k = view(kkt.C_dk_batched, :, :, k)
         rhs_k = view(kkt.rhs_k_batched, :, k)
-        mul!(kkt.rhs_d, C_k, rhs_k, -one(T), one(T))
+        mul!(kkt.rhs_d, C_k', rhs_k, -one(T), one(T))
     end
 
     # Step 4: Solve Schur complement

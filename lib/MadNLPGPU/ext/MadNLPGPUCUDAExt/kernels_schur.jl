@@ -24,19 +24,21 @@
     @inbounds nzval[offset + nzpos_flat[i]] += src[src_idx[i]]
 end
 
-# Scatter src[src_idx[i]] into C_dk[row, col, k] (nd × blk_size × ns).
+# Scatter src[src_idx[i]] into C_dk[v_idx, d_idx, k] (blk_size × nd × ns).
+# Layout has scenario-var dim first so each C_dk[:, :, k] is a contiguous
+# (blk × nd) matrix — directly usable as a cuDSS multi-RHS dense matrix.
 # Used for: Hessian coupling entries, equality Jacobian coupling entries.
 @kernel function _scatter_to_Cdk_batched!(
     C_dk,
     @Const(src),
     @Const(src_idx),
-    @Const(row_flat),
-    @Const(col_flat),
+    @Const(v_idx_flat),       # scenario-var index (1..blk)
+    @Const(d_idx_flat),       # design-var index (1..nd)
     @Const(n_per_s),
 )
     i = @index(Global)
     k = (i - 1) ÷ n_per_s + 1
-    @inbounds C_dk[row_flat[i], col_flat[i], k] += src[src_idx[i]]
+    @inbounds C_dk[v_idx_flat[i], d_idx_flat[i], k] += src[src_idx[i]]
 end
 
 # Inequality condensation → A_kk (lower triangle).
@@ -57,13 +59,13 @@ end
         jac[jcoo1_flat[i]] * jac[jcoo2_flat[i]]
 end
 
-# Inequality condensation → C_dk
+# Inequality condensation → C_dk (blk_size × nd × ns; see _scatter_to_Cdk_batched!).
 @kernel function _ineq_condense_Cdk_kernel!(
     C_dk,
     @Const(jac),
     @Const(diag_buffer),
-    @Const(row_flat),
-    @Const(col_flat),
+    @Const(v_idx_flat),       # scenario-var index (1..blk)
+    @Const(d_idx_flat),       # design-var index (1..nd)
     @Const(jcoo_d_flat),
     @Const(jcoo_v_flat),
     @Const(bufidx_flat),
@@ -71,7 +73,7 @@ end
 )
     i = @index(Global)
     k = (i - 1) ÷ n_per_s + 1
-    @inbounds C_dk[row_flat[i], col_flat[i], k] += diag_buffer[bufidx_flat[i]] *
+    @inbounds C_dk[v_idx_flat[i], d_idx_flat[i], k] += diag_buffer[bufidx_flat[i]] *
         jac[jcoo_d_flat[i]] * jac[jcoo_v_flat[i]]
 end
 
