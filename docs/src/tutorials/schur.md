@@ -122,8 +122,12 @@ nothing
 
 ### Choosing the per-scenario solver
 
-By default each per-scenario block is factored by `MadNLP.LDLSolver`. On the
-CPU you can swap in any sparse solver (e.g. an HSL solver) via the
+Each per-scenario block ``A_k`` is symmetric indefinite (it embeds equality
+duals), so the default is `MadNLP.MumpsSolver`, which handles indefinite
+systems robustly. `MadNLP.LDLSolver` is faster on quasi-definite blocks but
+can struggle on truly indefinite ones — only swap it in if you know your
+problem produces SQD per-scenario blocks. HSL solvers (`Ma27Solver`,
+`Ma57Solver`, …) are also valid drop-in replacements via the
 `schur_scenario_linear_solver` option; the dense Schur factor is controlled by
 the usual `linear_solver` argument:
 
