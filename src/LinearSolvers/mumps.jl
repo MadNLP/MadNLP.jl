@@ -107,6 +107,7 @@ end
     deficiency::Cint = 0
     pivnul_list::Ptr{Cint} = C_NULL
     mapping::Ptr{Cint} = C_NULL
+    singular_values::Ptr{T} = C_NULL
 
     size_schur::Cint = 0
     listvar_schur::Ptr{Cint} = C_NULL
