@@ -104,9 +104,10 @@ end
     rinfo::NTuple{40,T} = tzeros(40)
     rinfog::NTuple{40,T} = tzeros(40)
 
-    deficiency::Cint = 0
     pivnul_list::Ptr{Cint} = C_NULL
     mapping::Ptr{Cint} = C_NULL
+    singular_values::Ptr{T} = C_NULL
+    nb_singular_values::Cint = 0
 
     size_schur::Cint = 0
     listvar_schur::Ptr{Cint} = C_NULL
