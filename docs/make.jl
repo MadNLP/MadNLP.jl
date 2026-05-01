@@ -24,7 +24,6 @@ makedocs(
             "Warm-start" => "tutorials/warmstart.md",
             "Quasi-Newton" => "tutorials/quasi_newton.md",
             "Custom KKT system" => "tutorials/kktsystem.md",
-            "Schur complement KKT" => "tutorials/schur.md",
         ],
         "Manual" => [
             "KKT systems" => "man/kkt.md",
