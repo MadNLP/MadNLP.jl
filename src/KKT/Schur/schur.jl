@@ -253,8 +253,6 @@ function _build_schur_symbolic(
     eq_per_scenario = Vector{Vector{Int}}(undef, ns)
     ineq_per_scenario = Vector{Vector{Int}}(undef, ns)
 
-    nc_eq_per_s = 0
-    nc_ineq_per_s = 0
     for k in 1:ns
         cr = (k-1)*nc+1 : k*nc
         eq_per_scenario[k] = Int[]
@@ -267,9 +265,22 @@ function _build_schur_symbolic(
                 push!(ineq_per_scenario[k], gi)
             end
         end
-        if k == 1
-            nc_eq_per_s = length(eq_per_scenario[k])
-            nc_ineq_per_s = length(ineq_per_scenario[k])
+    end
+
+    # Scenario 1 sets the canonical per-scenario constraint count; reject any
+    # scenario that disagrees, since downstream code (and the GPU batched layout)
+    # assumes uniform per-scenario shape.
+    nc_eq_per_s = length(eq_per_scenario[1])
+    nc_ineq_per_s = length(ineq_per_scenario[1])
+    for k in 2:ns
+        n_eq_k = length(eq_per_scenario[k])
+        n_in_k = length(ineq_per_scenario[k])
+        if n_eq_k != nc_eq_per_s || n_in_k != nc_ineq_per_s
+            error(
+                "SchurComplementKKTSystem requires uniform per-scenario constraint counts. " *
+                "Scenario 1 has (eq=$nc_eq_per_s, ineq=$nc_ineq_per_s); " *
+                "scenario $k has (eq=$n_eq_k, ineq=$n_in_k)."
+            )
         end
     end
 
@@ -300,6 +311,7 @@ function _build_schur_symbolic(
 
     hess_per_scenario_diag = [Tuple{Int,Int,Int}[] for _ in 1:ns]      # (coo, local_i, local_j)
     hess_per_scenario_coupling = [Tuple{Int,Int,Int}[] for _ in 1:ns]  # (coo, design_local, var_local)
+    hess_classified = falses(n_hess)
 
     for ci in 1:n_hess
         ri = Int(hess_I[ci])
@@ -313,6 +325,7 @@ function _build_schur_symbolic(
             if di != dj
                 push!(hess_S_coo, ci); push!(hess_S_row, dj); push!(hess_S_col, di)
             end
+            hess_classified[ci] = true
             continue
         end
 
@@ -323,6 +336,7 @@ function _build_schur_symbolic(
             if k >= 1 && k <= ns
                 vj = rj - (k-1)*nv
                 push!(hess_per_scenario_coupling[k], (ci, di, vj))
+                hess_classified[ci] = true
             end
             continue
         end
@@ -335,8 +349,24 @@ function _build_schur_symbolic(
                 li = ri - (ki-1)*nv
                 lj = rj - (ki-1)*nv
                 push!(hess_per_scenario_diag[ki], (ci, li, lj))
+                hess_classified[ci] = true
             end
         end
+    end
+
+    # Anything left unclassified is a Hessian entry that doesn't fit the
+    # block-arrowhead pattern — typically cross-scenario coupling. Silently
+    # dropping it would converge the IPM to a wrong optimum, so error loudly.
+    n_bad_hess = count(!, hess_classified)
+    if n_bad_hess > 0
+        bad = findall(!, hess_classified)
+        sample = first(bad, min(5, length(bad)))
+        details = join(("(row=$(Int(hess_I[ci])), col=$(Int(hess_J[ci])))" for ci in sample), ", ")
+        error(
+            "$n_bad_hess Hessian COO entries do not fit the SchurComplementKKTSystem " *
+            "block-arrowhead pattern (likely cross-scenario coupling). First few: " *
+            details
+        )
     end
 
     # --- Build shared A_kk template from scenario 1 ---
@@ -404,11 +434,23 @@ function _build_schur_symbolic(
         end
     end
 
+    # Wrap lookups so a missing key (scenario k has a sparsity entry absent from
+    # scenario 1's template) surfaces as a meaningful error instead of KeyError.
+    @inline akk_pos(key, k) = let p = get(akk_lookup, key, 0)
+        p == 0 && error(
+            "SchurComplementKKTSystem: scenario $k has an A_kk entry at local " *
+            "(row=$(key[1]), col=$(key[2])) absent from scenario 1's template. " *
+            "Per-scenario Hessian/Jacobian sparsity must be uniform."
+        )
+        p
+    end
+
     nnz_per_scenario = length(akk_csc_template.nzval)
 
     # --- Build per-scenario ScenarioBlockMaps ---
     block_maps = Vector{ScenarioBlockMap}(undef, ns)
     eq_global_flat = Int[]
+    jac_classified = falses(n_jac)
 
     for k in 1:ns
         vr_start = (k-1)*nv + 1
@@ -425,7 +467,7 @@ function _build_schur_symbolic(
         hess_Akk_nzpos_vec = Int[]
         for (ci, li, lj) in hess_per_scenario_diag[k]
             push!(hess_Akk_coo_vec, ci)
-            push!(hess_Akk_nzpos_vec, akk_lookup[(li, lj)])
+            push!(hess_Akk_nzpos_vec, akk_pos((li, lj), k))
         end
 
         # Hessian coupling → C_dk
@@ -451,12 +493,14 @@ function _build_schur_symbolic(
                 if col >= vr_start && col < vr_start + nv
                     local_var = col - vr_start + 1
                     push!(jeq_Akk_coo_vec, coo_idx)
-                    push!(jeq_Akk_nzpos_vec, akk_lookup[(nv + local_eq, local_var)])
+                    push!(jeq_Akk_nzpos_vec, akk_pos((nv + local_eq, local_var), k))
+                    jac_classified[coo_idx] = true
                 elseif col >= d_start && col <= d_end
                     di = col - d_start + 1
                     push!(jeq_Cdk_coo_vec, coo_idx)
                     push!(jeq_Cdk_row_vec, di)
                     push!(jeq_Cdk_col_vec, nv + local_eq)
+                    jac_classified[coo_idx] = true
                 end
             end
         end
@@ -466,7 +510,7 @@ function _build_schur_symbolic(
         pr_diag_nzpos_vec = Int[]
         for i in 1:nv
             push!(pr_diag_global_vec, vr_start + i - 1)
-            push!(pr_diag_nzpos_vec, akk_lookup[(i, i)])
+            push!(pr_diag_nzpos_vec, akk_pos((i, i), k))
         end
 
         # du_diag → A_kk diagonal
@@ -474,7 +518,7 @@ function _build_schur_symbolic(
         du_diag_nzpos_vec = Int[]
         for (ci, gi) in enumerate(eq_cons)
             push!(du_diag_global_vec, gi)
-            push!(du_diag_nzpos_vec, akk_lookup[(nv + ci, nv + ci)])
+            push!(du_diag_nzpos_vec, akk_pos((nv + ci, nv + ci), k))
         end
 
         # Inequality condensation
@@ -503,15 +547,17 @@ function _build_schur_symbolic(
             for (coo_idx, col) in get(jac_by_constraint, gi, Tuple{Int,Int}[])
                 if col >= vr_start && col < vr_start + nv
                     push!(v_entries, (coo_idx, col - vr_start + 1))
+                    jac_classified[coo_idx] = true
                 elseif col >= d_start && col <= d_end
                     push!(d_entries, (coo_idx, col - d_start + 1))
+                    jac_classified[coo_idx] = true
                 end
             end
 
             # A_kk: lower-triangle pairs of scenario vars
             for (coo_a, la) in v_entries, (coo_b, lb) in v_entries
                 if la >= lb
-                    push!(ineq_Akk_nzpos_vec, akk_lookup[(la, lb)])
+                    push!(ineq_Akk_nzpos_vec, akk_pos((la, lb), k))
                     push!(ineq_Akk_jcoo1_vec, coo_a)
                     push!(ineq_Akk_jcoo2_vec, coo_b)
                     push!(ineq_Akk_bufidx_vec, bidx)
@@ -550,6 +596,42 @@ function _build_schur_symbolic(
         )
 
         append!(eq_global_flat, eq_cons)
+    end
+
+    # Catch Jacobian entries whose column doesn't match the constraint's own
+    # scenario stripe or the design stripe (cross-scenario coupling).
+    n_bad_jac = count(!, jac_classified)
+    if n_bad_jac > 0
+        bad = findall(!, jac_classified)
+        sample = first(bad, min(5, length(bad)))
+        details = join(("(row=$(Int(jac_I[ci])), col=$(Int(jac_J[ci])))" for ci in sample), ", ")
+        error(
+            "$n_bad_jac Jacobian COO entries do not fit the SchurComplementKKTSystem " *
+            "block-arrowhead pattern (column belongs to a different scenario). First few: " *
+            details
+        )
+    end
+
+    # Per-scenario field cardinalities must match scenario 1, otherwise the GPU
+    # batched layout (which uses scenario-1 lengths as the per-scenario stride)
+    # would silently drop entries on longer scenarios. This catches non-uniform
+    # Hessian/Jacobian sparsity that still passes the aggregate count checks.
+    bm1 = block_maps[1]
+    fields_to_check = (
+        :hess_Akk_coo, :hess_Cdk_coo,
+        :jeq_Akk_coo, :jeq_Cdk_coo,
+        :ineq_Akk_nzpos, :ineq_Cdk_row, :ineq_S_row,
+        :pr_diag_global, :du_diag_global,
+    )
+    for k in 2:ns, f in fields_to_check
+        n1 = length(getfield(bm1, f))
+        nk = length(getfield(block_maps[k], f))
+        if nk != n1
+            error(
+                "SchurComplementKKTSystem requires uniform per-scenario sparsity. " *
+                "Scenario 1 has $n1 entries in $f; scenario $k has $nk."
+            )
+        end
     end
 
     return (

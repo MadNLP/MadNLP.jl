@@ -135,4 +135,60 @@ using MadNLPTests
         @test isapprox(result.solution[2], 7.0; atol = 1.0e-3)
         @test isapprox(result.solution[3], 5.0; atol = 1.0e-3)
     end
+
+    @testset "Layout validation" begin
+        # ns=2, nv=1, nd=1, nc=1: vars [v1, v2, d], cons [c1, c2]
+        ns, nv, nd, nc = 2, 1, 1, 1
+        n, m = ns*nv + nd, ns*nc
+
+        # Happy case as a baseline: diagonal Hessian, each constraint touches its own
+        # scenario var and the design var, all equality.
+        hess_I_ok = Int32[1, 2, 3]; hess_J_ok = Int32[1, 2, 3]
+        jac_I_ok  = Int32[1, 1, 2, 2]; jac_J_ok = Int32[1, 3, 2, 3]
+        ind_eq    = Int32[1, 2]
+        ind_ineq  = Int32[]
+        @test MadNLP._build_schur_symbolic(
+            Float64, n, m, ns, nv, nd, nc,
+            hess_I_ok, hess_J_ok, jac_I_ok, jac_J_ok, ind_eq, ind_ineq,
+        ) isa NamedTuple
+
+        # Cross-scenario Hessian coupling: entry at (row=2, col=1) couples scenarios 1 and 2.
+        hess_I_bad = Int32[1, 2, 3, 2]
+        hess_J_bad = Int32[1, 2, 3, 1]
+        @test_throws ErrorException MadNLP._build_schur_symbolic(
+            Float64, n, m, ns, nv, nd, nc,
+            hess_I_bad, hess_J_bad, jac_I_ok, jac_J_ok, ind_eq, ind_ineq,
+        )
+
+        # Cross-scenario Jacobian coupling: c_1 reaches v_2 (scenario 2's variable).
+        jac_I_bad = Int32[1, 1, 1, 2, 2]
+        jac_J_bad = Int32[1, 2, 3, 2, 3]
+        @test_throws ErrorException MadNLP._build_schur_symbolic(
+            Float64, n, m, ns, nv, nd, nc,
+            hess_I_ok, hess_J_ok, jac_I_bad, jac_J_bad, ind_eq, ind_ineq,
+        )
+
+        # Non-uniform eq/ineq counts: c_1 is equality, c_2 is inequality.
+        @test_throws ErrorException MadNLP._build_schur_symbolic(
+            Float64, n, m, ns, nv, nd, nc,
+            hess_I_ok, hess_J_ok, jac_I_ok, jac_J_ok, Int32[1], Int32[2],
+        )
+
+        # Non-uniform sparsity: scenario 2 has an extra off-diagonal Hessian entry
+        # at local (2,1) that scenario 1 doesn't, but the entry wouldn't exist in
+        # this 1-var-per-scenario layout. Use nv=2 instead.
+        ns2, nv2, nd2, nc2 = 2, 2, 1, 1
+        n2, m2 = ns2*nv2 + nd2, ns2*nc2
+        # vars: [v1_1, v1_2, v2_1, v2_2, d], cons: [c1, c2]
+        # Scenario 1 has Hessian entries at (1,1),(2,2) only.
+        # Scenario 2 has Hessian entries at (3,3),(4,4) AND off-diag (4,3).
+        hess_I_nu = Int32[1, 2, 3, 4, 4, 5]
+        hess_J_nu = Int32[1, 2, 3, 4, 3, 5]
+        jac_I_nu  = Int32[1, 1, 1, 2, 2, 2]
+        jac_J_nu  = Int32[1, 2, 5, 3, 4, 5]
+        @test_throws ErrorException MadNLP._build_schur_symbolic(
+            Float64, n2, m2, ns2, nv2, nd2, nc2,
+            hess_I_nu, hess_J_nu, jac_I_nu, jac_J_nu, Int32[1, 2], Int32[],
+        )
+    end
 end
