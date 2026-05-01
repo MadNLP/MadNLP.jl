@@ -171,9 +171,57 @@ function _resolve_schur_dims(cb, n, m, schur_ns, schur_nv, schur_nd, schur_nc)
             schur_ns = tags.ns
             var_scen = Array(tags.var_scenario)
             con_scen = Array(tags.con_scenario)
-            schur_nd = count(==(0), var_scen)
-            schur_nv = count(==(1), var_scen)
-            schur_nc = count(==(1), con_scen)
+
+            # Single-pass histograms over the scenario tags. Index 1 is the design
+            # bucket (tag 0); 1+k is scenario k. Cheaper than the previous three
+            # `count(==(·))` passes and lets us validate per-scenario uniformity
+            # in the same pass — important because a malformed model whose global
+            # aggregates happen to satisfy n == ns*nv + nd would otherwise drive
+            # downstream symbolic build into garbage territory.
+            var_hist = zeros(Int, schur_ns + 1)
+            for tag in var_scen
+                t = Int(tag)
+                (0 <= t <= schur_ns) || error(
+                    "var_scenario tag $t out of range [0, $schur_ns]; " *
+                    "0 = design, 1..$schur_ns = scenario index."
+                )
+                @inbounds var_hist[t + 1] += 1
+            end
+            con_hist = zeros(Int, schur_ns + 1)
+            for tag in con_scen
+                t = Int(tag)
+                (0 <= t <= schur_ns) || error(
+                    "con_scenario tag $t out of range [0, $schur_ns]; " *
+                    "1..$schur_ns = scenario index."
+                )
+                @inbounds con_hist[t + 1] += 1
+            end
+
+            schur_nd = var_hist[1]
+            schur_nv = var_hist[2]
+            schur_nc = con_hist[2]
+
+            # Reject design-only constraints — the Schur reduction has no slot
+            # for them.
+            con_hist[1] == 0 || error(
+                "$(con_hist[1]) constraints have con_scenario tag 0; " *
+                "design-only constraints are not supported by SchurComplementKKTSystem."
+            )
+
+            # Per-scenario uniformity. Cheap loop, fires before any symbolic
+            # work and points at the offending scenario.
+            for k in 2:schur_ns
+                @inbounds nv_k = var_hist[k + 1]
+                @inbounds nc_k = con_hist[k + 1]
+                nv_k == schur_nv || error(
+                    "Scenario $k has $nv_k variables; scenario 1 has $schur_nv. " *
+                    "SchurComplementKKTSystem requires uniform per-scenario sizes."
+                )
+                nc_k == schur_nc || error(
+                    "Scenario $k has $nc_k constraints; scenario 1 has $schur_nc. " *
+                    "SchurComplementKKTSystem requires uniform per-scenario sizes."
+                )
+            end
         end
     end
 

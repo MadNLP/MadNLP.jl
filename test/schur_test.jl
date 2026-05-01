@@ -136,6 +136,31 @@ using MadNLPTests
         @test isapprox(result.solution[3], 5.0; atol = 1.0e-3)
     end
 
+    @testset "Autodetect dims via tags" begin
+        # Fake `cb` exposing the tag interface that _resolve_schur_dims expects.
+        mkcb(tags) = (; nlp = (; tags))
+
+        # Happy case: ns=2, nv=1, nd=1, nc=1 → var_scen [1, 2, 0], con_scen [1, 2]
+        ok = (; ns = 2, var_scenario = [1, 2, 0], con_scenario = [1, 2])
+        @test MadNLP._resolve_schur_dims(mkcb(ok), 3, 2, 0, 0, 0, 0) == (2, 1, 1, 1)
+
+        # Out-of-range variable tag
+        bad_tag = (; ns = 2, var_scenario = [1, 5, 0], con_scenario = [1, 2])
+        @test_throws ErrorException MadNLP._resolve_schur_dims(mkcb(bad_tag), 3, 2, 0, 0, 0, 0)
+
+        # Non-uniform per-scenario variable count: scenario 2 has 2 vars, scenario 1 has 1.
+        nu_var = (; ns = 2, var_scenario = [1, 2, 2, 0], con_scenario = [1, 2])
+        @test_throws ErrorException MadNLP._resolve_schur_dims(mkcb(nu_var), 4, 2, 0, 0, 0, 0)
+
+        # Non-uniform per-scenario constraint count.
+        nu_con = (; ns = 2, var_scenario = [1, 2, 0], con_scenario = [1, 2, 2])
+        @test_throws ErrorException MadNLP._resolve_schur_dims(mkcb(nu_con), 3, 3, 0, 0, 0, 0)
+
+        # Design-only constraint (con tag 0) is rejected.
+        d_only = (; ns = 2, var_scenario = [1, 2, 0], con_scenario = [1, 2, 0])
+        @test_throws ErrorException MadNLP._resolve_schur_dims(mkcb(d_only), 3, 3, 0, 0, 0, 0)
+    end
+
     @testset "Layout validation" begin
         # ns=2, nv=1, nd=1, nc=1: vars [v1, v2, d], cons [c1, c2]
         ns, nv, nd, nc = 2, 1, 1, 1
