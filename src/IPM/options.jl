@@ -198,6 +198,9 @@ tau\\_min                      | 0.99                 | lower bound on fraction-
     # mu_min by courtesy of Ipopt
     barrier::AbstractBarrierUpdate{T} = MonotoneUpdate(T(tol), barrier_tol_factor)
     tau_min::T = 0.99
+
+    # KKT system options (passed through to create_kkt_system)
+    kkt_options::Dict{Symbol, Any} = Dict{Symbol, Any}()
 end
 
 is_dense_callback(nlp) = !nlp.meta.sparse_jacobian && !nlp.meta.sparse_hessian
@@ -225,7 +228,7 @@ get_tolerance(::Type{T},::Type{SparseCondensedKKTSystem}) where T = 10^(round(lo
 default_sparse_solver(nlp::AbstractNLPModel) = MumpsSolver
 
 function check_option_sanity(options)
-    is_kkt_dense = options.kkt_system <: AbstractDenseKKTSystem
+    is_kkt_dense = options.kkt_system <: AbstractDenseKKTSystem || options.kkt_system <: SchurComplementKKTSystem
     is_hess_approx_dense = options.hessian_approximation <: Union{BFGS, DampedBFGS}
     if input_type(options.linear_solver) == :csc && is_kkt_dense
         error("[options] Sparse Linear solver is not supported in dense mode.\n"*
