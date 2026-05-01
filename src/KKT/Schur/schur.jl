@@ -895,7 +895,10 @@ function build_kkt!(kkt::SchurComplementKKTSystem{T, VT, MT}) where {T, VT, MT}
         S[i, i] += kkt.pr_diag[ns*nv+i]
     end
 
-    # Phase 1 (parallel): assemble per-scenario blocks, factorize, compute A_kk^{-1} * C_dk'
+    # Phase 1 (parallel): assemble per-scenario blocks, factorize, compute A_kk^{-1} * C_dk'.
+    # `@blas_safe_threads` runs `Threads.@threads` over scenarios while pinning
+    # BLAS to a single thread per task to avoid oversubscription with the
+    # per-scenario `mul!` / `factorize!` calls inside the loop.
     @blas_safe_threads for k in 1:ns
         bm = kkt.block_maps[k]
         A_kk = kkt.A_kk[k]
