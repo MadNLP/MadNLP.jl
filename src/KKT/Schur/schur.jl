@@ -123,7 +123,7 @@ struct SchurComplementKKTSystem{
     # Buffers
     diag_buffer::VT                 # n_ineq — condensing diagonal
     buffer::VT                      # m_total — general
-    wy_eq_buf::VT                   # n_eq — preserves eq duals across J*Δx round-trip
+    wy_eq_buf::VT                   # ns*nc_eq_per_s — preserves eq duals across J*Δx round-trip
     rhs_d::VT                       # nd — design RHS
     rhs_k::Vector{VT}              # ns × blk_size — scenario RHS buffers
     tmp_blk_nd::Vector{MT}         # ns × (blk_size × nd)
@@ -135,9 +135,9 @@ struct SchurComplementKKTSystem{
     hess_S_row::Vector{Int}         # S row (1:nd)
     hess_S_col::Vector{Int}         # S col (1:nd)
 
-    # Scenario classification
-    eq_per_scenario::Vector{Vector{Int}}
-    ineq_per_scenario::Vector{Vector{Int}}
+    # Flat per-scenario equality indices (length ns * nc_eq_per_s).
+    # Scenario k's indices live at (k-1)*nc_eq_per_s+1 : k*nc_eq_per_s.
+    eq_global_indices::Vector{Int}
 
     # Inequality/equality/bound index info
     n_eq::Int
@@ -828,8 +828,6 @@ function create_kkt_system(
     nc_ineq_per_s = sym.nc_ineq_per_s
     blk_size = sym.blk_size
     block_maps = sym.block_maps
-    eq_per_scenario = sym.eq_per_scenario
-    ineq_per_scenario = sym.ineq_per_scenario
 
     # Per-scenario A_kk: independent copies of the shared template (same sparsity, fresh nzval).
     A_kk_vec = [copy(sym.akk_csc_template) for _ in 1:ns]
@@ -851,7 +849,12 @@ function create_kkt_system(
     # --- Buffers ---
     diag_buffer = VT(undef, ns_ineq)
     buffer      = VT(undef, m)
-    wy_eq_buf   = VT(undef, n_eq)
+    # Size from the per-scenario invariant rather than the global eq count: the
+    # uniform-scenario validation in `_build_schur_symbolic` guarantees these
+    # are equal, but tying the buffer to `ns * nc_eq_per_s` keeps the
+    # round-trip in `solve_kkt!` (gather/scatter via the eq index list) shape-
+    # consistent by construction.
+    wy_eq_buf   = VT(undef, ns * nc_eq_per_s)
     rhs_d       = VT(undef, nd)
     rhs_k       = [VT(undef, blk_size) for _ in 1:ns]
     solve_buffers = [VT(undef, blk_size) for _ in 1:ns]
@@ -879,7 +882,7 @@ function create_kkt_system(
         diag_buffer, buffer, wy_eq_buf, rhs_d, rhs_k, tmp_blk_nd, solve_buffers,
         block_maps,
         sym.hess_S_coo, sym.hess_S_row, sym.hess_S_col,
-        eq_per_scenario, ineq_per_scenario,
+        sym.eq_global_flat,
         n_eq, cb.ind_eq,
         ns_ineq, cb.ind_ineq, cb.ind_lb, cb.ind_ub,
         scenario_solvers,
@@ -1032,14 +1035,16 @@ function solve_kkt!(
     # Step 2: Extract per-scenario RHS blocks
     # NOTE: writes to disjoint slices of wx/wy → safe to @blas_safe_threads,
     # but per-iteration work is just a few scalar copies; profile before threading.
-    for k in 1:ns
-        vr = (k-1)*nv+1 : k*nv
+    nc_eq = kkt.nc_eq_per_s
+    @inbounds for k in 1:ns
+        vr_start = (k-1)*nv
         rhs = kkt.rhs_k[k]
-        @inbounds for i in 1:nv
-            rhs[i] = wx[vr[1]+i-1]
+        for i in 1:nv
+            rhs[i] = wx[vr_start + i]
         end
-        for (ci, gi) in enumerate(kkt.eq_per_scenario[k])
-            rhs[nv+ci] = wy[gi]
+        eq_base = (k-1)*nc_eq
+        for ci in 1:nc_eq
+            rhs[nv+ci] = wy[kkt.eq_global_indices[eq_base + ci]]
         end
     end
     @inbounds for i in 1:nd
@@ -1065,14 +1070,15 @@ function solve_kkt!(
     end
 
     # Step 6: Write back to w (same threading note as Step 2 above)
-    for k in 1:ns
-        vr = (k-1)*nv+1 : k*nv
+    @inbounds for k in 1:ns
+        vr_start = (k-1)*nv
         rhs = kkt.rhs_k[k]
-        @inbounds for i in 1:nv
-            wx[vr[1]+i-1] = rhs[i]
+        for i in 1:nv
+            wx[vr_start + i] = rhs[i]
         end
-        for (ci, gi) in enumerate(kkt.eq_per_scenario[k])
-            wy[gi] = rhs[nv+ci]
+        eq_base = (k-1)*nc_eq
+        for ci in 1:nc_eq
+            wy[kkt.eq_global_indices[eq_base + ci]] = rhs[nv+ci]
         end
     end
     @inbounds for i in 1:nd

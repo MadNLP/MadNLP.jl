@@ -81,11 +81,10 @@ struct GPUSchurComplementKKTSystem{
     # Buffers
     diag_buffer::VT
     buffer::VT
-    wy_eq_buf::VT                       # n_eq — preserves eq duals across J*Δx round-trip
+    wy_eq_buf::VT                       # ns*nc_eq_per_s — preserves eq duals across J*Δx round-trip
     rhs_d::VT
     rhs_k_batched::MT                   # (blk_size, ns)
     tmp_blk_nd_batched::CuArray{T, 3}   # (blk_size, nd, ns)
-    S_contrib::CuArray{T, 3}            # (nd, nd, ns)
     solve_buffer::VT                    # blk_size * ns
 
     # Flattened GPU index maps (all scenarios concatenated in scenario order).
@@ -174,8 +173,7 @@ function MadNLP.create_kkt_system(
     schur_nv::Int=0,
     schur_nd::Int=0,
     schur_nc::Int=0,
-    schur_scenario_linear_solver::Type=CUDSSSolver,
-    schur_scenario_opt_linear_solver=MadNLP.default_options(schur_scenario_linear_solver),
+    schur_scenario_opt_linear_solver=MadNLP.default_options(CUDSSSolver),
 ) where {T, VT <: CuVector{T}}
 
     n = cb.nvar
@@ -256,7 +254,6 @@ function MadNLP.create_kkt_system(
     C_dk_batched = CuArray{T, 3}(undef, blk_size, nd, ns)
     fill!(C_dk_batched, zero(T))
     tmp_blk_nd_batched = CuArray{T, 3}(undef, blk_size, nd, ns)
-    S_contrib = CuArray{T, 3}(undef, nd, nd, ns)
 
     # --- Diagonal vectors on GPU ---
     reg     = CuVector{T}(undef, n + ns_ineq)
@@ -273,7 +270,10 @@ function MadNLP.create_kkt_system(
     # --- Buffers ---
     diag_buffer = CuVector{T}(undef, max(ns_ineq, 1))
     buffer      = CuVector{T}(undef, m)
-    wy_eq_buf   = CuVector{T}(undef, n_eq_total)
+    # Size matches the eq_global_indices gather/scatter shape used in
+    # solve_kkt! step 7. ns * nc_eq_per_s == n_eq_total under the uniform-
+    # scenario invariant validated in _build_schur_symbolic.
+    wy_eq_buf   = CuVector{T}(undef, ns * nc_eq_per_s)
     rhs_d       = CuVector{T}(undef, nd)
     rhs_k_batched = CuMatrix{T}(undef, blk_size, ns)
     solve_buffer = CuVector{T}(undef, blk_size * ns)
@@ -314,16 +314,14 @@ function MadNLP.create_kkt_system(
 
     # --- Create solvers ---
     quasi_newton = MadNLP.create_quasi_newton(hessian_approximation, cb, n; options=qn_options)
-    scenario_solver = schur_scenario_linear_solver(A_kk_batched; opt=schur_scenario_opt_linear_solver)
+    # cuDSS is the only sparse batched solver wired into this path; users tune it
+    # via `schur_scenario_opt_linear_solver` rather than swapping the type.
+    scenario_solver = CUDSSSolver(A_kk_batched; opt=schur_scenario_opt_linear_solver)
     _linear_solver = linear_solver(aug_com; opt=opt_linear_solver)
 
     # --- Multi-RHS cuDSS descriptors for batched A_kk \ C_dk' ---
-    # Requires the scenario solver to be cuDSS; the descriptors hold the shape
-    # (blk × nd) per scenario and point at the existing buffers each iteration.
-    scenario_solver isa CUDSSSolver || error(
-        "Schur scenario solver must be CUDSSSolver for the multi-RHS solve path; " *
-        "got $(typeof(scenario_solver))"
-    )
+    # The descriptors hold the (blk × nd) shape per scenario and point at the
+    # existing buffers each iteration.
     scenario_b_multi = CUDSS.CudssMatrix(T, blk_size, nd; nbatch=ns)
     scenario_x_multi = CUDSS.CudssMatrix(T, blk_size, nd; nbatch=ns)
     # Re-analyze for the multi-RHS shape so cuDSS plans enough workspace.
@@ -350,7 +348,7 @@ function MadNLP.create_kkt_system(
         ns, nv, nd, nc, nc_eq_per_s, nc_ineq_per_s, blk_size,
         A_kk_batched, nnz_per_scenario,
         C_dk_batched, aug_com,
-        diag_buffer, buffer, wy_eq_buf, rhs_d, rhs_k_batched, tmp_blk_nd_batched, S_contrib, solve_buffer,
+        diag_buffer, buffer, wy_eq_buf, rhs_d, rhs_k_batched, tmp_blk_nd_batched, solve_buffer,
         flat.n_per_s_hess_Akk, gpu_hess_Akk_coo, gpu_hess_Akk_nzpos,
         flat.n_per_s_hess_Cdk, gpu_hess_Cdk_coo, gpu_hess_Cdk_row, gpu_hess_Cdk_col,
         flat.n_per_s_pr_diag, gpu_pr_diag_global, gpu_pr_diag_nzpos,
@@ -534,8 +532,6 @@ function MadNLP.build_kkt!(kkt::GPUSchurComplementKKTSystem{T}) where T
         )
     end
 
-    CUDA.synchronize()
-
     # Factorize all scenario blocks in one batched cuDSS call
     MadNLP.factorize!(kkt.scenario_solver)
 
@@ -552,15 +548,15 @@ function MadNLP.build_kkt!(kkt::GPUSchurComplementKKTSystem{T}) where T
         asynchronous=kkt.scenario_solver.opt.cudss_asynchronous,
     )
 
-    # S -= Σ_k C_dk[:,:,k]' * tmp[:,:,k]  via strided batched GEMM.
-    # With the (blk, nd, ns) layout both operands are (blk × nd) per batch;
-    # the transpose on the first operand produces the (nd × nd) contribution.
-    CUBLAS.gemm_strided_batched!('T', 'N', -one(T),
-        kkt.C_dk_batched, kkt.tmp_blk_nd_batched, zero(T), kkt.S_contrib)
-
-    # Accumulate: S += sum(S_contrib, dims=3)
-    S_sum = dropdims(sum(kkt.S_contrib; dims=3); dims=3)
-    kkt.aug_com .+= S_sum
+    # S -= Σ_k C_dk[:,:,k]' * tmp[:,:,k]
+    # Reshape the (blk, nd, ns) buffers as (blk*ns, nd): column-major flattening
+    # collapses the per-scenario contributions into a single GEMM, since
+    # (C_2d' * tmp_2d)[a, b] = Σ_{i,k} C[i,a,k] * tmp[i,b,k] = Σ_k (C_dk[:,:,k]' * tmp[:,:,k])[a, b].
+    # Avoids both the (nd × nd × ns) S_contrib buffer and the per-iteration
+    # `dropdims(sum(...))` allocation that the batched-GEMM path required.
+    C_2d = reshape(kkt.C_dk_batched, blk * ns, nd)
+    tmp_2d = reshape(kkt.tmp_blk_nd_batched, blk * ns, nd)
+    mul!(kkt.aug_com, C_2d', tmp_2d, -one(T), one(T))
 
     return
 end
@@ -606,7 +602,6 @@ function MadNLP.solve_kkt!(
             nv, nc_eq, ns, blk;
             ndrange=blk * ns,
         )
-        CUDA.synchronize()
     end
     copyto!(kkt.rhs_d, view(wx, ns*nv+1:ns*nv+nd))
 
@@ -615,23 +610,20 @@ function MadNLP.solve_kkt!(
     MadNLP.solve_linear_system!(kkt.scenario_solver, kkt.solve_buffer)
     copyto!(vec(kkt.rhs_k_batched), kkt.solve_buffer)
 
-    # rhs_d -= Σ_k C_dk[:,:,k]' * rhs_k[:,k]  — C_dk stored (blk, nd, ns), so each
-    # slice is (blk × nd) and we transpose to get the (nd,) update.
-    for k in 1:ns
-        C_k = view(kkt.C_dk_batched, :, :, k)
-        rhs_k = view(kkt.rhs_k_batched, :, k)
-        mul!(kkt.rhs_d, C_k', rhs_k, -one(T), one(T))
-    end
+    # rhs_d -= Σ_k C_dk[:,:,k]' * rhs_k[:,k]: same column-major reshape trick as
+    # build_kkt!. C_2d' * vec(rhs_k_batched) == Σ_k C_dk[:,:,k]' * rhs_k[:,k].
+    # One launch instead of ns.
+    C_2d = reshape(kkt.C_dk_batched, blk * ns, nd)
+    mul!(kkt.rhs_d, C_2d', vec(kkt.rhs_k_batched), -one(T), one(T))
 
     # Step 4: Solve Schur complement
     MadNLP.solve_linear_system!(kkt.linear_solver, kkt.rhs_d)
 
-    # Step 5: Back-substitution
-    for k in 1:ns
-        tmp_k = view(kkt.tmp_blk_nd_batched, :, :, k)
-        rhs_k = view(kkt.rhs_k_batched, :, k)
-        mul!(rhs_k, tmp_k, kkt.rhs_d, -one(T), one(T))
-    end
+    # Step 5: Back-substitution. rhs_k[:,k] -= tmp[:,:,k] * rhs_d for all k;
+    # reshape tmp as (blk*ns, nd) so a single GEMV updates the flattened
+    # rhs_k_batched in place.
+    tmp_2d = reshape(kkt.tmp_blk_nd_batched, blk * ns, nd)
+    mul!(vec(kkt.rhs_k_batched), tmp_2d, kkt.rhs_d, -one(T), one(T))
 
     # Step 6: Write back to w via kernel
     if blk * ns > 0
@@ -640,7 +632,6 @@ function MadNLP.solve_kkt!(
             nv, nc_eq, ns, blk;
             ndrange=blk * ns,
         )
-        CUDA.synchronize()
     end
     copyto!(view(wx, ns*nv+1:ns*nv+nd), kkt.rhs_d)
 
