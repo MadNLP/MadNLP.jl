@@ -22,8 +22,8 @@ import MadNLPGPU: ORDERING, DEFAULT_ORDERING, METIS_ORDERING, AMD_ORDERING,
 
 import KernelAbstractions: @kernel, @index, @Const, synchronize, get_backend
 
-using CUDA
-using CUDA.cuSPARSE, CUDA.cuBLAS, CUDA.cuSOLVER
+using CUDACore
+using cuSPARSE, cuBLAS, cuSOLVER
 import CUDSS
 
 import AMD, Metis
