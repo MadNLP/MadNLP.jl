@@ -31,8 +31,8 @@ end
     SparseMatrixCSC to CuSparseMatrixCSC
 =#
 
-function CUSPARSE.CuSparseMatrixCSC{Tv, Ti}(A::SparseMatrixCSC{Tv, Ti}) where {Tv, Ti}
-    return CUSPARSE.CuSparseMatrixCSC{Tv, Ti}(
+function cuSPARSE.CuSparseMatrixCSC{Tv, Ti}(A::SparseMatrixCSC{Tv, Ti}) where {Tv, Ti}
+    return cuSPARSE.CuSparseMatrixCSC{Tv, Ti}(
         CuVector(A.colptr),
         CuVector(A.rowval),
         CuVector(A.nzval),
@@ -44,41 +44,41 @@ end
     CuSparseMatrixCSC to CuMatrix
 =#
 
-MadNLPGPU.gpu_transfer!(y::CuMatrix{T}, x::CUSPARSE.CuSparseMatrixCSC{T}) where {T} =
+MadNLPGPU.gpu_transfer!(y::CuMatrix{T}, x::cuSPARSE.CuSparseMatrixCSC{T}) where {T} =
     MadNLPGPU._gpu_sparse_csc_to_dense!(y, x)
 
 #=
     MadNLP._ger!
 =#
 
-MadNLP._ger!(alpha::T, x::CuVector{T}, y::CuVector{T}, A::CuMatrix{T}) where {T} = CUBLAS.ger!(alpha, x, y, A)
+MadNLP._ger!(alpha::T, x::CuVector{T}, y::CuVector{T}, A::CuMatrix{T}) where {T} = cuBLAS.ger!(alpha, x, y, A)
 
 #=
     MadNLP._syr!
 =#
 
-MadNLP._syr!(uplo::Char, alpha::T, x::CuVector{T}, A::CuMatrix{T}) where {T} = CUBLAS.syr!(uplo, alpha, x, A)
+MadNLP._syr!(uplo::Char, alpha::T, x::CuVector{T}, A::CuMatrix{T}) where {T} = cuBLAS.syr!(uplo, alpha, x, A)
 
 #=
     MadNLP._symv!
 =#
 
-MadNLP._symv!(uplo::Char, alpha::T, A::CuMatrix{T}, x::CuVector{T}, beta::T, y::CuVector{T}) where {T} = CUBLAS.symv!(uplo, alpha, A, x, beta, y)
+MadNLP._symv!(uplo::Char, alpha::T, A::CuMatrix{T}, x::CuVector{T}, beta::T, y::CuVector{T}) where {T} = cuBLAS.symv!(uplo, alpha, A, x, beta, y)
 
 #=
     MadNLP._syrk!
 =#
 
-MadNLP._syrk!(uplo::Char, trans::Char, alpha::T, A::CuMatrix{T}, beta::T, C::CuMatrix{T}) where {T} = CUBLAS.syrk!(uplo, trans, alpha, A, beta, C)
+MadNLP._syrk!(uplo::Char, trans::Char, alpha::T, A::CuMatrix{T}, beta::T, C::CuMatrix{T}) where {T} = cuBLAS.syrk!(uplo, trans, alpha, A, beta, C)
 
 #=
     MadNLP._trsm!
 =#
 
-MadNLP._trsm!(side::Char, uplo::Char, transa::Char, diag::Char, alpha::T, A::CuMatrix{T}, B::CuMatrix{T}) where {T} = CUBLAS.trsm!(side, uplo, transa, diag, alpha, A, B)
+MadNLP._trsm!(side::Char, uplo::Char, transa::Char, diag::Char, alpha::T, A::CuMatrix{T}, B::CuMatrix{T}) where {T} = cuBLAS.trsm!(side, uplo, transa, diag, alpha, A, B)
 
 #=
     MadNLP._dgmm!
 =#
 
-MadNLP._dgmm!(side::Char, A::CuMatrix{T}, x::CuVector{T}, B::CuMatrix{T}) where {T} = CUBLAS.dgmm!(side, A, x, B)
+MadNLP._dgmm!(side::Char, A::CuMatrix{T}, x::CuVector{T}, B::CuMatrix{T}) where {T} = cuBLAS.dgmm!(side, A, x, B)

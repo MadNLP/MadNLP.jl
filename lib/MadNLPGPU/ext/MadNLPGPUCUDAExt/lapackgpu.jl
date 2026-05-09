@@ -54,4 +54,4 @@ end
 MadNLP.transfer_matrix!(M::LapackCUDASolver) = MadNLPGPU.gpu_transfer!(M.fact, M.A)
 MadNLP._get_info(M::LapackCUDASolver) = sum(M.info)
 MadNLP.solve!(M::LapackCUDASolver{T}, x::CuVector{T}) where {T} = MadNLP._solve!(M, x)
-MadNLP.introduce(M::LapackCUDASolver) = "cuSOLVER v$(CUSOLVER.version()) -- ($(M.opt.lapack_algorithm))"
+MadNLP.introduce(M::LapackCUDASolver) = "cuSOLVER v$(cuSOLVER.version()) -- ($(M.opt.lapack_algorithm))"
