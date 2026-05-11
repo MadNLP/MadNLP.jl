@@ -9,7 +9,7 @@ function _compare_gpu_with_cpu(KKTSystem, n, m, ind_fixed)
         madnlp_options = Dict{Symbol, Any}(
             :callback=>MadNLP.DenseCallback,
             :kkt_system=>KKTSystem,
-            :linear_solver=>LapackCUDASolver,
+            :linear_solver=>MadNLPGPU.LapackCUDASolver,
             :print_level=>MadNLP.ERROR,
             :tol=>tol
         )
@@ -62,7 +62,7 @@ end
             callback=MadNLP.DenseCallback,
             print_level=MadNLP.ERROR,
             kkt_system=KKT,
-            linear_solver=LapackCUDASolver,
+            linear_solver=MadNLPGPU.LapackCUDASolver,
         )
         results_ref = MadNLP.solve!(solver_exact)
 
@@ -73,7 +73,7 @@ end
             print_level=MadNLP.ERROR,
             kkt_system=KKT,
             hessian_approximation=QN,
-            linear_solver=LapackCUDASolver,
+            linear_solver=MadNLPGPU.LapackCUDASolver,
         )
         results_qn = MadNLP.solve!(solver_qn)
 
