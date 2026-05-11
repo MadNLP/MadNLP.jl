@@ -6,6 +6,8 @@ on:
       - master
   pull_request:
     types: [opened, synchronize, reopened]
+  schedule:
+    - cron: '0 0 * * 0'
 
 permissions:
   actions: write
@@ -40,7 +42,7 @@ jobs:
           directories: src
       - uses: codecov/codecov-action@v5
         with:
-          file: lcov.info
+          files: lcov.info
           token: ${{ secrets.CODECOV_TOKEN }}
   test-hsl:
     runs-on:
@@ -75,7 +77,7 @@ jobs:
           directories: lib/MadNLPHSL/src
       - uses: codecov/codecov-action@v5
         with:
-          file: lcov.info
+          files: lcov.info
           token: ${{ secrets.CODECOV_TOKEN }}
   # Pardiso license currently not available
   #
@@ -149,6 +151,6 @@ jobs:
           directories: lib/MadNLPGPU/src
       - uses: codecov/codecov-action@v5
         with:
-          file: lcov.info
+          files: lcov.info
           token: ${{ secrets.CODECOV_TOKEN }}
 
