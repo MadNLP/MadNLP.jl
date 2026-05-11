@@ -3,7 +3,7 @@ cuda_testset = [
     [
         "CUDSS",
         ()->MadNLP.Optimizer(
-            linear_solver=MadNLPGPU.CUDSSSolver,
+            linear_solver = MadNLPGPU.CUDSSSolver,
             print_level=MadNLP.ERROR
         ),
         [],
@@ -11,7 +11,7 @@ cuda_testset = [
     [
         "CUDSS-AMD",
         ()->MadNLP.Optimizer(
-            linear_solver=MadNLPGPU.CUDSSSolver,
+            linear_solver = MadNLPGPU.CUDSSSolver,
             print_level=MadNLP.ERROR,
             cudss_ordering=MadNLPGPU.AMD_ORDERING,
         ),
@@ -20,7 +20,7 @@ cuda_testset = [
     [
         "CUDSS-SYMAMD",
         ()->MadNLP.Optimizer(
-            linear_solver=MadNLPGPU.CUDSSSolver,
+            linear_solver = MadNLPGPU.CUDSSSolver,
             print_level=MadNLP.ERROR,
             cudss_ordering=MadNLPGPU.SYMAMD_ORDERING,
         ),
@@ -29,7 +29,7 @@ cuda_testset = [
     [
         "CUDSS-COLAMD",
         ()->MadNLP.Optimizer(
-            linear_solver=MadNLPGPU.CUDSSSolver,
+            linear_solver = MadNLPGPU.CUDSSSolver,
             print_level=MadNLP.ERROR,
             cudss_ordering=MadNLPGPU.COLAMD_ORDERING,
         ),
@@ -38,7 +38,7 @@ cuda_testset = [
     [
         "CUDSS-METIS",
         ()->MadNLP.Optimizer(
-            linear_solver=MadNLPGPU.CUDSSSolver,
+            linear_solver = MadNLPGPU.CUDSSSolver,
             print_level=MadNLP.ERROR,
             cudss_ordering=MadNLPGPU.METIS_ORDERING,
         ),
@@ -47,7 +47,7 @@ cuda_testset = [
     [
         "CUDSS-IR",
         ()->MadNLP.Optimizer(
-            linear_solver=MadNLPGPU.CUDSSSolver,
+            linear_solver = MadNLPGPU.CUDSSSolver,
             print_level=MadNLP.ERROR,
             cudss_ir=1,
         ),
@@ -56,7 +56,7 @@ cuda_testset = [
     [
         "CUDSS-HYBRID",
         ()->MadNLP.Optimizer(
-            linear_solver=MadNLPGPU.CUDSSSolver,
+            linear_solver = MadNLPGPU.CUDSSSolver,
             print_level=MadNLP.ERROR,
             cudss_hybrid_memory=true,
         ),
@@ -65,7 +65,7 @@ cuda_testset = [
     [
         "CUDSS-NOPIVOTING",
         ()->MadNLP.Optimizer(
-            linear_solver=MadNLPGPU.CUDSSSolver,
+            linear_solver = MadNLPGPU.CUDSSSolver,
             print_level=MadNLP.ERROR,
             cudss_pivoting=false,
         ),
@@ -92,7 +92,7 @@ cuda_testset = [
     [
         "LapackGPU-BUNCHKAUFMAN",
         ()->MadNLP.Optimizer(
-            linear_solver=MadNLPGPU.LapackCUDASolver,
+            linear_solver = MadNLPGPU.LapackCUDASolver,
             lapack_algorithm=MadNLP.BUNCHKAUFMAN,
             print_level=MadNLP.ERROR,
         ),
@@ -101,7 +101,7 @@ cuda_testset = [
     [
         "LapackGPU-LU",
         ()->MadNLP.Optimizer(
-            linear_solver=MadNLPGPU.LapackCUDASolver,
+            linear_solver = MadNLPGPU.LapackCUDASolver,
             lapack_algorithm=MadNLP.LU,
             print_level=MadNLP.ERROR,
         ),
@@ -110,7 +110,7 @@ cuda_testset = [
     [
         "LapackGPU-QR",
         ()->MadNLP.Optimizer(
-            linear_solver=MadNLPGPU.LapackCUDASolver,
+            linear_solver = MadNLPGPU.LapackCUDASolver,
             lapack_algorithm=MadNLP.QR,
             print_level=MadNLP.ERROR,
         ),
@@ -119,7 +119,7 @@ cuda_testset = [
     [
         "LapackGPU-EVD",
         ()->MadNLP.Optimizer(
-            linear_solver=MadNLPGPU.LapackCUDASolver,
+            linear_solver = MadNLPGPU.LapackCUDASolver,
             lapack_algorithm=MadNLP.EVD,
             print_level=MadNLP.ERROR,
         ),
@@ -128,7 +128,7 @@ cuda_testset = [
     [
         "LapackGPU-CHOLESKY",
         ()->MadNLP.Optimizer(
-            linear_solver=MadNLPGPU.LapackCUDASolver,
+            linear_solver = MadNLPGPU.LapackCUDASolver,
             lapack_algorithm=MadNLP.CHOLESKY,
             print_level=MadNLP.ERROR,
         ),
@@ -140,7 +140,7 @@ rocm_testset = [
     [
         "LapackROCmSolver-LU",
         ()->MadNLP.Optimizer(
-            linear_solver=MadNLPGPU.LapackROCmSolver,
+            linear_solver = MadNLPGPU.LapackROCmSolver,
             lapack_algorithm=MadNLP.LU,
             print_level=MadNLP.ERROR,
         ),
@@ -149,7 +149,7 @@ rocm_testset = [
     [
         "LapackROCmSolver-QR",
         ()->MadNLP.Optimizer(
-            linear_solver=MadNLPGPU.LapackROCmSolver,
+            linear_solver = MadNLPGPU.LapackROCmSolver,
             lapack_algorithm=MadNLP.QR,
             print_level=MadNLP.ERROR,
         ),
@@ -158,7 +158,7 @@ rocm_testset = [
     [
         "LapackROCmSolver-EVD",
         ()->MadNLP.Optimizer(
-            linear_solver=MadNLPGPU.LapackROCmSolver,
+            linear_solver = MadNLPGPU.LapackROCmSolver,
             lapack_algorithm=MadNLP.EVD,
             print_level=MadNLP.ERROR,
         ),
@@ -167,7 +167,7 @@ rocm_testset = [
     [
         "LapackROCmSolver-CHOLESKY",
         ()->MadNLP.Optimizer(
-            linear_solver=MadNLPGPU.LapackROCmSolver,
+            linear_solver = MadNLPGPU.LapackROCmSolver,
             lapack_algorithm=MadNLP.CHOLESKY,
             print_level=MadNLP.ERROR,
         ),
@@ -177,16 +177,16 @@ rocm_testset = [
 
 @testset "MadNLPGPU test" begin
     if HAS_CUDA && CUDA.functional()
-        MadNLPTests.test_linear_solver(MadNLPGPU.LapackCUDASolver,Float32)
-        MadNLPTests.test_linear_solver(MadNLPGPU.LapackCUDASolver,Float64)
+        MadNLPTests.test_linear_solver(MadNLPGPU.LapackCUDASolver, Float32)
+        MadNLPTests.test_linear_solver(MadNLPGPU.LapackCUDASolver, Float64)
         # Test LapackGPU wrapper
         for (name,optimizer_constructor,exclude) in cuda_testset
             test_madnlp(name,optimizer_constructor,exclude; Arr=CuArray)
         end
     end
     if HAS_AMDGPU && AMDGPU.functional()
-        MadNLPTests.test_linear_solver(MadNLPGPU.LapackROCmSolver,Float32)
-        MadNLPTests.test_linear_solver(MadNLPGPU.LapackROCmSolver,Float64)
+        MadNLPTests.test_linear_solver(MadNLPGPU.LapackROCmSolver, Float32)
+        MadNLPTests.test_linear_solver(MadNLPGPU.LapackROCmSolver, Float64)
         for (name,optimizer_constructor,exclude) in rocm_testset
             test_madnlp(name,optimizer_constructor,exclude; Arr=ROCArray)
         end
