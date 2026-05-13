@@ -26,4 +26,8 @@ import SparseArrays: sparse
     @testset "MINLP test" begin
         include("minlp_test.jl")
     end
+
+    @testset "Schur complement" begin
+        include("schur_test.jl")
+    end
 end # @testset

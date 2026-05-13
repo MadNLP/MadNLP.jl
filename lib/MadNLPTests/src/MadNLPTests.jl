@@ -13,7 +13,7 @@ import JuMP: Model, @variable, @constraint, @objective, optimize!, set_attribute
     MOI, termination_status, LowerBoundRef, UpperBoundRef, value, dual, fix
 import NLPModelsJuMP
 
-export test_madnlp, solcmp
+export test_madnlp, solcmp, TwoStageQP, build_twostage_qp, schur_opts
 
 function solcmp(x,sol;atol=1e-4,rtol=1e-4)
     aerr = norm(x-sol,Inf)
@@ -459,5 +459,6 @@ include("Instances/dummy_qp.jl")
 include("Instances/hs15.jl")
 include("Instances/hs15nohessian.jl")
 include("Instances/nls.jl")
+include("Instances/twostage_qp.jl")
 
 end # module

@@ -75,6 +75,17 @@ DenseCondensedKKTSystem
 
 ```
 
+## Schur complement KKT system
+
+For two-stage stochastic programs with a block-arrowhead structure,
+MadNLP provides a specialized KKT system that eliminates the per-scenario
+blocks and reduces the linear system to a dense `nd × nd` Schur complement
+on the design variables.
+```@docs
+SchurComplementKKTSystem
+
+```
+
 ## AbstractKKTVector
 Each instance of `AbstractKKTVector` implements the following interface.
 
