@@ -271,7 +271,6 @@ end
 
 function get_varphi(obj_val, x_lr, xl_r, xu_r, x_ur, mu)
     varphi = obj_val
-    # TODO(@anton) Check if we can @simd this
     for ii in eachindex(x_lr)
         varphi += _get_varphi(x_lr[ii],xl_r[ii],mu)
     end

@@ -1,5 +1,5 @@
-# TODO(@anton): All of these could probably be made more efficient via custom kernels.
-#               For now I am just returning the mapreduce functionality here so MadNLPGPU works again.
+# NOTE: All of these could probably be made more efficient via custom kernels or nonallocating mapreduce.
+#       For now we just use the standard mapreduce functionality which may allocate.
 
 const AbstractGPUVectorOrSubVector{T,VT<:AbstractGPUVector{T}} = Union{AbstractGPUVector{T}, SubVector{T, VT}}
 
