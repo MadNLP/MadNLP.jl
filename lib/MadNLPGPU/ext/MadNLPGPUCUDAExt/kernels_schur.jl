@@ -92,7 +92,7 @@ end
     i = @index(Global)
     @inbounds begin
         val = diag_buffer[bufidx_flat[i]] * jac[jcoo1_flat[i]] * jac[jcoo2_flat[i]]
-        CUDA.@atomic S[row_flat[i], col_flat[i]] += val
+        CUDACore.@atomic S[row_flat[i], col_flat[i]] += val
     end
 end
 
