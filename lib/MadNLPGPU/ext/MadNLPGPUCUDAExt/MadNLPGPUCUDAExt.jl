@@ -22,15 +22,15 @@ import MadNLPGPU: ORDERING, DEFAULT_ORDERING, METIS_ORDERING, AMD_ORDERING,
 
 import KernelAbstractions: @kernel, @index, @Const, synchronize, get_backend
 
-using CUDA
-using CUDA.CUSPARSE, CUDA.CUBLAS, CUDA.CUSOLVER
+using CUDACore
+using cuSPARSE, cuBLAS, cuSOLVER
 import CUDSS
 
 import AMD, Metis
 
-import .CUSOLVER: cusolverStatus_t, CuPtr, cudaDataType, cublasFillMode_t, cusolverDnHandle_t,
+import .cuSOLVER: cusolverStatus_t, CuPtr, cudaDataType, cublasFillMode_t, cusolverDnHandle_t,
     dense_handle, CuSolverParameters, CUSOLVER_EIG_MODE_VECTOR
-import .CUBLAS: handle, CUBLAS_DIAG_NON_UNIT,
+import .cuBLAS: handle, CUBLAS_DIAG_NON_UNIT,
     CUBLAS_FILL_MODE_LOWER, CUBLAS_FILL_MODE_UPPER, CUBLAS_SIDE_LEFT, CUBLAS_OP_N, CUBLAS_OP_T
 
 function __init__()

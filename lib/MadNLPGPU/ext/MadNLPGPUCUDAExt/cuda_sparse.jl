@@ -4,20 +4,20 @@
 ######################################################
 
 function MadNLP.transfer!(
-        dest::CUSPARSE.CuSparseMatrixCSC,
+        dest::cuSPARSE.CuSparseMatrixCSC,
         src::MadNLP.SparseMatrixCOO,
         map,
     )
     return copyto!(view(dest.nzVal, map), src.V)
 end
 
-MadNLP.nzval(H::CUSPARSE.CuSparseMatrixCSC) = H.nzVal
+MadNLP.nzval(H::cuSPARSE.CuSparseMatrixCSC) = H.nzVal
 
 function MadNLP._get_sparse_csc(dims, colptr::CuVector, rowval, nzval)
-    return CUSPARSE.CuSparseMatrixCSC(colptr, rowval, nzval, dims)
+    return cuSPARSE.CuSparseMatrixCSC(colptr, rowval, nzval, dims)
 end
 
-function MadNLP._sym_length(Jt::CUSPARSE.CuSparseMatrixCSC)
+function MadNLP._sym_length(Jt::cuSPARSE.CuSparseMatrixCSC)
     return mapreduce(
         (x, y) -> begin
             z = x - y
@@ -29,7 +29,7 @@ function MadNLP._sym_length(Jt::CUSPARSE.CuSparseMatrixCSC)
     )
 end
 
-function MadNLP.get_tril_to_full(csc::CUSPARSE.CuSparseMatrixCSC{Tv, Ti}) where {Tv, Ti}
+function MadNLP.get_tril_to_full(csc::cuSPARSE.CuSparseMatrixCSC{Tv, Ti}) where {Tv, Ti}
     cscind = MadNLP.SparseMatrixCSC{Int, Ti}(
         Symmetric(
             MadNLP.SparseMatrixCSC{Int, Ti}(
@@ -41,7 +41,7 @@ function MadNLP.get_tril_to_full(csc::CUSPARSE.CuSparseMatrixCSC{Tv, Ti}) where 
             :L,
         ),
     )
-    return CUSPARSE.CuSparseMatrixCSC{Tv, Ti}(
+    return cuSPARSE.CuSparseMatrixCSC{Tv, Ti}(
             CuArray(cscind.colptr),
             CuArray(cscind.rowval),
             CuVector{Tv}(undef, MadNLP.nnz(cscind)),
