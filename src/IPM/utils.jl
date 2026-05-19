@@ -88,7 +88,7 @@ function get_vars_info(solver)
 
     num_lu_vars = 0
     for ii in eachindex(x_lb)
-        if (x_lb !=-Inf) && (x_ub != Inf)
+        if (x_lb[ii] !=-Inf) && (x_ub[ii] != Inf)
             num_lu_vars += 1
         end
     end
@@ -114,9 +114,9 @@ function get_cons_info(solver)
     num_le_cons = 0
     num_ue_cons = 0
     for ii in eachindex(g_lb)
-        if (g_lb != -Inf) && (g_ub ==  Inf)
+        if (g_lb[ii] != -Inf) && (g_ub[ii] == Inf)
             num_le_cons += 1
-        elseif (g_ub !=  Inf) && (g_lb == -Inf)
+        elseif (g_ub[ii] !=  Inf) && (g_lb[ii] == -Inf)
             num_ue_cons += 1
         end
     end
