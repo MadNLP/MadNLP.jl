@@ -120,7 +120,6 @@ jobs:
       - uses: julia-actions/install-juliaup@v2
         with:
           channel: ${{ matrix.julia-version }}
-      - uses: julia-actions/cache@v1
       - name: Setup test environment
         shell: julia --project=./lib/MadNLPGPU/test --color=yes {0}
         run: |
