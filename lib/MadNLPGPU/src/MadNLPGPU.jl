@@ -29,6 +29,8 @@ import MadNLP:
 # AMD and Metis
 import AMD, Metis
 
+const AbstractGPUVectorOrSubVector{T,VT<:AbstractGPUVector{T}} = Union{AbstractGPUVector{T}, SubVector{T, VT}}
+
 include("KKT/kernels_dense.jl")
 include("KKT/kernels_sparse.jl")
 include("KKT/kernels_qn.jl")

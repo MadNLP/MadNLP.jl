@@ -1,8 +1,6 @@
 # NOTE: All of these could probably be made more efficient via custom kernels or nonallocating mapreduce.
 #       For now we just use the standard mapreduce functionality which may allocate.
 
-const AbstractGPUVectorOrSubVector{T,VT<:AbstractGPUVector{T}} = Union{AbstractGPUVector{T}, SubVector{T, VT}}
-
 function get_varphi(
     obj_val,
     x_lr::VT,
