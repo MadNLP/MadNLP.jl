@@ -94,7 +94,7 @@ has_constraints(solver) = get_m(solver) != 0
 end
 
 
-function get_vars_info(solver)
+function get_vars_info(solver::AbstractMadNLPSolver)
     nlp = get_nlp(solver)
 
     x_lb = get_lvar(nlp)
@@ -115,7 +115,7 @@ function get_vars_info(solver)
     )
 end
 
-function get_cons_info(solver)
+function get_cons_info(solver::AbstractMadNLPSolver)
     nlp = get_nlp(solver)
 
     g_lb = get_lcon(nlp)
