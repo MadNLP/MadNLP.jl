@@ -77,6 +77,23 @@ struct NotEnoughDegreesOfFreedomException <: Exception end
 # Utilities
 has_constraints(solver) = get_m(solver) != 0
 
+@inline function count_lu_bounds(lb::AbstractVector, ub::AbstractVector)
+    num_lu_bounds = 0
+    num_le_bounds = 0
+    num_ue_bounds = 0
+    for ii in eachindex(lb)
+        if (lb[ii] !=-Inf) && (ub[ii] != Inf)
+            num_lu_bounds += 1
+        elseif (lb[ii] == -Inf)
+            num_ue_bounds += 1
+        elseif (ub[ii] == Inf)
+            num_le_bounds += 1
+        end
+    end
+    return num_lu_bounds, num_le_bounds, num_ue_bounds
+end
+
+
 function get_vars_info(solver)
     nlp = get_nlp(solver)
 
@@ -86,12 +103,7 @@ function get_vars_info(solver)
     num_var = get_nvar(nlp) - num_fixed
     num_llb_vars = length(get_ind_llb(solver))
 
-    num_lu_vars = 0
-    for ii in eachindex(x_lb)
-        if (x_lb[ii] !=-Inf) && (x_ub[ii] != Inf)
-            num_lu_vars += 1
-        end
-    end
+    num_lu_vars,_,_ = count_lu_bounds(x_lb, x_ub)
     num_lu_vars = num_lu_vars - num_fixed
     num_uub_vars = length(get_ind_uub(solver))
     return (
@@ -111,15 +123,7 @@ function get_cons_info(solver)
 
     num_eq_cons = length(solver.cb.ind_eq)
     num_ineq_cons = length(solver.cb.ind_ineq)
-    num_le_cons = 0
-    num_ue_cons = 0
-    for ii in eachindex(g_lb)
-        if (g_lb[ii] != -Inf) && (g_ub[ii] == Inf)
-            num_le_cons += 1
-        elseif (g_ub[ii] !=  Inf) && (g_lb[ii] == -Inf)
-            num_ue_cons += 1
-        end
-    end
+    _,num_le_cons,num_ue_cons = count_lu_bounds(g_lb, g_ub)
     num_lu_cons = num_ineq_cons - num_le_cons - num_ue_cons
 
     return (
