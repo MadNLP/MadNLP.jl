@@ -7,7 +7,7 @@ for (potrf, potrf_buffer, potrs, nbytes, T) in
         function MadNLP.setup_cholesky!(M::LapackCUDASolver{$T})
             if M.legacy
                 potrf_lwork_gpu = Ref{Cint}(0)
-                CUSOLVER.$potrf_buffer(
+                cuSOLVER.$potrf_buffer(
                     dense_handle(),
                     CUBLAS_FILL_MODE_LOWER,
                     Cint(M.n),
@@ -20,7 +20,7 @@ for (potrf, potrf_buffer, potrs, nbytes, T) in
             else
                 potrf_lwork_gpu = Ref{Csize_t}(0)
                 potrf_lwork_cpu = Ref{Csize_t}(0)
-                CUSOLVER.cusolverDnXpotrf_bufferSize(
+                cuSOLVER.cusolverDnXpotrf_bufferSize(
                     dense_handle(),
                     M.params,
                     CUBLAS_FILL_MODE_LOWER,
@@ -42,7 +42,7 @@ for (potrf, potrf_buffer, potrs, nbytes, T) in
 
         function MadNLP.factorize_cholesky!(M::LapackCUDASolver{$T})
             if M.legacy
-                CUSOLVER.$potrf(
+                cuSOLVER.$potrf(
                     dense_handle(),
                     CUBLAS_FILL_MODE_LOWER,
                     Cint(M.n),
@@ -53,7 +53,7 @@ for (potrf, potrf_buffer, potrs, nbytes, T) in
                     M.info,
                 )
             else
-                CUSOLVER.cusolverDnXpotrf(
+                cuSOLVER.cusolverDnXpotrf(
                     dense_handle(),
                     M.params,
                     CUBLAS_FILL_MODE_LOWER,
@@ -74,7 +74,7 @@ for (potrf, potrf_buffer, potrs, nbytes, T) in
 
         function MadNLP.solve_cholesky!(M::LapackCUDASolver{$T}, x::CuVector{$T})
             if M.legacy
-                CUSOLVER.$potrs(
+                cuSOLVER.$potrs(
                     dense_handle(),
                     CUBLAS_FILL_MODE_LOWER,
                     Cint(M.n),
@@ -86,7 +86,7 @@ for (potrf, potrf_buffer, potrs, nbytes, T) in
                     M.info,
                 )
             else
-                CUSOLVER.cusolverDnXpotrs(
+                cuSOLVER.cusolverDnXpotrs(
                     dense_handle(),
                     M.params,
                     CUBLAS_FILL_MODE_LOWER,
@@ -116,7 +116,7 @@ for (sytrf_buffer, sytrf, nbytes, T) in
             resize!(M.ipiv, M.n)
             resize!(M.ipiv64, M.n)
             sytrf_lwork_gpu = Ref{Cint}(0)
-            CUSOLVER.$sytrf_buffer(
+            cuSOLVER.$sytrf_buffer(
                 dense_handle(),
                 Cint(M.n),
                 M.fact,
@@ -125,7 +125,7 @@ for (sytrf_buffer, sytrf, nbytes, T) in
             )
             sytrs_lwork_cpu = Ref{Csize_t}(0)
             sytrs_lwork_gpu = Ref{Csize_t}(0)
-            CUSOLVER.cusolverDnXsytrs_bufferSize(
+            cuSOLVER.cusolverDnXsytrs_bufferSize(
                 dense_handle(),
                 CUBLAS_FILL_MODE_LOWER,
                 M.n,
@@ -149,7 +149,7 @@ for (sytrf_buffer, sytrf, nbytes, T) in
 
         function MadNLP.factorize_bunchkaufman!(M::LapackCUDASolver{$T})
             # We only have the legacy API for sytrf
-            CUSOLVER.$sytrf(
+            cuSOLVER.$sytrf(
                 dense_handle(),
                 CUBLAS_FILL_MODE_LOWER,
                 Cint(M.n),
@@ -165,7 +165,7 @@ for (sytrf_buffer, sytrf, nbytes, T) in
 
         function MadNLP.solve_bunchkaufman!(M::LapackCUDASolver{$T}, x::CuVector{$T})
             copyto!(M.ipiv64, M.ipiv)  # No workaround possible until NVIDIA implements cusolverDnXsytrf
-            CUSOLVER.cusolverDnXsytrs(
+            cuSOLVER.cusolverDnXsytrs(
                 dense_handle(),
                 CUBLAS_FILL_MODE_LOWER,
                 M.n,
@@ -198,7 +198,7 @@ for (getrf, getrf_buffer, getrs, nbytes, T) in
             if M.legacy
                 resize!(M.ipiv, M.n)
                 getrf_lwork_gpu = Ref{Cint}(0)
-                CUSOLVER.$getrf_buffer(
+                cuSOLVER.$getrf_buffer(
                     dense_handle(),
                     Cint(M.n),
                     Cint(M.n),
@@ -212,7 +212,7 @@ for (getrf, getrf_buffer, getrs, nbytes, T) in
                 resize!(M.ipiv64, M.n)
                 getrf_lwork_cpu = Ref{Csize_t}(0)
                 getrf_lwork_gpu = Ref{Csize_t}(0)
-                CUSOLVER.cusolverDnXgetrf_bufferSize(
+                cuSOLVER.cusolverDnXgetrf_bufferSize(
                     dense_handle(),
                     M.params,
                     M.n,
@@ -234,7 +234,7 @@ for (getrf, getrf_buffer, getrs, nbytes, T) in
 
         function MadNLP.factorize_lu!(M::LapackCUDASolver{$T})
             if M.legacy
-                CUSOLVER.$getrf(
+                cuSOLVER.$getrf(
                     dense_handle(),
                     Cint(M.n),
                     Cint(M.n),
@@ -245,7 +245,7 @@ for (getrf, getrf_buffer, getrs, nbytes, T) in
                     M.info,
                 )
             else
-                CUSOLVER.cusolverDnXgetrf(
+                cuSOLVER.cusolverDnXgetrf(
                     dense_handle(),
                     M.params,
                     M.n,
@@ -267,7 +267,7 @@ for (getrf, getrf_buffer, getrs, nbytes, T) in
 
         function MadNLP.solve_lu!(M::LapackCUDASolver{$T}, x::CuVector{$T})
             if M.legacy
-                CUSOLVER.$getrs(
+                cuSOLVER.$getrs(
                     dense_handle(),
                     CUBLAS_OP_N,
                     Cint(M.n),
@@ -280,7 +280,7 @@ for (getrf, getrf_buffer, getrs, nbytes, T) in
                     M.info,
                 )
             else
-                CUSOLVER.cusolverDnXgetrs(
+                cuSOLVER.cusolverDnXgetrs(
                     dense_handle(),
                     M.params,
                     CUBLAS_OP_N,
@@ -310,7 +310,7 @@ for (geqrf, geqrf_buffer, ormqr, ormqr_buffer, trsv, nbytes, T) in
         function MadNLP.setup_qr!(M::LapackCUDASolver{$T})
             resize!(M.tau, M.n)
             ormqr_lwork_gpu = Ref{Cint}(0)
-            CUSOLVER.$ormqr_buffer(
+            cuSOLVER.$ormqr_buffer(
                 dense_handle(),
                 CUBLAS_SIDE_LEFT,
                 CUBLAS_OP_T,
@@ -326,7 +326,7 @@ for (geqrf, geqrf_buffer, ormqr, ormqr_buffer, trsv, nbytes, T) in
             )
             if M.legacy
                 geqrf_lwork_gpu = Ref{Cint}(0)
-                CUSOLVER.$geqrf_buffer(
+                cuSOLVER.$geqrf_buffer(
                     dense_handle(),
                     Cint(M.n),
                     Cint(M.n),
@@ -339,7 +339,7 @@ for (geqrf, geqrf_buffer, ormqr, ormqr_buffer, trsv, nbytes, T) in
             else
                 geqrf_lwork_cpu = Ref{Csize_t}(0)
                 geqrf_lwork_gpu = Ref{Csize_t}(0)
-                CUSOLVER.cusolverDnXgeqrf_bufferSize(
+                cuSOLVER.cusolverDnXgeqrf_bufferSize(
                     dense_handle(),
                     M.params,
                     M.n,
@@ -363,7 +363,7 @@ for (geqrf, geqrf_buffer, ormqr, ormqr_buffer, trsv, nbytes, T) in
 
         function MadNLP.factorize_qr!(M::LapackCUDASolver{$T})
             if M.legacy
-                CUSOLVER.$geqrf(
+                cuSOLVER.$geqrf(
                     dense_handle(),
                     Cint(M.n),
                     Cint(M.n),
@@ -375,7 +375,7 @@ for (geqrf, geqrf_buffer, ormqr, ormqr_buffer, trsv, nbytes, T) in
                     M.info,
                 )
             else
-                CUSOLVER.cusolverDnXgeqrf(
+                cuSOLVER.cusolverDnXgeqrf(
                     dense_handle(),
                     M.params,
                     M.n,
@@ -398,7 +398,7 @@ for (geqrf, geqrf_buffer, ormqr, ormqr_buffer, trsv, nbytes, T) in
 
         function MadNLP.solve_qr!(M::LapackCUDASolver{$T}, x::CuVector{$T})
             # We only have the legacy API for ormqr
-            CUSOLVER.$ormqr(
+            cuSOLVER.$ormqr(
                 dense_handle(),
                 CUBLAS_SIDE_LEFT,
                 CUBLAS_OP_T,
@@ -414,7 +414,7 @@ for (geqrf, geqrf_buffer, ormqr, ormqr_buffer, trsv, nbytes, T) in
                 Cint(M.lwork_gpu ÷ $nbytes),
                 M.info,
             )
-            CUBLAS.$trsv(
+            cuBLAS.$trsv(
                 handle(),
                 CUBLAS_FILL_MODE_UPPER,
                 CUBLAS_OP_N,
@@ -441,7 +441,7 @@ for (syevd, syevd_buffer, gemv, nbytes, T) in
             resize!(M.Λ, M.n)
             if M.legacy
                 syevd_lwork_gpu = Ref{Cint}(0)
-                CUSOLVER.$syevd_buffer(
+                cuSOLVER.$syevd_buffer(
                     dense_handle(),
                     CUSOLVER_EIG_MODE_VECTOR,
                     CUBLAS_FILL_MODE_LOWER,
@@ -456,7 +456,7 @@ for (syevd, syevd_buffer, gemv, nbytes, T) in
             else
                 syevd_lwork_cpu = Ref{Csize_t}(0)
                 syevd_lwork_gpu = Ref{Csize_t}(0)
-                CUSOLVER.cusolverDnXsyevd_bufferSize(
+                cuSOLVER.cusolverDnXsyevd_bufferSize(
                     dense_handle(),
                     M.params,
                     CUSOLVER_EIG_MODE_VECTOR,
@@ -481,7 +481,7 @@ for (syevd, syevd_buffer, gemv, nbytes, T) in
 
         function MadNLP.factorize_evd!(M::LapackCUDASolver{$T})
             if M.legacy
-                CUSOLVER.$syevd(
+                cuSOLVER.$syevd(
                     dense_handle(),
                     CUSOLVER_EIG_MODE_VECTOR,
                     CUBLAS_FILL_MODE_LOWER,
@@ -494,7 +494,7 @@ for (syevd, syevd_buffer, gemv, nbytes, T) in
                     M.info,
                 )
             else
-                CUSOLVER.cusolverDnXsyevd(
+                cuSOLVER.cusolverDnXsyevd(
                     dense_handle(),
                     M.params,
                     CUSOLVER_EIG_MODE_VECTOR,
@@ -517,7 +517,7 @@ for (syevd, syevd_buffer, gemv, nbytes, T) in
         end
 
         function MadNLP.solve_evd!(M::LapackCUDASolver{$T}, x::CuVector{$T})
-            CUBLAS.$gemv(
+            cuBLAS.$gemv(
                 handle(),
                 CUBLAS_OP_T,
                 M.n,
@@ -532,7 +532,7 @@ for (syevd, syevd_buffer, gemv, nbytes, T) in
                 one(Int64),
             )
             M.tau ./= M.Λ
-            CUBLAS.$gemv(
+            cuBLAS.$gemv(
                 handle(),
                 CUBLAS_OP_N,
                 M.n,

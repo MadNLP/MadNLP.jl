@@ -6,6 +6,8 @@ on:
       - master
   pull_request:
     types: [opened, synchronize, reopened]
+  schedule:
+    - cron: '0 0 * * 0'
 
 permissions:
   actions: write
@@ -40,7 +42,7 @@ jobs:
           directories: src
       - uses: codecov/codecov-action@v5
         with:
-          file: lcov.info
+          files: lcov.info
           token: ${{ secrets.CODECOV_TOKEN }}
   test-hsl:
     runs-on:
@@ -75,7 +77,7 @@ jobs:
           directories: lib/MadNLPHSL/src
       - uses: codecov/codecov-action@v5
         with:
-          file: lcov.info
+          files: lcov.info
           token: ${{ secrets.CODECOV_TOKEN }}
   # Pardiso license currently not available
   #
@@ -109,7 +111,7 @@ jobs:
       fail-fast: false
       matrix:
         julia-version: ['1']
-        gpu: [cuda, amdgpu]
+        gpu: [cuda13, amdgpu]
     runs-on:
       - self-hosted
       - ${{ matrix.gpu }}
@@ -118,7 +120,6 @@ jobs:
       - uses: julia-actions/install-juliaup@v2
         with:
           channel: ${{ matrix.julia-version }}
-      - uses: julia-actions/cache@v1
       - name: Setup test environment
         shell: julia --project=./lib/MadNLPGPU/test --color=yes {0}
         run: |
@@ -128,19 +129,12 @@ jobs:
           Pkg.develop(path="./lib/MadNLPGPU")
           Pkg.develop(path="./lib/MadNLPTests")
       - name: Add CUDA and CUDSS
-        if: matrix.gpu == 'cuda'
+        if: matrix.gpu == 'cuda13'
         shell: julia --project=./lib/MadNLPGPU/test --color=yes {0}
         run: |
           using Pkg
           Pkg.add("CUDA")
           Pkg.add("CUDSS")
-          # Pin the CUDA runtime to a 12.x toolkit so the self-hosted
-          # V100 runner keeps working: CUDA 13 dropped sm_70 support, and
-          # without this pin CUDA_Runtime_jll may auto-select CUDA 13.
-          # See JuliaGPU/CUDA.jl#3134 — once that fix is in a tagged
-          # CUDA.jl release, this pin can be removed.
-          using CUDA
-          CUDA.set_runtime_version!(v"12.9")
       - name: Add AMDGPU
         if: matrix.gpu == 'amdgpu'
         shell: julia --project=./lib/MadNLPGPU/test --color=yes {0}
@@ -156,6 +150,6 @@ jobs:
           directories: lib/MadNLPGPU/src
       - uses: codecov/codecov-action@v5
         with:
-          file: lcov.info
+          files: lcov.info
           token: ${{ secrets.CODECOV_TOKEN }}
 

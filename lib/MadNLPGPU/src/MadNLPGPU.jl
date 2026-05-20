@@ -33,9 +33,9 @@ include("KKT/gpu_dense.jl")
 include("KKT/gpu_sparse.jl")
 include("KKT/gpu_qn.jl")
 
-global LapackCUDASolver
-global CUDSSSolver
-global LapackROCmSolver
+global LapackCUDASolver::Any = nothing
+global CUDSSSolver::Any = nothing
+global LapackROCmSolver::Any = nothing
 export LapackCUDASolver, CUDSSSolver, LapackROCmSolver
 
 # re-export MadNLP, including deprecated names

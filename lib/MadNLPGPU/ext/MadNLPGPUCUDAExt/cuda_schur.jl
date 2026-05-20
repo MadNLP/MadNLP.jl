@@ -242,9 +242,9 @@ function MadNLP.create_kkt_system(
     # --- Create batched CSC on GPU (shared colptr/rowval, per-scenario nzval slabs) ---
     batched_colPtr = CuVector{Cint}(Vector{Cint}(akk_csc_cpu.colptr))
     batched_rowVal = CuVector{Cint}(Vector{Cint}(akk_csc_cpu.rowval))
-    batched_nzVal = CUDA.fill(zero(T), ns * nnz_per_scenario)
+    batched_nzVal = CUDACore.fill(zero(T), ns * nnz_per_scenario)
 
-    A_kk_batched = CUSPARSE.CuSparseMatrixCSC{T, Cint}(
+    A_kk_batched = cuSPARSE.CuSparseMatrixCSC{T, Cint}(
         batched_colPtr, batched_rowVal, batched_nzVal, (blk_size, blk_size),
     )
 
@@ -259,10 +259,10 @@ function MadNLP.create_kkt_system(
     reg     = CuVector{T}(undef, n + ns_ineq)
     pr_diag = CuVector{T}(undef, n + ns_ineq)
     du_diag = CuVector{T}(undef, m)
-    l_diag  = CUDA.fill(one(T), nlb)
-    u_diag  = CUDA.fill(one(T), nub)
-    l_lower = CUDA.fill(zero(T), nlb)
-    u_lower = CUDA.fill(zero(T), nub)
+    l_diag  = CUDACore.fill(one(T), nlb)
+    u_diag  = CUDACore.fill(one(T), nub)
+    l_lower = CUDACore.fill(zero(T), nlb)
+    u_lower = CUDACore.fill(zero(T), nub)
 
     fill!(pr_diag, zero(T))
     fill!(du_diag, zero(T))

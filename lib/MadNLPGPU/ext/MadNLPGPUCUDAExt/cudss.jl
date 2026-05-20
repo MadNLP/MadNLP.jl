@@ -79,7 +79,7 @@ end
 
 mutable struct CUDSSSolver{T, V} <: MadNLP.AbstractLinearSolver{T}
     inner::CUDSS.CudssSolver{T}
-    tril::CUSPARSE.CuSparseMatrixCSC{T, Cint}
+    tril::cuSPARSE.CuSparseMatrixCSC{T, Cint}
     x_gpu::CUDSS.CudssMatrix{T}
     b_gpu::CUDSS.CudssMatrix{T}
     buffer::V
@@ -89,7 +89,7 @@ mutable struct CUDSSSolver{T, V} <: MadNLP.AbstractLinearSolver{T}
 end
 
 function CUDSSSolver(
-        csc::CUSPARSE.CuSparseMatrixCSC{T, Cint};
+        csc::cuSPARSE.CuSparseMatrixCSC{T, Cint};
         opt = CudssSolverOptions(),
         logger = MadNLP.MadNLPLogger(),
     ) where {T}
