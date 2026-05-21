@@ -77,7 +77,24 @@ struct NotEnoughDegreesOfFreedomException <: Exception end
 # Utilities
 has_constraints(solver) = get_m(solver) != 0
 
-function get_vars_info(solver)
+@inline function count_lu_bounds(lb::AbstractVector, ub::AbstractVector)
+    num_lu_bounds = 0
+    num_le_bounds = 0
+    num_ue_bounds = 0
+    for ii in eachindex(lb)
+        if (lb[ii] !=-Inf) && (ub[ii] != Inf)
+            num_lu_bounds += 1
+        elseif (lb[ii] == -Inf)
+            num_ue_bounds += 1
+        elseif (ub[ii] == Inf)
+            num_le_bounds += 1
+        end
+    end
+    return num_lu_bounds, num_le_bounds, num_ue_bounds
+end
+
+
+function get_vars_info(solver::AbstractMadNLPSolver)
     nlp = get_nlp(solver)
 
     x_lb = get_lvar(nlp)
@@ -86,8 +103,8 @@ function get_vars_info(solver)
     num_var = get_nvar(nlp) - num_fixed
     num_llb_vars = length(get_ind_llb(solver))
 
-    # TODO make this non-allocating
-    num_lu_vars = sum((x_lb .!=-Inf) .& (x_ub .!= Inf)) - num_fixed
+    num_lu_vars,_,_ = count_lu_bounds(x_lb, x_ub)
+    num_lu_vars = num_lu_vars - num_fixed
     num_uub_vars = length(get_ind_uub(solver))
     return (
         n_free=num_var,
@@ -98,17 +115,15 @@ function get_vars_info(solver)
     )
 end
 
-function get_cons_info(solver)
+function get_cons_info(solver::AbstractMadNLPSolver)
     nlp = get_nlp(solver)
 
     g_lb = get_lcon(nlp)
     g_ub = get_ucon(nlp)
 
-    # TODO make this non-allocating
-    num_eq_cons = sum(g_lb .== g_ub)
-    num_ineq_cons = length(g_lb) - num_eq_cons
-    num_le_cons = sum((g_lb .!= -Inf) .& (g_ub .==  Inf))
-    num_ue_cons = sum((g_ub .!=  Inf) .& (g_lb .== -Inf))
+    num_eq_cons = length(solver.cb.ind_eq)
+    num_ineq_cons = length(solver.cb.ind_ineq)
+    _,num_le_cons,num_ue_cons = count_lu_bounds(g_lb, g_ub)
     num_lu_cons = num_ineq_cons - num_le_cons - num_ue_cons
 
     return (

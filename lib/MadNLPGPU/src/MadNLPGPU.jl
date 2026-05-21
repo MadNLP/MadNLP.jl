@@ -21,9 +21,15 @@ import MadNLP:
     setup_cholesky!, setup_lu!, setup_qr!, setup_evd!, setup_bunchkaufman!,
     factorize_cholesky!, factorize_lu!, factorize_qr!, factorize_evd!, factorize_bunchkaufman!,
     solve_cholesky!, solve_lu!, solve_qr!, solve_evd!, solve_bunchkaufman!
-
+import MadNLP:
+    _get_varphi, get_varphi, get_inf_du, get_inf_compl, get_min_complementarity,
+    get_varphi_d, get_alpha_max, get_alpha_z, get_obj_val_R, get_theta_R, get_inf_pr_R,
+    get_inf_du_R, get_inf_compl_R, get_alpha_max_R, get_alpha_z_R, get_varphi_R, get_F,
+    get_varphi_d_R, get_rel_search_norm, populate_RR_nn!, SubVector, count_lu_bounds
 # AMD and Metis
 import AMD, Metis
+
+const AbstractGPUVectorOrSubVector{T,VT<:AbstractGPUVector{T}} = Union{AbstractGPUVector{T}, SubVector{T, VT}}
 
 include("KKT/kernels_dense.jl")
 include("KKT/kernels_sparse.jl")
@@ -32,6 +38,8 @@ include("utils.jl")
 include("KKT/gpu_dense.jl")
 include("KKT/gpu_sparse.jl")
 include("KKT/gpu_qn.jl")
+include("IPM/utils.jl")
+include("IPM/kernels.jl")
 
 global LapackCUDASolver::Any = nothing
 global CUDSSSolver::Any = nothing
