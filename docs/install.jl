@@ -4,9 +4,11 @@ MADNLP_DIR = pwd()
 
 Pkg.update()
 Pkg.resolve()
-Pkg.develop(path=joinpath(MADNLP_DIR, "lib", "MadNLPTests"))
-Pkg.develop(path=joinpath(MADNLP_DIR, "lib", "MadNLPGPU"))
-Pkg.develop(path=MADNLP_DIR)
+Pkg.develop([
+    PackageSpec(path=MADNLP_DIR),
+    PackageSpec(path=joinpath(MADNLP_DIR, "lib", "MadNLPGPU")),
+    PackageSpec(path=joinpath(MADNLP_DIR, "lib", "MadNLPTests")),
+])
 Base.compilecache(Base.identify_package("MadNLPTests"))
 Base.compilecache(Base.identify_package("MadNLPGPU"))
 Base.compilecache(Base.identify_package("MadNLP"))
