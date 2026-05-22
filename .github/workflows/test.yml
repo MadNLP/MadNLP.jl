@@ -126,9 +126,11 @@ jobs:
         run: |
           using Pkg
           Pkg.Registry.update()
-          Pkg.develop(path=".")
-          Pkg.develop(path="./lib/MadNLPGPU")
-          Pkg.develop(path="./lib/MadNLPTests")
+          Pkg.develop([
+              PackageSpec(path="."),
+              PackageSpec(path="./lib/MadNLPGPU"),
+              PackageSpec(path="./lib/MadNLPTests"),
+          ])
       - name: Add CUDA and CUDSS
         if: matrix.gpu == 'cuda13'
         shell: julia --project=./lib/MadNLPGPU/test --color=yes {0}
