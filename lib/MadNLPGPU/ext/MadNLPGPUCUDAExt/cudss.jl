@@ -4,7 +4,7 @@ MadNLP.@kwdef mutable struct CudssSolverOptions <: MadNLP.AbstractOptions
     cudss_ordering::ORDERING = DEFAULT_ORDERING
     cudss_perm::Vector{Cint} = Cint[]
     cudss_ir::Int = 0
-    cudss_ir_tol::Float64 = 1.0e-8  # currently ignored in cuDSS 0.7
+    cudss_ir_tol::Float64 = 1.0e-8  # currently ignored by cuDSS
     cudss_pivot_threshold::Float64 = 0.0
     cudss_pivot_epsilon::Float64 = 0.0
     cudss_matching_alg::String = "default"
@@ -47,9 +47,16 @@ function set_cudss_options!(solver::CUDSS.CudssSolver, opt::CudssSolverOptions)
         CUDSS.cudss_set(solver, "pivot_threshold", opt.cudss_pivot_threshold)
     end
     if opt.cudss_matching
-        CUDSS.cudss_set(solver, "use_matching", 1)
-        if opt.cudss_matching_alg != "default"
-            CUDSS.cudss_set(solver, "matching_alg", opt.cudss_matching_alg)
+        if pkgversion(CUDSS) < v"0.8"
+            CUDSS.cudss_set(solver, "use_matching", 1)
+            if opt.cudss_matching_alg != "default"
+                CUDSS.cudss_set(solver, "matching_alg", opt.cudss_matching_alg)
+            end
+        else
+            # cuDSS 0.8 dropped "use_matching": matching is enabled by selecting a
+            # matching algorithm ("default" disables it), so fall back to "algo1".
+            matching_alg = opt.cudss_matching_alg == "default" ? "algo1" : opt.cudss_matching_alg
+            CUDSS.cudss_set(solver, "matching_alg", matching_alg)
         end
     end
     if opt.cudss_reordering_alg != "default"
