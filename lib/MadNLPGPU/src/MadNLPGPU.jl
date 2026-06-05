@@ -46,6 +46,21 @@ global CUDSSSolver::Any = nothing
 global LapackROCmSolver::Any = nothing
 export LapackCUDASolver, CUDSSSolver, LapackROCmSolver
 
+# Fallback that fires when a GPU array reaches sparse-matrix construction but no
+# backend extension is active. The real overrides (CuSparseMatrixCSC /
+# ROCSparseMatrixCSC) are strictly more specific and win once their extension
+# loads; without them the call would otherwise hit the generic CPU
+# `SparseMatrixCSC` constructor and fail with a cryptic MethodError. For CUDA the
+# extension only activates once CUDSS is loaded too.
+function MadNLP._get_sparse_csc(dims, colptr::AbstractGPUVector, rowval, nzval)
+    error(
+        "MadNLPGPU: cannot build a GPU sparse KKT system because the GPU backend " *
+        "extension is not loaded. For CUDA, the extension activates only once both " *
+        "the CUDA backend and CUDSS are loaded — add `using CUDSS` (in addition to " *
+        "your CUDA package) before solving a model with GPU arrays.",
+    )
+end
+
 # re-export MadNLP, including deprecated names
 for name in names(MadNLP, all=true)
     if Base.isexported(MadNLP, name)
