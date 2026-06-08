@@ -8,7 +8,7 @@ using Reexport
 
 # Bring MadCore functions that MadNLP's IPM extends into scope so unqualified
 # method definitions in IPM/*.jl extend the canonical MadCore generics.
-import MadCore: solve_kkt!, initialize!, default_options
+import MadCore: solve_kkt!, initialize!, default_options, update!, introduce, mul_hess_blk!
 
 # MadCore defines logger macros (@trace, @debug, etc.) that the IPM uses.
 # Pull them in explicitly since `using` is the standard way to bring macros
