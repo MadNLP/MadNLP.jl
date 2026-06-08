@@ -157,65 +157,9 @@ function set_aug_rhs_RR!(
     return
 end
 
-# solving KKT system
-@inbounds function _kktmul!(
-    w::AbstractKKTVector,
-    x::AbstractKKTVector,
-    reg,
-    du_diag,
-    l_lower,
-    u_lower,
-    l_diag,
-    u_diag,
-    alpha,
-    beta,
-)
-    primal(w) .+= alpha .* reg .* primal(x)
-    dual(w) .+= alpha .* du_diag .* dual(x)
-    w.xp_lr .-= alpha .* dual_lb(x)
-    w.xp_ur .+= alpha .* dual_ub(x)
-    dual_lb(w) .= beta .* dual_lb(w) .+ alpha .* (x.xp_lr .* l_lower .- dual_lb(x) .* l_diag)
-    dual_ub(w) .= beta .* dual_ub(w) .+ alpha .* (x.xp_ur .* u_lower .+ dual_ub(x) .* u_diag)
-    return
-end
-
-@inbounds function reduce_rhs!(
-    xp_lr, wl, l_diag,
-    xp_ur, wu, u_diag,
-)
-    xp_lr .-= wl ./ l_diag
-    xp_ur .-= wu ./ u_diag
-    return
-end
-function reduce_rhs!(kkt::AbstractKKTSystem, d::AbstractKKTVector)
-    reduce_rhs!(
-        d.xp_lr, dual_lb(d), kkt.l_diag,
-        d.xp_ur, dual_ub(d), kkt.u_diag,
-    )
-end
-
-# Finish
-function finish_aug_solve!(kkt::AbstractKKTSystem, d::AbstractKKTVector)
-    dlb = dual_lb(d)
-    dub = dual_ub(d)
-    dlb .= (.-dlb .+ kkt.l_lower .* d.xp_lr) ./ kkt.l_diag
-    dub .= (  dub .- kkt.u_lower .* d.xp_ur) ./ kkt.u_diag
-    return
-end
-
-function set_initial_bounds!(xl::AbstractVector{T}, xu::AbstractVector{T}, tol) where T
-    # If `tol` is set to zero, keep the bounds unchanged.
-    if tol > zero(T)
-        map!(
-            x->x - max(one(T), abs(x)) * tol,
-            xl, xl
-        )
-        map!(
-            x->x + max(one(T), abs(x)) * tol,
-            xu, xu
-        )
-    end
-end
+# NOTE: the core KKT-vector solve kernels (_kktmul!, reduce_rhs!, finish_aug_solve!)
+# moved to MadCore (src/KKT/rhs.jl) — they are solver-agnostic and shared with the
+# KKT systems. They remain visible here via `@reexport using MadCore`.
 
 function set_initial_rhs!(solver::AbstractMadNLPSolver{T}, kkt::AbstractKKTSystem) where T
     f = primal(get_f(solver))
@@ -635,23 +579,9 @@ function get_varphi_d_R(
     return varphi_d
 end
 
-function _initialize_variables!(x::T, xl, xu, bound_push, bound_fac) where T
-    if xl!=-T(Inf) && xu!=T(Inf)
-        return min(
-            xu-min(bound_push*max(1,abs(xu)), bound_fac*(xu-xl)),
-            max(xl+min(bound_push*max(1,abs(xl)),bound_fac*(xu-xl)),x),
-        )
-    elseif xl!=-T(Inf) && xu==T(Inf)
-        return max(xl+bound_push*max(1,abs(xl)), x)
-    elseif xl==-T(Inf) && xu!=T(Inf)
-        return min(xu-bound_push*max(1,abs(xu)), x)
-    end
-    return x
-end
-
-function initialize_variables!(x, xl, xu, bound_push, bound_fac)
-    map!((x,l,u) -> _initialize_variables!(x,l,u, bound_push, bound_fac), x, x, xl, xu)
-end
+# NOTE: initialize_variables! / _initialize_variables! moved to MadCore
+# (src/Callbacks/nlpmodels.jl) — solver-agnostic, used by the callback init.
+# Visible here via `@reexport using MadCore`.
 
 function adjust_boundary!(
     x_lr::AbstractVector{T},

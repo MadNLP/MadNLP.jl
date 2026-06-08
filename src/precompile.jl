@@ -85,9 +85,13 @@
     end
 
     nlp = HS15Model()
-    __init__()
-    
-    @compile_workload begin
-        madnlp(nlp; print_level=MadNLP.ERROR)
-    end
+    # BLAS LP64 forwarding init lives in MadCore.__init__ now; it runs
+    # automatically when MadCore is loaded (before this workload).
+
+    # NOTE: workload temporarily disabled during the MadCore refactor.
+    # Re-enable once the rewire stabilises (the `madnlp(nlp)` call JITs the
+    # full IPM machinery and dominates iteration time).
+    # @compile_workload begin
+    #     madnlp(nlp; print_level=MadNLP.ERROR)
+    # end
 end
