@@ -7,7 +7,6 @@ LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 Logging = "56ddb016-857b-54e1-b83d-db4d58db5568"
 MadCore = "6fc510d6-e066-472d-adc5-2ce5e9b14820"
 MadCoreLDLFactorizations = "877f3277-2ef7-40eb-84b4-46ec536b8592"
-MadCoreMUMPS = "4f77d88a-5128-4a00-b6ab-45ff49a012b8"
 MadCoreSuiteSparse = "61d78279-8fb2-45d2-ac45-b4fb79296057"
 MadNLPTests = "b52a2a03-04ab-4a5f-9698-6a2deff93217"
 NLPModels = "a4795742-8479-5a88-8948-cc11e1c8c1a6"
@@ -24,8 +23,8 @@ MathOptInterface = "b8f27783-ece8-5eb3-8dc8-9495eed66fee"
 [sources]
 MadCore = {path = "../MadCore.jl"}
 MadCoreLDLFactorizations = {path = "../MadCore.jl/lib/MadCoreLDLFactorizations"}
-MadCoreMUMPS = {path = "../MadCore.jl/lib/MadCoreMUMPS"}
 MadCoreSuiteSparse = {path = "../MadCore.jl/lib/MadCoreSuiteSparse"}
+MadNLPTests = {path = "lib/MadNLPTests"}
 
 [extensions]
 MadNLPMOI = "MathOptInterface"
@@ -34,7 +33,6 @@ MadNLPMOI = "MathOptInterface"
 MINLPTests = "~0.5"
 MadCore = "0.1"
 MadCoreLDLFactorizations = "0.1"
-MadCoreMUMPS = "0.1"
 MadCoreSuiteSparse = "0.1"
 MadNLPTests = "0.6"
 MathOptInterface = "1.48"

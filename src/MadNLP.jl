@@ -3,7 +3,6 @@ module MadNLP
 using Reexport
 @reexport using MadCore
 @reexport using MadCoreLDLFactorizations
-@reexport using MadCoreMUMPS
 @reexport using MadCoreSuiteSparse
 
 # Bring MadCore functions that MadNLP's IPM extends into scope so unqualified
