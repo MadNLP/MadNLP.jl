@@ -59,21 +59,19 @@ jobs:
       - uses: julia-actions/cache@v1
       - name: Set HSL_VERSION as environment variable
         run: echo "HSL_VERSION=${{ matrix.hsl-version }}" >> $GITHUB_ENV
-      - name: test MadNLPHSL
-        shell: julia --project=./lib/MadNLPHSL --color=yes {0}
+      - name: test MadCoreHSL
+        shell: julia --project=./MadCore/lib/MadCoreHSL --color=yes {0}
         run: |
           using Pkg
           Pkg.Registry.update()
           path_HSL_jll = "/home/action-runner/HSL_jll.jl.v" * ENV["HSL_VERSION"]
           Pkg.develop([
-              PackageSpec(path="."),
-              PackageSpec(path="./lib/MadNLPTests"),
               PackageSpec(path=path_HSL_jll),
           ])
-          Pkg.test("MadNLPHSL", coverage=true)
+          Pkg.test("MadCoreHSL", coverage=true)
       - uses: julia-actions/julia-processcoverage@v1
         with:
-          directories: lib/MadNLPHSL/src
+          directories: MadCore/lib/MadCoreHSL/src
       - uses: codecov/codecov-action@v5
         with:
           files: lcov.info
@@ -121,35 +119,38 @@ jobs:
         with:
           channel: ${{ matrix.julia-version }}
       - name: Setup test environment
-        shell: julia --project=./lib/MadNLPGPU/test --color=yes {0}
+        shell: julia --project=./lib/CuMadNLP/test --color=yes {0}
         run: |
           using Pkg
           Pkg.Registry.update()
           Pkg.develop([
               PackageSpec(path="."),
-              PackageSpec(path="./lib/MadNLPGPU"),
+              PackageSpec(path="./MadCore"),
+              PackageSpec(path="./MadCore/lib/MadCoreKernelAbstractions"),
+              PackageSpec(path="./MadCore/lib/MadCoreCUDA"),
+              PackageSpec(path="./lib/CuMadNLP"),
               PackageSpec(path="./lib/MadNLPTests"),
           ])
       - name: Add CUDA and CUDSS
         if: matrix.gpu == 'cuda13'
-        shell: julia --project=./lib/MadNLPGPU/test --color=yes {0}
+        shell: julia --project=./lib/CuMadNLP/test --color=yes {0}
         run: |
           using Pkg
           Pkg.add("CUDA")
           Pkg.add("CUDSS")
       - name: Add AMDGPU
         if: matrix.gpu == 'amdgpu'
-        shell: julia --project=./lib/MadNLPGPU/test --color=yes {0}
+        shell: julia --project=./lib/CuMadNLP/test --color=yes {0}
         run: |
           using Pkg
           Pkg.add("AMDGPU")
-      - name: test MadNLPGPU
+      - name: test CuMadNLP
         env:
           MADNLP_GPU_BACKEND: ${{ matrix.gpu }}
-        run: julia --project=./lib/MadNLPGPU/test --code-coverage=user --color=yes -e 'include("lib/MadNLPGPU/test/runtests.jl")'
+        run: julia --project=./lib/CuMadNLP/test --code-coverage=user --color=yes -e 'include("lib/CuMadNLP/test/runtests.jl")'
       - uses: julia-actions/julia-processcoverage@v1
         with:
-          directories: lib/MadNLPGPU/src
+          directories: MadCore/lib/MadCoreCUDA/src,lib/CuMadNLP/src
       - uses: codecov/codecov-action@v5
         with:
           files: lcov.info
