@@ -1,0 +1,30 @@
+name = "CuMadNLP"
+uuid = "d47ba66d-cfbe-40a6-987c-5a56a1b97d17"
+version = "0.1.0"
+authors = ["MadNLP contributors"]
+
+[deps]
+CUDACore = "bd0ed864-bdfe-4181-a5ed-ce625a5fdea2"
+GPUArraysCore = "46192b85-c4d5-4398-a991-12ede77f4527"
+MadCoreCUDA = "bc4e0c13-4672-410c-a012-e283a446691e"
+MadCoreKernelAbstractions = "b5d449e2-bd97-4205-9c78-f5795562dab8"
+MadNLP = "2621e9c9-9eb4-46b1-8089-e8c72242dfb6"
+
+[sources]
+MadNLP = {path = "../.."}
+MadCoreCUDA = {path = "../../MadCore/lib/MadCoreCUDA"}
+MadCoreKernelAbstractions = {path = "../../MadCore/lib/MadCoreKernelAbstractions"}
+
+[compat]
+CUDACore = "6"
+GPUArraysCore = "0.2"
+MadCoreCUDA = "0.1"
+MadCoreKernelAbstractions = "0.1"
+MadNLP = "0.11"
+julia = "1.10"
+
+[extras]
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[targets]
+test = ["Test"]
