@@ -157,6 +157,9 @@ include("backsolve.jl")
 include("lapack_common.jl")
 include("lapack.jl")
 
+# No-op solver used as the bare interior-point default (see dummy.jl)
+include("dummy.jl")
+
 # MUMPS, LDLFactorizations, UMFPACK, CHOLMOD live in lib/* subpackages — kept out
 # of the lightweight core because of their heavy/external binaries:
 #   - MadCoreMUMPS              (MumpsSolver — MUMPS_seq_jll)
