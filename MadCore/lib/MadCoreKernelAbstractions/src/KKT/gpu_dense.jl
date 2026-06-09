@@ -17,7 +17,7 @@ end
 function MadCore.diag!(dest::AbstractGPUVector{T}, src::AbstractGPUMatrix{T}) where {T}
     @assert length(dest) == size(src, 1)
     backend = get_backend(dest)
-    MadNLPGPU._copy_diag_kernel!(backend)(dest, src, ndrange = length(dest))
+    MadCoreKernelAbstractions._copy_diag_kernel!(backend)(dest, src, ndrange = length(dest))
     return
 end
 
@@ -27,7 +27,7 @@ end
 
 function MadCore.diag_add!(dest::AbstractGPUMatrix, src1::AbstractGPUVector, src2::AbstractGPUVector)
     backend = get_backend(dest)
-    MadNLPGPU._add_diagonal_kernel!(backend)(dest, src1, src2, ndrange = size(dest, 1))
+    MadCoreKernelAbstractions._add_diagonal_kernel!(backend)(dest, src1, src2, ndrange = size(dest, 1))
     return
 end
 
@@ -38,7 +38,7 @@ end
 function MadCore._set_diag!(A::AbstractGPUMatrix, inds, a)
     if !isempty(inds)
         backend = get_backend(A)
-        MadNLPGPU._set_diag_kernel!(backend)(A, inds, a; ndrange = length(inds))
+        MadCoreKernelAbstractions._set_diag_kernel!(backend)(A, inds, a; ndrange = length(inds))
 
     end
     return
@@ -63,7 +63,7 @@ function MadCore._build_dense_kkt_system!(
     backend = get_backend(dest)
     ind_ineq_gpu = adapt(backend, ind_ineq)
     ndrange = (n + m + ns, n)
-    MadNLPGPU._build_dense_kkt_system_kernel!(backend)(
+    MadCoreKernelAbstractions._build_dense_kkt_system_kernel!(backend)(
         dest,
         hess,
         jac,
@@ -95,7 +95,7 @@ function MadCore._build_ineq_jac!(
     backend = get_backend(dest)
     ind_ineq_gpu = adapt(backend, ind_ineq)
     ndrange = (m_ineq, n)
-    MadNLPGPU._build_jacobian_condensed_kernel!(backend)(
+    MadCoreKernelAbstractions._build_jacobian_condensed_kernel!(backend)(
         dest,
         jac,
         diag_buffer,
@@ -123,7 +123,7 @@ function MadCore._build_condensed_kkt_system!(
     backend = get_backend(dest)
     ind_eq_gpu = adapt(backend, ind_eq)
     ndrange = (n + m_eq, n)
-    MadNLPGPU._build_condensed_kkt_system_kernel!(backend)(
+    MadCoreKernelAbstractions._build_condensed_kkt_system_kernel!(backend)(
         dest,
         hess,
         jac,
