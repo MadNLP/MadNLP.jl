@@ -1,22 +1,6 @@
 # Options
-
-parse_option(::Type{Module},str::String) = eval(Symbol(str))
-parse_option(::Type{<:AbstractUserCallback}, f::Any) = f
-parse_option(type::Type{T},i::Int64) where {T<:Enum} = type(i)
-
-function set_options!(opt::AbstractOptions, options)
-    other_options = Dict{Symbol, Any}()
-    for (key, val) in options
-        if hasproperty(opt, key)
-            T = fieldtype(typeof(opt), key)
-            val isa T ? setproperty!(opt,key,val) :
-                setproperty!(opt,key,parse_option(T,val))
-        else
-            other_options[key] = val
-        end
-    end
-    return other_options
-end
+# set_options! / parse_option moved to MadCore (src/utils.jl) — solver-agnostic,
+# shared by the lib/* backends and the IPM; visible here via @reexport.
 
 """
 Option | Default Value | Description

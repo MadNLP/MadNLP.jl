@@ -5,6 +5,7 @@ using Reexport
 @reexport using MadCoreLDLFactorizations
 @reexport using MadCoreSuiteSparse
 @reexport using MadCoreHSL
+@reexport using MadCorePardiso
 
 # Bring MadCore functions that MadNLP's IPM extends into scope so unqualified
 # method definitions in IPM/*.jl extend the canonical MadCore generics.
