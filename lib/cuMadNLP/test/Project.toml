@@ -1,7 +1,7 @@
 [deps]
 CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
 CUDSS = "45b445bb-4962-46a0-9369-b4df9d0f772e"
-CuMadNLP = "d47ba66d-cfbe-40a6-987c-5a56a1b97d17"
+cuMadNLP = "d47ba66d-cfbe-40a6-987c-5a56a1b97d17"
 MadCoreCUDA = "bc4e0c13-4672-410c-a012-e283a446691e"
 MadCoreKernelAbstractions = "b5d449e2-bd97-4205-9c78-f5795562dab8"
 MadNLP = "2621e9c9-9eb4-46b1-8089-e8c72242dfb6"

@@ -1,6 +1,6 @@
 # NOTE: the GPU-default `MadNLPOptions{T}` constructor that lived here is
 # IPM-specific (sets dense_callback/tol/kkt_system defaults for the interior-
-# point solver) and moved to MadNLP/lib/CuMadNLP.
+# point solver) and moved to MadNLP/lib/cuMadNLP.
 
 function MadCore.default_options(::MadCore.AbstractNLPModel{T, VT}, ::Type{MadCore.SparseCondensedKKTSystem}, linear_solver::Type{CUDSSSolver}) where {T, VT <: CuVector{T}}
     opt = MadCore.default_options(linear_solver)

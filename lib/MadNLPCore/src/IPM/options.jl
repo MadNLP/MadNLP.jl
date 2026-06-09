@@ -127,8 +127,8 @@ tau\\_min                      | 0.99                 | lower bound on fraction-
 
     # NLP options
     kappa_d::T = 1e-5
-    fixed_variable_treatment::Type = kkt_system <: MadNLP.SparseCondensedKKTSystem ? MadNLP.RelaxBound : MadNLP.MakeParameter
-    equality_treatment::Type = kkt_system <: MadNLP.SparseCondensedKKTSystem ? MadNLP.RelaxEquality : MadNLP.EnforceEquality
+    fixed_variable_treatment::Type = kkt_system <: SparseCondensedKKTSystem ? RelaxBound : MakeParameter
+    equality_treatment::Type = kkt_system <: SparseCondensedKKTSystem ? RelaxEquality : EnforceEquality
     bound_relax_factor::T = 1e-8
     jacobian_constant::Bool = false
     hessian_constant::Bool = false
@@ -141,7 +141,7 @@ tau\\_min                      | 0.99                 | lower bound on fraction-
 
     # initialization options
     dual_initialized::Bool = false
-    dual_initialization_method::Type = kkt_system <: MadNLP.SparseCondensedKKTSystem ? DualInitializeSetZero : DualInitializeLeastSquares
+    dual_initialization_method::Type = kkt_system <: SparseCondensedKKTSystem ? DualInitializeSetZero : DualInitializeLeastSquares
     constr_mult_init_max::T = 1e3
     bound_push::T = 1e-2
     bound_fac::T = 1e-2
@@ -192,10 +192,10 @@ is_dense_callback(nlp) = !nlp.meta.sparse_jacobian && !nlp.meta.sparse_hessian
 # smart option presets
 function MadNLPOptions{T}(
     nlp::AbstractNLPModel{T};
-    dense_callback = MadNLP.is_dense_callback(nlp),
+    dense_callback = is_dense_callback(nlp),
     callback = dense_callback ? DenseCallback : SparseCallback,
     kkt_system = dense_callback ? DenseCondensedKKTSystem : SparseKKTSystem,
-    linear_solver = dense_callback ? LapackCPUSolver : default_sparse_solver(nlp),
+    linear_solver = dense_callback ? LapackCPUSolver : DummyLinearSolver,
     tol = get_tolerance(T,kkt_system)
 ) where {T}
     return MadNLPOptions{T}(
@@ -209,7 +209,10 @@ end
 get_tolerance(::Type{T},::Type{KKT}) where {T, KKT} = 10^round(log10(eps(T))/2)
 get_tolerance(::Type{T},::Type{SparseCondensedKKTSystem}) where T = 10^(round(log10(eps(T))/4))
 
-default_sparse_solver(nlp::AbstractNLPModel) = MumpsSolver
+# NOTE: the bare solver defaults the sparse linear_solver to DummyLinearSolver
+# (above). `default_sparse_solver` and a Vector-specialized MadNLPOptions
+# constructor that uses MumpsSolver live in MadNLP; cuMadNLP/MadCoreAMDGPU provide
+# their own GPU-specialized constructors.
 
 function check_option_sanity(options)
     is_kkt_dense = options.kkt_system <: AbstractDenseKKTSystem || options.kkt_system <: SchurComplementKKTSystem

@@ -3,7 +3,7 @@ module MadCoreKernelAbstractions
 # Solver-agnostic, KernelAbstractions-based GPU support: the GPU KKT systems
 # (dense/sparse/quasi-Newton) and their kernels, migrated from MadNLPGPU. Backend
 # packages (MadCoreCUDA, MadCoreAMDGPU) build on this; IPM-specific GPU code lives
-# in MadNLP/lib/CuMadNLP.
+# in MadNLP/lib/cuMadNLP.
 
 import LinearAlgebra
 import LinearAlgebra: Symmetric, mul!, norm, dot

@@ -36,7 +36,7 @@ function _compare_gpu_with_cpu(KKTSystem, n, m, ind_fixed)
     end
 end
 
-@testset "CuMadNLP -- LapackCUDASolver -- ($(kkt_system))" for kkt_system in [
+@testset "cuMadNLP -- LapackCUDASolver -- ($(kkt_system))" for kkt_system in [
         MadNLP.DenseKKTSystem,
         MadNLP.DenseCondensedKKTSystem,
     ]

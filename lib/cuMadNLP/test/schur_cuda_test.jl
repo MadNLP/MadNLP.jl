@@ -5,7 +5,7 @@ using CUDSS
 using MadNLP
 using MadCoreCUDA
 using MadCoreKernelAbstractions
-using CuMadNLP
+using cuMadNLP
 using MadNLPTests
 
 @testset "GPUSchurComplementKKTSystem" begin

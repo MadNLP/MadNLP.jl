@@ -1,0 +1,34 @@
+name = "MadNLPCore"
+uuid = "43bd1597-a228-47d9-956a-80a32bfaa81a"
+version = "0.11.0"
+authors = ["MadNLP contributors"]
+
+[deps]
+LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+MadCore = "6fc510d6-e066-472d-adc5-2ce5e9b14820"
+NLPModels = "a4795742-8479-5a88-8948-cc11e1c8c1a6"
+Pkg = "44cfe95a-1eb2-52ea-b672-e2afdf69b78f"
+Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
+Reexport = "189a3867-3050-52da-a836-e630ba90ab69"
+SolverCore = "ff4d7338-4cf1-434d-91df-b86cb86fb843"
+SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
+
+[sources]
+MadCore = {path = "../../MadCore"}
+
+[compat]
+LinearAlgebra = "1.10"
+MadCore = "0.1"
+NLPModels = "0.21.9"
+Pkg = "1.10"
+Printf = "1.10"
+Reexport = "1"
+SolverCore = "~0.3"
+SparseArrays = "1.10"
+julia = "1.10"
+
+[extras]
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[targets]
+test = ["Test"]

@@ -62,7 +62,12 @@ include(joinpath("LinearSolvers", "linearsolvers.jl"))
 # (e.g. `const SubVector = SubArray{...}` -> parentmodule is Base), which the
 # IPM uses unqualified -> precompile fails with `UndefVarError: SubVector`.
 let
-    skip = Set([:eval, :include, :MadCore])
+    # Skip eval/include/the module name, and the logger macros that shadow Base's
+    # (@debug/@info/@warn/@error) — exporting those would make `@warn` etc.
+    # ambiguous for any `using MadCore`/`using MadNLP` consumer. They remain
+    # available via explicit `using MadCore: @warn`.
+    skip = Set([:eval, :include, :MadCore,
+                Symbol("@debug"), Symbol("@info"), Symbol("@warn"), Symbol("@error")])
     for name in names(@__MODULE__, all=true, imported=false)
         s = String(name)
         name in skip && continue

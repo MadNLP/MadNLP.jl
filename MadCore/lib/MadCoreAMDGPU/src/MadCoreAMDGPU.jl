@@ -4,7 +4,7 @@ module MadCoreAMDGPU
 # migrated from MadNLPGPU/ext/MadNLPGPUAMDGPUExt and promoted from a weakdep
 # extension to a standalone package (AMDGPU is a hard dependency). Builds on
 # MadCore + MadCoreKernelAbstractions. The IPM-specific GPU-default MadNLPOptions
-# constructor was split out (a future RocMadNLP, mirroring CuMadNLP).
+# constructor was split out (a future RocMadNLP, mirroring cuMadNLP).
 
 import LinearAlgebra
 import SparseArrays: SparseMatrixCSC, nonzeros, nnz

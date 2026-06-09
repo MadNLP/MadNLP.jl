@@ -11,6 +11,8 @@ MadCoreLDLFactorizations = "877f3277-2ef7-40eb-84b4-46ec536b8592"
 MadCoreMUMPS = "4f77d88a-5128-4a00-b6ab-45ff49a012b8"
 MadCorePardiso = "b539c633-712d-4c21-9960-e1fc902d97f4"
 MadCoreSuiteSparse = "61d78279-8fb2-45d2-ac45-b4fb79296057"
+MadNLPCore = "43bd1597-a228-47d9-956a-80a32bfaa81a"
+MadNLPTests = "b52a2a03-04ab-4a5f-9698-6a2deff93217"
 NLPModels = "a4795742-8479-5a88-8948-cc11e1c8c1a6"
 Pkg = "44cfe95a-1eb2-52ea-b672-e2afdf69b78f"
 PrecompileTools = "aea7be01-6a6a-4083-8856-8a6e6704d82a"
@@ -29,17 +31,15 @@ MadCoreLDLFactorizations = {path = "MadCore/lib/MadCoreLDLFactorizations"}
 MadCoreMUMPS = {path = "MadCore/lib/MadCoreMUMPS"}
 MadCorePardiso = {path = "MadCore/lib/MadCorePardiso"}
 MadCoreSuiteSparse = {path = "MadCore/lib/MadCoreSuiteSparse"}
+MadNLPCore = {path = "lib/MadNLPCore"}
 MadNLPTests = {path = "lib/MadNLPTests"}
 
 [extensions]
 MadNLPMOI = "MathOptInterface"
 
 [compat]
-SparseArrays = "1.10"
-Printf = "1.10"
-Pkg = "1.10"
-Logging = "1.10"
 LinearAlgebra = "1.10"
+Logging = "1.10"
 MINLPTests = "~0.5"
 MadCore = "0.1"
 MadCoreHSL = "0.1"
@@ -47,12 +47,16 @@ MadCoreLDLFactorizations = "0.1"
 MadCoreMUMPS = "0.1"
 MadCorePardiso = "0.1"
 MadCoreSuiteSparse = "0.1"
+MadNLPCore = "0.11"
 MadNLPTests = "0.6"
 MathOptInterface = "1.48"
 NLPModels = "0.21.9"
+Pkg = "1.10"
 PrecompileTools = "1.2"
+Printf = "1.10"
 Reexport = "1"
 SolverCore = "~0.3"
+SparseArrays = "1.10"
 julia = "1.10"
 
 [extras]

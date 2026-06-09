@@ -5,7 +5,7 @@ module MadCoreCUDA
 # MadNLPGPU/ext/MadNLPGPUCUDAExt and promoted from a weakdep extension to a
 # standalone package — the CUDA stack is a hard dependency here. Builds on
 # MadCore + MadCoreKernelAbstractions. IPM-specific GPU code lives in
-# MadNLP/lib/CuMadNLP.
+# MadNLP/lib/cuMadNLP.
 
 import LinearAlgebra
 import SparseArrays: SparseMatrixCSC, nonzeros, nnz

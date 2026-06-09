@@ -24,4 +24,4 @@ end
 
 # NOTE: GPU methods of get_sd / get_sc (a norm()-on-GPU-view workaround) are
 # IPM-specific — they extend MadNLP's interior-point scaling getters — so they
-# live in MadNLP/lib/CuMadNLP, not here.
+# live in MadNLP/lib/cuMadNLP, not here.

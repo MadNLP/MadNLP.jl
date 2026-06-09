@@ -1,6 +1,6 @@
-# STASHED for phase F / MadNLP/lib/CuMadNLP — IPM-specific GPU methods split out
+# STASHED for phase F / MadNLP/lib/cuMadNLP — IPM-specific GPU methods split out
 # of MadNLPGPU/src/utils.jl (they extend MadNLP's interior-point get_sd/get_sc).
-# In CuMadNLP these stay `MadNLP.get_sd`/`MadNLP.get_sc` (or import + extend),
+# In cuMadNLP these stay `MadNLP.get_sd`/`MadNLP.get_sc` (or import + extend),
 # and need AbstractGPUVector (GPUArraysCore) in scope.
 if VERSION > v"1.11"
     _my1norm(x) = mapreduce(abs, +, x)

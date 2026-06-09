@@ -1,4 +1,4 @@
-module CuMadNLP
+module cuMadNLP
 
 # IPM-specific GPU support for MadNLP on CUDA: GPU methods of the interior-point
 # error/restoration kernels (get_varphi, get_inf_*, populate_RR_nn!, ...), the
