@@ -222,13 +222,14 @@ end
     MadNLP.eval_jac_wrapper!(solver, kkt, x)
     MadNLP.eval_lag_hess_wrapper!(solver, kkt, x, solver.y)
 
-    # Broken after the MadCore/MadNLP split: eval_f_wrapper's scalar return is
-    # boxed (16 B) only when called from a type-unstable context like this test's
-    # module-global `solver`. The code is allocation-free in a typed/barrier
-    # context (the IPM hot loop hits 0), so this is call-context boxing, not a
-    # real regression. See refactor notes.
+    # eval_f_wrapper returns a scalar, which is boxed (16 B) when called from a
+    # type-unstable context like this test's module-global `solver`, but is
+    # allocation-free (0 B) in a typed/barrier context (the IPM hot loop). The
+    # exact count is call-context dependent (and varies across Julia builds), not
+    # a real regression, so tolerate the boxing rather than asserting exactly 0
+    # (a bare `@test ==0` flakes; `@test_broken` errors when the equality holds).
     n_allocs = @allocated MadNLP.eval_f_wrapper(solver, x)
-    @test_broken n_allocs == 0
+    @test n_allocs <= 16
     n_allocs = @allocated MadNLP.eval_grad_f_wrapper!(solver, f, x)
     @test n_allocs == 0
     n_allocs = @allocated MadNLP.eval_cons_wrapper!(solver, c, x)
