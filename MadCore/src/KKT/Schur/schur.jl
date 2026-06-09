@@ -65,8 +65,9 @@ Constraint layout: `[c_1, ..., c_ns]` where `c_k ∈ R^nc`.
 
 The augmented per-scenario block `A_k` (size `blk_size × blk_size`) is stored
 as a sparse lower-triangular `SparseMatrixCSC` and factored by a configurable
-sparse solver (default `MumpsSolver` — each `A_k` is symmetric indefinite, not
-SQD in general). The coupling blocks `C_dk` remain dense. The Schur complement
+per-scenario solver (default `LapackCPUSolver`; pass e.g. `MumpsSolver` from
+MadCoreMUMPS for a sparse factorization — each `A_k` is symmetric indefinite,
+not SQD in general). The coupling blocks `C_dk` remain dense. The Schur complement
 `S = aug_com` (size `nd × nd`) is dense.
 """
 struct SchurComplementKKTSystem{
@@ -781,7 +782,7 @@ function create_kkt_system(
     schur_nv::Int=0,
     schur_nd::Int=0,
     schur_nc::Int=0,
-    schur_scenario_linear_solver::Type=MumpsSolver,
+    schur_scenario_linear_solver::Type=LapackCPUSolver,
 ) where {T, VT}
 
     n = cb.nvar

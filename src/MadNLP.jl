@@ -3,6 +3,7 @@ module MadNLP
 using Reexport
 @reexport using MadCore
 @reexport using MadCoreLDLFactorizations
+@reexport using MadCoreMUMPS
 @reexport using MadCoreSuiteSparse
 @reexport using MadCoreHSL
 @reexport using MadCorePardiso

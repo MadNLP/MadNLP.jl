@@ -6,7 +6,6 @@ authors = ["MadNLP contributors"]
 [deps]
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 Logging = "56ddb016-857b-54e1-b83d-db4d58db5568"
-MUMPS_seq_jll = "d7ed1dd3-d0ae-5e8e-bfb4-87a502085b8d"
 NLPModels = "a4795742-8479-5a88-8948-cc11e1c8c1a6"
 OpenBLAS32_jll = "656ef2d0-ae68-5445-9ca0-591084a874a2"
 Pkg = "44cfe95a-1eb2-52ea-b672-e2afdf69b78f"
@@ -16,7 +15,6 @@ SolverCore = "ff4d7338-4cf1-434d-91df-b86cb86fb843"
 SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 
 [compat]
-MUMPS_seq_jll = "~500.900"
 NLPModels = "0.21.9"
 OpenBLAS32_jll = "0.3"
 PrecompileTools = "1.2"

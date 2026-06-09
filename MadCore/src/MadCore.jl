@@ -23,7 +23,6 @@ import NLPModels:
 import SolverCore:
     getStatus, AbstractOptimizationSolver, AbstractExecutionStats, solve!
 import OpenBLAS32_jll
-import MUMPS_seq_jll
 
 function __init__()
     config = BLAS.lbt_get_config()
