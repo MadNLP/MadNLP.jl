@@ -1,0 +1,21 @@
+name = "MadCoreGPUArrays"
+uuid = "d554ef03-408b-4a7c-a1fb-cdd79a2212ff"
+version = "0.1.0"
+authors = ["MadNLP contributors"]
+
+[deps]
+MadCore = "6fc510d6-e066-472d-adc5-2ce5e9b14820"
+# Backend deps (GPUArrays, GPUArraysCore, Adapt) added in Phase F.
+
+[sources]
+MadCore = {path = "../.."}
+
+[compat]
+MadCore = "0.1"
+julia = "1.10"
+
+[extras]
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[targets]
+test = ["Test"]

@@ -1,0 +1,24 @@
+name = "MadCoreCUDA"
+uuid = "bc4e0c13-4672-410c-a012-e283a446691e"
+version = "0.1.0"
+authors = ["MadNLP contributors"]
+
+[deps]
+MadCore = "6fc510d6-e066-472d-adc5-2ce5e9b14820"
+MadCoreKernelAbstractions = "b5d449e2-bd97-4205-9c78-f5795562dab8"
+# Backend deps (CUDACore, CUDSS, cuBLAS, cuSOLVER, cuSPARSE, KernelAbstractions) added in Phase F.
+
+[sources]
+MadCore = {path = "../.."}
+MadCoreKernelAbstractions = {path = "../MadCoreKernelAbstractions"}
+
+[compat]
+MadCore = "0.1"
+MadCoreKernelAbstractions = "0.1"
+julia = "1.10"
+
+[extras]
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[targets]
+test = ["Test"]

@@ -23,11 +23,11 @@ SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 MathOptInterface = "b8f27783-ece8-5eb3-8dc8-9495eed66fee"
 
 [sources]
-MadCore = {url = "https://github.com/MadNLP/MadCore.jl.git", rev = "madcore-refactor"}
-MadCoreHSL = {url = "https://github.com/MadNLP/MadCore.jl.git", rev = "madcore-refactor", subdir = "lib/MadCoreHSL"}
-MadCoreLDLFactorizations = {url = "https://github.com/MadNLP/MadCore.jl.git", rev = "madcore-refactor", subdir = "lib/MadCoreLDLFactorizations"}
-MadCorePardiso = {url = "https://github.com/MadNLP/MadCore.jl.git", rev = "madcore-refactor", subdir = "lib/MadCorePardiso"}
-MadCoreSuiteSparse = {url = "https://github.com/MadNLP/MadCore.jl.git", rev = "madcore-refactor", subdir = "lib/MadCoreSuiteSparse"}
+MadCore = {path = "MadCore"}
+MadCoreHSL = {path = "MadCore/lib/MadCoreHSL"}
+MadCoreLDLFactorizations = {path = "MadCore/lib/MadCoreLDLFactorizations"}
+MadCorePardiso = {path = "MadCore/lib/MadCorePardiso"}
+MadCoreSuiteSparse = {path = "MadCore/lib/MadCoreSuiteSparse"}
 MadNLPTests = {path = "lib/MadNLPTests"}
 
 [extensions]
