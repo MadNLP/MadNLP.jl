@@ -13,6 +13,9 @@ SuiteSparse = "4607b0f0-06f3-5cda-b6b1-a6196a1729e9"
 MadCore = {path = "../.."}
 
 [compat]
+SuiteSparse = "1.10"
+SparseArrays = "1.10"
+LinearAlgebra = "1.10"
 MadCore = "0.1"
 julia = "1.10"
 

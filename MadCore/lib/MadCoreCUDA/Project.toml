@@ -22,6 +22,8 @@ MadCore = {path = "../.."}
 MadCoreKernelAbstractions = {path = "../MadCoreKernelAbstractions"}
 
 [compat]
+SparseArrays = "1.10"
+LinearAlgebra = "1.10"
 AMD = "0.5"
 CUDACore = "6"
 CUDSS = "0.7"

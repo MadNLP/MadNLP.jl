@@ -17,6 +17,8 @@ SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 MadCore = {path = "../.."}
 
 [compat]
+SparseArrays = "1.10"
+LinearAlgebra = "1.10"
 AMD = "0.5"
 Adapt = "4"
 GPUArraysCore = "0.2"

@@ -15,6 +15,11 @@ SolverCore = "ff4d7338-4cf1-434d-91df-b86cb86fb843"
 SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 
 [compat]
+SparseArrays = "1.10"
+Printf = "1.10"
+Pkg = "1.10"
+Logging = "1.10"
+LinearAlgebra = "1.10"
 NLPModels = "0.21.9"
 OpenBLAS32_jll = "0.3"
 PrecompileTools = "1.2"
