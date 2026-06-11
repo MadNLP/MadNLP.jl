@@ -960,8 +960,7 @@ end
 # (bound) constraints are excluded so that MOI's fallback throws
 # `VariableIndexConstraintNameError`, mirroring Gurobi.jl/Xpress.jl. Vector
 # constraints (VectorNonlinearOracle) are excluded on purpose: a single name
-# would label a whole block of `output_dimension` rows, so per-row labelling is
-# deferred to the future KKT diagnostic rather than baked in here.
+# would label a whole block of `output_dimension` rows.
 const _NAMED_CONSTRAINT = MOI.ConstraintIndex{<:_FUNCTIONS,<:_SETS}
 
 MOI.supports(::Optimizer, ::MOI.ConstraintName, ::Type{<:_NAMED_CONSTRAINT}) = true
