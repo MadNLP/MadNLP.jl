@@ -267,27 +267,6 @@ function test_ConstraintName_scalar_nonlinear()
     return
 end
 
-function test_ConstraintName_vector_oracle()
-    model = MadNLP.Optimizer()
-    x = MOI.add_variables(model, 2)
-    set = MOI.VectorNonlinearOracle(;
-        dimension = 2,
-        l = [0.0],
-        u = [0.0],
-        eval_f = (ret, y) -> (ret[1] = y[1]^2 - y[2]; return),
-        jacobian_structure = [(1, 1), (1, 2)],
-        eval_jacobian = (ret, y) -> (ret[1] = 2.0 * y[1]; ret[2] = -1.0; return),
-        hessian_lagrangian_structure = [(1, 1)],
-        eval_hessian_lagrangian = (ret, y, u) -> (ret[1] = 2.0 * u[1]; return),
-    )
-    ci = MOI.add_constraint(model, MOI.VectorOfVariables(x), set)
-    @test MOI.supports(model, MOI.ConstraintName(), typeof(ci))
-    @test MOI.get(model, MOI.ConstraintName(), ci) == ""
-    MOI.set(model, MOI.ConstraintName(), ci, "oracle1")
-    @test MOI.get(model, MOI.ConstraintName(), ci) == "oracle1"
-    return
-end
-
 function test_ConstraintName_not_supported_for_bounds()
     model = MadNLP.Optimizer()
     x = MOI.add_variable(model)

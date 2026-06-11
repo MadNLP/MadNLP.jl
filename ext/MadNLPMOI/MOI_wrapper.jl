@@ -955,13 +955,14 @@ end
 
 ### MOI.ConstraintName
 
-# The constraint types that may carry a name. `VariableIndex`-in-set (bound)
-# constraints are deliberately excluded so that MOI's fallback throws
-# `VariableIndexConstraintNameError`, mirroring Gurobi.jl/Xpress.jl.
-const _NAMED_CONSTRAINT = Union{
-    MOI.ConstraintIndex{<:_FUNCTIONS,<:_SETS},
-    MOI.ConstraintIndex{MOI.VectorOfVariables,MOI.VectorNonlinearOracle{Float64}},
-}
+# The constraint types that may carry a name: the scalar function/set blocks,
+# which map one ConstraintIndex to exactly one KKT row. `VariableIndex`-in-set
+# (bound) constraints are excluded so that MOI's fallback throws
+# `VariableIndexConstraintNameError`, mirroring Gurobi.jl/Xpress.jl. Vector
+# constraints (VectorNonlinearOracle) are excluded on purpose: a single name
+# would label a whole block of `output_dimension` rows, so per-row labelling is
+# deferred to the future KKT diagnostic rather than baked in here.
+const _NAMED_CONSTRAINT = MOI.ConstraintIndex{<:_FUNCTIONS,<:_SETS}
 
 MOI.supports(::Optimizer, ::MOI.ConstraintName, ::Type{<:_NAMED_CONSTRAINT}) = true
 
