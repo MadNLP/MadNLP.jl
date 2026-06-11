@@ -19,8 +19,41 @@ import NLPModels: AbstractNLPModel
 using PrecompileTools: @setup_workload, @compile_workload
 
 export madsuite, default_sparse_solver
+export madlifted, madhykkt
 
 madsuite(::Val{:madnlp}, args...; kwargs...) = madnlp(args...; kwargs...)
+
+# Solver presets. The default entry point is `madnlp`, which picks the KKT system
+# by the model's array type (Vector -> full-space, CuVector -> condensed) — i.e.
+# full-space on CPU, LiftedKKT on GPU. `madlifted` and `madhykkt` are special-case
+# presets that force a specific condensed formulation.
+
+"""
+    madlifted(model; kwargs...)
+
+LiftedKKT condensed-space preset (`SparseCondensedKKTSystem` with relaxed
+equalities/bounds). This is what `madnlp` selects by default on GPU.
+"""
+madlifted(args...; kwargs...) = madnlp(
+    args...;
+    kkt_system = SparseCondensedKKTSystem,
+    equality_treatment = RelaxEquality,
+    fixed_variable_treatment = RelaxBound,
+    kwargs...,
+)
+
+"""
+    madhykkt(model; kwargs...)
+
+Hybrid (HyKKT) preset (`HybridCondensedKKTSystem` from MadNLPHybridKKT).
+"""
+madhykkt(args...; kwargs...) = madnlp(
+    args...;
+    kkt_system = HybridCondensedKKTSystem,
+    equality_treatment = RelaxEquality,
+    fixed_variable_treatment = RelaxBound,
+    kwargs...,
+)
 
 # MadNLPCore defaults the sparse linear solver to the no-op DummyLinearSolver.
 # MadNLP bundles MadCoreMUMPS/HSL, so it provides `default_sparse_solver` and a
