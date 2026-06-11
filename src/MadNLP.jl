@@ -50,8 +50,8 @@ Hybrid (HyKKT) preset (`HybridCondensedKKTSystem` from MadNLPHybridKKT).
 madhykkt(args...; kwargs...) = madnlp(
     args...;
     kkt_system = HybridCondensedKKTSystem,
-    equality_treatment = RelaxEquality,
-    fixed_variable_treatment = RelaxBound,
+    equality_treatment = EnforceEquality,
+    fixed_variable_treatment = MakeParameter,
     kwargs...,
 )
 
@@ -61,17 +61,22 @@ madhykkt(args...; kwargs...) = madnlp(
 # MadNLPCore's generic one — a method addition, not a precompile-breaking
 # overwrite) that uses it. The GPU backends specialize on CuVector/ROCVector.
 #
-# Prefer HSL's Ma27 when a licensed HSL is functional, else MUMPS. The check is
-# evaluated at solve-time (here, inside the function body), NOT baked in at
-# precompile/load — so it tracks the runtime system and never overwrites a method.
-default_sparse_solver(nlp) = is_hsl_functional() ? Ma27Solver : MumpsSolver
+# `default_sparse_solver(nlp, kkt_system)` picks the sparse solver by the model's
+# array type and the KKT formulation, via multiple dispatch:
+#  - full-space / generic: HSL Ma27 when a licensed HSL is functional, else MUMPS
+#    (a runtime branch, never baked at precompile);
+#  - condensed / hybrid formulations want a Cholesky solver: CHOLMOD on CPU here,
+#    CUDSS on GPU (the CuVector methods live in cuMadNLP).
+default_sparse_solver(nlp, kkt_system) = is_hsl_functional() ? Ma27Solver : MumpsSolver
+default_sparse_solver(::AbstractNLPModel{T, Vector{T}}, ::Type{SparseCondensedKKTSystem}) where {T} = CHOLMODSolver
+default_sparse_solver(::AbstractNLPModel{T, Vector{T}}, ::Type{HybridCondensedKKTSystem}) where {T} = CHOLMODSolver
 
 function MadNLPOptions{T}(
         nlp::AbstractNLPModel{T, VT};
         dense_callback = is_dense_callback(nlp),
         callback = dense_callback ? DenseCallback : SparseCallback,
         kkt_system = dense_callback ? DenseCondensedKKTSystem : SparseKKTSystem,
-        linear_solver = dense_callback ? LapackCPUSolver : default_sparse_solver(nlp),
+        linear_solver = dense_callback ? LapackCPUSolver : default_sparse_solver(nlp, kkt_system),
         tol = get_tolerance(T, kkt_system),
     ) where {T, VT <: Vector{T}}
     return MadNLPOptions{T}(

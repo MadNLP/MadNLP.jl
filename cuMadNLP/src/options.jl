@@ -7,7 +7,7 @@ function MadNLP.MadNLPOptions{T}(
         dense_callback = MadNLP.is_dense_callback(nlp),
         callback = dense_callback ? MadNLP.DenseCallback : MadNLP.SparseCallback,
         kkt_system = dense_callback ? MadNLP.DenseCondensedKKTSystem : MadNLP.SparseCondensedKKTSystem,
-        linear_solver = dense_callback ? LapackCUDASolver : CUDSSSolver,
+        linear_solver = dense_callback ? LapackCUDASolver : MadNLP.default_sparse_solver(nlp, kkt_system),
         tol = MadNLP.get_tolerance(T, kkt_system),
         bound_relax_factor = (kkt_system == MadNLP.SparseCondensedKKTSystem) ? tol : T(1.0e-8),
     ) where {T, VT <: CuVector{T}}
@@ -19,3 +19,7 @@ function MadNLP.MadNLPOptions{T}(
         bound_relax_factor = bound_relax_factor,
     )
 end
+
+# GPU sparse-solver defaults for the condensed/hybrid formulations: CUDSS.
+MadNLP.default_sparse_solver(::MadNLP.AbstractNLPModel{T, VT}, ::Type{MadNLP.SparseCondensedKKTSystem}) where {T, VT <: CuVector{T}} = CUDSSSolver
+MadNLP.default_sparse_solver(::MadNLP.AbstractNLPModel{T, VT}, ::Type{MadNLP.HybridCondensedKKTSystem}) where {T, VT <: CuVector{T}} = CUDSSSolver
