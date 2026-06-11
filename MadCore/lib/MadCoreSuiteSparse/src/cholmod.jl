@@ -4,8 +4,8 @@ end
 
 mutable struct CHOLMODSolver{T} <: AbstractLinearSolver{T}
     inner::CHOLMOD.Factor{Float64}
-    tril::SparseMatrixCSC{T,Int32}
-    full::SparseMatrixCSC{Float64,Int}
+    tril::SparseMatrixCSC{T, Int32}
+    full::SparseMatrixCSC{Float64, Int}
     tril_to_full_view::SubVector{T}
 
     p::Vector{Float64}
@@ -16,18 +16,18 @@ mutable struct CHOLMODSolver{T} <: AbstractLinearSolver{T}
 end
 
 function CHOLMODSolver(
-    csc::SparseMatrixCSC{T};
-    opt=CHOLMODOptions(), logger=MadNLPLogger(),
-) where T
-    p = Vector{Float64}(undef,csc.n)
-    d = Vector{Float64}(undef,csc.n)
+        csc::SparseMatrixCSC{T};
+        opt = CHOLMODOptions(), logger = MadNLPLogger(),
+    ) where {T}
+    p = Vector{Float64}(undef, csc.n)
+    d = Vector{Float64}(undef, csc.n)
     full, tril_to_full_view = get_tril_to_full(Float64, csc)
 
     if opt.cholmod_algorithm == LDL && VERSION <= v"1.9"
         error("[CHOLMOD] Option `cholmod_algorithm=LDL` is not supported for Julia version <= 1.9")
     end
 
-    full = SparseMatrixCSC{Float64,Int}(
+    full = SparseMatrixCSC{Float64, Int}(
         full.m,
         full.n,
         Vector{Int64}(full.colptr),
@@ -46,14 +46,14 @@ function factorize!(M::CHOLMODSolver)
     M.full.nzval .= M.tril_to_full_view
     # We check the factorization succeeded later in the backsolve
     if M.opt.cholmod_algorithm == LDL
-        CHOLMOD.ldlt!(M.inner, M.full; check=false)
+        CHOLMOD.ldlt!(M.inner, M.full; check = false)
     elseif M.opt.cholmod_algorithm == CHOLESKY
-        CHOLMOD.cholesky!(M.inner, M.full; check=false)
+        CHOLMOD.cholesky!(M.inner, M.full; check = false)
     end
     return M
 end
 
-function solve_linear_system!(M::CHOLMODSolver{T}, rhs::Vector{T}) where T
+function solve_linear_system!(M::CHOLMODSolver{T}, rhs::Vector{T}) where {T}
     if issuccess(M.inner)
         B = CHOLMOD.Dense(rhs)
         X = CHOLMOD.solve(CHOLMOD.CHOLMOD_A, M.inner, B)
@@ -65,19 +65,19 @@ function solve_linear_system!(M::CHOLMODSolver{T}, rhs::Vector{T}) where T
 end
 
 # Utils function to copy the diagonal entries directly from CHOLMOD's factor.
-function _get_diagonal!(F::CHOLMOD.Factor{T}, d::Vector{T}) where T
+function _get_diagonal!(F::CHOLMOD.Factor{T}, d::Vector{T}) where {T}
     s = unsafe_load(CHOLMOD.typedpointer(F))
     # Wrap in memory the factor LD stored in CHOLMOD.
-    colptr = unsafe_wrap(Array, s.p, s.n+1, own=false)
-    nz = unsafe_wrap(Array, s.nz, s.n, own=false)
-    rowval = unsafe_wrap(Array, s.i, s.nzmax, own=false)
-    nzvals = unsafe_wrap(Array, Ptr{T}(s.x), s.nzmax, own=false)
+    colptr = unsafe_wrap(Array, s.p, s.n + 1, own = false)
+    nz = unsafe_wrap(Array, s.nz, s.n, own = false)
+    rowval = unsafe_wrap(Array, s.i, s.nzmax, own = false)
+    nzvals = unsafe_wrap(Array, Ptr{T}(s.x), s.nzmax, own = false)
     # Read LD factor and load diagonal entries
     for j in 1:s.n
-        for c in colptr[j]:colptr[j]+nz[j]-1
-            i = rowval[c+1] + 1  # convert to 1-based indexing
+        for c in colptr[j]:(colptr[j] + nz[j] - 1)
+            i = rowval[c + 1] + 1  # convert to 1-based indexing
             if i == j
-                d[i] = nzvals[c+1]
+                d[i] = nzvals[c + 1]
             end
         end
     end
@@ -93,7 +93,7 @@ function _inertia_cholesky(M::CHOLMODSolver)
         return (0, n, 0)
     end
 end
-function _inertia_ldlt(M::CHOLMODSolver{T}) where T
+function _inertia_ldlt(M::CHOLMODSolver{T}) where {T}
     n = size(M.full, 1)
     if !issuccess(M.inner)
         return (0, n, 0)
@@ -127,5 +127,5 @@ default_options(::Type{CHOLMODSolver}) = CHOLMODOptions()
 
 improve!(M::CHOLMODSolver) = false
 introduce(::CHOLMODSolver) = "cholmod v$(CHOLMOD.BUILD_VERSION)"
-is_supported(::Type{CHOLMODSolver},::Type{Float32}) = true
-is_supported(::Type{CHOLMODSolver},::Type{Float64}) = true
+is_supported(::Type{CHOLMODSolver}, ::Type{Float32}) = true
+is_supported(::Type{CHOLMODSolver}, ::Type{Float64}) = true

@@ -53,7 +53,7 @@ julia> is_supported(UmfpackSolver,Float32)
 false
 ```
 """
-function is_supported(::Type{LS},::Type{T}) where {LS <: AbstractLinearSolver, T <: AbstractFloat}
+function is_supported(::Type{LS}, ::Type{T}) where {LS <: AbstractLinearSolver, T <: AbstractFloat}
     return false
 end
 
@@ -96,17 +96,18 @@ function improve! end
 
 # Default function for AbstractKKTVector
 function solve_linear_system!(s::AbstractLinearSolver, x::AbstractKKTVector)
-    solve_linear_system!(s, full(x))
+    return solve_linear_system!(s, full(x))
 end
 
-function solve_linear_system!(s::AbstractLinearSolver{T}, X::AbstractMatrix) where T
+function solve_linear_system!(s::AbstractLinearSolver{T}, X::AbstractMatrix) where {T}
     n, nrhs = size(X)
     x = zeros(T, n)
     for i in 1:nrhs
-        copyto!(x, 1, X, (i-1)*n + 1, n)
+        copyto!(x, 1, X, (i - 1) * n + 1, n)
         solve_linear_system!(s, x)
-        copyto!(X, (i-1)*n + 1, x, 1, n)
+        copyto!(X, (i - 1) * n + 1, x, 1, n)
     end
+    return
 end
 
 #=
@@ -134,7 +135,7 @@ struct SymbolicException <: Exception end
 struct FactorizationException <: Exception end
 struct SolveException <: Exception end
 struct InertiaException <: Exception end
-LinearSolverException=Union{SymbolicException,FactorizationException,SolveException,InertiaException}
+LinearSolverException = Union{SymbolicException, FactorizationException, SolveException, InertiaException}
 
 @enum(
     LinearFactorization::Int,

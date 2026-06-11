@@ -27,7 +27,7 @@ import MadCore:
 
 import AMD, Metis
 
-const AbstractGPUVectorOrSubVector{T,VT<:AbstractGPUVector{T}} =
+const AbstractGPUVectorOrSubVector{T, VT <: AbstractGPUVector{T}} =
     Union{AbstractGPUVector{T}, SubVector{T, VT}}
 
 include("KKT/kernels_dense.jl")

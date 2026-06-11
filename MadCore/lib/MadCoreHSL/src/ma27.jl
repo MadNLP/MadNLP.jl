@@ -33,15 +33,15 @@ ma27_default_icntl(INT) = INT[
 ma27_default_cntl(T) = T[0.1, 1.0, 0.0, 0.0, 0.0]
 
 @kwdef mutable struct Ma27Options <: AbstractOptions
-    ma27_pivtol::Float64 = 1e-8
-    ma27_pivtolmax::Float64 = 1e-4
+    ma27_pivtol::Float64 = 1.0e-8
+    ma27_pivtolmax::Float64 = 1.0e-4
     ma27_liw_init_factor::Float64 = 5.0
     ma27_la_init_factor::Float64 = 5.0
     ma27_meminc_factor::Float64 = 2.0
 end
 
-mutable struct Ma27Solver{T,INT} <: AbstractLinearSolver{T}
-    csc::SparseMatrixCSC{T,INT}
+mutable struct Ma27Solver{T, INT} <: AbstractLinearSolver{T}
+    csc::SparseMatrixCSC{T, INT}
     I::Vector{INT}
     J::Vector{INT}
 
@@ -51,7 +51,7 @@ mutable struct Ma27Solver{T,INT} <: AbstractLinearSolver{T}
     info::Vector{INT}
 
     a::Vector{T}
-    a_view::SubArray{T,1,Vector{T},Tuple{UnitRange{Int64}},true}
+    a_view::SubArray{T, 1, Vector{T}, Tuple{UnitRange{Int64}}, true}
     la::INT
     ikeep::Vector{INT}
 
@@ -67,10 +67,10 @@ mutable struct Ma27Solver{T,INT} <: AbstractLinearSolver{T}
 end
 
 function Ma27Solver(
-    csc::SparseMatrixCSC{T,INT};
-    opt = Ma27Options(),
-    logger = MadNLPLogger(),
-) where {T,INT}
+        csc::SparseMatrixCSC{T, INT};
+        opt = Ma27Options(),
+        logger = MadNLPLogger(),
+    ) where {T, INT}
     I, J = findIJ(csc)
     nz = nnz(csc) |> INT
 
@@ -114,7 +114,7 @@ function Ma27Solver(
     resize!(iw, liw)
     maxfrt = INT[1]
 
-    return Ma27Solver{T,INT}(
+    return Ma27Solver{T, INT}(
         csc,
         I,
         J,
@@ -137,7 +137,7 @@ function Ma27Solver(
 end
 
 
-function factorize!(M::Ma27Solver{T,INT}) where {T,INT}
+function factorize!(M::Ma27Solver{T, INT}) where {T, INT}
     M.a_view .= M.csc.nzval
     while true
         HSL.ma27br(
@@ -176,7 +176,7 @@ function factorize!(M::Ma27Solver{T,INT}) where {T,INT}
     return M
 end
 
-function solve_linear_system!(M::Ma27Solver{T,INT}, rhs::Vector{T}) where {T,INT}
+function solve_linear_system!(M::Ma27Solver{T, INT}, rhs::Vector{T}) where {T, INT}
     length(M.w) < M.maxfrt[1] && resize!(M.w, M.maxfrt[1])
     length(M.iw1) < M.nsteps[1] && resize!(M.iw1, M.nsteps[1])
     HSL.ma27cr(
@@ -221,4 +221,4 @@ end
 introduce(::Ma27Solver) = "ma27 v$(HSL.MA27_version())"
 input_type(::Type{Ma27Solver}) = :csc
 default_options(::Type{Ma27Solver}) = Ma27Options()
-is_supported(::Type{Ma27Solver}, ::Type{T}) where T <: AbstractFloat = HSL.is_supported(Val(:ma27), T)
+is_supported(::Type{Ma27Solver}, ::Type{T}) where {T <: AbstractFloat} = HSL.is_supported(Val(:ma27), T)

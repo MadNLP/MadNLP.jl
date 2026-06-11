@@ -12,23 +12,23 @@ struct RichardsonIterator{T, KKT <: AbstractKKTSystem{T}} <: AbstractIterator{T}
 end
 
 function RichardsonIterator(
-    kkt;
-    opt = RichardsonOptions(),
-    logger = MadNLPLogger(),
-    cnt = MadNLPCounters()
-)
+        kkt;
+        opt = RichardsonOptions(),
+        logger = MadNLPLogger(),
+        cnt = MadNLPCounters()
+    )
     return RichardsonIterator(
         kkt, opt, cnt, logger
     )
 end
 
-default_options(::Type{RichardsonIterator}, tol) = RichardsonOptions(richardson_tol=tol^(5/4), richardson_acceptable_tol=tol^(5/8))
+default_options(::Type{RichardsonIterator}, tol) = RichardsonOptions(richardson_tol = tol^(5 / 4), richardson_acceptable_tol = tol^(5 / 8))
 
 function solve_refine!(
-    x::VT,
-    iterator::R,
-    b::VT,
-    w::VT
+        x::VT,
+        iterator::R,
+        b::VT,
+        w::VT
     ) where {T, VT, R <: RichardsonIterator{T}}
     @debug(iterator.logger, "Iterative solver initiated")
 
@@ -43,17 +43,17 @@ function solve_refine!(
 
         while true
             solve_kkt!(iterator.kkt, w)
-            axpy!(1., full(w), full(x))
+            axpy!(1.0, full(w), full(x))
             copyto!(full(w), full(b))
 
             mul!(w, iterator.kkt, x, -one(T), one(T))
 
             norm_w = norm(full(w), Inf)
             norm_x = norm(full(x), Inf)
-            residual_ratio = norm_w / (min(norm_x, 1e6 * norm_b) + norm_b)
+            residual_ratio = norm_w / (min(norm_x, 1.0e6 * norm_b) + norm_b)
 
-            if mod(iterator.cnt.ir, 10)==0
-                @debug(iterator.logger,"iterator.cnt.ir ||res||")
+            if mod(iterator.cnt.ir, 10) == 0
+                @debug(iterator.logger, "iterator.cnt.ir ||res||")
             end
             @debug(iterator.logger, @sprintf("%4i %6.2e", iterator.cnt.ir, residual_ratio))
             iterator.cnt.ir += 1
@@ -74,4 +74,3 @@ function solve_refine!(
 
     return residual_ratio < iterator.opt.richardson_acceptable_tol
 end
-

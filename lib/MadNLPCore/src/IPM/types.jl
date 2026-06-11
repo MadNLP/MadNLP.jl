@@ -28,7 +28,7 @@ mutable struct RobustRestorer{T, VT}
     tau_R::T
     zeta::T
 
-    filter::Vector{Tuple{T,T}}
+    filter::Vector{Tuple{T, T}}
 end
 
 abstract type AbstractInertiaCorrector end
@@ -36,10 +36,10 @@ struct InertiaAuto <: AbstractInertiaCorrector end
 struct InertiaBased <: AbstractInertiaCorrector end
 struct InertiaIgnore <: AbstractInertiaCorrector end
 struct InertiaFree{
-    T,
-    VT <: AbstractVector{T},
-    KKTVec <: AbstractKKTVector{T, VT}
-} <: AbstractInertiaCorrector 
+        T,
+        VT <: AbstractVector{T},
+        KKTVec <: AbstractKKTVector{T, VT},
+    } <: AbstractInertiaCorrector
     p0::KKTVec
     d0::KKTVec
     t::VT
@@ -64,13 +64,13 @@ Update the barrier parameter using the classical Fiacco-McCormick monotone rule.
 
 """
 @kwdef mutable struct MonotoneUpdate{T} <: AbstractBarrierUpdate{T}
-    mu_init::T = 1e-1
-    mu_min::T = 1e-11
+    mu_init::T = 1.0e-1
+    mu_min::T = 1.0e-11
     mu_superlinear_decrease_power::T = 1.5
-    mu_linear_decrease_factor::T = .2
+    mu_linear_decrease_factor::T = 0.2
 end
-function MonotoneUpdate(tol::T, barrier_tol_factor) where T
-    return MonotoneUpdate{T}(; mu_min=min(1e-4, tol ) / (barrier_tol_factor + 1))
+function MonotoneUpdate(tol::T, barrier_tol_factor) where {T}
+    return MonotoneUpdate{T}(; mu_min = min(1.0e-4, tol) / (barrier_tol_factor + 1))
 end
 
 """
@@ -99,23 +99,23 @@ The algorithm is described in [Nocedal2009, Section 4].
 
 """
 @kwdef mutable struct QualityFunctionUpdate{T} <: AbstractAdaptiveUpdate{T}
-    mu_init::T = 1e-1
-    mu_min::T = 1e-11
-    mu_max::T = 1e5
-    sigma_min::T = 1e-6
-    sigma_max::T = 1e2
-    sigma_tol::T = 1e-2
+    mu_init::T = 1.0e-1
+    mu_min::T = 1.0e-11
+    mu_max::T = 1.0e5
+    sigma_min::T = 1.0e-6
+    sigma_max::T = 1.0e2
+    sigma_tol::T = 1.0e-2
     gamma::T = 1.0
     max_gs_iter::Int = 8
     # For non-free mode
     mu_superlinear_decrease_power::T = 1.5
-    mu_linear_decrease_factor::T = .2
+    mu_linear_decrease_factor::T = 0.2
     free_mode::Bool = true
     globalization::Bool = true
     n_update::Int = 0
 end
-function QualityFunctionUpdate(tol::T, barrier_tol_factor) where T
-    return QualityFunctionUpdate{T}(; mu_min=min(1e-4, tol ) / (barrier_tol_factor + 1))
+function QualityFunctionUpdate(tol::T, barrier_tol_factor) where {T}
+    return QualityFunctionUpdate{T}(; mu_min = min(1.0e-4, tol) / (barrier_tol_factor + 1))
 end
 
 """
@@ -131,16 +131,16 @@ The algorithm is described in [Nocedal2009, Section 3].
 
 """
 @kwdef mutable struct LOQOUpdate{T} <: AbstractAdaptiveUpdate{T}
-    mu_init::T = 1e-1
-    mu_min::T = 1e-11
-    mu_max::T = 1e5
+    mu_init::T = 1.0e-1
+    mu_min::T = 1.0e-11
+    mu_max::T = 1.0e5
     gamma::T = 0.1 # scale factor
-    r::T = .95 # Steplength param
+    r::T = 0.95 # Steplength param
     mu_superlinear_decrease_power::T = 1.5
-    mu_linear_decrease_factor::T = .2
+    mu_linear_decrease_factor::T = 0.2
     free_mode::Bool = true
     globalization::Bool = true
 end
-function LOQOUpdate(tol::T, barrier_tol_factor) where T
-    return LOQOUpdate{T}(; mu_min=min(1e-4, tol ) / (barrier_tol_factor + 1))
+function LOQOUpdate(tol::T, barrier_tol_factor) where {T}
+    return LOQOUpdate{T}(; mu_min = min(1.0e-4, tol) / (barrier_tol_factor + 1))
 end

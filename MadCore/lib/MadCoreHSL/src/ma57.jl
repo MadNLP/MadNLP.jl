@@ -1,10 +1,10 @@
 ma57_default_icntl(INT) =
     INT[0, 0, 6, 1, 0, 5, 1, 0, 10, 0, 16, 16, 10, 100, 0, 0, 0, 0, 0, 0]
-ma57_default_cntl(T) = T[1e-8, 1.0e-20, 0.5, 0.0, 0.0]
+ma57_default_cntl(T) = T[1.0e-8, 1.0e-20, 0.5, 0.0, 0.0]
 
 @kwdef mutable struct Ma57Options <: AbstractOptions
-    ma57_pivtol::Float64 = 1e-8
-    ma57_pivtolmax::Float64 = 1e-4
+    ma57_pivtol::Float64 = 1.0e-8
+    ma57_pivtolmax::Float64 = 1.0e-4
     ma57_pre_alloc::Float64 = 1.05
     ma57_pivot_order::Int = 5
     ma57_automatic_scaling::Bool = false
@@ -14,8 +14,8 @@ ma57_default_cntl(T) = T[1e-8, 1.0e-20, 0.5, 0.0, 0.0]
     ma57_small_pivot_flag::Int = 0
 end
 
-mutable struct Ma57Solver{T,INT} <: AbstractLinearSolver{T}
-    csc::SparseMatrixCSC{T,INT}
+mutable struct Ma57Solver{T, INT} <: AbstractLinearSolver{T}
+    csc::SparseMatrixCSC{T, INT}
     I::Vector{INT}
     J::Vector{INT}
 
@@ -44,10 +44,10 @@ end
 
 
 function Ma57Solver(
-    csc::SparseMatrixCSC{T,INT};
-    opt = Ma57Options(),
-    logger = MadNLPLogger(),
-) where {T,INT}
+        csc::SparseMatrixCSC{T, INT};
+        opt = Ma57Options(),
+        logger = MadNLPLogger(),
+    ) where {T, INT}
     I, J = findIJ(csc)
 
     icntl = ma57_default_icntl(INT)
@@ -94,7 +94,7 @@ function Ma57Solver(
     lwork = INT(csc.n)
     work = Vector{T}(undef, lwork)
 
-    return Ma57Solver{T,INT}(
+    return Ma57Solver{T, INT}(
         csc,
         I,
         J,
@@ -116,7 +116,7 @@ function Ma57Solver(
     )
 end
 
-function factorize!(M::Ma57Solver{T,INT}) where {T,INT}
+function factorize!(M::Ma57Solver{T, INT}) where {T, INT}
     while true
         HSL.ma57br(
             T,
@@ -153,7 +153,7 @@ function factorize!(M::Ma57Solver{T,INT}) where {T,INT}
     return M
 end
 
-function solve_linear_system!(M::Ma57Solver{T,INT}, rhs::Vector{T}) where {T,INT}
+function solve_linear_system!(M::Ma57Solver{T, INT}, rhs::Vector{T}) where {T, INT}
     HSL.ma57cr(
         T,
         INT,
@@ -193,4 +193,4 @@ end
 introduce(::Ma57Solver) = "ma57 v$(HSL.MA57_version())"
 input_type(::Type{Ma57Solver}) = :csc
 default_options(::Type{Ma57Solver}) = Ma57Options()
-is_supported(::Type{Ma57Solver}, ::Type{T}) where T <: AbstractFloat = HSL.is_supported(Val(:ma57), T)
+is_supported(::Type{Ma57Solver}, ::Type{T}) where {T <: AbstractFloat} = HSL.is_supported(Val(:ma57), T)

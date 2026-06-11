@@ -1,14 +1,13 @@
-
 struct HybridCondensedKKTSystem{T, VT, MT, QN, VI, VI32, VInd, SC, LS, LS2, EXT} <: AbstractCondensedKKTSystem{T, VT, MT, QN}
     # Hessian
     hess::VT      # dimension nnzh
-    hess_raw::SparseMatrixCOO{T,Int32,VT, VI32}
+    hess_raw::SparseMatrixCOO{T, Int32, VT, VI32}
     hess_com::MT  # dimension n x n
     hess_csc_map::Union{Nothing, VI}
 
     # Full Jacobian
     jac::VT       # dimension nnzj
-    jt_coo::SparseMatrixCOO{T,Int32,VT, VI32}
+    jt_coo::SparseMatrixCOO{T, Int32, VT, VI32}
     jt_csc::MT
     jt_csc_map::Union{Nothing, VI}
 
@@ -65,14 +64,14 @@ end
 
 # Build KKT system directly from SparseCallback
 function create_kkt_system(
-    ::Type{HybridCondensedKKTSystem},
-    cb::SparseCallback{T,VT},
-    linear_solver;
-    opt_linear_solver=default_options(linear_solver),
-    hessian_approximation=ExactHessian,
-    qn_options=QuasiNewtonOptions(),
-    cg_algorithm=:cg,
-) where {T, VT}
+        ::Type{HybridCondensedKKTSystem},
+        cb::SparseCallback{T, VT},
+        linear_solver;
+        opt_linear_solver = default_options(linear_solver),
+        hessian_approximation = ExactHessian,
+        qn_options = QuasiNewtonOptions(),
+        cg_algorithm = :cg,
+    ) where {T, VT}
 
     n = cb.nvar
     m = cb.ncon
@@ -91,12 +90,12 @@ function create_kkt_system(
     # Evaluate sparsity pattern
     jac_sparsity_I = create_array(cb, Int32, cb.nnzj)
     jac_sparsity_J = create_array(cb, Int32, cb.nnzj)
-    _jac_sparsity_wrapper!(cb,jac_sparsity_I, jac_sparsity_J)
+    _jac_sparsity_wrapper!(cb, jac_sparsity_I, jac_sparsity_J)
 
     quasi_newton = create_quasi_newton(ExactHessian, cb, n)
     hess_sparsity_I, hess_sparsity_J = build_hessian_structure(cb, ExactHessian)
 
-    force_lower_triangular!(hess_sparsity_I,hess_sparsity_J)
+    force_lower_triangular!(hess_sparsity_I, hess_sparsity_J)
 
     n_jac = length(jac_sparsity_I)
     n_hess = length(hess_sparsity_I)
@@ -182,14 +181,14 @@ function create_kkt_system(
 
     ext = get_sparse_condensed_ext(VT, hess_com, jptr, jt_csc_map, hess_csc_map)
     etc = Dict{Symbol, Any}(
-        :cg_algorithm=>cg_algorithm,
-        :cg_iters=>Int[],
-        :accuracy=>Float64[],
-        :time_cg=>0.0,
-        :time_backsolve=>0.0,
-        :time_condensation=>0.0,
-        :time_init_condensation=>init_condensation,
-        :time_init_linear_solver=>init_linear_solver,
+        :cg_algorithm => cg_algorithm,
+        :cg_iters => Int[],
+        :accuracy => Float64[],
+        :time_cg => 0.0,
+        :time_backsolve => 0.0,
+        :time_condensation => 0.0,
+        :time_init_condensation => init_condensation,
+        :time_init_linear_solver => init_linear_solver,
     )
 
     return HybridCondensedKKTSystem(
@@ -218,7 +217,7 @@ function initialize!(kkt::HybridCondensedKKTSystem)
     fill!(kkt.u_lower, 0.0)
     fill!(kkt.l_diag, 1.0)
     fill!(kkt.u_diag, 1.0)
-    fill!(nonzeros(kkt.hess_com), 0.) # so that mul! in the initial primal-dual solve has no effect
+    return fill!(nonzeros(kkt.hess_com), 0.0) # so that mul! in the initial primal-dual solve has no effect
 end
 
 function is_inertia_correct(kkt::HybridCondensedKKTSystem, num_pos, num_zero, num_neg)
@@ -226,20 +225,20 @@ function is_inertia_correct(kkt::HybridCondensedKKTSystem, num_pos, num_zero, nu
 end
 
 # mul!
-function LinearAlgebra.mul!(w::AbstractKKTVector{T}, kkt::HybridCondensedKKTSystem, x::AbstractKKTVector, alpha, beta) where T
+function LinearAlgebra.mul!(w::AbstractKKTVector{T}, kkt::HybridCondensedKKTSystem, x::AbstractKKTVector, alpha, beta) where {T}
     n = size(kkt.hess_com, 1)
     m = size(kkt.jt_csc, 2)
     mi = length(kkt.ind_ineq)
 
     # Decompose results
     xx = view(full(x), 1:n)
-    xs = view(full(x), n+1:n+mi)
-    xz = view(full(x), n+mi+1:n+mi+m)
+    xs = view(full(x), (n + 1):(n + mi))
+    xz = view(full(x), (n + mi + 1):(n + mi + m))
 
     # Decompose buffers
     wx = view(full(w), 1:n)
-    ws = view(full(w), n+1:n+mi)
-    wz = view(full(w), n+mi+1:n+mi+m)
+    ws = view(full(w), (n + 1):(n + mi))
+    wz = view(full(w), (n + mi + 1):(n + mi + m))
 
     wz_ineq = view(wz, kkt.ind_ineq)
     xz_ineq = view(xz, kkt.ind_ineq)
@@ -250,9 +249,9 @@ function LinearAlgebra.mul!(w::AbstractKKTVector{T}, kkt::HybridCondensedKKTSyst
     mul!(wz, kkt.jt_csc', xx, alpha, beta)
     axpy!(-alpha, xs, wz_ineq)
 
-    ws .= beta.*ws .- alpha.* xz_ineq
+    ws .= beta .* ws .- alpha .* xz_ineq
 
-    _kktmul!(w,x,kkt.reg,kkt.du_diag,kkt.l_lower,kkt.u_lower,kkt.l_diag,kkt.u_diag, alpha, beta)
+    _kktmul!(w, x, kkt.reg, kkt.du_diag, kkt.l_lower, kkt.u_lower, kkt.l_diag, kkt.u_diag, alpha, beta)
     return w
 end
 
@@ -274,12 +273,12 @@ function jtprod!(y::AbstractVector, kkt::HybridCondensedKKTSystem, x::AbstractVe
 
     x_ineq = view(x, kkt.ind_ineq)
     mul!(view(y, 1:n), kkt.jt_csc, x)
-    y[size(kkt.jt_csc,1)+1:end] .= -x_ineq
+    y[(size(kkt.jt_csc, 1) + 1):end] .= -x_ineq
     return y
 end
 
 function compress_hessian!(kkt::HybridCondensedKKTSystem)
-    transfer!(kkt.hess_com, kkt.hess_raw, kkt.hess_csc_map)
+    return transfer!(kkt.hess_com, kkt.hess_raw, kkt.hess_csc_map)
 end
 
 # build_kkt!
@@ -289,7 +288,7 @@ function build_kkt!(kkt::HybridCondensedKKTSystem)
     m = size(kkt.jt_csc, 2)
 
     Σx = view(kkt.pr_diag, 1:n)
-    Σs = view(kkt.pr_diag, n+1:n+mi)
+    Σs = view(kkt.pr_diag, (n + 1):(n + mi))
     Σd = kkt.du_diag # TODO: add support
 
     fill!(kkt.diag_buffer, 0.0)
@@ -304,15 +303,15 @@ function build_kkt!(kkt::HybridCondensedKKTSystem)
 end
 
 # solve!
-function solve_kkt!(kkt::HybridCondensedKKTSystem{T}, w::AbstractKKTVector)  where T
-    (n,m) = size(kkt.jt_csc)
+function solve_kkt!(kkt::HybridCondensedKKTSystem{T}, w::AbstractKKTVector) where {T}
+    (n, m) = size(kkt.jt_csc)
     mi = length(kkt.ind_ineq)
     G = kkt.G_csc
 
     # Decompose buffers
     wx = _madnlp_unsafe_wrap(full(w), n)
-    ws = view(full(w), n+1:n+mi)
-    wc = view(full(w), n+mi+1:n+mi+m)
+    ws = view(full(w), (n + 1):(n + mi))
+    wc = view(full(w), (n + mi + 1):(n + mi + m))
 
     r1 = kkt.buffer3
     vs = kkt.buffer4
@@ -322,7 +321,7 @@ function solve_kkt!(kkt::HybridCondensedKKTSystem{T}, w::AbstractKKTVector)  whe
     index_copy!(wy, wc, kkt.ind_eq)
     index_copy!(wz, wc, kkt.ind_ineq)
 
-    Σs = view(kkt.pr_diag, n+1:n+mi)
+    Σs = view(kkt.pr_diag, (n + 1):(n + mi))
 
     reduce_rhs!(w.xp_lr, dual_lb(w), kkt.l_diag, w.xp_ur, dual_ub(w), kkt.u_diag)
 
@@ -347,20 +346,20 @@ function solve_kkt!(kkt::HybridCondensedKKTSystem{T}, w::AbstractKKTVector)  whe
             kkt.iterative_linear_solver,
             kkt.S,
             wy;
-            atol=0.0,
-            rtol=1e-10,
-            verbose=0,
+            atol = 0.0,
+            rtol = 1.0e-10,
+            verbose = 0,
         )
         copyto!(wy, kkt.iterative_linear_solver.x)
-    elseif kkt.etc[:cg_algorithm] ∈ (:craigmr, )
+    elseif kkt.etc[:cg_algorithm] ∈ (:craigmr,)
         t_cg = @elapsed_hykkt Krylov.krylov_solve!(
             kkt.iterative_linear_solver,
             kkt.G_csc,
             wy;
-            N=kkt.S,
-            atol=0.0,
-            rtol=1e-10,
-            verbose=0,
+            N = kkt.S,
+            atol = 0.0,
+            rtol = 1.0e-10,
+            verbose = 0,
         )
         copyto!(wy, kkt.iterative_linear_solver.y)
     end
@@ -393,11 +392,11 @@ end
 
 # Custom iterative-refinement
 function solve_refine_wrapper!(
-    d,
-    solver::MadNLPSolver{T, VT, VI, KKT},
-    p,
-    w,
-) where {T, VT, VI, KKT<:HybridCondensedKKTSystem{T}}
+        d,
+        solver::MadNLPSolver{T, VT, VI, KKT},
+        p,
+        w,
+    ) where {T, VT, VI, KKT <: HybridCondensedKKTSystem{T}}
     copyto!(d.values, p.values)
 
     solver.cnt.linear_solver_time += @elapsed_hykkt begin
@@ -424,22 +423,22 @@ end
     kernels come from MadCoreKernelAbstractions.
 =#
 
-function compress_hessian!(kkt::HybridCondensedKKTSystem{T, VT, MT}) where {T, VT<:AbstractGPUVector{T}, MT}
+function compress_hessian!(kkt::HybridCondensedKKTSystem{T, VT, MT}) where {T, VT <: AbstractGPUVector{T}, MT}
     fill!(kkt.hess_com.nzVal, zero(T))
-    if length(kkt.ext.hess_com_ptrptr) > 1
+    return if length(kkt.ext.hess_com_ptrptr) > 1
         backend = get_backend(kkt.hess_com.nzVal)
         MadCoreKernelAbstractions._transfer_to_csc_kernel!(backend)(
             kkt.hess_com.nzVal,
             kkt.ext.hess_com_ptr,
             kkt.ext.hess_com_ptrptr,
             kkt.hess_raw.V;
-            ndrange = length(kkt.ext.hess_com_ptrptr)-1,
+            ndrange = length(kkt.ext.hess_com_ptrptr) - 1,
         )
         KernelAbstractions.synchronize(backend)
     end
 end
 
-function compress_jacobian!(kkt::HybridCondensedKKTSystem{T, VT, MT}) where {T, VT<:AbstractGPUVector{T}, MT}
+function compress_jacobian!(kkt::HybridCondensedKKTSystem{T, VT, MT}) where {T, VT <: AbstractGPUVector{T}, MT}
     fill!(kkt.jt_csc.nzVal, zero(T))
     if length(kkt.ext.jt_csc_ptrptr) > 1 # otherwise error is thrown
         backend = get_backend(kkt.jt_csc.nzVal)
@@ -448,11 +447,11 @@ function compress_jacobian!(kkt::HybridCondensedKKTSystem{T, VT, MT}) where {T, 
             kkt.ext.jt_csc_ptr,
             kkt.ext.jt_csc_ptrptr,
             kkt.jt_coo.V;
-            ndrange = length(kkt.ext.jt_csc_ptrptr)-1,
+            ndrange = length(kkt.ext.jt_csc_ptrptr) - 1,
         )
         KernelAbstractions.synchronize(backend)
     end
-    if length(kkt.ind_eq) > 0
+    return if length(kkt.ind_eq) > 0
         transfer_coef!(kkt.G_csc, kkt.G_csc_map, kkt.jac, kkt.ind_eq_jac)
     end
 end
@@ -460,32 +459,32 @@ end
 # N.B: we use the custom diag kernel from MadCoreKernelAbstractions for KKT
 # multiplication as symv is not supported on the GPU.
 function LinearAlgebra.mul!(
-    w::AbstractKKTVector{T,VT},
-    kkt::HybridCondensedKKTSystem,
-    x::AbstractKKTVector{T, VT},
-    alpha = one(T), beta = zero(T)
-) where {T, VT <: AbstractGPUVector{T}}
+        w::AbstractKKTVector{T, VT},
+        kkt::HybridCondensedKKTSystem,
+        x::AbstractKKTVector{T, VT},
+        alpha = one(T), beta = zero(T)
+    ) where {T, VT <: AbstractGPUVector{T}}
     n = size(kkt.hess_com, 1)
     m = size(kkt.jt_csc, 2)
     mi = length(kkt.ind_ineq)
 
     # Decompose results
     xx = view(full(x), 1:n)
-    xs = view(full(x), n+1:n+mi)
-    xz = view(full(x), n+mi+1:n+mi+m)
+    xs = view(full(x), (n + 1):(n + mi))
+    xz = view(full(x), (n + mi + 1):(n + mi + m))
 
     # Decompose buffers
     wx = view(full(w), 1:n)
-    ws = view(full(w), n+1:n+mi)
-    wz = view(full(w), n+mi+1:n+mi+m)
+    ws = view(full(w), (n + 1):(n + mi))
+    wz = view(full(w), (n + mi + 1):(n + mi + m))
 
     wz_ineq = kkt.buffer4
     xz_ineq = kkt.buffer5
 
     # First block / x
-    mul!(wx, kkt.hess_com , xx, alpha, beta)
+    mul!(wx, kkt.hess_com, xx, alpha, beta)
     mul!(wx, kkt.hess_com', xx, alpha, one(T))
-    mul!(wx, kkt.jt_csc,  xz, alpha, one(T))
+    mul!(wx, kkt.jt_csc, xz, alpha, one(T))
     if !isempty(kkt.ext.diag_map_to)
         backend = get_backend(wx)
         MadCoreKernelAbstractions._diag_operation_kernel!(backend)(
@@ -513,6 +512,6 @@ function LinearAlgebra.mul!(
     axpy!(-alpha, xs, wz_ineq)
     index_copy!(wz, kkt.ind_ineq, wz_ineq)
 
-    _kktmul!(w,x,kkt.reg,kkt.du_diag,kkt.l_lower,kkt.u_lower,kkt.l_diag,kkt.u_diag, alpha, beta)
+    _kktmul!(w, x, kkt.reg, kkt.du_diag, kkt.l_lower, kkt.u_lower, kkt.l_diag, kkt.u_diag, alpha, beta)
     return
 end

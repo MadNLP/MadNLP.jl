@@ -3,6 +3,7 @@ uuid = "2621e9c9-9eb4-46b1-8089-e8c72242dfb6"
 version = "0.11.0"
 
 [deps]
+HSL = "34c5aeac-e683-54a6-a0e9-6e0fdc586c50"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 Logging = "56ddb016-857b-54e1-b83d-db4d58db5568"
 MadCore = "6fc510d6-e066-472d-adc5-2ce5e9b14820"
@@ -40,6 +41,7 @@ MadNLPTests = {path = "lib/MadNLPTests"}
 MadNLPMOI = "MathOptInterface"
 
 [compat]
+HSL = "0.5.4"
 LinearAlgebra = "1.10"
 Logging = "1.10"
 MINLPTests = "~0.5"
@@ -63,6 +65,7 @@ SparseArrays = "1.10"
 julia = "1.10"
 
 [extras]
+HSL = "34c5aeac-e683-54a6-a0e9-6e0fdc586c50"
 MINLPTests = "ee0a3090-8ee9-5cdb-b8cb-8eeba3165522"
 MadNLPTests = "b52a2a03-04ab-4a5f-9698-6a2deff93217"
 Quadmath = "be4d8f0f-7fa4-5f49-b795-2f01399ab2dd"
@@ -70,4 +73,4 @@ Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [targets]
-test = ["Test", "MadNLPTests", "MINLPTests", "Random", "MathOptInterface", "Quadmath"]
+test = ["Test", "MadNLPTests", "MINLPTests", "Random", "MathOptInterface", "Quadmath", "HSL"]

@@ -1,4 +1,3 @@
-
 """
     update_barrier!(barrier::AbstractBarrierUpdate{T}, solver::AbstractMadNLPSolver{T}, sc::T) where T
 
@@ -10,13 +9,13 @@ function update_barrier! end
 # Implement monotone update in a dedicated function as this code is reused
 # throughout all the barrier updates.
 function _update_monotone!(
-    barrier::AbstractBarrierUpdate{T},
-    solver::AbstractMadNLPSolver{T},
-    sc::T
-) where T
+        barrier::AbstractBarrierUpdate{T},
+        solver::AbstractMadNLPSolver{T},
+        sc::T
+    ) where {T}
     set_inf_compl_mu!(solver, get_inf_compl(solver, sc))
-    while (get_mu(solver) > max(barrier.mu_min, get_opt(solver).tol/10)) &&
-        (get_inf_barrier(solver) <= get_opt(solver).barrier_tol_factor*get_mu(solver))
+    while (get_mu(solver) > max(barrier.mu_min, get_opt(solver).tol / 10)) &&
+            (get_inf_barrier(solver) <= get_opt(solver).barrier_tol_factor * get_mu(solver))
         mu_new = get_mu(
             get_mu(solver),
             barrier.mu_min,
@@ -37,10 +36,10 @@ end
 # N.B: we always fallack to monotone update for restoration, no matter
 # the barrier update being used in the regular phase.
 function _update_monotone_RR!(
-    barrier::AbstractBarrierUpdate{T},
-    solver::AbstractMadNLPSolver{T},
-    sc::T
-) where T
+        barrier::AbstractBarrierUpdate{T},
+        solver::AbstractMadNLPSolver{T},
+        sc::T
+    ) where {T}
     RR = get_RR(solver)
     inf_compl_mu_R = get_inf_compl_R(
         get_x_lr(solver),
@@ -57,7 +56,7 @@ function _update_monotone_RR!(
         sc,
     )
     while RR.mu_R >= barrier.mu_min &&
-        max(RR.inf_pr_R,RR.inf_du_R,inf_compl_mu_R) <= get_opt(solver).barrier_tol_factor*RR.mu_R
+            max(RR.inf_pr_R, RR.inf_du_R, inf_compl_mu_R) <= get_opt(solver).barrier_tol_factor * RR.mu_R
         RR.mu_R = get_mu(
             RR.mu_R,
             barrier.mu_min,
@@ -79,16 +78,16 @@ function _update_monotone_RR!(
             RR.mu_R,
             sc,
         )
-        RR.tau_R= max(get_opt(solver).tau_min,1-RR.mu_R)
+        RR.tau_R = max(get_opt(solver).tau_min, 1 - RR.mu_R)
         RR.zeta = sqrt(RR.mu_R)
         empty!(RR.filter)
-        push!(RR.filter,(get_theta_max(solver),-Inf))
+        push!(RR.filter, (get_theta_max(solver), -Inf))
     end
     return
 end
 
-function update_barrier!(barrier::MonotoneUpdate{T}, solver::AbstractMadNLPSolver{T}, sc::T) where T
-    _update_monotone!(barrier, solver, sc)
+function update_barrier!(barrier::MonotoneUpdate{T}, solver::AbstractMadNLPSolver{T}, sc::T) where {T}
+    return _update_monotone!(barrier, solver, sc)
 end
 
 #=
@@ -96,16 +95,16 @@ end
 =#
 
 # Initial barrier parameter used when we fallback to the monotone barrier update.
-function get_fixed_mu(solver::AbstractMadNLPSolver{T}, barrier::AbstractAdaptiveUpdate{T}) where T
+function get_fixed_mu(solver::AbstractMadNLPSolver{T}, barrier::AbstractAdaptiveUpdate{T}) where {T}
     mu = T(0.8) * get_average_complementarity(solver)
     return clamp(mu, barrier.mu_min, barrier.mu_max)
 end
 
-function _check_progress(barrier::AbstractAdaptiveUpdate{T}, solver::AbstractMadNLPSolver{T}) where T
+function _check_progress(barrier::AbstractAdaptiveUpdate{T}, solver::AbstractMadNLPSolver{T}) where {T}
     if !barrier.globalization
         return true
     end
-    kappa_1 = T(1e-5) # filter margin width
+    kappa_1 = T(1.0e-5) # filter margin width
     kappa_2 = T(1.0)  # filter margin maximum width
     # Check current progress using filter line search
     theta = get_theta(get_c(solver))
@@ -115,7 +114,7 @@ function _check_progress(barrier::AbstractAdaptiveUpdate{T}, solver::AbstractMad
     return is_filter_acceptable(get_filter(solver), theta + delta, varphi + delta)
 end
 
-function update_barrier!(barrier::AbstractAdaptiveUpdate{T}, solver::AbstractMadNLPSolver{T}, sc::T) where T
+function update_barrier!(barrier::AbstractAdaptiveUpdate{T}, solver::AbstractMadNLPSolver{T}, sc::T) where {T}
     old_mu = get_mu(solver)
     progress = _check_progress(barrier, solver)
     # Update state of barrier algorithm
@@ -177,7 +176,7 @@ function _evaluate_quality_function(solver, sigma, step_aff, step_cen, res_dual,
         (x, xl, dx, z, dz) -> ((x + alpha_pr * dx - xl) * (z + alpha_du * dz))^2,
         +,
         get_x_lr(solver), get_xl_r(solver), get_dx_lr(solver), get_zl_r(solver), dual_lb(d);
-        init=0.0,
+        init = 0.0,
     )
 
     # ||(Xu - X - αp ΔX) (Zu + αd ΔZu)||^2
@@ -185,14 +184,14 @@ function _evaluate_quality_function(solver, sigma, step_aff, step_cen, res_dual,
         (x, xu, dx, z, dz) -> ((xu - x - alpha_pr * dx) * (z + alpha_du * dz))^2,
         +,
         get_x_ur(solver), get_xu_r(solver), get_dx_ur(solver), get_zu_r(solver), dual_ub(d);
-        init=0.0,
+        init = 0.0,
     )
     # Primal infeasibility
     inf_pr = (m > 0) ? (1.0 - alpha_pr)^2 * res_primal^2 / m : 0.0
     # Dual infeasibility
     inf_du = (1.0 - alpha_du)^2 * res_dual^2 / n
     # Complementarity infeasibility
-    inf_compl = (inf_compl_lb + inf_compl_ub ) / (nlb + nub)
+    inf_compl = (inf_compl_lb + inf_compl_ub) / (nlb + nub)
 
     @debug(get_logger(solver), @sprintf("sigma=%4.1e inf_pr=%4.2e inf_du=%4.2e inf_cc=%4.2e a_pr=%4.2e a_du=%4.2e", sigma, inf_pr, inf_du, inf_compl, alpha_pr, alpha_du))
 
@@ -257,7 +256,7 @@ function set_centering_aug_rhs!(solver::AbstractMadNLPSolver, kkt::AbstractKKTSy
     return
 end
 
-function get_adaptive_mu(solver::AbstractMadNLPSolver{T}, barrier::QualityFunctionUpdate{T}) where T
+function get_adaptive_mu(solver::AbstractMadNLPSolver{T}, barrier::QualityFunctionUpdate{T}) where {T}
     # No inequality constraint: early return as barrier update is useless
     if get_nlb(solver) + get_nub(solver) == 0
         return barrier.mu_min
@@ -277,14 +276,14 @@ function get_adaptive_mu(solver::AbstractMadNLPSolver{T}, barrier::QualityFuncti
     # Centering step
     set_centering_aug_rhs!(solver, get_kkt(solver), mu)
     # NOTE(@anton) Ipopt also applies the dual infeasibility perturbation for some reason???
-    dual_inf_perturbation!(primal(get_p(solver)),get_ind_llb(solver),get_ind_uub(solver),mu,get_opt(solver).kappa_d)
+    dual_inf_perturbation!(primal(get_p(solver)), get_ind_llb(solver), get_ind_uub(solver), mu, get_opt(solver).kappa_d)
     # Get (again) approximate solution without iterative refinement
     copyto!(full(step_cen), full(get_p(solver)))
     solve_kkt!(get_kkt(solver), step_cen)
     # Refine the search interval using Ipopt's heuristics
     # First, check if sigma is greater than 1.
     phi1 = _evaluate_quality_function(solver, one(T), step_aff, step_cen, res_primal, res_dual)
-    sigma_1m = one(T) - T(1e-4)
+    sigma_1m = one(T) - T(1.0e-4)
     phi1m = _evaluate_quality_function(solver, sigma_1m, step_aff, step_cen, res_primal, res_dual)
     # Restrict search interval
     if phi1m > phi1
@@ -301,7 +300,7 @@ function get_adaptive_mu(solver::AbstractMadNLPSolver{T}, barrier::QualityFuncti
     return clamp(sigma_opt * mu, barrier.mu_min, barrier.mu_max)
 end
 
-function get_adaptive_mu(solver::AbstractMadNLPSolver{T}, barrier::LOQOUpdate{T}) where T
+function get_adaptive_mu(solver::AbstractMadNLPSolver{T}, barrier::LOQOUpdate{T}) where {T}
     # No inequality constraint: early return as barrier update is useless
     if get_nlb(solver) + get_nub(solver) == 0
         return barrier.mu_min
@@ -309,9 +308,8 @@ function get_adaptive_mu(solver::AbstractMadNLPSolver{T}, barrier::LOQOUpdate{T}
     mu = get_average_complementarity(solver) # get average complementarity.
     ncc = get_nlb(solver) + get_nub(solver)
     min_cc = get_min_complementarity(solver)
-    xi = min_cc/mu
-    sigma = barrier.gamma*min((1-barrier.r)*((1-xi)/xi),2)^3
+    xi = min_cc / mu
+    sigma = barrier.gamma * min((1 - barrier.r) * ((1 - xi) / xi), 2)^3
     mu = clamp(sigma * mu, barrier.mu_min, barrier.mu_max)
     return mu
 end
-

@@ -4,10 +4,10 @@
 ######################################################
 
 function MadCore.transfer!(
-    dest::rocSPARSE.ROCSparseMatrixCSC,
-    src::MadCore.SparseMatrixCOO,
-    map,
-)
+        dest::rocSPARSE.ROCSparseMatrixCSC,
+        src::MadCore.SparseMatrixCOO,
+        map,
+    )
     return copyto!(view(dest.nzVal, map), src.V)
 end
 
@@ -29,10 +29,10 @@ function MadCore._sym_length(Jt::rocSPARSE.ROCSparseMatrixCSC)
     )
 end
 
-function MadCore.get_tril_to_full(csc::rocSPARSE.ROCSparseMatrixCSC{Tv,Ti}) where {Tv,Ti}
-    cscind = MadCore.SparseMatrixCSC{Int,Ti}(
+function MadCore.get_tril_to_full(csc::rocSPARSE.ROCSparseMatrixCSC{Tv, Ti}) where {Tv, Ti}
+    cscind = MadCore.SparseMatrixCSC{Int, Ti}(
         Symmetric(
-            MadCore.SparseMatrixCSC{Int,Ti}(
+            MadCore.SparseMatrixCSC{Int, Ti}(
                 size(csc)...,
                 Array(csc.colPtr),
                 Array(csc.rowVal),
@@ -41,12 +41,11 @@ function MadCore.get_tril_to_full(csc::rocSPARSE.ROCSparseMatrixCSC{Tv,Ti}) wher
             :L,
         ),
     )
-    return rocSPARSE.ROCSparseMatrixCSC{Tv,Ti}(
-        ROCArray(cscind.colptr),
-        ROCArray(cscind.rowval),
-        ROCVector{Tv}(undef, MadCore.nnz(cscind)),
-        size(csc),
-    ),
-    view(csc.nzVal, ROCArray(cscind.nzval))
+    return rocSPARSE.ROCSparseMatrixCSC{Tv, Ti}(
+            ROCArray(cscind.colptr),
+            ROCArray(cscind.rowval),
+            ROCVector{Tv}(undef, MadCore.nnz(cscind)),
+            size(csc),
+        ),
+        view(csc.nzVal, ROCArray(cscind.nzval))
 end
-

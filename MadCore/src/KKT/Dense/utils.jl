@@ -1,4 +1,3 @@
-
 # For templating
 const AbstractDenseKKTSystem{T, VT, MT, QN} = Union{
     DenseKKTSystem{T, VT, MT, QN},
@@ -14,7 +13,7 @@ function jtprod!(y::AbstractVector, kkt::AbstractDenseKKTSystem, x::AbstractVect
     ind_ineq = kkt.ind_ineq
     ns = length(ind_ineq)
     yx = view(y, 1:nx)
-    ys = view(y, 1+nx:nx+ns)
+    ys = view(y, (1 + nx):(nx + ns))
     # / x
     mul!(yx, kkt.jac', x)
     # / s

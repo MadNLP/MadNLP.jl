@@ -1,4 +1,4 @@
-@enum(MatchingStrategy::Int, COMPLETE=1, COMPLETE2x2=2, CONSTRAINTS=3)
+@enum(MatchingStrategy::Int, COMPLETE = 1, COMPLETE2x2 = 2, CONSTRAINTS = 3)
 
 @kwdef mutable struct PardisoOptions <: AbstractOptions
     pardiso_matching_strategy::MatchingStrategy = COMPLETE2x2
@@ -17,20 +17,20 @@ mutable struct PardisoSolver{T} <: AbstractLinearSolver{T}
     msglvl::Ref{Int32}
     mtype::Ref{Int32}
     err::Ref{Int32}
-    csc::SparseMatrixCSC{T,Int32}
+    csc::SparseMatrixCSC{T, Int32}
     w::Vector{T}
     opt::PardisoOptions
     logger::MadNLPLogger
 end
 
 function _pardisoinit(
-    pt::Vector{Int},
-    mtype::Ref{Cint},
-    solver::Ref{Cint},
-    iparm::Vector{Cint},
-    dparm::Vector{Cdouble},
-    err::Ref{Cint},
-)
+        pt::Vector{Int},
+        mtype::Ref{Cint},
+        solver::Ref{Cint},
+        iparm::Vector{Cint},
+        dparm::Vector{Cdouble},
+        err::Ref{Cint},
+    )
     return pardisoinit(
         pt,
         mtype,
@@ -42,24 +42,24 @@ function _pardisoinit(
 end
 
 function _pardiso(
-    pt::Vector{Int},
-    maxfct::Ref{Cint},
-    mnum::Ref{Cint},
-    mtype::Ref{Cint},
-    phase::Ref{Cint},
-    n::Ref{Cint},
-    a::Vector{Cdouble},
-    ia::Vector{Cint},
-    ja::Vector{Cint},
-    perm::Vector{Cint},
-    nrhs::Ref{Cint},
-    iparm::Vector{Cint},
-    msglvl::Ref{Cint},
-    b::Vector{Cdouble},
-    x::Vector{Cdouble},
-    err::Ref{Cint},
-    dparm::Vector{Cdouble},
-)
+        pt::Vector{Int},
+        maxfct::Ref{Cint},
+        mnum::Ref{Cint},
+        mtype::Ref{Cint},
+        phase::Ref{Cint},
+        n::Ref{Cint},
+        a::Vector{Cdouble},
+        ia::Vector{Cint},
+        ja::Vector{Cint},
+        perm::Vector{Cint},
+        nrhs::Ref{Cint},
+        iparm::Vector{Cint},
+        msglvl::Ref{Cint},
+        b::Vector{Cdouble},
+        x::Vector{Cdouble},
+        err::Ref{Cint},
+        dparm::Vector{Cdouble},
+    )
     return pardiso(
         pt,
         maxfct,
@@ -82,16 +82,16 @@ function _pardiso(
 end
 
 function PardisoSolver(
-    csc::SparseMatrixCSC{T,Int32};
-    opt = PardisoOptions(),
-    logger = MadNLPLogger(),
-    option_dict::Dict{Symbol,Any} = Dict{Symbol,Any}(),
-    kwargs...,
-) where {T}
+        csc::SparseMatrixCSC{T, Int32};
+        opt = PardisoOptions(),
+        logger = MadNLPLogger(),
+        option_dict::Dict{Symbol, Any} = Dict{Symbol, Any}(),
+        kwargs...,
+    ) where {T}
     !isempty(kwargs) && (
         for (key, val) in kwargs
-            ;
-            option_dict[key]=val;
+
+            option_dict[key] = val
         end
     )
     set_options!(opt, option_dict)
@@ -110,11 +110,13 @@ function PardisoSolver(
     elseif opt.pardiso_algorithm == CHOLESKY
         Ref{Int32}(2)  # real and symmetric positive definite
     else
-        error("Only the factorizations CHOLESKY, LDL or BUNCHKAUFMAN are supported in MadNLPPardiso." *
-              "Please change the option `pardiso_algorithm` accordingly.")
+        error(
+            "Only the factorizations CHOLESKY, LDL or BUNCHKAUFMAN are supported in MadNLPPardiso." *
+                "Please change the option `pardiso_algorithm` accordingly."
+        )
     end
 
-    pt.=0
+    pt .= 0
     iparm[1] = 0
 
     _pardisoinit(pt, mtype, Ref{Int32}(0), iparm, dparm, err)
@@ -124,7 +126,7 @@ function PardisoSolver(
 
     iparm[1] = 1
     iparm[2] = opt.pardiso_order # METIS
-    iparm[3] = haskey(ENV,"OMP_NUM_THREADS") ? parse(Int32,ENV["OMP_NUM_THREADS"]) : 1
+    iparm[3] = haskey(ENV, "OMP_NUM_THREADS") ? parse(Int32, ENV["OMP_NUM_THREADS"]) : 1
     iparm[6] = 1
     iparm[8] = opt.pardiso_max_inner_refinement_steps
     iparm[10] = 12 # pivot perturbation
@@ -266,7 +268,7 @@ function finalize(M::PardisoSolver{T}) where {T}
     )
 end
 
-is_inertia(::PardisoSolver)=true
+is_inertia(::PardisoSolver) = true
 
 function inertia(M::PardisoSolver)
     n = M.csc.n
@@ -280,7 +282,7 @@ function inertia(M::PardisoSolver)
         else
             pos = M.iparm[22]
             neg = M.iparm[23]
-            return (pos, n-pos-neg, neg)
+            return (pos, n - pos - neg, neg)
         end
     end
 end
@@ -290,7 +292,7 @@ function improve!(M::PardisoSolver)
     return false
 end
 
-introduce(::PardisoSolver)="pardiso"
+introduce(::PardisoSolver) = "pardiso"
 input_type(::Type{PardisoSolver}) = :csc
 default_options(::Type{PardisoSolver}) = PardisoOptions()
 is_supported(::Type{PardisoSolver}, ::Type{Float32}) = true

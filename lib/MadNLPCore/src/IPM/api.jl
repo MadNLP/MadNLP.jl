@@ -16,18 +16,20 @@ end
 # Necessary Mutators
 for (k, (attribute, type)) in enumerate(zip(fieldnames(MadNLPSolver), fieldtypes(MadNLPSolver)))
     # These types shouldn't ever be set by value so we ignore them.
-    if type <: Union{AbstractVector,
-                     PrimalVector,
-                     AbstractKKTVector,
-                     MadNLPOptions,
-                     MadNLPCounters,
-                     MadNLPLogger,
-                     AbstractKKTSystem,
-                     AbstractNLPModel,
-                     AbstractCallback,
-                     AbstractIterator,
-                     AbstractInertiaCorrector}
-      continue
+    if type <: Union{
+            AbstractVector,
+            PrimalVector,
+            AbstractKKTVector,
+            MadNLPOptions,
+            MadNLPCounters,
+            MadNLPLogger,
+            AbstractKKTSystem,
+            AbstractNLPModel,
+            AbstractCallback,
+            AbstractIterator,
+            AbstractInertiaCorrector,
+        }
+        continue
     end
     fname = "set_$(attribute)!"
     @eval begin
@@ -42,6 +44,6 @@ end
 get_theta(solver::AbstractMadNLPSolver) = get_theta(get_c(solver))
 get_varphi(solver::AbstractMadNLPSolver) = get_varphi(get_obj_val(solver), get_x_lr(solver), get_xl_r(solver), get_xu_r(solver), get_x_ur(solver), get_mu(solver))
 get_kkt_error(solver::AbstractMadNLPSolver) = max(get_inf_pr(solver), get_inf_du(solver), get_inf_compl(solver))
-get_inf_compl(solver::AbstractMadNLPSolver{T}, sc::T; mu=get_mu(solver)) where {T} = get_inf_compl(get_x_lr(solver),get_xl_r(solver),get_zl_r(solver),get_xu_r(solver),get_x_ur(solver),get_zu_r(solver), mu, sc)
-get_inf_barrier(solver::AbstractMadNLPSolver) = max(get_inf_pr(solver),get_inf_du(solver),get_inf_compl_mu(solver))
-get_inf_total(solver::AbstractMadNLPSolver) = max(get_inf_pr(solver),get_inf_du(solver),get_inf_compl(solver))
+get_inf_compl(solver::AbstractMadNLPSolver{T}, sc::T; mu = get_mu(solver)) where {T} = get_inf_compl(get_x_lr(solver), get_xl_r(solver), get_zl_r(solver), get_xu_r(solver), get_x_ur(solver), get_zu_r(solver), mu, sc)
+get_inf_barrier(solver::AbstractMadNLPSolver) = max(get_inf_pr(solver), get_inf_du(solver), get_inf_compl_mu(solver))
+get_inf_total(solver::AbstractMadNLPSolver) = max(get_inf_pr(solver), get_inf_du(solver), get_inf_compl(solver))

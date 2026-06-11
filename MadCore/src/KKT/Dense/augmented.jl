@@ -1,4 +1,3 @@
-
 """
     DenseKKTSystem{T, VT, MT, QN, VI} <: AbstractReducedKKTSystem{T, VT, MT, QN}
 
@@ -8,12 +7,12 @@ Requires a dense linear solver to be factorized (otherwise an error is returned)
 
 """
 struct DenseKKTSystem{
-    T,
-    VT <: AbstractVector{T},
-    MT <: AbstractMatrix{T},
-    QN,
-    LS,
-    VI <: AbstractVector{Int},
+        T,
+        VT <: AbstractVector{T},
+        MT <: AbstractMatrix{T},
+        QN,
+        LS,
+        VI <: AbstractVector{Int},
     } <: AbstractReducedKKTSystem{T, VT, MT, QN}
 
     hess::MT
@@ -40,13 +39,13 @@ struct DenseKKTSystem{
 end
 
 function create_kkt_system(
-    ::Type{DenseKKTSystem},
-    cb::AbstractCallback{T,VT},
-    linear_solver::Type;
-    opt_linear_solver=default_options(linear_solver),
-    hessian_approximation=ExactHessian,
-    qn_options=QuasiNewtonOptions(),
-) where {T, VT}
+        ::Type{DenseKKTSystem},
+        cb::AbstractCallback{T, VT},
+        linear_solver::Type;
+        opt_linear_solver = default_options(linear_solver),
+        hessian_approximation = ExactHessian,
+        qn_options = QuasiNewtonOptions(),
+    ) where {T, VT}
 
     ind_ineq = cb.ind_ineq
     ind_lb = cb.ind_lb
@@ -60,9 +59,9 @@ function create_kkt_system(
 
     hess = create_array(cb, n, n)
     jac = create_array(cb, m, n)
-    aug_com = create_array(cb, n+ns+m, n+ns+m)
-    reg = create_array(cb, n+ns)
-    pr_diag = create_array(cb, n+ns)
+    aug_com = create_array(cb, n + ns + m, n + ns + m)
+    reg = create_array(cb, n + ns)
+    pr_diag = create_array(cb, n + ns)
     du_diag = create_array(cb, m)
     diag_hess = create_array(cb, n)
 
@@ -73,14 +72,14 @@ function create_kkt_system(
 
     # Init!
     fill!(aug_com, zero(T))
-    fill!(hess,    zero(T))
-    fill!(jac,     zero(T))
-    fill!(reg,     zero(T))
+    fill!(hess, zero(T))
+    fill!(jac, zero(T))
+    fill!(reg, zero(T))
     fill!(pr_diag, zero(T))
     fill!(du_diag, zero(T))
     fill!(diag_hess, zero(T))
 
-    quasi_newton = create_quasi_newton(hessian_approximation, cb, n; options=qn_options)
+    quasi_newton = create_quasi_newton(hessian_approximation, cb, n; options = qn_options)
     _linear_solver = linear_solver(aug_com; opt = opt_linear_solver)
 
     return DenseKKTSystem(
@@ -95,8 +94,8 @@ end
 
 num_variables(kkt::DenseKKTSystem) = length(kkt.pr_diag)
 
-function mul!(y::AbstractVector, kkt::DenseKKTSystem{T}, x::AbstractVector) where T
-    _symv!('L', one(T), kkt.aug_com, x, zero(T), y)
+function mul!(y::AbstractVector, kkt::DenseKKTSystem{T}, x::AbstractVector) where {T}
+    return _symv!('L', one(T), kkt.aug_com, x, zero(T), y)
 end
 
 # Special getters for Jacobian
@@ -108,7 +107,7 @@ end
 
 function diag_add!(dest::AbstractMatrix, d1::AbstractVector, d2::AbstractVector)
     n = length(d1)
-    @inbounds for i in 1:n
+    return @inbounds for i in 1:n
         dest[i, i] = d1[i] + d2[i]
     end
 end
@@ -125,7 +124,7 @@ function _build_dense_kkt_system!(dest::VT, hess, jac, pr_diag, du_diag, diag_he
     end
     # Transfer slack diagonal
     for i in 1:ns
-        dest[i+n, i+n] = pr_diag[i+n]
+        dest[i + n, i + n] = pr_diag[i + n]
     end
     # Transfer Jacobian / variables
     for i in 1:m, j in 1:n
@@ -142,6 +141,7 @@ function _build_dense_kkt_system!(dest::VT, hess, jac, pr_diag, du_diag, diag_he
     for i in 1:m
         dest[i + n + ns, i + n + ns] = du_diag[i]
     end
+    return
 end
 
 function build_kkt!(kkt::DenseKKTSystem{T, VT, MT}) where {T, VT, MT}
@@ -149,14 +149,15 @@ function build_kkt!(kkt::DenseKKTSystem{T, VT, MT}) where {T, VT, MT}
     m = size(kkt.jac, 1)
     ns = length(kkt.ind_ineq)
 
-    _build_dense_kkt_system!(kkt.aug_com, kkt.hess, kkt.jac,
-                                kkt.pr_diag, kkt.du_diag, kkt.diag_hess,
-                                kkt.ind_ineq,
-                                n, m, ns)
+    return _build_dense_kkt_system!(
+        kkt.aug_com, kkt.hess, kkt.jac,
+        kkt.pr_diag, kkt.du_diag, kkt.diag_hess,
+        kkt.ind_ineq,
+        n, m, ns
+    )
 end
 
 function compress_hessian!(kkt::DenseKKTSystem)
     # Transfer diagonal term for future regularization
-    diag!(kkt.diag_hess, kkt.hess)
+    return diag!(kkt.diag_hess, kkt.hess)
 end
-

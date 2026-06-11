@@ -1,4 +1,3 @@
-
 """
     AbstractHessian{T, VT}
 
@@ -64,8 +63,8 @@ end
     init_strategy::BFGSInitStrategy = SCALAR1
     max_history::Int = 6
     init_value::T = 1.0
-    sigma_min::T = 1e-8
-    sigma_max::T = 1e+8
+    sigma_min::T = 1.0e-8
+    sigma_max::T = 1.0e+8
 end
 
 """
@@ -92,12 +91,12 @@ struct BFGS{T, VT <: AbstractVector{T}} <: AbstractQuasiNewton{T, VT}
 end
 
 function create_quasi_newton(
-    ::Type{BFGS},
-    cb::AbstractCallback{T,VT},
-    n;
-    options=QuasiNewtonOptions{T}(),
-    ) where {T,VT}
-    BFGS(
+        ::Type{BFGS},
+        cb::AbstractCallback{T, VT},
+        n;
+        options = QuasiNewtonOptions{T}(),
+    ) where {T, VT}
+    return BFGS(
         options.init_strategy,
         Ref(false),
         VT(undef, n),
@@ -111,7 +110,7 @@ end
 
 function update!(qn::BFGS{T, VT}, Bk::AbstractMatrix, sk::AbstractVector, yk::AbstractVector) where {T, VT}
     yksk = dot(sk, yk)
-    if yksk < T(1e-8)
+    if yksk < T(1.0e-8)
         return false
     end
     # Initial approximation (Nocedal & Wright, p.143)
@@ -142,11 +141,11 @@ struct DampedBFGS{T, VT <: AbstractVector{T}} <: AbstractQuasiNewton{T, VT}
 end
 
 function create_quasi_newton(
-    ::Type{DampedBFGS},
-    cb::AbstractCallback{T,VT},
-    n;
-    options=QuasiNewtonOptions{T}(),
-    ) where {T,VT}
+        ::Type{DampedBFGS},
+        cb::AbstractCallback{T, VT},
+        n;
+        options = QuasiNewtonOptions{T}(),
+    ) where {T, VT}
     return DampedBFGS(
         options.init_strategy,
         Ref(false),
@@ -191,7 +190,7 @@ function update!(qn::DampedBFGS{T, VT}, Bk::AbstractMatrix, sk::AbstractVector, 
     return true
 end
 
-function init!(qn::Union{BFGS, DampedBFGS}, Bk::AbstractMatrix{T}, g0::AbstractVector{T}, f0::T) where T
+function init!(qn::Union{BFGS, DampedBFGS}, Bk::AbstractMatrix{T}, g0::AbstractVector{T}, f0::T) where {T}
     norm_g0 = dot(g0, g0)
     # Initiate B0 with Gilbert & Lemaréchal rule.
     rho0 = if norm_g0 < sqrt(eps(T))
@@ -240,10 +239,10 @@ mutable struct CompactLBFGS{T, VT <: AbstractVector{T}, MT <: AbstractMatrix{T},
 end
 
 function create_quasi_newton(
-    ::Type{CompactLBFGS},
-    cb::AbstractCallback{T,VT},
-    n;
-    options=QuasiNewtonOptions{T}(),
+        ::Type{CompactLBFGS},
+        cb::AbstractCallback{T, VT},
+        n;
+        options = QuasiNewtonOptions{T}(),
     ) where {T, VT}
     return CompactLBFGS(
         options.init_strategy,
@@ -280,14 +279,14 @@ Base.size(qn::CompactLBFGS) = (size(qn.Sk, 1), qn.current_mem)
 
 function _resize!(qn::CompactLBFGS{T, VT, MT}) where {T, VT, MT}
     n, k = size(qn)
-    qn.Lk    = fill!(MT(undef, k, k), zero(T))
-    qn.Mk    = fill!(MT(undef, k, k), zero(T))
-    qn.Tk    = fill!(MT(undef, 2*k, 2*k), zero(T))
-    qn.DkLk  = fill!(MT(undef, k, k), zero(T))
-    qn.U     = fill!(MT(undef, n, k), zero(T))
-    qn.V     = fill!(MT(undef, n, k), zero(T))
-    qn._w1   = fill!(VT(undef, k), zero(T))
-    qn._w2   = fill!(VT(undef, 2*k), zero(T))
+    qn.Lk = fill!(MT(undef, k, k), zero(T))
+    qn.Mk = fill!(MT(undef, k, k), zero(T))
+    qn.Tk = fill!(MT(undef, 2 * k, 2 * k), zero(T))
+    qn.DkLk = fill!(MT(undef, k, k), zero(T))
+    qn.U = fill!(MT(undef, n, k), zero(T))
+    qn.V = fill!(MT(undef, n, k), zero(T))
+    qn._w1 = fill!(VT(undef, k), zero(T))
+    qn._w2 = fill!(VT(undef, 2 * k), zero(T))
     return
 end
 
@@ -300,17 +299,17 @@ function _reset!(qn::CompactLBFGS{T, VT, MT}) where {T, VT, MT}
     qn.Sk = MT(undef, n, 0)
     qn.Yk = MT(undef, n, 0)
     qn.max_mem_reached = false
-    _resize!(qn)
+    return _resize!(qn)
 end
 
 function _update_S_and_Y!(qn::CompactLBFGS, s::Vector, y::Vector)
-    if qn.current_mem < qn.max_mem
+    return if qn.current_mem < qn.max_mem
         qn.current_mem += 1
         n, k = size(qn)
         vec_Sk = vec(qn.Sk)
         vec_Yk = vec(qn.Yk)
-        resize!(vec_Sk, n*k)
-        resize!(vec_Yk, n*k)
+        resize!(vec_Sk, n * k)
+        resize!(vec_Yk, n * k)
         qn.Sk = reshape(vec_Sk, n, k)
         qn.Yk = reshape(vec_Yk, n, k)
         view(qn.Sk, 1:n, k) .= s
@@ -319,9 +318,9 @@ function _update_S_and_Y!(qn::CompactLBFGS, s::Vector, y::Vector)
     else
         n, k = size(qn)
         # Shift
-        @inbounds for i_ in 1:k-1, j in 1:n
-            qn.Sk[j, i_] = qn.Sk[j, i_+1]
-            qn.Yk[j, i_] = qn.Yk[j, i_+1]
+        @inbounds for i_ in 1:(k - 1), j in 1:n
+            qn.Sk[j, i_] = qn.Sk[j, i_ + 1]
+            qn.Yk[j, i_] = qn.Yk[j, i_ + 1]
         end
         # Latest element
         @inbounds for j in 1:n
@@ -334,12 +333,12 @@ end
 function _update_L_and_D!(qn::CompactLBFGS{T}, sk::Vector, yk::Vector) where {T}
     # Update the strict lower triangular part of S'Y
     n, k = size(qn)
-    if qn.max_mem_reached
+    return if qn.max_mem_reached
         # shift of all coefficients
-        @inbounds for i in 1:k-1
-            qn.Dk[i] = qn.Dk[i+1]
-            @inbounds for j in 1:i-1
-                qn.Lk[i, j] = qn.Lk[i+1, j+1]
+        @inbounds for i in 1:(k - 1)
+            qn.Dk[i] = qn.Dk[i + 1]
+            @inbounds for j in 1:(i - 1)
+                qn.Lk[i, j] = qn.Lk[i + 1, j + 1]
             end
         end
         # Compute the new last row of tril(S'Y)
@@ -347,13 +346,13 @@ function _update_L_and_D!(qn::CompactLBFGS{T}, sk::Vector, yk::Vector) where {T}
         lk = view(qn.Lk, k, 1:k)
         sk = view(qn.Sk, 1:n, k)
         mul!(lk, qn.Yk', sk)
-        qn.Dk[k] = qn.Lk[k,k]
-        qn.Lk[k,k] = zero(T)
+        qn.Dk[k] = qn.Lk[k, k]
+        qn.Lk[k, k] = zero(T)
     else
         # To be optimized...
         p = size(qn.Lk, 1)
         mul!(qn.Lk, qn.Sk', qn.Yk)
-        push!(qn.Dk, qn.Lk[k,k])
+        push!(qn.Dk, qn.Lk[k, k])
         @inbounds for i in 1:p, j in i:p
             qn.Lk[i, j] = zero(T)
         end
@@ -366,10 +365,11 @@ end
 function update!(qn::CompactLBFGS{T}, Bk, sk, yk) where {T}
     norm_sk, norm_yk = norm(sk), norm(yk)
     # Skip update if vectors are too small or local curvature is negative.
-    if ((norm_sk < T(100) * eps(T)) ||
-        (norm_yk < T(100) * eps(T)) ||
-        (dot(sk, yk) < sqrt(eps(T)) * norm_sk * norm_yk)
-    )
+    if (
+            (norm_sk < T(100) * eps(T)) ||
+                (norm_yk < T(100) * eps(T)) ||
+                (dot(sk, yk) < sqrt(eps(T)) * norm_sk * norm_yk)
+        )
         qn.skipped_iter += 1
         if qn.skipped_iter >= 2
             _reset!(qn)
@@ -422,7 +422,7 @@ function update!(qn::CompactLBFGS{T}, Bk, sk, yk) where {T}
     return true
 end
 
-function init!(qn::CompactLBFGS{T}, Bk::AbstractVector{T}, g0::AbstractVector{T}, f0::T) where T
+function init!(qn::CompactLBFGS{T}, Bk::AbstractVector{T}, g0::AbstractVector{T}, f0::T) where {T}
     norm_g0 = dot(g0, g0)
     # Initiate B0 with Gilbert & Lemaréchal rule.
     rho0 = if norm_g0 < sqrt(eps(T))
@@ -437,4 +437,4 @@ function init!(qn::CompactLBFGS{T}, Bk::AbstractVector{T}, g0::AbstractVector{T}
 end
 
 struct ExactHessian{T, VT} <: AbstractHessian{T, VT} end
-create_quasi_newton(::Type{ExactHessian}, cb::AbstractCallback{T,VT}, n; options...) where {T,VT} = ExactHessian{T, VT}()
+create_quasi_newton(::Type{ExactHessian}, cb::AbstractCallback{T, VT}, n; options...) where {T, VT} = ExactHessian{T, VT}()

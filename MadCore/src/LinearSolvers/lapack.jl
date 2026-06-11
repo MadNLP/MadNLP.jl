@@ -19,12 +19,12 @@ mutable struct LapackCPUSolver{T, MT, Alg} <: AbstractLapackSolver{T, Alg}
     logger::MadNLPLogger
 
     function LapackCPUSolver(
-        A::MT;
-        opt=LapackOptions(),
-        logger=MadNLPLogger(),
-    ) where {MT <: AbstractMatrix}
+            A::MT;
+            opt = LapackOptions(),
+            logger = MadNLPLogger(),
+        ) where {MT <: AbstractMatrix}
         T = eltype(A)
-        m,n = size(A)
+        m, n = size(A)
         @assert m == n
         fact = Matrix{T}(undef, m, n)
         sol = Vector{T}(undef, 0)
@@ -48,94 +48,136 @@ supports_bunchkaufman_inertia(::LapackCPUSolver) = true
 inertia_bunchkaufman(M::LapackCPUSolver) = inertia(M.fact, M.ipiv, M.info[])
 
 for (potrf, potrs, getrf, getrs, sytrf, sytrs, geqrf, ormqr, trsv, syevd, gemv, T) in
-    ((:spotrf_, :spotrs_, :sgetrf_, :sgetrs_, :ssytrf_, :ssytrs_, :sgeqrf_, :sormqr_, :strsv_, :ssyevd_, :sgemv_, :Float32),
-     (:dpotrf_, :dpotrs_, :dgetrf_, :dgetrs_, :dsytrf_, :dsytrs_, :dgeqrf_, :dormqr_, :dtrsv_, :dsyevd_, :dgemv_, :Float64))
+    (
+        (:spotrf_, :spotrs_, :sgetrf_, :sgetrs_, :ssytrf_, :ssytrs_, :sgeqrf_, :sormqr_, :strsv_, :ssyevd_, :sgemv_, :Float32),
+        (:dpotrf_, :dpotrs_, :dgetrf_, :dgetrs_, :dsytrf_, :dsytrs_, :dgeqrf_, :dormqr_, :dtrsv_, :dsyevd_, :dgemv_, :Float64),
+    )
     @eval begin
         # potrf
         function $potrf(uplo, n, a, lda, info)
-            return ccall((@blasfunc($potrf), libblastrampoline), Cvoid,
-                         (Ref{UInt8}, Ref{BlasInt}, Ptr{$T}, Ref{BlasInt}, Ref{BlasInt}, Clong),
-                          uplo, n, a, lda, info, 1)
+            return ccall(
+                (@blasfunc($potrf), libblastrampoline), Cvoid,
+                (Ref{UInt8}, Ref{BlasInt}, Ptr{$T}, Ref{BlasInt}, Ref{BlasInt}, Clong),
+                uplo, n, a, lda, info, 1
+            )
         end
 
         # potrs
         function $potrs(uplo, n, nrhs, a, lda, b, ldb, info)
-            return ccall((@blasfunc($potrs), libblastrampoline), Cvoid,
-                         (Ref{UInt8}, Ref{BlasInt}, Ref{BlasInt}, Ptr{$T}, Ref{BlasInt}, Ptr{$T},
-                          Ref{BlasInt}, Ref{BlasInt}, Clong),
-                          uplo, n, nrhs, a, lda, b, ldb, info, 1)
+            return ccall(
+                (@blasfunc($potrs), libblastrampoline), Cvoid,
+                (
+                    Ref{UInt8}, Ref{BlasInt}, Ref{BlasInt}, Ptr{$T}, Ref{BlasInt}, Ptr{$T},
+                    Ref{BlasInt}, Ref{BlasInt}, Clong,
+                ),
+                uplo, n, nrhs, a, lda, b, ldb, info, 1
+            )
         end
 
         # getrf
         function $getrf(m, n, a, lda, ipiv, info)
-            return ccall((@blasfunc($getrf), libblastrampoline), Cvoid,
-                         (Ref{BlasInt}, Ref{BlasInt}, Ptr{$T}, Ref{BlasInt}, Ptr{BlasInt}, Ref{BlasInt}),
-                          m, n, a, lda, ipiv, info)
+            return ccall(
+                (@blasfunc($getrf), libblastrampoline), Cvoid,
+                (Ref{BlasInt}, Ref{BlasInt}, Ptr{$T}, Ref{BlasInt}, Ptr{BlasInt}, Ref{BlasInt}),
+                m, n, a, lda, ipiv, info
+            )
         end
 
         # getrs
         function $getrs(trans, n, nrhs, a, lda, ipiv, b, ldb, info)
-            return ccall((@blasfunc($getrs), libblastrampoline), Cvoid,
-                         (Ref{UInt8}, Ref{BlasInt}, Ref{BlasInt}, Ptr{$T}, Ref{BlasInt}, Ptr{BlasInt},
-                          Ptr{$T}, Ref{BlasInt}, Ref{BlasInt}, Clong),
-                          trans, n, nrhs, a, lda, ipiv, b, ldb, info, 1)
+            return ccall(
+                (@blasfunc($getrs), libblastrampoline), Cvoid,
+                (
+                    Ref{UInt8}, Ref{BlasInt}, Ref{BlasInt}, Ptr{$T}, Ref{BlasInt}, Ptr{BlasInt},
+                    Ptr{$T}, Ref{BlasInt}, Ref{BlasInt}, Clong,
+                ),
+                trans, n, nrhs, a, lda, ipiv, b, ldb, info, 1
+            )
         end
 
         # sytrf
         function $sytrf(uplo, n, a, lda, ipiv, work, lwork, info)
-            return ccall((@blasfunc($sytrf), libblastrampoline), Cvoid,
-                         (Ref{UInt8}, Ref{BlasInt}, Ptr{$T}, Ref{BlasInt}, Ptr{BlasInt}, Ptr{$T},
-                          Ref{BlasInt}, Ref{BlasInt}, Clong),
-                          uplo, n, a, lda, ipiv, work, lwork, info, 1)
+            return ccall(
+                (@blasfunc($sytrf), libblastrampoline), Cvoid,
+                (
+                    Ref{UInt8}, Ref{BlasInt}, Ptr{$T}, Ref{BlasInt}, Ptr{BlasInt}, Ptr{$T},
+                    Ref{BlasInt}, Ref{BlasInt}, Clong,
+                ),
+                uplo, n, a, lda, ipiv, work, lwork, info, 1
+            )
         end
 
         # sytrs
         function $sytrs(uplo, n, nrhs, a, lda, ipiv, b, ldb, info)
-            return ccall((@blasfunc($sytrs), libblastrampoline), Cvoid,
-                         (Ref{UInt8}, Ref{BlasInt}, Ref{BlasInt}, Ptr{$T}, Ref{BlasInt}, Ptr{BlasInt},
-                          Ptr{$T}, Ref{BlasInt}, Ref{BlasInt}, Clong), uplo, n, nrhs, a, lda, ipiv,
-                          b, ldb, info, 1)
+            return ccall(
+                (@blasfunc($sytrs), libblastrampoline), Cvoid,
+                (
+                    Ref{UInt8}, Ref{BlasInt}, Ref{BlasInt}, Ptr{$T}, Ref{BlasInt}, Ptr{BlasInt},
+                    Ptr{$T}, Ref{BlasInt}, Ref{BlasInt}, Clong,
+                ), uplo, n, nrhs, a, lda, ipiv,
+                b, ldb, info, 1
+            )
         end
 
         # geqrf
         function $geqrf(m, n, a, lda, tau, work, lwork, info)
-            return ccall((@blasfunc($geqrf), libblastrampoline), Cvoid,
-                         (Ref{BlasInt}, Ref{BlasInt}, Ptr{$T}, Ref{BlasInt}, Ptr{$T}, Ptr{$T},
-                          Ref{BlasInt}, Ref{BlasInt}),
-                          m, n, a, lda, tau, work, lwork, info)
+            return ccall(
+                (@blasfunc($geqrf), libblastrampoline), Cvoid,
+                (
+                    Ref{BlasInt}, Ref{BlasInt}, Ptr{$T}, Ref{BlasInt}, Ptr{$T}, Ptr{$T},
+                    Ref{BlasInt}, Ref{BlasInt},
+                ),
+                m, n, a, lda, tau, work, lwork, info
+            )
         end
 
         # ormqr
         function $ormqr(side, trans, m, n, k, a, lda, tau, c, ldc, work, lwork, info)
-            return ccall((@blasfunc($ormqr), libblastrampoline), Cvoid,
-                         (Ref{UInt8}, Ref{UInt8}, Ref{BlasInt}, Ref{BlasInt}, Ref{BlasInt}, Ptr{$T},
-                          Ref{BlasInt}, Ptr{$T}, Ptr{$T}, Ref{BlasInt}, Ptr{$T}, Ref{BlasInt},
-                          Ref{BlasInt}, Clong, Clong),
-                          side, trans, m, n, k, a, lda, tau, c, ldc, work, lwork, info, 1, 1)
+            return ccall(
+                (@blasfunc($ormqr), libblastrampoline), Cvoid,
+                (
+                    Ref{UInt8}, Ref{UInt8}, Ref{BlasInt}, Ref{BlasInt}, Ref{BlasInt}, Ptr{$T},
+                    Ref{BlasInt}, Ptr{$T}, Ptr{$T}, Ref{BlasInt}, Ptr{$T}, Ref{BlasInt},
+                    Ref{BlasInt}, Clong, Clong,
+                ),
+                side, trans, m, n, k, a, lda, tau, c, ldc, work, lwork, info, 1, 1
+            )
         end
 
         # trsv
         function $trsv(uplo, trans, diag, n, a, lda, x, incx)
-            return ccall((@blasfunc($trsv), libblastrampoline), Cvoid,
-                         (Ref{UInt8}, Ref{UInt8}, Ref{UInt8}, Ref{BlasInt}, Ptr{$T}, Ref{BlasInt},
-                          Ptr{$T}, Ref{BlasInt}, Clong, Clong, Clong),
-                          uplo, trans, diag, n, a, lda, x, incx, 1, 1, 1)
+            return ccall(
+                (@blasfunc($trsv), libblastrampoline), Cvoid,
+                (
+                    Ref{UInt8}, Ref{UInt8}, Ref{UInt8}, Ref{BlasInt}, Ptr{$T}, Ref{BlasInt},
+                    Ptr{$T}, Ref{BlasInt}, Clong, Clong, Clong,
+                ),
+                uplo, trans, diag, n, a, lda, x, incx, 1, 1, 1
+            )
         end
 
         # syevd
         function $syevd(jobz, uplo, n, a, lda, w, work, lwork, iwork, liwork, info)
-            return ccall((@blasfunc($syevd), libblastrampoline), Cvoid,
-                         (Ref{UInt8}, Ref{UInt8}, Ref{BlasInt}, Ptr{$T}, Ref{BlasInt}, Ptr{$T},
-                          Ptr{$T}, Ref{BlasInt}, Ptr{BlasInt}, Ref{BlasInt}, Ref{BlasInt}, Clong, Clong),
-                          jobz, uplo, n, a, lda, w, work, lwork, iwork, liwork, info, 1, 1)
+            return ccall(
+                (@blasfunc($syevd), libblastrampoline), Cvoid,
+                (
+                    Ref{UInt8}, Ref{UInt8}, Ref{BlasInt}, Ptr{$T}, Ref{BlasInt}, Ptr{$T},
+                    Ptr{$T}, Ref{BlasInt}, Ptr{BlasInt}, Ref{BlasInt}, Ref{BlasInt}, Clong, Clong,
+                ),
+                jobz, uplo, n, a, lda, w, work, lwork, iwork, liwork, info, 1, 1
+            )
         end
 
         # gemv
         function $gemv(trans, m, n, alpha, a, lda, x, incx, beta, y, incy)
-            return ccall((@blasfunc($gemv), libblastrampoline), Cvoid,
-                         (Ref{UInt8}, Ref{BlasInt}, Ref{BlasInt}, Ref{$T}, Ptr{$T}, Ref{BlasInt},
-                          Ptr{$T}, Ref{BlasInt}, Ref{$T}, Ptr{$T}, Ref{BlasInt}, Clong),
-                          trans, m, n, alpha, a, lda, x, incx, beta, y, incy, 1)
+            return ccall(
+                (@blasfunc($gemv), libblastrampoline), Cvoid,
+                (
+                    Ref{UInt8}, Ref{BlasInt}, Ref{BlasInt}, Ref{$T}, Ptr{$T}, Ref{BlasInt},
+                    Ptr{$T}, Ref{BlasInt}, Ref{$T}, Ptr{$T}, Ref{BlasInt}, Clong,
+                ),
+                trans, m, n, alpha, a, lda, x, incx, beta, y, incy, 1
+            )
         end
 
         function setup_cholesky!(M::LapackCPUSolver{$T})
@@ -204,7 +246,7 @@ for (potrf, potrs, getrf, getrs, sytrf, sytrs, geqrf, ormqr, trsv, syevd, gemv, 
 
         function solve_qr!(M::LapackCPUSolver{$T}, x::Vector{$T})
             $ormqr('L', 'T', M.n, one(BlasInt), M.n, M.fact, M.n, M.tau, x, M.n, M.work, M.lwork, M.info)
-            $trsv('U', 'N', 'N' , M.n, M.fact, M.n, x, one(BlasInt))
+            $trsv('U', 'N', 'N', M.n, M.fact, M.n, x, one(BlasInt))
             return x
         end
 
@@ -238,21 +280,21 @@ end
 introduce(M::LapackCPUSolver) = "Lapack-CPU ($(M.opt.lapack_algorithm))"
 
 function inertia(fact, ipiv, info)
-    numneg = num_neg_ev(size(fact,1), fact, ipiv)
+    numneg = num_neg_ev(size(fact, 1), fact, ipiv)
     numzero = info > 0 ? 1 : 0
-    numpos = size(fact,1) - numneg - numzero
+    numpos = size(fact, 1) - numneg - numzero
     return (numpos, numzero, numneg)
 end
 
 function num_neg_ev(n, D, ipiv)
     numneg = 0
     t = 0
-    for k=1:n
-        d = D[k,k]
+    for k in 1:n
+        d = D[k, k]
         if ipiv[k] < 0
             if t == 0
-                t = abs(D[k+1,k])
-                d = (d/t) * D[k+1,k+1] - t
+                t = abs(D[k + 1, k])
+                d = (d / t) * D[k + 1, k + 1] - t
             else
                 d = t
                 t = 0

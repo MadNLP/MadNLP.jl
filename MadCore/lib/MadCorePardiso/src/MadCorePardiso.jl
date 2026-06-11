@@ -8,10 +8,10 @@ import Libdl: dlopen, RTLD_DEEPBIND
 # PardisoSolver is still defined but unusable; PardisoMKLSolver (via MKL_jll)
 # always works.
 const _PARDISO_NAMES = Sys.iswindows() ? ["libpardiso.dll", "libpardiso600-WIN-X86-64.dll"] :
-                       Sys.isapple()   ? ["libpardiso.dylib", "libpardiso600-MACOS-X86-64.dylib"] :
-                                         ["libpardiso.so", "libpardiso600-GNU800-X86-64.so"]
+    Sys.isapple() ? ["libpardiso.dylib", "libpardiso600-MACOS-X86-64.dylib"] :
+    ["libpardiso.so", "libpardiso600-GNU800-X86-64.so"]
 function _find_pardiso()
-    for prefix in split(get(ENV, "JULIA_PARDISO", ""), ':'; keepempty=false)
+    for prefix in split(get(ENV, "JULIA_PARDISO", ""), ':'; keepempty = false)
         for name in _PARDISO_NAMES
             path = joinpath(prefix, name)
             isfile(path) && return path

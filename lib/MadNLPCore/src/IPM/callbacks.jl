@@ -1,7 +1,7 @@
-function eval_f_wrapper(solver::AbstractMadNLPSolver{T}, x::PrimalVector{T}) where T
+function eval_f_wrapper(solver::AbstractMadNLPSolver{T}, x::PrimalVector{T}) where {T}
     nlp = get_nlp(solver)
     cnt = get_cnt(solver)
-    @trace(get_logger(solver),"Evaluating objective.")
+    @trace(get_logger(solver), "Evaluating objective.")
     cnt.eval_function_time += @elapsed begin
         # NOTE: we flip the objective here so the rest of MadNLP internals
         # are the same, between min and max. when showing the objective value
@@ -16,10 +16,10 @@ function eval_f_wrapper(solver::AbstractMadNLPSolver{T}, x::PrimalVector{T}) whe
     return obj_val
 end
 
-function eval_grad_f_wrapper!(solver::AbstractMadNLPSolver, f::PrimalVector{T}, x::PrimalVector{T}) where T
+function eval_grad_f_wrapper!(solver::AbstractMadNLPSolver, f::PrimalVector{T}, x::PrimalVector{T}) where {T}
     nlp = get_nlp(solver)
     cnt = get_cnt(solver)
-    @trace(get_logger(solver),"Evaluating objective gradient.")
+    @trace(get_logger(solver), "Evaluating objective gradient.")
     cnt.eval_function_time += @elapsed _eval_grad_f_wrapper!(
         get_cb(solver),
         variable(x),
@@ -28,7 +28,7 @@ function eval_grad_f_wrapper!(solver::AbstractMadNLPSolver, f::PrimalVector{T}, 
     if !get_minimize(nlp)
         variable(f) .*= -one(T)
     end
-    cnt.obj_grad_cnt+=1
+    cnt.obj_grad_cnt += 1
 
     if cnt.obj_grad_cnt == 1 && !is_valid(full(f))
         throw(InvalidNumberException(:grad))
@@ -36,7 +36,7 @@ function eval_grad_f_wrapper!(solver::AbstractMadNLPSolver, f::PrimalVector{T}, 
     return f
 end
 
-function eval_cons_wrapper!(solver::AbstractMadNLPSolver, c::AbstractVector{T}, x::PrimalVector{T}) where T
+function eval_cons_wrapper!(solver::AbstractMadNLPSolver, c::AbstractVector{T}, x::PrimalVector{T}) where {T}
     nlp = get_nlp(solver)
     cnt = get_cnt(solver)
     @trace(get_logger(solver), "Evaluating constraints.")
@@ -45,16 +45,16 @@ function eval_cons_wrapper!(solver::AbstractMadNLPSolver, c::AbstractVector{T}, 
         variable(x),
         c,
     )
-    view(c,get_ind_ineq(solver)) .-= slack(x)
+    view(c, get_ind_ineq(solver)) .-= slack(x)
     c .-= get_rhs(solver)
-    cnt.con_cnt+=1
+    cnt.con_cnt += 1
     if cnt.con_cnt == 1 && !is_valid(c)
         throw(InvalidNumberException(:cons))
     end
     return c
 end
 
-function eval_jac_wrapper!(solver::AbstractMadNLPSolver, kkt::AbstractKKTSystem, x::PrimalVector{T}) where T
+function eval_jac_wrapper!(solver::AbstractMadNLPSolver, kkt::AbstractKKTSystem, x::PrimalVector{T}) where {T}
     nlp = get_nlp(solver)
     cnt = get_cnt(solver)
     ns = length(get_ind_ineq(solver))
@@ -64,20 +64,20 @@ function eval_jac_wrapper!(solver::AbstractMadNLPSolver, kkt::AbstractKKTSystem,
         get_cb(solver),
         variable(x),
         jac,
-        )
+    )
     compress_jacobian!(kkt)
     cnt.con_jac_cnt += 1
     if cnt.con_jac_cnt == 1 && !is_valid(jac)
         throw(InvalidNumberException(:jac))
     end
-    @trace(get_logger(solver),"Constraint jacobian evaluation started.")
+    @trace(get_logger(solver), "Constraint jacobian evaluation started.")
     return jac
 end
 
-function eval_lag_hess_wrapper!(solver::AbstractMadNLPSolver, kkt::AbstractKKTSystem, x::PrimalVector{T},l::AbstractVector{T};is_resto=false) where T
+function eval_lag_hess_wrapper!(solver::AbstractMadNLPSolver, kkt::AbstractKKTSystem, x::PrimalVector{T}, l::AbstractVector{T}; is_resto = false) where {T}
     nlp = get_nlp(solver)
     cnt = get_cnt(solver)
-    @trace(get_logger(solver),"Evaluating Lagrangian Hessian.")
+    @trace(get_logger(solver), "Evaluating Lagrangian Hessian.")
     hess = get_hessian(kkt)
     scale = (get_minimize(nlp) ? one(T) : -one(T)) * (is_resto ? zero(T) : one(T))
     cnt.eval_function_time += @elapsed _eval_lag_hess_wrapper!(
@@ -95,7 +95,7 @@ function eval_lag_hess_wrapper!(solver::AbstractMadNLPSolver, kkt::AbstractKKTSy
     return hess
 end
 
-function eval_jac_wrapper!(solver::AbstractMadNLPSolver, kkt::AbstractDenseKKTSystem, x::PrimalVector{T}) where T
+function eval_jac_wrapper!(solver::AbstractMadNLPSolver, kkt::AbstractDenseKKTSystem, x::PrimalVector{T}) where {T}
     nlp = get_nlp(solver)
     cnt = get_cnt(solver)
     ns = length(get_ind_ineq(solver))
@@ -107,24 +107,24 @@ function eval_jac_wrapper!(solver::AbstractMadNLPSolver, kkt::AbstractDenseKKTSy
         jac,
     )
     compress_jacobian!(kkt)
-    cnt.con_jac_cnt+=1
+    cnt.con_jac_cnt += 1
     if cnt.con_jac_cnt == 1 && !is_valid(jac)
         throw(InvalidNumberException(:jac))
     end
-    @trace(get_logger(solver),"Constraint jacobian evaluation started.")
+    @trace(get_logger(solver), "Constraint jacobian evaluation started.")
     return jac
 end
 
 function eval_lag_hess_wrapper!(
-    solver::AbstractMadNLPSolver,
-    kkt::AbstractDenseKKTSystem{T, VT, MT, QN},
-    x::PrimalVector{T},
-    l::AbstractVector{T};
-    is_resto=false,
-) where {T, VT, MT, QN<:ExactHessian}
+        solver::AbstractMadNLPSolver,
+        kkt::AbstractDenseKKTSystem{T, VT, MT, QN},
+        x::PrimalVector{T},
+        l::AbstractVector{T};
+        is_resto = false,
+    ) where {T, VT, MT, QN <: ExactHessian}
     nlp = get_nlp(solver)
     cnt = get_cnt(solver)
-    @trace(get_logger(solver),"Evaluating Lagrangian Hessian.")
+    @trace(get_logger(solver), "Evaluating Lagrangian Hessian.")
     hess = get_hessian(kkt)
     scale = is_resto ? zero(T) : get_minimize(nlp) ? one(T) : -one(T)
     cnt.eval_function_time += @elapsed _eval_lag_hess_wrapper!(
@@ -135,7 +135,7 @@ function eval_lag_hess_wrapper!(
         obj_weight = scale,
     )
     compress_hessian!(kkt)
-    cnt.lag_hess_cnt+=1
+    cnt.lag_hess_cnt += 1
     if cnt.lag_hess_cnt == 1 && !is_valid(hess)
         throw(InvalidNumberException(:hess))
     end
@@ -143,12 +143,12 @@ function eval_lag_hess_wrapper!(
 end
 
 function eval_lag_hess_wrapper!(
-    solver::AbstractMadNLPSolver,
-    kkt::AbstractKKTSystem{T, VT, MT, QN},
-    x::PrimalVector{T},
-    l::AbstractVector{T};
-    is_resto=false,
-) where {T, VT, MT<:AbstractMatrix{T}, QN<:AbstractQuasiNewton{T, VT}}
+        solver::AbstractMadNLPSolver,
+        kkt::AbstractKKTSystem{T, VT, MT, QN},
+        x::PrimalVector{T},
+        l::AbstractVector{T};
+        is_resto = false,
+    ) where {T, VT, MT <: AbstractMatrix{T}, QN <: AbstractQuasiNewton{T, VT}}
     cb = get_cb(solver)
     cnt = get_cnt(solver)
     @trace(get_logger(solver), "Update BFGS matrices.")
@@ -188,4 +188,3 @@ function eval_lag_hess_wrapper!(
     compress_hessian!(kkt)
     return get_hessian(kkt)
 end
-

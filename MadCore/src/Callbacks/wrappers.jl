@@ -1,6 +1,6 @@
-abstract type AbstractWrapperModel{T,VT} <: NLPModels.AbstractNLPModel{T,VT} end
+abstract type AbstractWrapperModel{T, VT} <: NLPModels.AbstractNLPModel{T, VT} end
 
-struct DenseWrapperModel{T,VT,T2,VT2,MT2, I <: NLPModels.AbstractNLPModel{T2,VT2}} <: AbstractWrapperModel{T,VT}
+struct DenseWrapperModel{T, VT, T2, VT2, MT2, I <: NLPModels.AbstractNLPModel{T2, VT2}} <: AbstractWrapperModel{T, VT}
     inner::I
     x::VT2
     y::VT2
@@ -12,7 +12,7 @@ struct DenseWrapperModel{T,VT,T2,VT2,MT2, I <: NLPModels.AbstractNLPModel{T2,VT2
     counters::NLPModels.Counters
 end
 
-struct SparseWrapperModel{T,VT,T2,VI2,VT2,I <: NLPModels.AbstractNLPModel{T2,VT2}} <: AbstractWrapperModel{T,VT}
+struct SparseWrapperModel{T, VT, T2, VI2, VT2, I <: NLPModels.AbstractNLPModel{T2, VT2}} <: AbstractWrapperModel{T, VT}
     inner::I
     jrows::VI2
     jcols::VI2
@@ -105,18 +105,18 @@ function SparseWrapperModel(Arr, m::NLPModels.AbstractNLPModel)
 end
 
 function NLPModels.obj(
-    m::M,
-    x::V
-) where {M <: AbstractWrapperModel, V <: AbstractVector}
+        m::M,
+        x::V
+    ) where {M <: AbstractWrapperModel, V <: AbstractVector}
     copyto!(m.x, x)
     return NLPModels.obj(m.inner, m.x)
 end
 
 function NLPModels.cons!(
-    m::M,
-    x::V,
-    g::V
-) where {M <: AbstractWrapperModel, V <: AbstractVector}
+        m::M,
+        x::V,
+        g::V
+    ) where {M <: AbstractWrapperModel, V <: AbstractVector}
     copyto!(m.x, x)
     NLPModels.cons!(m.inner, m.x, m.con)
     copyto!(g, m.con)
@@ -124,10 +124,10 @@ function NLPModels.cons!(
 end
 
 function NLPModels.grad!(
-    m::M,
-    x::V,
-    f::V
-) where {M <: AbstractWrapperModel, V <: AbstractVector}
+        m::M,
+        x::V,
+        f::V
+    ) where {M <: AbstractWrapperModel, V <: AbstractVector}
     copyto!(m.x, x)
     NLPModels.grad!(m.inner, m.x, m.grad)
     copyto!(f, m.grad)
@@ -135,10 +135,10 @@ function NLPModels.grad!(
 end
 
 function NLPModels.jac_structure!(
-    m::M,
-    rows::V,
-    cols::V
-) where {M <: SparseWrapperModel, V <: AbstractVector}
+        m::M,
+        rows::V,
+        cols::V
+    ) where {M <: SparseWrapperModel, V <: AbstractVector}
     NLPModels.jac_structure!(m.inner, m.jrows, m.jcols)
     copyto!(rows, m.jrows)
     copyto!(cols, m.jcols)
@@ -146,10 +146,10 @@ function NLPModels.jac_structure!(
 end
 
 function NLPModels.hess_structure!(
-    m::M,
-    rows::V,
-    cols::V
-) where {M <: SparseWrapperModel, V <: AbstractVector}
+        m::M,
+        rows::V,
+        cols::V
+    ) where {M <: SparseWrapperModel, V <: AbstractVector}
     NLPModels.hess_structure!(m.inner, m.hrows, m.hcols)
     copyto!(rows, m.hrows)
     copyto!(cols, m.hcols)
@@ -157,11 +157,11 @@ function NLPModels.hess_structure!(
 end
 
 function NLPModels.jtprod!(
-    m::SparseWrapperModel,
-    x::AbstractVector,
-    v::AbstractVector,
-    jtv::AbstractVector,
-)
+        m::SparseWrapperModel,
+        x::AbstractVector,
+        v::AbstractVector,
+        jtv::AbstractVector,
+    )
     copyto!(m.x, x)
     copyto!(m.grad, jtv)
     copyto!(m.con, v)
@@ -171,10 +171,10 @@ function NLPModels.jtprod!(
 end
 
 function NLPModels.jac_coord!(
-    m::SparseWrapperModel,
-    x::AbstractVector,
-    jac::AbstractVector,
-)
+        m::SparseWrapperModel,
+        x::AbstractVector,
+        jac::AbstractVector,
+    )
     copyto!(m.x, x)
     NLPModels.jac_coord!(m.inner, m.x, m.jac)
     copyto!(jac, m.jac)
@@ -182,24 +182,24 @@ function NLPModels.jac_coord!(
 end
 
 function NLPModels.hess_coord!(
-    m::M,
-    x::AbstractVector,
-    y::AbstractVector,
-    hess::AbstractVector;
-    obj_weight = one(eltype(x))
-) where {M <: SparseWrapperModel}
+        m::M,
+        x::AbstractVector,
+        y::AbstractVector,
+        hess::AbstractVector;
+        obj_weight = one(eltype(x))
+    ) where {M <: SparseWrapperModel}
     copyto!(m.x, x)
     copyto!(m.y, y)
-    NLPModels.hess_coord!(m.inner, m.x, m.y, m.hess; obj_weight=obj_weight)
+    NLPModels.hess_coord!(m.inner, m.x, m.y, m.hess; obj_weight = obj_weight)
     copyto!(hess, m.hess)
     return hess
 end
 
 function NLPModels.jac_dense!(
-    m::Model,
-    x::V,
-    jac::M
-) where {Model <: DenseWrapperModel, V <: AbstractVector, M <: AbstractMatrix}
+        m::Model,
+        x::V,
+        jac::M
+    ) where {Model <: DenseWrapperModel, V <: AbstractVector, M <: AbstractMatrix}
     copyto!(m.x, x)
     NLPModels.jac_dense!(m.inner, m.x, m.jac)
     copyto!(jac, m.jac)
@@ -207,15 +207,15 @@ function NLPModels.jac_dense!(
 end
 
 function NLPModels.hess_dense!(
-    m::Model,
-    x::V,
-    y::V,
-    hess::M;
-    obj_weight = one(eltype(x))
-) where {Model <: DenseWrapperModel, V <: AbstractVector, M <: AbstractMatrix}
+        m::Model,
+        x::V,
+        y::V,
+        hess::M;
+        obj_weight = one(eltype(x))
+    ) where {Model <: DenseWrapperModel, V <: AbstractVector, M <: AbstractMatrix}
     copyto!(m.x, x)
     copyto!(m.y, y)
-    NLPModels.hess_dense!(m.inner, m.x, m.y, m.hess; obj_weight=obj_weight)
+    NLPModels.hess_dense!(m.inner, m.x, m.y, m.hess; obj_weight = obj_weight)
     copyto!(hess, m.hess)
     return hess
 end

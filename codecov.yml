@@ -1,0 +1,18 @@
+# The refactor splits MadNLP into a lightweight core (MadCore + MadNLPCore) plus
+# GPU backends (MadCoreCUDA / MadCoreAMDGPU / MadCoreGPUArrays, cuMadNLP,
+# MadNLPHybridKKT) whose code is only fully exercisable on a GPU. The GPU CI
+# (test-gpu) covers what it can; the remaining GPU paths and the no-op
+# DummyLinearSolver default are reported but should not block PRs over small dips.
+coverage:
+  status:
+    project:
+      default:
+        target: auto
+        threshold: 2%
+    patch:
+      default:
+        informational: true
+
+comment:
+  layout: "reach, diff, flags, files"
+  behavior: default

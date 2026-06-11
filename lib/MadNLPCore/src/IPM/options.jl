@@ -118,65 +118,65 @@ tau\\_min                      | 0.99                 | lower bound on fraction-
     file_print_level::LogLevels = INFO
 
     # Termination options
-    acceptable_tol::T = 1e-6
+    acceptable_tol::T = 1.0e-6
     acceptable_iter::Int = 15
-    diverging_iterates_tol::T = 1e20
+    diverging_iterates_tol::T = 1.0e20
     max_iter::Int = 3000
-    max_wall_time::T = 1e6
-    s_max::T = 100.
+    max_wall_time::T = 1.0e6
+    s_max::T = 100.0
 
     # NLP options
-    kappa_d::T = 1e-5
+    kappa_d::T = 1.0e-5
     fixed_variable_treatment::Type = kkt_system <: SparseCondensedKKTSystem ? RelaxBound : MakeParameter
     equality_treatment::Type = kkt_system <: SparseCondensedKKTSystem ? RelaxEquality : EnforceEquality
-    bound_relax_factor::T = 1e-8
+    bound_relax_factor::T = 1.0e-8
     jacobian_constant::Bool = false
     hessian_constant::Bool = false
     hessian_approximation::Type = ExactHessian
     quasi_newton_options::QuasiNewtonOptions{T} = QuasiNewtonOptions{T}()
     inertia_correction_method::Type = InertiaAuto
-    inertia_free_tol::T = 0.
-    default_primal_regularization::T = 0.
-    default_dual_regularization::T = 0.
+    inertia_free_tol::T = 0.0
+    default_primal_regularization::T = 0.0
+    default_dual_regularization::T = 0.0
 
     # initialization options
     dual_initialized::Bool = false
     dual_initialization_method::Type = kkt_system <: SparseCondensedKKTSystem ? DualInitializeSetZero : DualInitializeLeastSquares
-    constr_mult_init_max::T = 1e3
-    bound_push::T = 1e-2
-    bound_fac::T = 1e-2
+    constr_mult_init_max::T = 1.0e3
+    bound_push::T = 1.0e-2
+    bound_fac::T = 1.0e-2
     nlp_scaling::Bool = true
-    nlp_scaling_max_gradient::T = 100.
+    nlp_scaling_max_gradient::T = 100.0
 
     # Hessian Perturbation
-    min_hessian_perturbation::T = 1e-20
-    first_hessian_perturbation::T = 1e-4
-    max_hessian_perturbation::T = 1e20
-    perturb_inc_fact_first::T = 1e2
-    perturb_inc_fact::T = 8.
-    perturb_dec_fact::T = 1/3
-    jacobian_regularization_exponent::T = 1/4
-    jacobian_regularization_value::T = 1e-8
+    min_hessian_perturbation::T = 1.0e-20
+    first_hessian_perturbation::T = 1.0e-4
+    max_hessian_perturbation::T = 1.0e20
+    perturb_inc_fact_first::T = 1.0e2
+    perturb_inc_fact::T = 8.0
+    perturb_dec_fact::T = 1 / 3
+    jacobian_regularization_exponent::T = 1 / 4
+    jacobian_regularization_value::T = 1.0e-8
 
     # restoration options
     soft_resto_pderror_reduction_factor::T = 0.9999
     required_infeasibility_reduction::T = 0.9
 
     # Line search
-    obj_max_inc::T = 5.
+    obj_max_inc::T = 5.0
     kappha_soc::T = 0.99
     max_soc::Int = 4
     alpha_min_frac::T = 0.05
     s_theta::T = 1.1
     s_phi::T = 2.3
-    eta_phi::T = 1e-4
+    eta_phi::T = 1.0e-4
     kappa_soc::T = 0.99
-    gamma_theta::T = 1e-5
-    gamma_phi::T = 1e-5
+    gamma_theta::T = 1.0e-5
+    gamma_phi::T = 1.0e-5
     delta::T = 1
-    kappa_sigma::T = 1e10
-    barrier_tol_factor::T = 10.
-    rho::T = 1000.
+    kappa_sigma::T = 1.0e10
+    barrier_tol_factor::T = 10.0
+    rho::T = 1000.0
 
     # Barrier
     # mu_min by courtesy of Ipopt
@@ -191,13 +191,13 @@ is_dense_callback(nlp) = !nlp.meta.sparse_jacobian && !nlp.meta.sparse_hessian
 
 # smart option presets
 function MadNLPOptions{T}(
-    nlp::AbstractNLPModel{T};
-    dense_callback = is_dense_callback(nlp),
-    callback = dense_callback ? DenseCallback : SparseCallback,
-    kkt_system = dense_callback ? DenseCondensedKKTSystem : SparseKKTSystem,
-    linear_solver = dense_callback ? LapackCPUSolver : DummyLinearSolver,
-    tol = get_tolerance(T,kkt_system)
-) where {T}
+        nlp::AbstractNLPModel{T};
+        dense_callback = is_dense_callback(nlp),
+        callback = dense_callback ? DenseCallback : SparseCallback,
+        kkt_system = dense_callback ? DenseCondensedKKTSystem : SparseKKTSystem,
+        linear_solver = dense_callback ? LapackCPUSolver : DummyLinearSolver,
+        tol = get_tolerance(T, kkt_system)
+    ) where {T}
     return MadNLPOptions{T}(
         tol = tol,
         callback = callback,
@@ -206,8 +206,8 @@ function MadNLPOptions{T}(
     )
 end
 
-get_tolerance(::Type{T},::Type{KKT}) where {T, KKT} = 10^round(log10(eps(T))/2)
-get_tolerance(::Type{T},::Type{SparseCondensedKKTSystem}) where T = 10^(round(log10(eps(T))/4))
+get_tolerance(::Type{T}, ::Type{KKT}) where {T, KKT} = 10^round(log10(eps(T)) / 2)
+get_tolerance(::Type{T}, ::Type{SparseCondensedKKTSystem}) where {T} = 10^(round(log10(eps(T)) / 4))
 
 # NOTE: the bare solver defaults the sparse linear_solver to DummyLinearSolver
 # (above). `default_sparse_solver` and a Vector-specialized MadNLPOptions
@@ -218,26 +218,31 @@ function check_option_sanity(options)
     is_kkt_dense = options.kkt_system <: AbstractDenseKKTSystem || options.kkt_system <: SchurComplementKKTSystem
     is_hess_approx_dense = options.hessian_approximation <: Union{BFGS, DampedBFGS}
     if input_type(options.linear_solver) == :csc && is_kkt_dense
-        error("[options] Sparse Linear solver is not supported in dense mode.\n"*
-              "Please use a dense linear solver or change `kkt_system` ")
+        error(
+            "[options] Sparse Linear solver is not supported in dense mode.\n" *
+                "Please use a dense linear solver or change `kkt_system` "
+        )
     end
-    if is_hess_approx_dense && !is_kkt_dense
-        error("[options] DENSE_BFGS and DENSE_DAMPED_BFGS quasi-Newton approximations\n"*
-              "require a dense KKT system (DENSE_KKT_SYSTEM or DENSE_CONDENSED_KKT_SYSTEM).")
+    return if is_hess_approx_dense && !is_kkt_dense
+        error(
+            "[options] DENSE_BFGS and DENSE_DAMPED_BFGS quasi-Newton approximations\n" *
+                "require a dense KKT system (DENSE_KKT_SYSTEM or DENSE_CONDENSED_KKT_SYSTEM)."
+        )
     end
 end
 
-function print_ignored_options(logger,option_dict)
-    @warn(logger,"The following options are ignored: ")
-    for (key,val) in option_dict
-        @warn(logger," - "*string(key))
+function print_ignored_options(logger, option_dict)
+    @warn(logger, "The following options are ignored: ")
+    for (key, val) in option_dict
+        @warn(logger, " - " * string(key))
     end
+    return
 end
 
 function _get_primary_options(options)
-    primary_opt = Dict{Symbol,Any}()
-    remaining_opt = Dict{Symbol,Any}()
-    for (k,v) in options
+    primary_opt = Dict{Symbol, Any}()
+    remaining_opt = Dict{Symbol, Any}()
+    for (k, v) in options
         if k in [:tol, :linear_solver, :callback, :kkt_system]
             primary_opt[k] = v
         else
@@ -248,7 +253,7 @@ function _get_primary_options(options)
     return primary_opt, remaining_opt
 end
 
-function load_options(nlp::AbstractNLPModel{T,VT}; options...) where {T, VT}
+function load_options(nlp::AbstractNLPModel{T, VT}; options...) where {T, VT}
 
     primary_opt, options = _get_primary_options(options)
 
@@ -266,22 +271,22 @@ function load_options(nlp::AbstractNLPModel{T,VT}; options...) where {T, VT}
 
     # Initiate logger
     logger = MadNLPLogger(
-        print_level=opt_ipm.print_level,
-        file_print_level=opt_ipm.file_print_level,
-        file = opt_ipm.output_file == "" ? nothing : open(opt_ipm.output_file,"w+"),
+        print_level = opt_ipm.print_level,
+        file_print_level = opt_ipm.file_print_level,
+        file = opt_ipm.output_file == "" ? nothing : open(opt_ipm.output_file, "w+"),
     )
-    @trace(logger,"Logger is initialized.")
+    @trace(logger, "Logger is initialized.")
 
     # Print remaning options (unsupported)
     if !isempty(remaining_options)
         print_ignored_options(logger, remaining_options)
     end
     return (
-        interior_point=opt_ipm,
-        linear_solver=opt_linear_solver,
-        iterative_refinement=opt_iterator,
-        logger=logger,
-        intermediate_callback=opt_ipm.intermediate_callback,
+        interior_point = opt_ipm,
+        linear_solver = opt_linear_solver,
+        iterative_refinement = opt_iterator,
+        logger = logger,
+        intermediate_callback = opt_ipm.intermediate_callback,
     )
 end
 

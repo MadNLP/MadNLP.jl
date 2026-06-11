@@ -26,7 +26,7 @@ import OpenBLAS32_jll
 
 function __init__()
     config = BLAS.lbt_get_config()
-    if !any(lib -> lib.interface == :lp64, config.loaded_libs)
+    return if !any(lib -> lib.interface == :lp64, config.loaded_libs)
         BLAS.lbt_forward(OpenBLAS32_jll.libopenblas_path)
     end
 end
@@ -66,9 +66,13 @@ let
     # (@debug/@info/@warn/@error) — exporting those would make `@warn` etc.
     # ambiguous for any `using MadCore`/`using MadNLP` consumer. They remain
     # available via explicit `using MadCore: @warn`.
-    skip = Set([:eval, :include, :MadCore,
-                Symbol("@debug"), Symbol("@info"), Symbol("@warn"), Symbol("@error")])
-    for name in names(@__MODULE__, all=true, imported=false)
+    skip = Set(
+        [
+            :eval, :include, :MadCore,
+            Symbol("@debug"), Symbol("@info"), Symbol("@warn"), Symbol("@error"),
+        ]
+    )
+    for name in names(@__MODULE__, all = true, imported = false)
         s = String(name)
         name in skip && continue
         startswith(s, "#") && continue

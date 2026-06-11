@@ -6,19 +6,19 @@
     ma77_nemin::Int = 8
     ma77_order::Ordering = METIS
     ma77_print_level::Int = -1
-    ma77_small::Float64 = 1e-20
+    ma77_small::Float64 = 1.0e-20
     ma77_static::Float64 = 0.0
-    ma77_u::Float64 = 1e-8
-    ma77_umax::Float64 = 1e-4
+    ma77_u::Float64 = 1.0e-8
+    ma77_umax::Float64 = 1.0e-4
 end
 
-mutable struct Ma77Solver{T,INT} <: AbstractLinearSolver{T}
-    tril::SparseMatrixCSC{T,INT}
-    full::SparseMatrixCSC{T,INT}
+mutable struct Ma77Solver{T, INT} <: AbstractLinearSolver{T}
+    tril::SparseMatrixCSC{T, INT}
+    full::SparseMatrixCSC{T, INT}
     tril_to_full_view::SubVector{T}
 
-    control::Ma77Control{T,INT}
-    info::Ma77Info{T,INT}
+    control::Ma77Control{T, INT}
+    info::Ma77Info{T, INT}
 
     mc68_control::Mc68Control{INT}
     mc68_info::Mc68Info{INT}
@@ -31,10 +31,10 @@ mutable struct Ma77Solver{T,INT} <: AbstractLinearSolver{T}
 end
 
 function Ma77Solver(
-    csc::SparseMatrixCSC{T,INT};
-    opt = Ma77Options(),
-    logger = MadNLPLogger(),
-) where {T,INT}
+        csc::SparseMatrixCSC{T, INT};
+        opt = Ma77Options(),
+        logger = MadNLPLogger(),
+    ) where {T, INT}
     full, tril_to_full_view = get_tril_to_full(csc)
     order = Vector{INT}(undef, csc.n)
 
@@ -57,8 +57,8 @@ function Ma77Solver(
         mc68info,
     )
 
-    info = Ma77Info{T,INT}()
-    control = Ma77Control{T,INT}()
+    info = Ma77Info{T, INT}()
+    control = Ma77Control{T, INT}()
     HSL.ma77_default_control(T, INT, control)
     control.f_arrays = 1
     control.bits = 32
@@ -89,15 +89,15 @@ function Ma77Solver(
 
     info.flag < 0 && throw(SymbolicException())
 
-    for i = 1:full.n
+    for i in 1:full.n
         HSL.ma77_input_vars(
             T,
             INT,
             INT(i),
-            full.colptr[i+1] - full.colptr[i],
+            full.colptr[i + 1] - full.colptr[i],
             _madnlp_unsafe_wrap(
                 full.rowval,
-                full.colptr[i+1] - full.colptr[i],
+                full.colptr[i + 1] - full.colptr[i],
                 full.colptr[i],
             ),
             keep,
@@ -110,7 +110,7 @@ function Ma77Solver(
     HSL.ma77_analyse(T, INT, order, keep, control, info)
     info.flag < 0 && throw(SymbolicException())
 
-    M = Ma77Solver{T,INT}(
+    M = Ma77Solver{T, INT}(
         csc,
         full,
         tril_to_full_view,
@@ -127,17 +127,17 @@ function Ma77Solver(
     return M
 end
 
-function factorize!(M::Ma77Solver{T,INT}) where {T,INT}
+function factorize!(M::Ma77Solver{T, INT}) where {T, INT}
     M.full.nzval .= M.tril_to_full_view
-    for i = 1:M.full.n
+    for i in 1:M.full.n
         HSL.ma77_input_reals(
             T,
             INT,
             INT(i),
-            M.full.colptr[i+1] - M.full.colptr[i],
+            M.full.colptr[i + 1] - M.full.colptr[i],
             _madnlp_unsafe_wrap(
                 M.full.nzval,
-                M.full.colptr[i+1] - M.full.colptr[i],
+                M.full.colptr[i + 1] - M.full.colptr[i],
                 M.full.colptr[i],
             ),
             M.keep,
@@ -150,7 +150,7 @@ function factorize!(M::Ma77Solver{T,INT}) where {T,INT}
     M.info.flag < 0 && throw(FactorizationException())
     return M
 end
-function solve_linear_system!(M::Ma77Solver{T,INT}, rhs::Vector{T}) where {T,INT}
+function solve_linear_system!(M::Ma77Solver{T, INT}, rhs::Vector{T}) where {T, INT}
     HSL.ma77_solve(
         T,
         INT,
@@ -176,8 +176,8 @@ function inertia(M::Ma77Solver)
     )
 end
 
-function finalize(M::Ma77Solver{T,INT}) where {T,INT}
-    HSL.ma77_finalise(T, INT, M.keep, M.control, M.info)
+function finalize(M::Ma77Solver{T, INT}) where {T, INT}
+    return HSL.ma77_finalise(T, INT, M.keep, M.control, M.info)
 end
 
 function improve!(M::Ma77Solver)
@@ -193,4 +193,4 @@ end
 introduce(::Ma77Solver) = "ma77 v$(HSL.HSL_MA77_version())"
 input_type(::Type{Ma77Solver}) = :csc
 default_options(::Type{Ma77Solver}) = Ma77Options()
-is_supported(::Type{Ma77Solver}, ::Type{T}) where T <: AbstractFloat = HSL.is_supported(Val(:hsl_ma77), T)
+is_supported(::Type{Ma77Solver}, ::Type{T}) where {T <: AbstractFloat} = HSL.is_supported(Val(:hsl_ma77), T)

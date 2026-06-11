@@ -1,10 +1,9 @@
-
 """
     AbstractKKTSystem{T, VT<:AbstractVector{T}, MT<:AbstractMatrix{T}, QN<:AbstractHessian{T}}
 
 Abstract type for KKT system.
 """
-abstract type AbstractKKTSystem{T, VT, MT<:AbstractMatrix{T}, QN<:AbstractHessian{T, VT}} end
+abstract type AbstractKKTSystem{T, VT, MT <: AbstractMatrix{T}, QN <: AbstractHessian{T, VT}} end
 
 """
     AbstractUnreducedKKTSystem{T, VT, MT, QN} <: AbstractKKTSystem{T, VT, MT, QN}
@@ -222,7 +221,7 @@ end
 function regularize_diagonal!(kkt::AbstractKKTSystem, primal, dual)
     kkt.reg .+= primal
     kkt.pr_diag .+= primal
-    kkt.du_diag .-= dual
+    return kkt.du_diag .-= dual
 end
 
 Base.size(kkt::AbstractKKTSystem) = size(kkt.aug_com)
@@ -265,4 +264,3 @@ include("Sparse/condensed.jl")
 include("Sparse/scaled_augmented.jl")
 include("Sparse/utils.jl")
 include("Schur/schur.jl")
-

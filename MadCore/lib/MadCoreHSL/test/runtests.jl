@@ -10,7 +10,7 @@ function test_solver(S, T)
     row = Int32[1, 2, 2]
     col = Int32[1, 1, 2]
     val = T[1.0, 0.1, 2.0]
-    b   = T[1.0, 3.0]
+    b = T[1.0, 3.0]
     sol = T[0.8542713567839195, 1.4572864321608041]
     csc = sparse(row, col, val, 2, 2)
     M = S(csc; opt = default_options(S))
@@ -19,7 +19,7 @@ function test_solver(S, T)
     factorize!(M)
     is_inertia(M) && @test inertia(M) == (2, 0, 0)
     x = solve_linear_system!(M, copy(b))
-    @test isapprox(x, sol; atol = 1e-6)
+    return @test isapprox(x, sol; atol = 1.0e-6)
 end
 
 @testset "MadCoreHSL" begin

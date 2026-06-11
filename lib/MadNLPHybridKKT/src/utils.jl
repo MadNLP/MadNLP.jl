@@ -2,7 +2,7 @@
 # Base.@elapsed rather than CUDA.@elapsed (these timings are diagnostic counters,
 # not correctness-critical; GPU work may complete asynchronously).
 macro elapsed_hykkt(ex)
-    quote
+    return quote
         Base.@elapsed $(esc(ex))
     end
 end
@@ -15,17 +15,17 @@ struct SchurComplementOperator{T, VT, SMT, LS}
 end
 
 function SchurComplementOperator(
-    K::AbstractLinearSolver,
-    G::AbstractMatrix,
-    buf::AbstractVector{T},
-) where T
+        K::AbstractLinearSolver,
+        G::AbstractMatrix,
+        buf::AbstractVector{T},
+    ) where {T}
     return SchurComplementOperator{T, typeof(buf), typeof(G), typeof(K)}(
         K, G, buf,
     )
 end
 
 Base.size(S::SchurComplementOperator) = (size(S.G, 1), size(S.G, 1))
-Base.eltype(S::SchurComplementOperator{T}) where T = T
+Base.eltype(S::SchurComplementOperator{T}) where {T} = T
 
 function LinearAlgebra.mul!(y::VT, S::SchurComplementOperator{T, VT}, x::VT, alpha::Number, beta::Number) where {T, VT}
     y .= beta .* y
@@ -43,16 +43,16 @@ struct CondensedOperator{T, VT, LS}
 end
 
 function CondensedOperator(
-    K::AbstractLinearSolver,
-    buf::AbstractVector{T},
-) where T
+        K::AbstractLinearSolver,
+        buf::AbstractVector{T},
+    ) where {T}
     return CondensedOperator{T, typeof(buf), typeof(K)}(
         K, buf,
     )
 end
 
 Base.size(S::CondensedOperator) = size(S.K.full)
-Base.eltype(S::CondensedOperator{T}) where T = T
+Base.eltype(S::CondensedOperator{T}) where {T} = T
 
 function LinearAlgebra.mul!(y::VT, S::CondensedOperator{T, VT}, x::VT, alpha::Number, beta::Number) where {T, VT}
     y .= beta .* y
@@ -115,4 +115,3 @@ function _extract_subjacobian(jac::SparseMatrixCOO{Tv, Ti}, index_rows::Abstract
 
     return G, mapG, ind_eq_jac
 end
-

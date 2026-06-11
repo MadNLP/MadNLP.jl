@@ -45,16 +45,16 @@ struct ScaledSparseKKTSystem{T, VT, MT, QN, LS, VI, VI32} <: AbstractReducedKKTS
     buffer1::VT
     buffer2::VT
     # Augmented system
-    aug_raw::SparseMatrixCOO{T,Int32,VT, VI32}
+    aug_raw::SparseMatrixCOO{T, Int32, VT, VI32}
     aug_com::MT
     aug_csc_map::Union{Nothing, VI}
-    scaled_aug_raw::SparseMatrixCOO{T,Int32,VT, VI32}
+    scaled_aug_raw::SparseMatrixCOO{T, Int32, VT, VI32}
     # Hessian
-    hess_raw::SparseMatrixCOO{T,Int32,VT, VI32}
+    hess_raw::SparseMatrixCOO{T, Int32, VT, VI32}
     hess_com::MT
     hess_csc_map::Union{Nothing, VI}
     # Jacobian
-    jac_raw::SparseMatrixCOO{T,Int32,VT, VI32}
+    jac_raw::SparseMatrixCOO{T, Int32, VT, VI32}
     jac_com::MT
     jac_csc_map::Union{Nothing, VI}
     # LinearSolver
@@ -67,13 +67,13 @@ end
 
 # Build KKT system directly from SparseCallback
 function create_kkt_system(
-    ::Type{ScaledSparseKKTSystem},
-    cb::SparseCallback{T,VT},
-    linear_solver::Type;
-    opt_linear_solver=default_options(linear_solver),
-    hessian_approximation=ExactHessian,
-    qn_options=QuasiNewtonOptions(),
-) where {T,VT}
+        ::Type{ScaledSparseKKTSystem},
+        cb::SparseCallback{T, VT},
+        linear_solver::Type;
+        opt_linear_solver = default_options(linear_solver),
+        hessian_approximation = ExactHessian,
+        qn_options = QuasiNewtonOptions(),
+    ) where {T, VT}
 
     n_slack = length(cb.ind_ineq)
     # Deduce KKT size.
@@ -83,15 +83,15 @@ function create_kkt_system(
     # Evaluate sparsity pattern
     jac_sparsity_I = create_array(cb, Int32, cb.nnzj)
     jac_sparsity_J = create_array(cb, Int32, cb.nnzj)
-    _jac_sparsity_wrapper!(cb,jac_sparsity_I, jac_sparsity_J)
+    _jac_sparsity_wrapper!(cb, jac_sparsity_I, jac_sparsity_J)
 
-    quasi_newton = create_quasi_newton(hessian_approximation, cb, n; options=qn_options)
+    quasi_newton = create_quasi_newton(hessian_approximation, cb, n; options = qn_options)
     hess_sparsity_I, hess_sparsity_J = build_hessian_structure(cb, hessian_approximation)
 
     nlb = length(cb.ind_lb)
     nub = length(cb.ind_ub)
 
-    force_lower_triangular!(hess_sparsity_I,hess_sparsity_J)
+    force_lower_triangular!(hess_sparsity_I, hess_sparsity_J)
 
     ind_ineq = cb.ind_ineq
 
@@ -101,30 +101,30 @@ function create_kkt_system(
     n_tot = n + n_slack
 
 
-    aug_vec_length = n_tot+m
-    aug_mat_length = n_tot+m+n_hess+n_jac+n_slack
+    aug_vec_length = n_tot + m
+    aug_mat_length = n_tot + m + n_hess + n_jac + n_slack
 
     I = create_array(cb, Int32, aug_mat_length)
     J = create_array(cb, Int32, aug_mat_length)
     V = VT(undef, aug_mat_length)
     fill!(V, 0.0)  # Need to initiate V to avoid NaN
 
-    offset = n_tot+n_jac+n_slack+n_hess+m
+    offset = n_tot + n_jac + n_slack + n_hess + m
 
     I[1:n_tot] .= 1:n_tot
-    I[n_tot+1:n_tot+n_hess] = hess_sparsity_I
-    I[n_tot+n_hess+1:n_tot+n_hess+n_jac] .= (jac_sparsity_I.+n_tot)
-    I[n_tot+n_hess+n_jac+1:n_tot+n_hess+n_jac+n_slack] .= ind_ineq .+ n_tot
-    I[n_tot+n_hess+n_jac+n_slack+1:offset] .= (n_tot+1:n_tot+m)
+    I[(n_tot + 1):(n_tot + n_hess)] = hess_sparsity_I
+    I[(n_tot + n_hess + 1):(n_tot + n_hess + n_jac)] .= (jac_sparsity_I .+ n_tot)
+    I[(n_tot + n_hess + n_jac + 1):(n_tot + n_hess + n_jac + n_slack)] .= ind_ineq .+ n_tot
+    I[(n_tot + n_hess + n_jac + n_slack + 1):offset] .= ((n_tot + 1):(n_tot + m))
 
     J[1:n_tot] .= 1:n_tot
-    J[n_tot+1:n_tot+n_hess] = hess_sparsity_J
-    J[n_tot+n_hess+1:n_tot+n_hess+n_jac] .= jac_sparsity_J
-    J[n_tot+n_hess+n_jac+1:n_tot+n_hess+n_jac+n_slack] .= (n+1:n+n_slack)
-    J[n_tot+n_hess+n_jac+n_slack+1:offset] .= (n_tot+1:n_tot+m)
+    J[(n_tot + 1):(n_tot + n_hess)] = hess_sparsity_J
+    J[(n_tot + n_hess + 1):(n_tot + n_hess + n_jac)] .= jac_sparsity_J
+    J[(n_tot + n_hess + n_jac + 1):(n_tot + n_hess + n_jac + n_slack)] .= ((n + 1):(n + n_slack))
+    J[(n_tot + n_hess + n_jac + n_slack + 1):offset] .= ((n_tot + 1):(n_tot + m))
 
     pr_diag = _madnlp_unsafe_wrap(V, n_tot)
-    du_diag = _madnlp_unsafe_wrap(V, m, n_jac+n_slack+n_hess+n_tot+1)
+    du_diag = _madnlp_unsafe_wrap(V, m, n_jac + n_slack + n_hess + n_tot + 1)
 
     reg = VT(undef, n_tot)
     l_diag = VT(undef, nlb)
@@ -136,15 +136,15 @@ function create_kkt_system(
     buffer1 = VT(undef, n_tot)
     buffer2 = VT(undef, n_tot)
 
-    hess = _madnlp_unsafe_wrap(V, n_hess, n_tot+1)
-    jac = _madnlp_unsafe_wrap(V, n_jac+n_slack, n_hess+n_tot+1)
-    jac_callback = _madnlp_unsafe_wrap(V, n_jac, n_hess+n_tot+1)
+    hess = _madnlp_unsafe_wrap(V, n_hess, n_tot + 1)
+    jac = _madnlp_unsafe_wrap(V, n_jac + n_slack, n_hess + n_tot + 1)
+    jac_callback = _madnlp_unsafe_wrap(V, n_jac, n_hess + n_tot + 1)
 
-    aug_raw = SparseMatrixCOO(aug_vec_length,aug_vec_length,I,J,V)
+    aug_raw = SparseMatrixCOO(aug_vec_length, aug_vec_length, I, J, V)
     jac_raw = SparseMatrixCOO(
         m, n_tot,
         Int32[jac_sparsity_I; ind_ineq],
-        Int32[jac_sparsity_J; n+1:n+n_slack],
+        Int32[jac_sparsity_J; (n + 1):(n + n_slack)],
         jac,
     )
     hess_raw = SparseMatrixCOO(
@@ -153,7 +153,7 @@ function create_kkt_system(
         hess_sparsity_J,
         hess,
     )
-    scaled_aug_raw = SparseMatrixCOO(aug_vec_length,aug_vec_length,I,J,copy(V))
+    scaled_aug_raw = SparseMatrixCOO(aug_vec_length, aug_vec_length, I, J, copy(V))
 
     aug_com, aug_csc_map = coo_to_csc(aug_raw)
     jac_com, jac_csc_map = coo_to_csc(jac_raw)
@@ -178,7 +178,7 @@ end
 num_variables(kkt::ScaledSparseKKTSystem) = length(kkt.pr_diag)
 get_jacobian(kkt::ScaledSparseKKTSystem) = kkt.jac_callback
 
-function initialize!(kkt::ScaledSparseKKTSystem{T}) where T
+function initialize!(kkt::ScaledSparseKKTSystem{T}) where {T}
     fill!(kkt.reg, one(T))
     fill!(kkt.pr_diag, one(T))
     fill!(kkt.du_diag, zero(T))
@@ -188,21 +188,21 @@ function initialize!(kkt::ScaledSparseKKTSystem{T}) where T
     fill!(kkt.l_diag, one(T))
     fill!(kkt.u_diag, one(T))
     fill!(kkt.scaling_factor, one(T))
-    fill!(nonzeros(kkt.hess_com), zero(T)) # so that mul! in the initial primal-dual solve has no effect
+    return fill!(nonzeros(kkt.hess_com), zero(T)) # so that mul! in the initial primal-dual solve has no effect
 end
 
 function jtprod!(y::AbstractVector, kkt::ScaledSparseKKTSystem, x::AbstractVector)
-    mul!(y, kkt.jac_com', x)
+    return mul!(y, kkt.jac_com', x)
 end
 
 function compress_jacobian!(kkt::ScaledSparseKKTSystem)
     ns = length(kkt.ind_ineq)
-    kkt.jac[end-ns+1:end] .= -1.0
-    transfer!(kkt.jac_com, kkt.jac_raw, kkt.jac_csc_map)
+    kkt.jac[(end - ns + 1):end] .= -1.0
+    return transfer!(kkt.jac_com, kkt.jac_raw, kkt.jac_csc_map)
 end
 
 function compress_hessian!(kkt::ScaledSparseKKTSystem)
-    transfer!(kkt.hess_com, kkt.hess_raw, kkt.hess_csc_map)
+    return transfer!(kkt.hess_com, kkt.hess_raw, kkt.hess_csc_map)
 end
 
 # N.B. Matrices are assumed to have an augmented KKT structure and be lower-triangular.
@@ -211,17 +211,18 @@ function _build_scale_augmented_system_coo!(dest, src, scaling, n, m)
         # Primal regularization pr_diag
         if k <= n
             dest.V[k] = src.V[k]
-        # Hessian block
+            # Hessian block
         elseif i <= n && j <= n
             dest.V[k] = src.V[k] * scaling[i] * scaling[j]
-        # Jacobian block
+            # Jacobian block
         elseif n + 1 <= i <= n + m && j <= n
             dest.V[k] = src.V[k] * scaling[j]
-        # Dual regularization du_diag
+            # Dual regularization du_diag
         elseif n + 1 <= i <= n + m && n + 1 <= j <= n + m
             dest.V[k] = src.V[k]
         end
     end
+    return
 end
 
 function build_kkt!(kkt::ScaledSparseKKTSystem)
@@ -232,12 +233,11 @@ function build_kkt!(kkt::ScaledSparseKKTSystem)
         kkt.scaling_factor,
         n, m,
     )
-    transfer!(kkt.aug_com, kkt.scaled_aug_raw, kkt.aug_csc_map)
+    return transfer!(kkt.aug_com, kkt.scaled_aug_raw, kkt.aug_csc_map)
 end
 
 function regularize_diagonal!(kkt::ScaledSparseKKTSystem, primal, dual)
     kkt.reg .+= primal
-    kkt.pr_diag .+= primal .* kkt.scaling_factor.^2
-    kkt.du_diag .-= dual
+    kkt.pr_diag .+= primal .* kkt.scaling_factor .^ 2
+    return kkt.du_diag .-= dual
 end
-

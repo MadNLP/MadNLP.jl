@@ -2,46 +2,50 @@
 # Created by Sungho Shin (sungho.shin@wisc.edu)
 
 # Options
-@enum(LogLevels::Int,
-      TRACE  = 1,
-      DEBUG  = 2,
-      INFO   = 3,
-      NOTICE = 4,
-      WARN   = 5,
-      ERROR  = 6)
-
-@enum(BFGSInitStrategy::Int,
-      SCALAR1  = 1,
-      SCALAR2  = 2,
-      SCALAR3  = 3,
-      SCALAR4  = 4,
-      CONSTANT = 5,
+@enum(
+    LogLevels::Int,
+    TRACE = 1,
+    DEBUG = 2,
+    INFO = 3,
+    NOTICE = 4,
+    WARN = 5,
+    ERROR = 6
 )
 
-@enum(Status::Int,
-      SOLVE_SUCCEEDED = 1,
-      SOLVED_TO_ACCEPTABLE_LEVEL = 2,
-      SEARCH_DIRECTION_BECOMES_TOO_SMALL = 3,
-      DIVERGING_ITERATES = 4,
-      INFEASIBLE_PROBLEM_DETECTED = 5,
-      MAXIMUM_ITERATIONS_EXCEEDED = 6,
-      MAXIMUM_WALLTIME_EXCEEDED = 7,
-      INITIAL = 11,
-      REGULAR = 12,
-      RESTORE = 13,
-      ROBUST  = 14,
-      LINESEARCH_SUCCEEDED = 15,
-      RESTORATION_FAILED = -1,
-      INVALID_NUMBER_DETECTED = -2,
-      ERROR_IN_STEP_COMPUTATION = -3,
-      NOT_ENOUGH_DEGREES_OF_FREEDOM = -4,
-      USER_REQUESTED_STOP = -5,
-      INTERNAL_ERROR = -6,
-      INVALID_NUMBER_OBJECTIVE = -7,
-      INVALID_NUMBER_GRADIENT = -8,
-      INVALID_NUMBER_CONSTRAINTS = -9,
-      INVALID_NUMBER_JACOBIAN = -10,
-      INVALID_NUMBER_HESSIAN_LAGRANGIAN = -11,
+@enum(
+    BFGSInitStrategy::Int,
+    SCALAR1 = 1,
+    SCALAR2 = 2,
+    SCALAR3 = 3,
+    SCALAR4 = 4,
+    CONSTANT = 5,
+)
+
+@enum(
+    Status::Int,
+    SOLVE_SUCCEEDED = 1,
+    SOLVED_TO_ACCEPTABLE_LEVEL = 2,
+    SEARCH_DIRECTION_BECOMES_TOO_SMALL = 3,
+    DIVERGING_ITERATES = 4,
+    INFEASIBLE_PROBLEM_DETECTED = 5,
+    MAXIMUM_ITERATIONS_EXCEEDED = 6,
+    MAXIMUM_WALLTIME_EXCEEDED = 7,
+    INITIAL = 11,
+    REGULAR = 12,
+    RESTORE = 13,
+    ROBUST = 14,
+    LINESEARCH_SUCCEEDED = 15,
+    RESTORATION_FAILED = -1,
+    INVALID_NUMBER_DETECTED = -2,
+    ERROR_IN_STEP_COMPUTATION = -3,
+    NOT_ENOUGH_DEGREES_OF_FREEDOM = -4,
+    USER_REQUESTED_STOP = -5,
+    INTERNAL_ERROR = -6,
+    INVALID_NUMBER_OBJECTIVE = -7,
+    INVALID_NUMBER_GRADIENT = -8,
+    INVALID_NUMBER_CONSTRAINTS = -9,
+    INVALID_NUMBER_JACOBIAN = -10,
+    INVALID_NUMBER_HESSIAN_LAGRANGIAN = -11,
 )
 
 function get_status_output(status, opt)

@@ -49,7 +49,7 @@ include(joinpath("IPM", "IPM.jl"))
 # `MadNLP.*`, so they must flow through. Skips gensyms, submodules, eval/include.
 let
     skip = Set([:eval, :include, :MadNLPCore])
-    for name in names(@__MODULE__, all=true, imported=false)
+    for name in names(@__MODULE__, all = true, imported = false)
         s = String(name)
         name in skip && continue
         startswith(s, "#") && continue

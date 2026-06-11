@@ -1,4 +1,3 @@
-
 @kwdef mutable struct PardisoMKLOptions <: AbstractOptions
     pardisomkl_num_threads::Int = 1
     pardiso_matching_strategy::MatchingStrategy = COMPLETE2x2
@@ -13,7 +12,7 @@ mutable struct PardisoMKLSolver{T} <: AbstractLinearSolver{T}
     perm::Vector{Int32}
     msglvl::Ref{Int32}
     err::Ref{Int32}
-    csc::SparseMatrixCSC{T,Int32}
+    csc::SparseMatrixCSC{T, Int32}
     w::Vector{T}
     opt::PardisoMKLOptions
     logger::MadNLPLogger
@@ -30,23 +29,23 @@ function pardisomkl_pardisoinit(pt, mtype::Ref{Cint}, iparm::Vector{Cint})
     )
 end
 function pardisomkl_pardiso(
-    pt,
-    maxfct::Ref{Cint},
-    mnum::Ref{Cint},
-    mtype::Ref{Cint},
-    phase::Ref{Cint},
-    n::Ref{Cint},
-    a::Vector{T},
-    ia::Vector{Cint},
-    ja::Vector{Cint},
-    perm::Vector{Cint},
-    nrhs::Ref{Cint},
-    iparm::Vector{Cint},
-    msglvl::Ref{Cint},
-    b::Vector{T},
-    x::Vector{T},
-    err::Ref{Cint},
-) where {T}
+        pt,
+        maxfct::Ref{Cint},
+        mnum::Ref{Cint},
+        mtype::Ref{Cint},
+        phase::Ref{Cint},
+        n::Ref{Cint},
+        a::Vector{T},
+        ia::Vector{Cint},
+        ja::Vector{Cint},
+        perm::Vector{Cint},
+        nrhs::Ref{Cint},
+        iparm::Vector{Cint},
+        msglvl::Ref{Cint},
+        b::Vector{T},
+        x::Vector{T},
+        err::Ref{Cint},
+    ) where {T}
     return ccall(
         (:pardiso, libmkl_rt),
         Cvoid,
@@ -93,10 +92,10 @@ function pardisomkl_set_num_threads!(n)
 end
 
 function PardisoMKLSolver(
-    csc::SparseMatrixCSC{T};
-    opt = PardisoMKLOptions(),
-    logger = MadNLPLogger(),
-) where {T}
+        csc::SparseMatrixCSC{T};
+        opt = PardisoMKLOptions(),
+        logger = MadNLPLogger(),
+    ) where {T}
     w = Vector{T}(undef, csc.n)
 
     pt = Vector{Ptr{Cvoid}}(undef, 64)
@@ -106,22 +105,22 @@ function PardisoMKLSolver(
     msglvl = Ref{Int32}(0)
     err = Ref{Int32}(0)
 
-    pt.=0
-    iparm[1]=0
+    pt .= 0
+    iparm[1] = 0
 
     pardisomkl_pardisoinit(pt, Ref{Int32}(-2), iparm)
 
-    iparm[1]=1
-    iparm[2]=opt.pardisomkl_order # METIS
-    iparm[3]=0
-    iparm[6]=1
-    iparm[8]=opt.pardisomkl_max_iterative_refinement_steps
-    iparm[10]=12
-    iparm[11]=2
-    iparm[13]=1 # matching strateg
-    iparm[21]=3 # bunch-kaufman pivotin
-    iparm[24]=1 # parallel factorization
-    iparm[25]=0 # parallel solv
+    iparm[1] = 1
+    iparm[2] = opt.pardisomkl_order # METIS
+    iparm[3] = 0
+    iparm[6] = 1
+    iparm[8] = opt.pardisomkl_max_iterative_refinement_steps
+    iparm[10] = 12
+    iparm[11] = 2
+    iparm[13] = 1 # matching strateg
+    iparm[21] = 3 # bunch-kaufman pivotin
+    iparm[24] = 1 # parallel factorization
+    iparm[25] = 0 # parallel solv
     iparm[28] = T == Float64 ? 0 : 1
 
     pardisomkl_set_num_threads!(opt.pardisomkl_num_threads)
@@ -245,18 +244,18 @@ function finalize(M::PardisoMKLSolver{T}) where {T}
         M.err,
     )
 end
-is_inertia(::PardisoMKLSolver)=true
+is_inertia(::PardisoMKLSolver) = true
 function inertia(M::PardisoMKLSolver)
     pos = M.iparm[22]
     neg = M.iparm[23]
-    return (pos, M.csc.n-pos-neg, neg)
+    return (pos, M.csc.n - pos - neg, neg)
 end
 
 function improve!(M::PardisoMKLSolver)
     @debug(M.logger, "improve quality failed.")
     return false
 end
-introduce(::PardisoMKLSolver)="pardiso-mkl"
+introduce(::PardisoMKLSolver) = "pardiso-mkl"
 
 input_type(::Type{PardisoMKLSolver}) = :csc
 default_options(::Type{PardisoMKLSolver}) = PardisoMKLOptions()

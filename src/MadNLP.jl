@@ -30,13 +30,13 @@ madsuite(::Val{:madnlp}, args...; kwargs...) = madnlp(args...; kwargs...)
 default_sparse_solver(nlp) = MumpsSolver
 
 function MadNLPOptions{T}(
-    nlp::AbstractNLPModel{T, VT};
-    dense_callback = is_dense_callback(nlp),
-    callback = dense_callback ? DenseCallback : SparseCallback,
-    kkt_system = dense_callback ? DenseCondensedKKTSystem : SparseKKTSystem,
-    linear_solver = dense_callback ? LapackCPUSolver : default_sparse_solver(nlp),
-    tol = get_tolerance(T, kkt_system),
-) where {T, VT <: Vector{T}}
+        nlp::AbstractNLPModel{T, VT};
+        dense_callback = is_dense_callback(nlp),
+        callback = dense_callback ? DenseCallback : SparseCallback,
+        kkt_system = dense_callback ? DenseCondensedKKTSystem : SparseKKTSystem,
+        linear_solver = dense_callback ? LapackCPUSolver : default_sparse_solver(nlp),
+        tol = get_tolerance(T, kkt_system),
+    ) where {T, VT <: Vector{T}}
     return MadNLPOptions{T}(
         tol = tol,
         callback = callback,

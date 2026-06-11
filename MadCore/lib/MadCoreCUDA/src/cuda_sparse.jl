@@ -49,4 +49,3 @@ function MadCore.get_tril_to_full(csc::cuSPARSE.CuSparseMatrixCSC{Tv, Ti}) where
         ),
         view(csc.nzVal, CuArray(cscind.nzval))
 end
-

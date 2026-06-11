@@ -7,16 +7,16 @@ include("types.jl")
 include("options.jl")
 
 mutable struct MadNLPSolver{
-    T,
-    VT <: AbstractVector{T},
-    VI <: AbstractVector{Int},
-    KKTSystem <: AbstractKKTSystem{T},
-    Model <: AbstractNLPModel{T,VT},
-    CB <: AbstractCallback{T},
-    Iterator <: AbstractIterator{T},
-    IC <: AbstractInertiaCorrector,
-    KKTVec <: AbstractKKTVector{T, VT},
-    ICB
+        T,
+        VT <: AbstractVector{T},
+        VI <: AbstractVector{Int},
+        KKTSystem <: AbstractKKTSystem{T},
+        Model <: AbstractNLPModel{T, VT},
+        CB <: AbstractCallback{T},
+        Iterator <: AbstractIterator{T},
+        IC <: AbstractInertiaCorrector,
+        KKTVec <: AbstractKKTVector{T, VT},
+        ICB,
     } <: AbstractMadNLPSolver{T}
 
     nlp::Model
@@ -57,7 +57,7 @@ mutable struct MadNLPSolver{
     c_trial::VT
     obj_val_trial::T
 
-    c_slk::SubVector{T,VT,VI}
+    c_slk::SubVector{T, VT, VI}
     rhs::VT
 
     ind_ineq::VI
@@ -65,16 +65,16 @@ mutable struct MadNLPSolver{
     ind_llb::VI
     ind_uub::VI
 
-    x_lr::SubVector{T,VT,VI}
-    x_ur::SubVector{T,VT,VI}
-    xl_r::SubVector{T,VT,VI}
-    xu_r::SubVector{T,VT,VI}
-    zl_r::SubVector{T,VT,VI}
-    zu_r::SubVector{T,VT,VI}
-    dx_lr::SubVector{T,VT,VI}
-    dx_ur::SubVector{T,VT,VI}
-    x_trial_lr::SubVector{T,VT,VI}
-    x_trial_ur::SubVector{T,VT,VI}
+    x_lr::SubVector{T, VT, VI}
+    x_ur::SubVector{T, VT, VI}
+    xl_r::SubVector{T, VT, VI}
+    xu_r::SubVector{T, VT, VI}
+    zl_r::SubVector{T, VT, VI}
+    zu_r::SubVector{T, VT, VI}
+    dx_lr::SubVector{T, VT, VI}
+    dx_ur::SubVector{T, VT, VI}
+    x_trial_lr::SubVector{T, VT, VI}
+    x_trial_ur::SubVector{T, VT, VI}
 
     iterator::Iterator
 
@@ -96,10 +96,10 @@ mutable struct MadNLPSolver{
     del_w_last::T
     del_c::T
 
-    filter::Vector{Tuple{T,T}}
+    filter::Vector{Tuple{T, T}}
 
     inertia_corrector::IC
-    RR::Union{Nothing,RobustRestorer{T,VT}}
+    RR::Union{Nothing, RobustRestorer{T, VT}}
     intermediate_callback::ICB
     status::Status
     output::Dict
@@ -121,7 +121,7 @@ The constructor allocates all the memory required in the interior-point
 algorithm, so the main algorithm remains allocation free.
 
 """
-function MadNLPSolver(nlp::AbstractNLPModel{T,VT}; kwargs...) where {T, VT}
+function MadNLPSolver(nlp::AbstractNLPModel{T, VT}; kwargs...) where {T, VT}
 
     options = load_options(nlp; kwargs...)
 
@@ -129,42 +129,42 @@ function MadNLPSolver(nlp::AbstractNLPModel{T,VT}; kwargs...) where {T, VT}
     logger = options.logger
     @assert is_supported(ipm_opt.linear_solver, T)
 
-    cnt = MadNLPCounters(start_time=time())
+    cnt = MadNLPCounters(start_time = time())
     cb = create_callback(
         ipm_opt.callback,
         nlp;
-        fixed_variable_treatment=ipm_opt.fixed_variable_treatment,
-        equality_treatment=ipm_opt.equality_treatment,
+        fixed_variable_treatment = ipm_opt.fixed_variable_treatment,
+        equality_treatment = ipm_opt.equality_treatment,
     )
 
     # generic options
     ipm_opt.disable_garbage_collector &&
-        (GC.enable(false); @warn(logger,"Julia garbage collector is temporarily disabled"))
-    set_blas_num_threads(ipm_opt.blas_num_threads; permanent=true)
-    @trace(logger,"Initializing variables.")
+        (GC.enable(false); @warn(logger, "Julia garbage collector is temporarily disabled"))
+    set_blas_num_threads(ipm_opt.blas_num_threads; permanent = true)
+    @trace(logger, "Initializing variables.")
 
     ind_lb = cb.ind_lb
     ind_ub = cb.ind_ub
 
     ns = length(cb.ind_ineq)
     nx = n_variables(cb)
-    n = nx+ns
+    n = nx + ns
     m = n_constraints(cb)
     nlb = length(ind_lb)
     nub = length(ind_ub)
 
-    @trace(logger,"Initializing KKT system.")
+    @trace(logger, "Initializing KKT system.")
     kkt = create_kkt_system(
         ipm_opt.kkt_system,
         cb,
         ipm_opt.linear_solver;
-        hessian_approximation=ipm_opt.hessian_approximation,
-        opt_linear_solver=options.linear_solver,
-        qn_options=ipm_opt.quasi_newton_options,
+        hessian_approximation = ipm_opt.hessian_approximation,
+        opt_linear_solver = options.linear_solver,
+        qn_options = ipm_opt.quasi_newton_options,
         ipm_opt.kkt_options...,
     )
 
-    @trace(logger,"Initializing iterative solver.")
+    @trace(logger, "Initializing iterative solver.")
     iterator = ipm_opt.iterator(kkt; cnt = cnt, logger = logger, opt = options.iterative_refinement)
 
     x = PrimalVector(VT, nx, ns, ind_lb, ind_ub)
@@ -182,13 +182,13 @@ function MadNLPSolver(nlp::AbstractNLPModel{T,VT}; kwargs...) where {T, VT}
     _w3 = UnreducedKKTVector(VT, n, m, nlb, nub, ind_lb, ind_ub)
     _w4 = UnreducedKKTVector(VT, n, m, nlb, nub, ind_lb, ind_ub)
 
-    jacl = VT(undef,n)
+    jacl = VT(undef, n)
     c_trial = VT(undef, m)
     y = VT(undef, m)
     c = VT(undef, m)
     rhs = VT(undef, m)
 
-    c_slk = view(c,cb.ind_ineq)
+    c_slk = view(c, cb.ind_ineq)
     x_lr = view(full(x), cb.ind_lb)
     x_ur = view(full(x), cb.ind_ub)
     xl_r = view(full(xl), cb.ind_lb)
