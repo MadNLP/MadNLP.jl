@@ -4,14 +4,21 @@ version = "0.1.0"
 authors = ["MadNLP contributors"]
 
 [deps]
+Atomix = "a9b6321e-bd34-4604-b9c9-b65b8de01458"
+GPUArraysCore = "46192b85-c4d5-4398-a991-12ede77f4527"
+KernelAbstractions = "63c18a36-062a-441e-b654-da1e3ab1ce7c"
 MadCore = "6fc510d6-e066-472d-adc5-2ce5e9b14820"
-# Backend deps (GPUArrays, GPUArraysCore, Adapt) added in Phase F.
+SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 
 [sources]
 MadCore = {path = "../.."}
 
 [compat]
+Atomix = "0.1, 1"
+GPUArraysCore = "0.2"
+KernelAbstractions = "0.9"
 MadCore = "0.1"
+SparseArrays = "1.10"
 julia = "1.10"
 
 [extras]

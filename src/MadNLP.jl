@@ -10,6 +10,7 @@ using Reexport
 @reexport using MadCoreSuiteSparse
 @reexport using MadCoreHSL
 @reexport using MadCorePardiso
+@reexport using MadNLPHybridKKT
 
 import MadNLPCore: madnlp, MadNLPOptions, is_dense_callback, get_tolerance
 import NLPModels
