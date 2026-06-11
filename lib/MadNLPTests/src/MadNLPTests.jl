@@ -7,7 +7,7 @@ import Random
 import Test: @test, @testset
 
 # Optimization packages
-import MadNLP
+import MadNLPCore
 import NLPModels
 import JuMP: Model, @variable, @constraint, @objective, optimize!, set_attribute,
     MOI, termination_status, LowerBoundRef, UpperBoundRef, value, dual, fix
@@ -32,45 +32,45 @@ function test_linear_solver(solver, T; kwargs...)
     sol= [0.8542713567839195, 1.4572864321608041]
 
     csc = sparse(row,col,val,m,n)
-    if MadNLP.input_type(solver) == :csc
-        opt = MadNLP.default_options(solver)
+    if MadNLPCore.input_type(solver) == :csc
+        opt = MadNLPCore.default_options(solver)
         M = solver(csc; opt=opt)
-    elseif MadNLP.input_type(solver) == :dense
+    elseif MadNLPCore.input_type(solver) == :dense
         dense = Array(csc)
-        opt = MadNLP.default_options(solver)
+        opt = MadNLPCore.default_options(solver)
         M = solver(dense; opt=opt)
     end
-    MadNLP.introduce(M)
-    MadNLP.improve!(M)
-    MadNLP.factorize!(M)
-    if MadNLP.is_inertia(M)
-        @test MadNLP.inertia(M) == (2, 0, 0)
+    MadNLPCore.introduce(M)
+    MadNLPCore.improve!(M)
+    MadNLPCore.factorize!(M)
+    if MadNLPCore.is_inertia(M)
+        @test MadNLPCore.inertia(M) == (2, 0, 0)
     end
-    x = MadNLP.solve_linear_system!(M,copy(b))
+    x = MadNLPCore.solve_linear_system!(M,copy(b))
     @test solcmp(x,sol)
 end
 
 function test_kkt_system(kkt, cb)
     # Getters
-    n = MadNLP.num_variables(kkt)
+    n = MadNLPCore.num_variables(kkt)
     (m, p) = size(kkt)
     # system should be square
     @test m == p
 
     # Interface
-    MadNLP.initialize!(kkt)
+    MadNLPCore.initialize!(kkt)
 
     # Update internal structure
     x0 = NLPModels.get_x0(cb.nlp)
     y0 = NLPModels.get_y0(cb.nlp)
     # Update Jacobian manually
-    jac = MadNLP.get_jacobian(kkt)
-    MadNLP._eval_jac_wrapper!(cb, x0, jac)
-    MadNLP.compress_jacobian!(kkt)
+    jac = MadNLPCore.get_jacobian(kkt)
+    MadNLPCore._eval_jac_wrapper!(cb, x0, jac)
+    MadNLPCore.compress_jacobian!(kkt)
     # Update Hessian manually
-    hess = MadNLP.get_hessian(kkt)
-    MadNLP._eval_lag_hess_wrapper!(cb, x0, y0, hess)
-    MadNLP.compress_hessian!(kkt)
+    hess = MadNLPCore.get_hessian(kkt)
+    MadNLPCore._eval_lag_hess_wrapper!(cb, x0, y0, hess)
+    MadNLPCore.compress_hessian!(kkt)
 
     # N.B.: set non-trivial dual's bounds to ensure
     # l_lower and u_lower are positive. If not we run into
@@ -80,31 +80,31 @@ function test_kkt_system(kkt, cb)
     fill!(kkt.u_lower, 1e-3)
 
     # Update diagonal terms manually.
-    MadNLP._set_aug_diagonal!(kkt)
+    MadNLPCore._set_aug_diagonal!(kkt)
 
     # Factorization
-    MadNLP.build_kkt!(kkt)
-    MadNLP.factorize!(kkt.linear_solver)
+    MadNLPCore.build_kkt!(kkt)
+    MadNLPCore.factorize!(kkt.linear_solver)
 
     # Backsolve
-    x = MadNLP.UnreducedKKTVector(kkt)
-    fill!(MadNLP.full(x), 1.0)  # fill RHS with 1
-    out1 = MadNLP.solve_kkt!(kkt, x)
+    x = MadNLPCore.UnreducedKKTVector(kkt)
+    fill!(MadNLPCore.full(x), 1.0)  # fill RHS with 1
+    out1 = MadNLPCore.solve_kkt!(kkt, x)
     @test out1 === x
 
     y = copy(x)
-    fill!(MadNLP.full(y), 0.0)
+    fill!(MadNLPCore.full(y), 0.0)
     out2 = mul!(y, kkt, x)
     @test out2 === y
-    @test MadNLP.full(y) ≈ ones(length(x))
+    @test MadNLPCore.full(y) ≈ ones(length(x))
 
-    if MadNLP.is_inertia(kkt.linear_solver)
-        ni, mi, pi = MadNLP.inertia(kkt.linear_solver)
-        @test MadNLP.is_inertia_correct(kkt, ni, mi, pi)
+    if MadNLPCore.is_inertia(kkt.linear_solver)
+        ni, mi, pi = MadNLPCore.inertia(kkt.linear_solver)
+        @test MadNLPCore.is_inertia_correct(kkt, ni, mi, pi)
     end
 
     prim_reg, dual_reg = 1.0, 1.0
-    MadNLP.regularize_diagonal!(kkt, prim_reg, dual_reg)
+    MadNLPCore.regularize_diagonal!(kkt, prim_reg, dual_reg)
 
     return
 end
@@ -124,14 +124,14 @@ function infeasible(optimizer_constructor::Function; Arr = Array)
         @constraint(m,x==0.)
         @objective(m,Min,x^2)
 
-        nlp = MadNLP.SparseWrapperModel(
+        nlp = MadNLPCore.SparseWrapperModel(
             Arr,
             NLPModelsJuMP.MathOptNLPModel(m)
         )
         optimizer = optimizer_constructor()
-        result = MadNLP.madnlp(nlp; optimizer.options...)
+        result = MadNLPCore.madnlp(nlp; optimizer.options...)
 
-        @test result.status == MadNLP.INFEASIBLE_PROBLEM_DETECTED
+        @test result.status == MadNLPCore.INFEASIBLE_PROBLEM_DETECTED
     end
 end
 
@@ -141,14 +141,14 @@ function unbounded(optimizer_constructor::Function; Arr = Array)
         @variable(m,x,start=1)
         @objective(m,Max,x^2)
 
-        nlp = MadNLP.SparseWrapperModel(
+        nlp = MadNLPCore.SparseWrapperModel(
             Arr,
             NLPModelsJuMP.MathOptNLPModel(m)
         )
         optimizer = optimizer_constructor()
-        result = MadNLP.madnlp(nlp; optimizer.options...)
+        result = MadNLPCore.madnlp(nlp; optimizer.options...)
 
-        @test result.status == MadNLP.DIVERGING_ITERATES
+        @test result.status == MadNLPCore.DIVERGING_ITERATES
     end
 end
 
@@ -164,13 +164,13 @@ function lootsma(optimizer_constructor::Function; Arr = Array)
         @objective(m,Min,x[1]^3 + 11. *x[1] - par*sqrt(x[1])  +x[3] )
 
 
-        nlp = MadNLP.SparseWrapperModel(
+        nlp = MadNLPCore.SparseWrapperModel(
             Arr,
             NLPModelsJuMP.MathOptNLPModel(m)
         )
 
         optimizer = optimizer_constructor()
-        result = MadNLP.madnlp(nlp; optimizer.options...)
+        result = MadNLPCore.madnlp(nlp; optimizer.options...)
 
         @test solcmp(
             Array(result.solution[2:4]),
@@ -193,7 +193,7 @@ function lootsma(optimizer_constructor::Function; Arr = Array)
             atol = sqrt(result.options.tol), rtol = sqrt(result.options.tol)
         )
 
-        @test result.status == MadNLP.SOLVE_SUCCEEDED
+        @test result.status == MadNLPCore.SOLVE_SUCCEEDED
     end
 end
 
@@ -320,14 +320,14 @@ function eigmina(optimizer_constructor::Function; Arr = Array)
         @constraint(m, x[100]*x[101] - 100*x[100] == 0)
         @objective(m, Min, x[101])
 
-        nlp = MadNLP.SparseWrapperModel(
+        nlp = MadNLPCore.SparseWrapperModel(
             Arr,
             NLPModelsJuMP.MathOptNLPModel(m)
         )
         optimizer = optimizer_constructor()
-        result = MadNLP.madnlp(nlp; optimizer.options...)
+        result = MadNLPCore.madnlp(nlp; optimizer.options...)
 
-        @test result.status == MadNLP.SOLVE_SUCCEEDED
+        @test result.status == MadNLPCore.SOLVE_SUCCEEDED
     end
 end
 
@@ -340,9 +340,9 @@ function test_scaling()
     @objective(model, Min, big_constant * (x[1] + 2 * x[2] + 3 * x[3]))
 
     nlp = NLPModelsJuMP.MathOptNLPModel(model)
-    solver = MadNLP.MadNLPSolver(nlp; print_level=MadNLP.ERROR)
+    solver = MadNLPCore.MadNLPSolver(nlp; print_level=MadNLPCore.ERROR)
 
-    results = MadNLP.solve!(solver)
+    results = MadNLPCore.solve!(solver)
 
     # Check MadNLP is scaling the problem.
     @test solver.cb.obj_scale[] != 1.0
@@ -367,9 +367,9 @@ function test_max_problem()
     @objective(model, Max, x[1] + 2*x[2] + 3*x[3])
 
     nlp = NLPModelsJuMP.MathOptNLPModel(model)
-    results = MadNLP.madnlp(nlp; print_level=MadNLP.ERROR)
+    results = MadNLPCore.madnlp(nlp; print_level=MadNLPCore.ERROR)
 
-    @test results.status == MadNLP.SOLVE_SUCCEEDED
+    @test results.status == MadNLPCore.SOLVE_SUCCEEDED
     @test results.objective ≈ 3.0
     @test results.solution ≈ [0.0, 0.0, 1.0] rtol=1e-7
     @test results.multipliers[1] ≈ -3.0 rtol=1e-7
@@ -388,9 +388,9 @@ function test_fixed_variable()
     @objective(model, Min, x[1] + 2*x[2] + 3*x[3])
 
     nlp = NLPModelsJuMP.MathOptNLPModel(model)
-    results = MadNLP.madnlp(nlp; print_level=MadNLP.ERROR)
+    results = MadNLPCore.madnlp(nlp; print_level=MadNLPCore.ERROR)
 
-    @test results.status == MadNLP.SOLVE_SUCCEEDED
+    @test results.status == MadNLPCore.SOLVE_SUCCEEDED
     @test results.objective ≈ 1.5
     @test results.solution ≈ [0.5, 0.5, 0.0] rtol=1e-7
     @test results.multipliers[1] ≈ -1.0 rtol=1e-7
@@ -407,9 +407,9 @@ function test_fixed_variable()
     @objective(model, Max, x[1] + 2*x[2] + 3*x[3])
 
     nlp = NLPModelsJuMP.MathOptNLPModel(model)
-    results = MadNLP.madnlp(nlp; print_level=MadNLP.ERROR)
+    results = MadNLPCore.madnlp(nlp; print_level=MadNLPCore.ERROR)
 
-    @test results.status == MadNLP.SOLVE_SUCCEEDED
+    @test results.status == MadNLPCore.SOLVE_SUCCEEDED
     @test results.objective ≈ 2.5
     @test results.solution ≈ [0.0, 0.5, 0.5] rtol=1e-7
     @test results.multipliers[1] ≈ -3.0 rtol=1e-7
@@ -429,14 +429,14 @@ function lp_examodels_issue75(optimizer_constructor::Function; Arr = Array)
         @constraint(m, c1, 6x + 8y >= 100)
         @constraint(m, c2, 7x + 12y >= 120)
 
-        nlp = MadNLP.SparseWrapperModel(
+        nlp = MadNLPCore.SparseWrapperModel(
             Arr,
             NLPModelsJuMP.MathOptNLPModel(m)
         )
         optimizer = optimizer_constructor()
-        result = MadNLP.madnlp(nlp; optimizer.options...)
+        result = MadNLPCore.madnlp(nlp; optimizer.options...)
 
-        @test result.status == MadNLP.SOLVE_SUCCEEDED
+        @test result.status == MadNLPCore.SOLVE_SUCCEEDED
     end
 end
 
