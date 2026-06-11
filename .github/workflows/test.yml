@@ -79,6 +79,32 @@ jobs:
         with:
           files: lcov.info
           token: ${{ secrets.CODECOV_TOKEN }}
+  test-madcore-backends:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        julia-version: ['1']
+        pkg: [MadCoreMUMPS, MadCoreLDLFactorizations, MadCoreSuiteSparse]
+    steps:
+      - uses: actions/checkout@v2
+      - uses: julia-actions/install-juliaup@v2
+        with:
+          channel: ${{ matrix.julia-version }}
+      - uses: julia-actions/cache@v1
+      - name: test ${{ matrix.pkg }}
+        shell: julia --project=./MadCore/lib/${{ matrix.pkg }} --color=yes {0}
+        run: |
+          using Pkg
+          Pkg.Registry.update()
+          Pkg.test(coverage=true)
+      - uses: julia-actions/julia-processcoverage@v1
+        with:
+          directories: MadCore/lib/${{ matrix.pkg }}/src
+      - uses: codecov/codecov-action@v5
+        with:
+          files: lcov.info
+          token: ${{ secrets.CODECOV_TOKEN }}
   # Pardiso license currently not available
   #
   # test-pardiso:
