@@ -73,3 +73,16 @@ Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [targets]
 test = ["Test", "MadNLPTests", "MINLPTests", "Random", "MathOptInterface", "Quadmath", "HSL"]
+
+# Dev-time monorepo workspace (Julia >= 1.12): MadNLP, the MadCore workspace, and
+# the lib/* subpackages share a single Manifest. Stripped for the registered
+# package, so the 1.10 runtime compat floor is unaffected.
+# cuMadNLP (CUDA-hard) is intentionally NOT in the workspace: a workspace-wide
+# instantiate would try to build CUDA, which fails on macOS / GPU-less CI runners.
+[workspace]
+projects = [
+    "MadCore",
+    "lib/MadNLPCore",
+    "lib/MadNLPHybridKKT",
+    "lib/MadNLPTests",
+]

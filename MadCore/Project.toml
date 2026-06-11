@@ -31,3 +31,21 @@ Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [targets]
 test = ["Test"]
+
+# Dev-time monorepo workspace (Julia >= 1.12): MadCore + its backend subpackages
+# share a single Manifest. Stripped for the registered package, so the 1.10
+# runtime compat floor is unaffected.
+# GPU-hard members (MadCoreCUDA, MadCoreAMDGPU) are intentionally NOT in the
+# workspace: a workspace-wide instantiate would try to build CUDA/AMDGPU, which
+# fail on macOS / GPU-less CI runners. Develop those alongside as needed.
+[workspace]
+projects = [
+    "lib/MadCoreLDLFactorizations",
+    "lib/MadCoreSuiteSparse",
+    "lib/MadCoreMUMPS",
+    "lib/MadCoreHSL",
+    "lib/MadCorePardiso",
+    "lib/MadCoreKernelAbstractions",
+    "lib/MadCoreGPUArrays",
+    "lib/MadCoreOneAPI",
+]
