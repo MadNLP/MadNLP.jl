@@ -23,11 +23,15 @@ export madsuite, default_sparse_solver
 madsuite(::Val{:madnlp}, args...; kwargs...) = madnlp(args...; kwargs...)
 
 # MadNLPCore defaults the sparse linear solver to the no-op DummyLinearSolver.
-# MadNLP bundles MadCoreMUMPS, so it provides `default_sparse_solver` and a
+# MadNLP bundles MadCoreMUMPS/HSL, so it provides `default_sparse_solver` and a
 # Vector-specialized MadNLPOptions constructor (a *more specific* method than
 # MadNLPCore's generic one — a method addition, not a precompile-breaking
 # overwrite) that uses it. The GPU backends specialize on CuVector/ROCVector.
-default_sparse_solver(nlp) = MumpsSolver
+#
+# Prefer HSL's Ma27 when a licensed HSL is functional, else MUMPS. The check is
+# evaluated at solve-time (here, inside the function body), NOT baked in at
+# precompile/load — so it tracks the runtime system and never overwrites a method.
+default_sparse_solver(nlp) = is_hsl_functional() ? Ma27Solver : MumpsSolver
 
 function MadNLPOptions{T}(
         nlp::AbstractNLPModel{T, VT};

@@ -50,6 +50,16 @@ include("ma77.jl")
 include("ma86.jl")
 include("ma97.jl")
 
+"""
+    is_hsl_functional()
+
+Return `true` if a licensed, functional HSL library is available at runtime
+(i.e. `HSL_jll` is the real licensed build, not the stub). This is a *runtime*
+check — call it when choosing a default solver, never at precompile/load time.
+"""
+is_hsl_functional() = HSL.LIBHSL_isfunctional()
+
 export Ma27Solver, Ma57Solver, Ma77Solver, Ma86Solver, Ma97Solver
+export is_hsl_functional
 
 end # module
