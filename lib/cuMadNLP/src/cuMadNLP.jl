@@ -11,7 +11,8 @@ module cuMadNLP
 # live here (CUDA is the tested backend); factor a shared base out when RocMadNLP
 # is built.
 
-import MadNLP
+using Reexport
+@reexport using MadNLP
 import MadNLP:
     _get_varphi, get_varphi, get_inf_du, get_inf_compl, get_min_complementarity,
     get_varphi_d, get_alpha_max, get_alpha_z, get_obj_val_R, get_theta_R, get_inf_pr_R,
@@ -20,12 +21,16 @@ import MadNLP:
 
 import MadCoreKernelAbstractions: AbstractGPUVectorOrSubVector
 import GPUArraysCore: AbstractGPUVector
-import CUDACore: CuVector
+import CUDACore: CuVector, CUDABackend
 import MadCoreCUDA: LapackCUDASolver, CUDSSSolver
 
 include("kernels.jl")
 include("utils.jl")
 include("scaling.jl")
 include("options.jl")
+
+# Re-export the CUDA KernelAbstractions backend so `using cuMadNLP` gives users
+# CUDABackend() for constructing GPU KKT systems (e.g. MadNLPHybridKKT on CUDA).
+export CUDABackend
 
 end # module
