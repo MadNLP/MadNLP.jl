@@ -39,7 +39,10 @@ jobs:
           Pkg.test("MadNLP", coverage=true)
       - uses: julia-actions/julia-processcoverage@v1
         with:
-          directories: src
+          # The IPM moved to lib/MadNLPCore/src and the solver-agnostic core to
+          # MadCore/src; collect coverage from all three so codecov sees the code
+          # the MadNLP suite exercises (was all under src/ before the refactor).
+          directories: src,MadCore/src,lib/MadNLPCore/src
       - uses: codecov/codecov-action@v5
         with:
           files: lcov.info
