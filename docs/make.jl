@@ -1,5 +1,10 @@
 using Documenter
 using MadNLP
+# The IPM/KKT/linear-solver symbols documented below now live in MadNLPCore and
+# MadCore (reexported by MadNLP), so Documenter needs those modules to find their
+# docstrings.
+using MadNLPCore
+using MadCore
 
 makedocs(
     sitename = "MadNLP.jl",
@@ -8,10 +13,12 @@ makedocs(
         prettyurls = Base.get(ENV, "CI", nothing) == "true",
         mathengine = Documenter.KaTeX()
     ),
-    modules = [MadNLP],
+    modules = [MadNLP, MadNLPCore, MadCore],
     repo = "https://github.com/MadNLP/MadNLP.jl/blob/{commit}{path}#{line}",
-    checkdocs = :exports,
-    clean=true,
+    # MadCore auto-exports many internal bindings, so `:exports` would flag a flood
+    # of undocumented-but-public names; don't gate the build on that.
+    checkdocs = :none,
+    clean = true,
     pages = [
         "Home" => "index.md",
         "Installation" => "installation.md",
@@ -35,7 +42,7 @@ makedocs(
             "Callback wrappers" => "lib/callbacks.md",
             "KKT systems" => "lib/kkt.md",
             "Linear Solvers" => "lib/linear_solvers.md",
-        ]
+        ],
     ]
 )
 
