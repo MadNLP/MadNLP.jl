@@ -13,4 +13,4 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           COMPATHELPER_PRIV: ${{ secrets.COMPATHELPER_PRIV }}  # optional
-        run: julia -e 'using CompatHelper; CompatHelper.main(; subdirs = ["","MadCore","MadCore/lib/MadCoreLDLFactorizations","MadCore/lib/MadCoreMUMPS","MadCore/lib/MadCoreSuiteSparse","MadCore/lib/MadCoreHSL","MadCore/lib/MadCorePardiso","MadCore/lib/MadCoreKernelAbstractions","MadCore/lib/MadCoreCUDA","MadCore/lib/MadCoreAMDGPU","MadCore/lib/MadCoreGPUArrays","lib/cuMadNLP","lib/MadNLPHybridKKT","lib/MadNLPTests"])'
+        run: julia -e 'using CompatHelper; CompatHelper.main(; subdirs = ["","MadCore","MadCore/lib/MadCoreLDLFactorizations","MadCore/lib/MadCoreMUMPS","MadCore/lib/MadCoreSuiteSparse","MadCore/lib/MadCoreHSL","MadCore/lib/MadCorePardiso","MadCore/lib/MadCoreKernelAbstractions","MadCore/lib/MadCoreCUDA","MadCore/lib/MadCoreAMDGPU","MadCore/lib/MadCoreGPUArrays","cuMadNLP","lib/MadNLPHybridKKT","lib/MadNLPTests"])'

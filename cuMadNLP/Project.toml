@@ -12,9 +12,9 @@ MadCoreKernelAbstractions = "b5d449e2-bd97-4205-9c78-f5795562dab8"
 MadNLP = "2621e9c9-9eb4-46b1-8089-e8c72242dfb6"
 
 [sources]
-MadNLP = {path = "../.."}
-MadCoreCUDA = {path = "../../MadCore/lib/MadCoreCUDA"}
-MadCoreKernelAbstractions = {path = "../../MadCore/lib/MadCoreKernelAbstractions"}
+MadNLP = {path = ".."}
+MadCoreCUDA = {path = "../MadCore/lib/MadCoreCUDA"}
+MadCoreKernelAbstractions = {path = "../MadCore/lib/MadCoreKernelAbstractions"}
 
 [compat]
 Reexport = "1"

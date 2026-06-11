@@ -122,7 +122,7 @@ jobs:
         with:
           channel: ${{ matrix.julia-version }}
       - name: Setup test environment
-        shell: julia --project=./lib/cuMadNLP/test --color=yes {0}
+        shell: julia --project=./cuMadNLP/test --color=yes {0}
         run: |
           using Pkg
           Pkg.Registry.update()
@@ -131,29 +131,29 @@ jobs:
               PackageSpec(path="./MadCore"),
               PackageSpec(path="./MadCore/lib/MadCoreKernelAbstractions"),
               PackageSpec(path="./MadCore/lib/MadCoreCUDA"),
-              PackageSpec(path="./lib/cuMadNLP"),
+              PackageSpec(path="./cuMadNLP"),
               PackageSpec(path="./lib/MadNLPTests"),
           ])
       - name: Add CUDA and CUDSS
         if: matrix.gpu == 'cuda13'
-        shell: julia --project=./lib/cuMadNLP/test --color=yes {0}
+        shell: julia --project=./cuMadNLP/test --color=yes {0}
         run: |
           using Pkg
           Pkg.add("CUDA")
           Pkg.add("CUDSS")
       - name: Add AMDGPU
         if: matrix.gpu == 'amdgpu'
-        shell: julia --project=./lib/cuMadNLP/test --color=yes {0}
+        shell: julia --project=./cuMadNLP/test --color=yes {0}
         run: |
           using Pkg
           Pkg.add("AMDGPU")
       - name: test cuMadNLP
         env:
           MADNLP_GPU_BACKEND: ${{ matrix.gpu }}
-        run: julia --project=./lib/cuMadNLP/test --code-coverage=user --color=yes -e 'include("lib/cuMadNLP/test/runtests.jl")'
+        run: julia --project=./cuMadNLP/test --code-coverage=user --color=yes -e 'include("cuMadNLP/test/runtests.jl")'
       - uses: julia-actions/julia-processcoverage@v1
         with:
-          directories: MadCore/lib/MadCoreCUDA/src,lib/cuMadNLP/src
+          directories: MadCore/lib/MadCoreCUDA/src,cuMadNLP/src
       - uses: codecov/codecov-action@v5
         with:
           files: lcov.info

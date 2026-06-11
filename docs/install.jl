@@ -10,7 +10,7 @@ Pkg.develop(
         PackageSpec(path = MADNLP_DIR),
         PackageSpec(path = joinpath(MADNLP_DIR, "MadCore")),
         PackageSpec(path = joinpath(MADNLP_DIR, "lib", "MadNLPCore")),
-        PackageSpec(path = joinpath(MADNLP_DIR, "lib", "cuMadNLP")),
+        PackageSpec(path = joinpath(MADNLP_DIR, "cuMadNLP")),
         PackageSpec(path = joinpath(MADNLP_DIR, "lib", "MadNLPTests")),
     ]
 )
