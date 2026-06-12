@@ -22,7 +22,8 @@ import MadNLP:
 import MadCoreKernelAbstractions: AbstractGPUVectorOrSubVector
 import GPUArraysCore: AbstractGPUVector
 import CUDACore: CuVector, CUDABackend
-import MadCoreCUDA: LapackCUDASolver, CUDSSSolver
+import MadCoreCUDA: LapackCUDASolver
+import MadCoreCUDSS: CUDSSSolver
 
 include("kernels.jl")
 include("utils.jl")

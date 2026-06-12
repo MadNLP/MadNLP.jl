@@ -1,11 +1,12 @@
 module MadCoreCUDA
 
-# CUDA backend for MadCore: GPU dense/sparse linear solvers (LapackCUDASolver via
-# cuSOLVER, CUDSSSolver via CUDSS) and the GPU Schur solver. Migrated from
-# MadNLPGPU/ext/MadNLPGPUCUDAExt and promoted from a weakdep extension to a
+# CUDA backend for MadCore: the cuSOLVER-based GPU dense linear solver
+# (LapackCUDASolver) and GPU sparse-matrix conversions. The cuDSS sparse solver
+# (CUDSSSolver) and the GPU Schur-complement KKT system are split out into
+# MadCoreCUDSS so this package does not pull in the heavy cuDSS library. Migrated
+# from MadNLPGPU/ext/MadNLPGPUCUDAExt and promoted from a weakdep extension to a
 # standalone package — the CUDA stack is a hard dependency here. Builds on
-# MadCore + MadCoreKernelAbstractions. IPM-specific GPU code lives in
-# MadNLP/lib/cuMadNLP.
+# MadCore + MadCoreKernelAbstractions. IPM-specific GPU code lives in cuMadNLP.
 
 import LinearAlgebra
 import SparseArrays: SparseMatrixCSC, nonzeros, nnz
@@ -30,7 +31,6 @@ import KernelAbstractions: @kernel, @index, @Const, synchronize, get_backend
 
 using CUDACore
 using cuSPARSE, cuBLAS, cuSOLVER
-import CUDSS
 
 import AMD, Metis
 
@@ -42,11 +42,8 @@ import .cuBLAS: handle, CUBLAS_DIAG_NON_UNIT,
 include("cuda_sparse.jl")
 include("lapackgpu.jl")
 include("cusolver.jl")
-include("cudss.jl")
 include("cuda.jl")
-include("kernels_schur.jl")
-include("cuda_schur.jl")
 
-export LapackCUDASolver, CUDSSSolver
+export LapackCUDASolver
 
 end # module

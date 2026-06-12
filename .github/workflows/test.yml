@@ -131,6 +131,7 @@ jobs:
               PackageSpec(path="./MadCore"),
               PackageSpec(path="./MadCore/lib/MadCoreKernelAbstractions"),
               PackageSpec(path="./MadCore/lib/MadCoreCUDA"),
+              PackageSpec(path="./MadCore/lib/MadCoreCUDSS"),
               PackageSpec(path="./cuMadNLP"),
               PackageSpec(path="./lib/MadNLPTests"),
           ])
@@ -153,7 +154,7 @@ jobs:
         run: julia --project=./cuMadNLP/test --code-coverage=user --color=yes -e 'include("cuMadNLP/test/runtests.jl")'
       - uses: julia-actions/julia-processcoverage@v1
         with:
-          directories: MadCore/lib/MadCoreCUDA/src,cuMadNLP/src
+          directories: MadCore/lib/MadCoreCUDA/src,MadCore/lib/MadCoreCUDSS/src,cuMadNLP/src
       - uses: codecov/codecov-action@v5
         with:
           files: lcov.info
