@@ -4,6 +4,7 @@ using CUDA
 using CUDSS
 using MadNLP
 using MadCoreCUDA
+using MadCoreCUDSS  # CUDSSSolver moved here from MadCoreCUDA (CUDSS split)
 using MadCoreKernelAbstractions
 using cuMadNLP
 using MadNLPTests

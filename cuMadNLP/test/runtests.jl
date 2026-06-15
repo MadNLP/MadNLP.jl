@@ -1,4 +1,4 @@
-using Test, MadNLP, MadCoreCUDA, MadCoreKernelAbstractions, cuMadNLP, MadNLPTests
+using Test, MadNLP, MadCoreCUDA, MadCoreCUDSS, MadCoreKernelAbstractions, cuMadNLP, MadNLPTests
 
 const HAS_CUDA = try
     using CUDA
