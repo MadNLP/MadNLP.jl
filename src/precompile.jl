@@ -2,12 +2,12 @@
     # Putting some things in `@setup_workload` instead of `@compile_workload` can reduce the size of the
     # precompile file and potentially make loading faster.
 
-    struct HS15Model{T} <: NLPModels.AbstractNLPModel{T,Vector{T}}
+    struct HS15Model{T} <: NLPModels.AbstractNLPModel{T, Vector{T}}
         meta::NLPModels.NLPModelMeta{T, Vector{T}}
         counters::NLPModels.Counters
     end
 
-    function HS15Model(;T = Float64, x0=zeros(T,2), y0=zeros(T,2))
+    function HS15Model(; T = Float64, x0 = zeros(T, 2), y0 = zeros(T, 2))
         return HS15Model(
             NLPModels.NLPModelMeta(
                 2,     #nvar
@@ -42,7 +42,7 @@
         c[2] = x[1] + x[2]^2
     end
 
-    function NLPModels.jac_structure!(nlp::HS15Model, I::AbstractVector{T}, J::AbstractVector{T}) where T
+    function NLPModels.jac_structure!(nlp::HS15Model, I::AbstractVector{T}, J::AbstractVector{T}) where {T}
         copyto!(I, [1, 1, 2, 2])
         copyto!(J, [1, 2, 1, 2])
     end
@@ -51,7 +51,7 @@
         J[1] = x[2]    # (1, 1)
         J[2] = x[1]    # (1, 2)
         J[3] = 1.0     # (2, 1)
-        J[4] = 2*x[2]  # (2, 2)
+        J[4] = 2 * x[2]  # (2, 2)
         return J
     end
 
@@ -67,12 +67,12 @@
         return jv
     end
 
-    function NLPModels.hess_structure!(nlp::HS15Model, I::AbstractVector{T}, J::AbstractVector{T}) where T
+    function NLPModels.hess_structure!(nlp::HS15Model, I::AbstractVector{T}, J::AbstractVector{T}) where {T}
         copyto!(I, [1, 2, 2])
         copyto!(J, [1, 1, 2])
     end
 
-    function NLPModels.hess_coord!(nlp::HS15Model, x, y, H::AbstractVector; obj_weight=1.0)
+    function NLPModels.hess_coord!(nlp::HS15Model, x, y, H::AbstractVector; obj_weight = 1.0)
         # Objective
         H[1] = obj_weight * (-400.0 * x[2] + 1200.0 * x[1]^2 + 2.0)
         H[2] = obj_weight * (-400.0 * x[1])
@@ -85,9 +85,13 @@
     end
 
     nlp = HS15Model()
-    __init__()
-    
-    @compile_workload begin
-        madnlp(nlp; print_level=MadNLP.ERROR)
-    end
+    # BLAS LP64 forwarding init lives in MadCore.__init__ now; it runs
+    # automatically when MadCore is loaded (before this workload).
+
+    # NOTE: workload temporarily disabled during the MadCore refactor.
+    # Re-enable once the rewire stabilises (the `madnlp(nlp)` call JITs the
+    # full IPM machinery and dominates iteration time).
+    # @compile_workload begin
+    #     madnlp(nlp; print_level=MadNLP.ERROR)
+    # end
 end

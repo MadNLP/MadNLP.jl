@@ -1,0 +1,10 @@
+[deps]
+CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
+CUDSS = "45b445bb-4962-46a0-9369-b4df9d0f772e"
+cuMadNLP = "d47ba66d-cfbe-40a6-987c-5a56a1b97d17"
+MadCoreCUDA = "bc4e0c13-4672-410c-a012-e283a446691e"
+MadCoreCUDSS = "1f78e23c-6596-4cec-b75b-391af35fa428"
+MadCoreKernelAbstractions = "b5d449e2-bd97-4205-9c78-f5795562dab8"
+MadNLP = "2621e9c9-9eb4-46b1-8089-e8c72242dfb6"
+MadNLPTests = "b52a2a03-04ab-4a5f-9698-6a2deff93217"
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"

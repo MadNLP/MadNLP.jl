@@ -1,0 +1,30 @@
+name = "rocMadNLP"
+uuid = "10162be7-b26c-4966-a968-231fbf846c70"
+version = "0.1.0"
+authors = ["MadNLP contributors"]
+
+[deps]
+AMDGPU = "21141c5a-9bdb-4563-92ae-f87d6854732e"
+MadCoreAMDGPU = "1b911487-7d6c-4293-9000-5721c953299c"
+MadNLP = "2621e9c9-9eb4-46b1-8089-e8c72242dfb6"
+MadNLPGPU = "d72a61cc-809d-412f-99be-fd81f4b8a598"
+Reexport = "189a3867-3050-52da-a836-e630ba90ab69"
+
+[sources]
+MadNLP = {path = ".."}
+MadCoreAMDGPU = {path = "../MadCore/lib/MadCoreAMDGPU"}
+MadNLPGPU = {path = "../MadNLPGPU"}
+
+[compat]
+AMDGPU = "2"
+MadCoreAMDGPU = "0.1"
+MadNLP = "0.11"
+MadNLPGPU = "0.11"
+Reexport = "1"
+julia = "1.10"
+
+[extras]
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[targets]
+test = ["Test"]

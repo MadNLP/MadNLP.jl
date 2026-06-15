@@ -1,0 +1,45 @@
+name = "MadNLPHybridKKT"
+uuid = "e298ccf4-2a31-4ea4-919c-7c3ecdf6ea6d"
+version = "0.4.0"
+authors = ["fpacaud <francoispacaud8@gmail.com>", "amontoison <amontoison@anl.gov>"]
+
+[deps]
+GPUArraysCore = "46192b85-c4d5-4398-a991-12ede77f4527"
+KernelAbstractions = "63c18a36-062a-441e-b654-da1e3ab1ce7c"
+Krylov = "ba0b0d4f-ebba-5204-a429-3ac8c609bfb7"
+LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+MadCore = "6fc510d6-e066-472d-adc5-2ce5e9b14820"
+MadCoreGPUArrays = "d554ef03-408b-4a7c-a1fb-cdd79a2212ff"
+MadCoreKernelAbstractions = "b5d449e2-bd97-4205-9c78-f5795562dab8"
+MadNLPCore = "43bd1597-a228-47d9-956a-80a32bfaa81a"
+NLPModels = "a4795742-8479-5a88-8948-cc11e1c8c1a6"
+Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
+SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
+
+[sources]
+MadCore = {path = "../../MadCore"}
+MadCoreGPUArrays = {path = "../../MadCore/lib/MadCoreGPUArrays"}
+MadCoreKernelAbstractions = {path = "../../MadCore/lib/MadCoreKernelAbstractions"}
+MadNLPCore = {path = "../MadNLPCore"}
+
+[compat]
+GPUArraysCore = "0.2"
+KernelAbstractions = "0.9"
+Krylov = "0.10.1"
+LinearAlgebra = "1.10"
+MadCore = "0.1"
+MadCoreGPUArrays = "0.1"
+MadCoreKernelAbstractions = "0.1"
+MadNLPCore = "0.11"
+NLPModels = "0.21.9"
+Printf = "1.10"
+SparseArrays = "1.10"
+julia = "1.10"
+
+[extras]
+ExaModels = "1037b233-b668-4ce9-9b63-f9f681f55dd2"
+Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[targets]
+test = ["ExaModels", "Random", "Test"]

@@ -1,0 +1,41 @@
+name = "MadCoreCUDA"
+uuid = "bc4e0c13-4672-410c-a012-e283a446691e"
+version = "0.1.0"
+authors = ["MadNLP contributors"]
+
+[deps]
+AMD = "14f7f29c-3bd6-536c-9a0b-7339e30b5a3e"
+CUDACore = "bd0ed864-bdfe-4181-a5ed-ce625a5fdea2"
+KernelAbstractions = "63c18a36-062a-441e-b654-da1e3ab1ce7c"
+LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+MadCore = "6fc510d6-e066-472d-adc5-2ce5e9b14820"
+MadCoreKernelAbstractions = "b5d449e2-bd97-4205-9c78-f5795562dab8"
+Metis = "2679e427-3c69-5b7f-982b-ece356f1e94b"
+SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
+cuBLAS = "182d3088-87b7-4494-8cad-fc6afaa545bc"
+cuSOLVER = "887afef0-6a32-4de5-add4-7827692ba8fc"
+cuSPARSE = "b26da814-b3bc-49ef-b0ee-c816305aa060"
+
+[sources]
+MadCore = {path = "../.."}
+MadCoreKernelAbstractions = {path = "../MadCoreKernelAbstractions"}
+
+[compat]
+SparseArrays = "1.10"
+LinearAlgebra = "1.10"
+AMD = "0.5"
+CUDACore = "6"
+KernelAbstractions = "0.9"
+MadCore = "0.1"
+MadCoreKernelAbstractions = "0.1"
+Metis = "1"
+cuBLAS = "6"
+cuSOLVER = "6"
+cuSPARSE = "6"
+julia = "1.10"
+
+[extras]
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[targets]
+test = ["Test"]

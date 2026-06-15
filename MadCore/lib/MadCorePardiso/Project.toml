@@ -1,0 +1,25 @@
+name = "MadCorePardiso"
+uuid = "b539c633-712d-4c21-9960-e1fc902d97f4"
+version = "0.1.0"
+authors = ["MadNLP contributors"]
+
+[deps]
+Libdl = "8f399da3-3557-5675-b5ff-fb832c97cbdb"
+MKL_jll = "856f044c-d86e-5d09-b602-aeab76dc8ba7"
+MadCore = "6fc510d6-e066-472d-adc5-2ce5e9b14820"
+
+[sources]
+MadCore = {path = "../.."}
+
+[compat]
+Libdl = "1.10"
+MKL_jll = "2021, 2022, 2023, 2024, 2025"
+MadCore = "0.1"
+julia = "1.10"
+
+[extras]
+SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[targets]
+test = ["SparseArrays", "Test"]

@@ -1,0 +1,25 @@
+name = "MadCoreHSL"
+uuid = "59ba41a0-a17b-4ed0-8c06-d36d026dd60c"
+authors = ["MadNLP contributors"]
+version = "0.1.0"
+
+[deps]
+HSL = "34c5aeac-e683-54a6-a0e9-6e0fdc586c50"
+LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+MadCore = "6fc510d6-e066-472d-adc5-2ce5e9b14820"
+
+[sources]
+MadCore = {path = "../.."}
+
+[compat]
+HSL = "0.5.3, 0.6"
+LinearAlgebra = "1.10"
+MadCore = "0.1"
+julia = "1.10"
+
+[extras]
+SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[targets]
+test = ["SparseArrays", "Test"]

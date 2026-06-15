@@ -1,46 +1,93 @@
 module MadNLP
 
-import Pkg.TOML: parsefile
-import Printf: @sprintf
-import LinearAlgebra: BLAS, LAPACK, Adjoint, Symmetric, Diagonal, mul!, ldiv!, rdiv!, lmul!, rmul!, norm, dot, diagind, normInf, transpose!, issuccess
-import LinearAlgebra: BlasReal, bunchkaufman, cholesky, qr, lu, bunchkaufman!, cholesky!, axpy!, LowerTriangular
-import LinearAlgebra.BLAS: libblastrampoline, BlasInt, @blasfunc
-import SparseArrays: SparseArrays, AbstractSparseMatrix, SparseMatrixCSC, sparse, getcolptr, rowvals, nnz, nonzeros
-import Base: string, show, print, size, getindex, copyto!, @kwdef
-Base.USE_GPL_LIBS && import SuiteSparse: UMFPACK, CHOLMOD
+using Reexport
+# The interior-point solver itself now lives in MadNLPCore (built on the
+# lightweight MadCore). MadNLP is the batteries-included meta-package: it bundles
+# the default linear-solver backends and specializes the bare-solver defaults.
+@reexport using MadNLPCore
+@reexport using MadCoreLDLFactorizations
+@reexport using MadCoreMUMPS
+@reexport using MadCoreSuiteSparse
+@reexport using MadCoreHSL
+@reexport using MadCorePardiso
+@reexport using MadNLPHybridKKT
+
+import MadNLPCore: madnlp, MadNLPOptions, is_dense_callback, get_tolerance
 import NLPModels
-import NLPModels: finalize, AbstractNLPModel, obj, grad!, cons!, jac_coord!, hess_coord!, hess_structure!, jac_structure!, hess_dense!, jac_dense!, NLPModelMeta, get_nvar, get_ncon, get_minimize, get_x0, get_y0, get_nnzj, get_nnzh, get_lvar, get_uvar, get_lcon, get_ucon
-import SolverCore: getStatus, AbstractOptimizationSolver, AbstractExecutionStats, solve!
-import LDLFactorizations
-import MUMPS_seq_jll, OpenBLAS32_jll
+import NLPModels: AbstractNLPModel
 
-export MadNLPSolver, MadNLPOptions, LDLSolver, LapackCPUSolver, MumpsSolver, MadNLPExecutionStats, madnlp, solve!, madsuite, SchurComplementKKTSystem
-Base.USE_GPL_LIBS && export UmfpackSolver, CHOLMODSolver
-
-function __init__()
-    config = BLAS.lbt_get_config()
-    if !any(lib -> lib.interface == :lp64, config.loaded_libs)
-        BLAS.lbt_forward(OpenBLAS32_jll.libopenblas_path)
-    end
-end
 using PrecompileTools: @setup_workload, @compile_workload
 
-# Version info
-version() = string(pkgversion(@__MODULE__))
-introduce() = "\033[34mMad\033[31mN\033[32mL\033[35mP\033[0m version v$(version())"
-
-include("enums.jl")
-include("utils.jl")
-include("matrixtools.jl")
-include(joinpath("Callbacks", "nlpmodels.jl"))
-include(joinpath("Callbacks", "wrappers.jl"))
-include("quasi_newton.jl")
-include(joinpath("KKT", "KKTsystem.jl"))
-include(joinpath("LinearSolvers", "linearsolvers.jl"))
-include(joinpath("IPM", "IPM.jl"))
-include("precompile.jl")
+export madsuite, default_sparse_solver
+export madlifted, madhykkt
 
 madsuite(::Val{:madnlp}, args...; kwargs...) = madnlp(args...; kwargs...)
+
+# Solver presets. The default entry point is `madnlp`, which picks the KKT system
+# by the model's array type (Vector -> full-space, CuVector -> condensed) — i.e.
+# full-space on CPU, LiftedKKT on GPU. `madlifted` and `madhykkt` are special-case
+# presets that force a specific condensed formulation.
+
+"""
+    madlifted(model; kwargs...)
+
+LiftedKKT condensed-space preset (`SparseCondensedKKTSystem` with relaxed
+equalities/bounds). This is what `madnlp` selects by default on GPU.
+"""
+madlifted(args...; kwargs...) = madnlp(
+    args...;
+    kkt_system = SparseCondensedKKTSystem,
+    equality_treatment = RelaxEquality,
+    fixed_variable_treatment = RelaxBound,
+    kwargs...,
+)
+
+"""
+    madhykkt(model; kwargs...)
+
+Hybrid (HyKKT) preset (`HybridCondensedKKTSystem` from MadNLPHybridKKT).
+"""
+madhykkt(args...; kwargs...) = madnlp(
+    args...;
+    kkt_system = HybridCondensedKKTSystem,
+    equality_treatment = EnforceEquality,
+    fixed_variable_treatment = MakeParameter,
+    kwargs...,
+)
+
+# MadNLPCore defaults the sparse linear solver to the no-op DummyLinearSolver.
+# MadNLP bundles MadCoreMUMPS/HSL, so it provides `default_sparse_solver` and a
+# Vector-specialized MadNLPOptions constructor (a *more specific* method than
+# MadNLPCore's generic one — a method addition, not a precompile-breaking
+# overwrite) that uses it. The GPU backends specialize on CuVector/ROCVector.
+#
+# `default_sparse_solver(nlp, kkt_system)` picks the sparse solver by the model's
+# array type and the KKT formulation, via multiple dispatch:
+#  - full-space / generic: HSL Ma27 when a licensed HSL is functional, else MUMPS
+#    (a runtime branch, never baked at precompile);
+#  - condensed / hybrid formulations want a Cholesky solver: CHOLMOD on CPU here,
+#    CUDSS on GPU (the CuVector methods live in cuMadNLP).
+default_sparse_solver(nlp, kkt_system) = is_hsl_functional() ? Ma27Solver : MumpsSolver
+default_sparse_solver(::AbstractNLPModel{T, Vector{T}}, ::Type{SparseCondensedKKTSystem}) where {T} = CHOLMODSolver
+default_sparse_solver(::AbstractNLPModel{T, Vector{T}}, ::Type{HybridCondensedKKTSystem}) where {T} = CHOLMODSolver
+
+function MadNLPOptions{T}(
+        nlp::AbstractNLPModel{T, VT};
+        dense_callback = is_dense_callback(nlp),
+        callback = dense_callback ? DenseCallback : SparseCallback,
+        kkt_system = dense_callback ? DenseCondensedKKTSystem : SparseKKTSystem,
+        linear_solver = dense_callback ? LapackCPUSolver : default_sparse_solver(nlp, kkt_system),
+        tol = get_tolerance(T, kkt_system),
+    ) where {T, VT <: Vector{T}}
+    return MadNLPOptions{T}(
+        tol = tol,
+        callback = callback,
+        kkt_system = kkt_system,
+        linear_solver = linear_solver,
+    )
+end
+
+include("precompile.jl")
 
 global Optimizer
 
