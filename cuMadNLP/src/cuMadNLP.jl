@@ -1,33 +1,19 @@
 module cuMadNLP
 
-# IPM-specific GPU support for MadNLP on CUDA: GPU methods of the interior-point
-# error/restoration kernels (get_varphi, get_inf_*, populate_RR_nn!, ...), the
-# GPU bound counter, the GPU scaling getters (get_sd/get_sc), and the GPU-default
-# MadNLPOptions constructor. Migrated from MadNLPGPU/src/IPM. Builds on MadNLP +
-# MadCoreCUDA.
-#
-# NOTE: the generic-GPU IPM kernels here dispatch on AbstractGPUVectorOrSubVector
-# (backend-agnostic), so a future RocMadNLP would want them too. For now they
-# live here (CUDA is the tested backend); factor a shared base out when RocMadNLP
-# is built.
+# CUDA backend layer for MadNLP's interior-point solver. The device-agnostic GPU
+# IPM kernels/scaling live in the shared MadNLPGPU base (re-exported here); this
+# package adds only the CUDA-specific pieces: the GPU-default MadNLPOptions
+# constructor (CuVector dispatch, LapackCUDASolver / CUDSSSolver defaults) and the
+# CUDSS sparse-solver defaults for the condensed/hybrid formulations.
 
 using Reexport
-@reexport using MadNLP
-import MadNLP:
-    _get_varphi, get_varphi, get_inf_du, get_inf_compl, get_min_complementarity,
-    get_varphi_d, get_alpha_max, get_alpha_z, get_obj_val_R, get_theta_R, get_inf_pr_R,
-    get_inf_du_R, get_inf_compl_R, get_alpha_max_R, get_alpha_z_R, get_varphi_R, get_F,
-    get_varphi_d_R, get_rel_search_norm, populate_RR_nn!, count_lu_bounds
+@reexport using MadNLPGPU
+import MadNLP  # options.jl extends MadNLP.MadNLPOptions / MadNLP.default_sparse_solver
 
-import MadCoreKernelAbstractions: AbstractGPUVectorOrSubVector
-import GPUArraysCore: AbstractGPUVector
 import CUDACore: CuVector, CUDABackend
 import MadCoreCUDA: LapackCUDASolver
 import MadCoreCUDSS: CUDSSSolver
 
-include("kernels.jl")
-include("utils.jl")
-include("scaling.jl")
 include("options.jl")
 
 # Re-export the CUDA KernelAbstractions backend so `using cuMadNLP` gives users
