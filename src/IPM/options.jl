@@ -4,6 +4,8 @@ parse_option(::Type{Module},str::String) = eval(Symbol(str))
 parse_option(::Type{<:AbstractUserCallback}, f::Any) = f
 parse_option(type::Type{T},i::Int64) where {T<:Enum} = type(i)
 
+const CondensedKKTSystems = Union{SparseCondensedKKTSystem, SchurComplementCondensedKKTSystem}
+
 function set_options!(opt::AbstractOptions, options)
     other_options = Dict{Symbol, Any}()
     for (key, val) in options
@@ -143,8 +145,8 @@ tau\\_min                      | 0.99                 | lower bound on fraction-
 
     # NLP options
     kappa_d::T = 1e-5
-    fixed_variable_treatment::Type = kkt_system <: Union{MadNLP.SparseCondensedKKTSystem, MadNLP.SchurComplementCondensedKKTSystem} ? MadNLP.RelaxBound : MadNLP.MakeParameter
-    equality_treatment::Type = kkt_system <: Union{MadNLP.SparseCondensedKKTSystem, MadNLP.SchurComplementCondensedKKTSystem} ? MadNLP.RelaxEquality : MadNLP.EnforceEquality
+    fixed_variable_treatment::Type = kkt_system <: CondensedKKTSystems ? MadNLP.RelaxBound : MadNLP.MakeParameter
+    equality_treatment::Type = kkt_system <: CondensedKKTSystems ? MadNLP.RelaxEquality : MadNLP.EnforceEquality
     bound_relax_factor::T = 1e-8
     jacobian_constant::Bool = false
     hessian_constant::Bool = false
@@ -157,7 +159,7 @@ tau\\_min                      | 0.99                 | lower bound on fraction-
 
     # initialization options
     dual_initialized::Bool = false
-    dual_initialization_method::Type = kkt_system <: Union{MadNLP.SparseCondensedKKTSystem, MadNLP.SchurComplementCondensedKKTSystem} ? DualInitializeSetZero : DualInitializeLeastSquares
+    dual_initialization_method::Type = kkt_system <: CondensedKKTSystems ? DualInitializeSetZero : DualInitializeLeastSquares
     constr_mult_init_max::T = 1e3
     bound_push::T = 1e-2
     bound_fac::T = 1e-2
@@ -219,7 +221,7 @@ function MadNLPOptions{T}(
     # by `tol` there (feasible to ~tol, but well-conditioned). Non-condensed systems keep equalities
     # exact and use the tight 1e-8. Must match the CUDA / ROCm extension constructors so a problem
     # behaves identically on CPU and GPU.
-    bound_relax_factor = (kkt_system <: Union{SparseCondensedKKTSystem, SchurComplementCondensedKKTSystem}) ? tol : T(1.0e-8),
+    bound_relax_factor = (kkt_system <: CondensedKKTSystems) ? tol : T(1.0e-8),
 ) where {T}
     return MadNLPOptions{T}(
         tol = tol,
