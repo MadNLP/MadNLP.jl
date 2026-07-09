@@ -41,10 +41,10 @@ mutable struct Optimizer <: MOI.AbstractOptimizer
     variables::MOI.Utilities.VariablesContainer{Float64}
     list_of_variable_indices::Vector{MOI.VariableIndex}
     variable_primal_start::Vector{Union{Nothing,Float64}}
-    variable_names::Dict{MOI.VariableIndex,String}
-    constraint_names::Dict{MOI.ConstraintIndex,String}
-    name_to_variable::Union{Nothing,Dict{String,Union{Nothing,MOI.VariableIndex}}}
-    name_to_constraint_index::Union{Nothing,Dict{String,Union{Nothing,MOI.ConstraintIndex}}}
+    variable_names::Dict{MOI.VariableIndex, String}
+    constraint_names::Dict{MOI.ConstraintIndex, String}
+    name_to_variable::Union{Nothing, Dict{String, Union{Nothing, MOI.VariableIndex}}}
+    name_to_constraint_index::Union{Nothing, Dict{String, Union{Nothing, MOI.ConstraintIndex}}}
 
     nlp_data::MOI.NLPBlockData
     nlp_dual_start::Union{Nothing,Vector{Float64}}
@@ -87,8 +87,8 @@ function Optimizer(; kwargs...)
         MOI.Utilities.VariablesContainer{Float64}(),
         MOI.VariableIndex[],
         Union{Nothing,Float64}[],
-        Dict{MOI.VariableIndex,String}(),
-        Dict{MOI.ConstraintIndex,String}(),
+        Dict{MOI.VariableIndex, String}(),
+        Dict{MOI.ConstraintIndex, String}(),
         nothing,
         nothing,
         MOI.NLPBlockData([], _EmptyNLPEvaluator(), false),
@@ -905,11 +905,11 @@ end
 MOI.supports(::Optimizer, ::MOI.VariableName, ::Type{MOI.VariableIndex}) = true
 
 function MOI.set(
-    model::Optimizer,
-    ::MOI.VariableName,
-    vi::MOI.VariableIndex,
-    name::String,
-)
+        model::Optimizer,
+        ::MOI.VariableName,
+        vi::MOI.VariableIndex,
+        name::String,
+    )
     MOI.throw_if_not_valid(model, vi)
     if isempty(name)
         delete!(model.variable_names, vi)
@@ -942,7 +942,7 @@ function MOI.get(model::Optimizer, ::Type{MOI.VariableIndex}, name::String)
 end
 
 function _rebuild_name_to_variable(model::Optimizer)
-    model.name_to_variable = Dict{String,Union{Nothing,MOI.VariableIndex}}()
+    model.name_to_variable = Dict{String, Union{Nothing, MOI.VariableIndex}}()
     for (vi, name) in model.variable_names
         if haskey(model.name_to_variable, name)
             model.name_to_variable[name] = nothing
@@ -961,16 +961,16 @@ end
 # `VariableIndexConstraintNameError`, mirroring Gurobi.jl/Xpress.jl. Vector
 # constraints (VectorNonlinearOracle) are excluded on purpose: a single name
 # would label a whole block of `output_dimension` rows.
-const _NAMED_CONSTRAINT = MOI.ConstraintIndex{<:_FUNCTIONS,<:_SETS}
+const _NAMED_CONSTRAINT = MOI.ConstraintIndex{<:_FUNCTIONS, <:_SETS}
 
 MOI.supports(::Optimizer, ::MOI.ConstraintName, ::Type{<:_NAMED_CONSTRAINT}) = true
 
 function MOI.set(
-    model::Optimizer,
-    ::MOI.ConstraintName,
-    ci::_NAMED_CONSTRAINT,
-    name::String,
-)
+        model::Optimizer,
+        ::MOI.ConstraintName,
+        ci::_NAMED_CONSTRAINT,
+        name::String,
+    )
     MOI.throw_if_not_valid(model, ci)
     if isempty(name)
         delete!(model.constraint_names, ci)
@@ -1001,7 +1001,7 @@ function MOI.get(model::Optimizer, ::Type{MOI.ConstraintIndex}, name::String)
 end
 
 function _rebuild_name_to_constraint_index(model::Optimizer)
-    model.name_to_constraint_index = Dict{String,Union{Nothing,MOI.ConstraintIndex}}()
+    model.name_to_constraint_index = Dict{String, Union{Nothing, MOI.ConstraintIndex}}()
     for (ci, name) in model.constraint_names
         if haskey(model.name_to_constraint_index, name)
             model.name_to_constraint_index[name] = nothing
