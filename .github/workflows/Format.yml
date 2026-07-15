@@ -2,7 +2,6 @@ name: 'Format'
 
 on:
   pull_request_target:
-    paths: ['**/*.jl']
     types: [opened, synchronize, reopened, ready_for_review]
 
 permissions:
@@ -36,8 +35,8 @@ jobs:
 
       - name: Install Runic
         run: |
-          julia --project=@runic -e 'using Pkg; Pkg.add("Runic")'
-          curl -o git-runic https://raw.githubusercontent.com/fredrikekre/Runic.jl/master/bin/git-runic
+          julia --project=@runic -e 'using Pkg; Pkg.add(name="Runic", version="1.7.0")'
+          curl -o git-runic https://raw.githubusercontent.com/fredrikekre/Runic.jl/v1.7.0/bin/git-runic
           chmod +x git-runic
           sudo mv git-runic /usr/local/bin
 
