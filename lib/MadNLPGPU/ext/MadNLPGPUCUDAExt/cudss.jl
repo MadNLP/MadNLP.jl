@@ -193,6 +193,25 @@ end
 MadNLP.input_type(::Type{CUDSSSolver}) = :csc
 MadNLP.default_options(::Type{CUDSSSolver}) = CudssSolverOptions()
 MadNLP.is_inertia(M::CUDSSSolver) = (M.inner.matrix.nbatch == 1)  # Uncomment if MadNLP.LU is supported -- (M.opt.cudss_algorithm ∈ (MadNLP.CHOLESKY, MadNLP.LDL))
+
+# Recover the inertia from the sign counts of the factor diagonal D, dumped via the
+# cuDSS "diag" data parameter ("Diagonal of the factorized matrix", i.e. D of P·S·A·S·Pᵀ
+# = L·D·Lᵀ — a congruence of A, so the sign counts equal A's inertia by Sylvester's law,
+# matching scaling/permutation included). Only meaningful for an LDLᵀ factorization,
+# hence the hard check. Exact only for 1×1 pivots, which holds for the (quasi-definite)
+# condensed KKT family this solver targets.
+function inertia_from_diag(M::CUDSSSolver)
+    @assert M.opt.cudss_algorithm == MadNLP.LDL "the factor diagonal D only determines the inertia for an LDLᵀ factorization"
+    n = size(M.tril, 1)
+    CUDSS.cudss_set(M.inner, "diag", M.diag)
+    CUDSS.cudss_get(M.inner, "diag")
+    d = Array(M.diag)
+    z = zero(eltype(d))
+    npos = count(>(z), d)
+    nneg = count(<(z), d)
+    return (npos, n - npos - nneg, nneg)
+end
+
 function MadNLP.inertia(M::CUDSSSolver)
     @assert M.inner.matrix.nbatch == 1
     n = size(M.tril, 1)
@@ -216,16 +235,8 @@ function MadNLP.inertia(M::CUDSSSolver)
                 # cuDSS (through 0.8) reports inertia (0, 0) whenever matching is enabled,
                 # even though the factorization is correct — trusting it sends
                 # InertiaBased/InertiaAuto into an endless regularization bump and then
-                # restoration. Recover the inertia from the sign counts of the factor
-                # diagonal instead. Caveat: exact only for 1×1 pivots, which holds for the
-                # (quasi-definite) condensed KKT family this solver targets.
-                CUDSS.cudss_set(M.inner, "diag", M.diag)
-                CUDSS.cudss_get(M.inner, "diag")
-                d = Array(M.diag)
-                z = zero(eltype(d))
-                npos = count(>(z), d)
-                nneg = count(<(z), d)
-                return (npos, n - npos - nneg, nneg)
+                # restoration. Recover the inertia from D instead.
+                return inertia_from_diag(M)
             end
             (k, l) = CUDSS.cudss_get(M.inner, "inertia")
             @assert 0 ≤ k + l ≤ n
